@@ -53,22 +53,7 @@ export default function Login() {
           </svg>
         </button>
 
-        {/* Heading */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.05 }}
-          className="mb-6"
-        >
-          <h1
-            className="text-[1.9rem] text-slate-900 leading-tight tracking-tight font-bold"
-            style={{ fontFamily: "'Inter', sans-serif", fontWeight: 700, letterSpacing: "-0.03em" }}
-          >
-            Começe agora!
-          </h1>
-        </motion.div>
-
-        {/* Logo — below heading */}
+        {/* Logo */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
