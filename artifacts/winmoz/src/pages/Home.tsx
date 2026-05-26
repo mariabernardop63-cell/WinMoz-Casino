@@ -89,47 +89,34 @@ function SaquesSection() {
 
 function WinMozLogo() {
   return (
-    <div className="flex items-center gap-2.5" data-testid="logo-winmoz">
-      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <linearGradient id="bgGrad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#1A3A8F"/>
-            <stop offset="100%" stopColor="#0F2060"/>
-          </linearGradient>
-          <linearGradient id="crownGrad" x1="8" y1="10" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#F5C842"/>
-            <stop offset="100%" stopColor="#D4940A"/>
-          </linearGradient>
-        </defs>
-        <rect width="36" height="36" rx="9" fill="url(#bgGrad)"/>
-        <path d="M18 4L32 9.5V19C32 26.5 25.5 32.5 18 34C10.5 32.5 4 26.5 4 19V9.5L18 4Z" fill="white" fillOpacity="0.06"/>
-        <path
-          d="M9 14 L12.5 24 L18 17.5 L23.5 24 L27 14"
-          stroke="url(#crownGrad)"
-          strokeWidth="2.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-        />
-        <path
-          d="M9 24.5 H27"
-          stroke="url(#crownGrad)"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          opacity="0.7"
-        />
-        <circle cx="9" cy="14" r="1.8" fill="#F5C842"/>
-        <circle cx="18" cy="17.5" r="1.8" fill="#F5C842"/>
-        <circle cx="27" cy="14" r="1.8" fill="#F5C842"/>
+    <div className="flex items-center" data-testid="logo-winmoz">
+      <svg viewBox="0 0 230 46" height="34" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Diagonal speed-slash */}
+        <path d="M1 2 L11 2 L7 44 L0 44 Z" fill="#0D0D0D"/>
+        <path d="M13 2 L20 2 L16 44 L10 44 Z" fill="#0D0D0D" opacity="0.18"/>
+
+        {/* "Poker" wordmark */}
+        <text
+          x="24"
+          y="40"
+          fontFamily="'Syne', sans-serif"
+          fontWeight="800"
+          fontSize="40"
+          letterSpacing="-1.5"
+          fill="#0D0D0D"
+        >Poker</text>
+
+        {/* ® */}
+        <circle cx="218" cy="11" r="7" stroke="#0D0D0D" strokeWidth="1.8" fill="none"/>
+        <text
+          x="214.5"
+          y="15.5"
+          fontFamily="'Syne', sans-serif"
+          fontWeight="700"
+          fontSize="9"
+          fill="#0D0D0D"
+        >R</text>
       </svg>
-      <div className="flex flex-col leading-none">
-        <span className="font-syne font-extrabold text-lg tracking-tight text-slate-900 leading-none">
-          Win<span className="text-blue-700">Moz</span>
-        </span>
-        <span className="text-[9px] tracking-[0.18em] text-slate-400 font-medium uppercase leading-none mt-0.5">
-          Aposta &amp; Ganha
-        </span>
-      </div>
     </div>
   );
 }
