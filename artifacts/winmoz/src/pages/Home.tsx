@@ -1,7 +1,91 @@
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Play, Home as HomeIcon, Gamepad2, Wallet, User, Star, ChevronRight } from "lucide-react";
+import { Play, Home as HomeIcon, Gamepad2, Wallet, User, Star, ChevronRight, ArrowDownLeft, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const SAQUES_POOL = [
+  { id: "s1", name: "Isabel Martins", initials: "IM", bg: "from-violet-500 to-purple-700", amount: "3.500 MT", time: "agora mesmo" },
+  { id: "s2", name: "Carlos Fonseca", initials: "CF", bg: "from-blue-500 to-indigo-700", amount: "12.000 MT", time: "há 1 min" },
+  { id: "s3", name: "Ana Rodrigues", initials: "AR", bg: "from-emerald-500 to-teal-700", amount: "850 MT", time: "há 2 min" },
+  { id: "s4", name: "Pedro Nhamposse", initials: "PN", bg: "from-orange-500 to-red-600", amount: "5.200 MT", time: "há 3 min" },
+  { id: "s5", name: "Beatriz Silva", initials: "BS", bg: "from-pink-500 to-rose-700", amount: "1.750 MT", time: "há 4 min" },
+  { id: "s6", name: "Miguel Chongo", initials: "MC", bg: "from-amber-500 to-yellow-600", amount: "22.000 MT", time: "há 5 min" },
+  { id: "s7", name: "Lúcia Tembe", initials: "LT", bg: "from-cyan-500 to-blue-600", amount: "4.400 MT", time: "há 7 min" },
+  { id: "s8", name: "Daniel Macuacua", initials: "DM", bg: "from-lime-500 to-green-700", amount: "9.800 MT", time: "há 8 min" },
+];
+
+function SaquesSection() {
+  const [visible, setVisible] = useState(SAQUES_POOL.slice(0, 4));
+  const [entering, setEntering] = useState<string | null>(null);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const next = SAQUES_POOL[Math.floor(Math.random() * SAQUES_POOL.length)];
+      const fresh = { ...next, id: next.id + Date.now(), time: "agora mesmo" };
+      setEntering(fresh.id);
+      setVisible(prev => {
+        const updated = [fresh, ...prev.slice(0, 3)];
+        return updated;
+      });
+      setTimeout(() => setEntering(null), 600);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <section className="px-4 py-4 mb-2">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="w-4 h-4 text-emerald-600" />
+          <h2 className="font-syne font-bold text-base text-slate-900">Saques 24 Horas</h2>
+          <span className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse inline-block" />
+            AO VIVO
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <AnimatePresence initial={false}>
+          {visible.map((saque) => (
+            <motion.div
+              key={saque.id}
+              initial={{ opacity: 0, y: -18, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.97 }}
+              transition={{ duration: 0.38, ease: "easeOut" }}
+              className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm"
+              data-testid={`row-saque-${saque.id}`}
+            >
+              {/* Avatar */}
+              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${saque.bg} flex items-center justify-center text-white font-syne font-bold text-sm flex-shrink-0 shadow-md`}>
+                {saque.initials}
+              </div>
+
+              {/* Info */}
+              <div className="flex-1 min-w-0">
+                <p className="font-syne font-bold text-slate-900 text-sm truncate">{saque.name}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{saque.time}</p>
+              </div>
+
+              {/* Amount + icon */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="text-right">
+                  <p className="font-syne font-extrabold text-emerald-600 text-sm">+{saque.amount}</p>
+                  <p className="text-[9px] text-slate-400 uppercase tracking-wide">Saque</p>
+                </div>
+                <div className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0">
+                  <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+    </section>
+  );
+}
 
 function WinMozLogo() {
   return (
@@ -301,6 +385,9 @@ export default function Home() {
             ))}
           </motion.div>
         </section>
+
+        {/* SAQUES 24 HORAS */}
+        <SaquesSection />
 
         {/* BOTTOM NAVIGATION BAR */}
         <nav className="fixed bottom-0 w-full max-w-[430px] bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 py-3 z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">

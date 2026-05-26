@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import {
   Home as HomeIcon, Gamepad2, Wallet, User,
-  Search, ChevronRight, Play, Users, Clock, Trophy, Zap, Plus
+  Search, ChevronRight, Play, Users, Clock, Trophy, Zap, Plus, Hash, ArrowRight, Shield
 } from "lucide-react";
 
 function BottomNav() {
@@ -31,7 +31,7 @@ function BottomNav() {
   );
 }
 
-const TABS = ["Jogos", "Assistir", "Criar Sala"] as const;
+const TABS = ["Jogos", "Assistir", "Entrar em Sala", "Criar Sala"] as const;
 type Tab = typeof TABS[number];
 
 const jogosCards = [
@@ -277,6 +277,118 @@ function MatchCard({ match }: { match: typeof partidasTempoReal[0] }) {
   );
 }
 
+const RECENT_ROOMS = [
+  { id: "WM-4821", game: "Damas Clássico", players: "2/2", bet: "500 MT", color: "from-blue-500 to-indigo-700", initials: "DA" },
+  { id: "WM-3307", game: "Ludo Turbo", players: "3/4", bet: "200 MT", color: "from-emerald-500 to-teal-700", initials: "LU" },
+  { id: "WM-9154", game: "Xadrez Rápido", players: "1/2", bet: "1.000 MT", color: "from-violet-500 to-purple-800", initials: "XA" },
+];
+
+function EntrarEmSalaTab() {
+  const [roomId, setRoomId] = useState("");
+
+  return (
+    <motion.div
+      key="entrar-sala"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+      className="pb-4"
+    >
+      {/* Premium card */}
+      <div className="relative rounded-3xl overflow-hidden mb-6 shadow-xl"
+        style={{ background: "linear-gradient(135deg, #4C1D95 0%, #6D28D9 50%, #5B21B6 100%)" }}>
+        <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-28 h-28 rounded-full bg-white/5 translate-y-1/2 -translate-x-1/4 pointer-events-none" />
+
+        <div className="relative z-10 p-6">
+          <div className="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center mb-4 shadow-inner">
+            <Shield className="w-7 h-7 text-white" />
+          </div>
+          <h2 className="font-syne font-extrabold text-xl text-white mb-1">Entrar em Sala</h2>
+          <p className="text-sm text-violet-200 leading-relaxed max-w-[220px]">
+            Introduz o ID da sala para entrar numa partida privada.
+          </p>
+        </div>
+      </div>
+
+      {/* Input area */}
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-md p-5 mb-5">
+        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3">
+          ID da Sala
+        </label>
+
+        <div className="relative flex items-center">
+          <div className="absolute left-4 flex items-center pointer-events-none">
+            <Hash className="w-4 h-4 text-violet-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Ex: WM-4821"
+            value={roomId}
+            onChange={e => setRoomId(e.target.value.toUpperCase())}
+            maxLength={10}
+            className="w-full pl-10 pr-4 py-4 bg-slate-50 border-2 border-slate-100 focus:border-violet-500 rounded-2xl text-slate-900 font-syne font-bold text-base outline-none transition-all duration-200 placeholder-slate-300 tracking-widest"
+            data-testid="input-room-id"
+          />
+        </div>
+
+        <button
+          disabled={roomId.length < 3}
+          className={`w-full mt-4 py-4 rounded-2xl font-syne font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 shadow-lg ${
+            roomId.length >= 3
+              ? "bg-gradient-to-r from-violet-600 to-purple-700 text-white hover:from-violet-700 hover:to-purple-800 shadow-violet-200 scale-100"
+              : "bg-slate-100 text-slate-300 cursor-not-allowed scale-100"
+          }`}
+          data-testid="button-enter-room"
+        >
+          {roomId.length >= 3 ? (
+            <>Entrar na Sala <ArrowRight className="w-5 h-5" /></>
+          ) : (
+            <>Introduz o ID da sala <Plus className="w-5 h-5 rotate-0" /></>
+          )}
+        </button>
+      </div>
+
+      {/* Recent rooms */}
+      <div className="mb-2">
+        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">
+          Salas Recentes
+        </p>
+        <div className="flex flex-col gap-2.5">
+          {RECENT_ROOMS.map((room, idx) => (
+            <motion.button
+              key={room.id}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.08 }}
+              onClick={() => setRoomId(room.id)}
+              className="flex items-center gap-3 p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-violet-200 hover:shadow-md transition-all duration-200 text-left w-full group"
+              data-testid={`button-recent-room-${room.id}`}
+            >
+              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${room.color} flex items-center justify-center text-white font-syne font-bold text-sm shadow-md flex-shrink-0`}>
+                {room.initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-syne font-bold text-slate-900 text-sm">{room.game}</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] text-slate-400 font-mono tracking-widest">{room.id}</span>
+                  <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                  <span className="text-[10px] text-slate-400">{room.players} jogadores</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                <span className="text-[11px] font-bold text-violet-700">{room.bet}</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-violet-500 transition-colors" />
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 export default function Explorar() {
   const [activeTab, setActiveTab] = useState<Tab>("Jogos");
   const [query, setQuery] = useState("");
@@ -406,6 +518,10 @@ export default function Explorar() {
                     .map(match => <MatchCard key={match.id} match={match} />)}
                 </motion.div>
               </motion.div>
+            )}
+
+            {activeTab === "Entrar em Sala" && (
+              <EntrarEmSalaTab />
             )}
 
             {activeTab === "Criar Sala" && (
