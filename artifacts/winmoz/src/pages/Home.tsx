@@ -249,10 +249,10 @@ export default function Home() {
         {/* DIVIDER */}
         <div className="mx-4 border-t border-slate-100 my-1"/>
 
-        {/* TOP APOSTAS */}
+        {/* POPULARES AGORA */}
         <section className="px-4 py-4 mb-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-syne font-bold text-base text-slate-900">Top Apostas</h2>
+            <h2 className="font-syne font-bold text-base text-slate-900">Populares Agora</h2>
             <Link href="/top" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center" data-testid="link-view-all-top">
               Ver Todos <ChevronRight className="w-3 h-3 ml-0.5"/>
             </Link>
@@ -309,9 +309,9 @@ export default function Home() {
               <HomeIcon className="w-5 h-5"/>
               <span className="text-[9px] font-semibold font-syne tracking-wide">Home</span>
             </Link>
-            <Link href="/jogos" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors" data-testid="nav-jogos">
+            <Link href="/explorar" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors" data-testid="nav-explorar">
               <Gamepad2 className="w-5 h-5"/>
-              <span className="text-[9px] font-medium font-syne tracking-wide">Jogos</span>
+              <span className="text-[9px] font-medium font-syne tracking-wide">Explorar</span>
             </Link>
             <Link href="/carteira" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors" data-testid="nav-carteira">
               <Wallet className="w-5 h-5"/>
