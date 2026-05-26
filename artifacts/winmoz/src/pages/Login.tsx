@@ -58,7 +58,7 @@ export default function Login() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="flex justify-start mb-8"
+          className="flex justify-center mb-8"
         >
           <PokerLogo />
         </motion.div>
