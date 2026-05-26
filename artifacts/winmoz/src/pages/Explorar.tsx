@@ -31,7 +31,7 @@ function BottomNav() {
   );
 }
 
-const TABS = ["Jogos", "Assistir", "Entrar em Sala", "Criar Sala"] as const;
+const TABS = ["Jogos", "Assistir", "Sala", "Criar Sala"] as const;
 type Tab = typeof TABS[number];
 
 const jogosCards = [
@@ -520,7 +520,7 @@ export default function Explorar() {
               </motion.div>
             )}
 
-            {activeTab === "Entrar em Sala" && (
+            {activeTab === "Sala" && (
               <EntrarEmSalaTab />
             )}
 
