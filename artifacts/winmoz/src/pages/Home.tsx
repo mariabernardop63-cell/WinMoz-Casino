@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Play, Home as HomeIcon, Gamepad2, Wallet, User, Star, ChevronRight, ArrowDownLeft, TrendingUp } from "lucide-react";
+import { Play, Home as HomeIcon, Gamepad2, Pause, User, Star, ChevronRight, ArrowDownLeft, TrendingUp } from "lucide-react";
 
 /* ─────────────────────────────────────────────
    SAQUES 24 HORAS
@@ -500,7 +500,7 @@ const SLIDES = [
     badgeDot: "#A78BFA",
     badgeText: "#FFFFFF",
     subtitleColor: "rgba(255,255,255,0.82)",
-    title: "Jogue ludo\napostado.",
+    title: "Jogue Ludo apostado.",
     subtitle: "Desafia rivais online e multiplica o teu saldo.",
     cta: "Jogar Agora",
   },
@@ -597,7 +597,10 @@ function HeroBanner() {
               </div>
 
               {/* Title */}
-              <h1 className="font-syne font-extrabold text-[1.55rem] leading-tight text-white mb-2 drop-shadow-md whitespace-pre-line">
+              <h1
+                className="font-syne font-extrabold leading-tight text-white mb-2 drop-shadow-md whitespace-pre-line"
+                style={{ fontSize: slide.id === "ludo" ? "1.32rem" : "1.55rem" }}
+              >
                 {slide.title}
               </h1>
 
@@ -939,8 +942,8 @@ export default function Home() {
               <Gamepad2 className="w-5 h-5"/>
               <span className="text-[9px] font-medium font-syne tracking-wide">Explorar</span>
             </Link>
-            <Link href="/carteira" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors">
-              <Wallet className="w-5 h-5"/>
+            <Link href="/carteira" className="flex flex-col items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors">
+              <Pause className="w-6 h-6"/>
               <span className="text-[9px] font-medium font-syne tracking-wide">Carteira</span>
             </Link>
             <Link href="/perfil" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors">

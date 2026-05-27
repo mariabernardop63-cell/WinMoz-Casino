@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import {
-  Home as HomeIcon, Gamepad2, Wallet, User,
+  Home as HomeIcon, Gamepad2, Pause, User,
   Search, ChevronRight, Play, Users, Clock, Trophy, Zap, Plus, Hash, ArrowRight, Shield
 } from "lucide-react";
 
@@ -18,8 +18,8 @@ function BottomNav() {
           <Gamepad2 className="w-5 h-5" />
           <span className="text-[9px] font-semibold font-syne tracking-wide">Explorar</span>
         </Link>
-        <Link href="/carteira" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors" data-testid="nav-carteira">
-          <Wallet className="w-5 h-5" />
+        <Link href="/carteira" className="flex flex-col items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors" data-testid="nav-carteira">
+          <Pause className="w-6 h-6" />
           <span className="text-[9px] font-medium font-syne tracking-wide">Carteira</span>
         </Link>
         <Link href="/perfil" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors" data-testid="nav-perfil">
