@@ -652,10 +652,9 @@ const games = [
     bet: "20–2.000 MT",
     rating: "4.9",
     players: "4.1K jogando",
-    image: null,
+    image: "/ludo-card.jpg",
     imageFit: "cover" as const,
     imagePos: "center",
-    ludoCard: true,
   },
   {
     id: "xadrez",
@@ -699,8 +698,8 @@ const topGames = [
     name: "Ludo Turbo",
     players: "3.8K apostadores ativos",
     rank: 2,
-    image: "/ludo-board.png",
-    imagePos: "center 60%",
+    image: "/ludo-card.jpg",
+    imagePos: "center",
     from: "#059669",
     to: "#064E3B",
   },
@@ -769,9 +768,7 @@ export default function Home() {
                 className="min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col"
               >
                 <div className="h-28 w-full relative overflow-hidden bg-slate-200">
-                  {"ludoCard" in game && game.ludoCard ? (
-                    <LudoCardArt />
-                  ) : game.image ? (
+                  {game.image ? (
                     <>
                       <img
                         src={game.image}
