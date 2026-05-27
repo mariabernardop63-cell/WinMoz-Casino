@@ -259,193 +259,206 @@ function DamasBoard({ size = 140 }: { size?: number }) {
    ANIMATED LUDO BOARD
 ───────────────────────────────────────────── */
 
-// 50-square Ludo track (col, row) — clockwise from blue exit
-const LUDO_TRACK: [number, number][] = [
-  [1,8],[1,7],[1,6],
-  [2,5],[3,5],[4,5],[5,5],
-  [6,4],[6,3],[6,2],[6,1],[6,0],
-  [7,0],
-  [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],
-  [9,5],[10,5],[11,5],[12,5],[13,5],
-  [13,6],[13,7],[13,8],
-  [13,9],[12,9],[11,9],[10,9],[9,9],
-  [8,9],[8,10],[8,11],[8,12],[8,13],[8,14],
-  [7,14],
-  [6,14],[6,13],[6,12],[6,11],[6,10],[6,9],
-  [5,9],[4,9],[3,9],[2,9],[1,9],
+/* ─────────────────────────────────────────────
+   LUDO CARD ART — Variant 3 style (crown + LUDO letters)
+───────────────────────────────────────────── */
+function LudoBoardBase({ S, C }: { S: number; C: number }) {
+  return (
+    <>
+      <rect width={S} height={S} fill="white" rx={2}/>
+      {[6,7,8].map(c => <rect key={`v${c}`} x={c*C} y={0} width={C} height={S} fill="#F2F2F2"/>)}
+      {[6,7,8].map(r => <rect key={`h${r}`} x={0} y={r*C} width={S} height={C} fill="#F2F2F2"/>)}
+      <rect x={0} y={0} width={6*C} height={6*C} fill="#E63030" rx={2}/>
+      <rect x={9*C} y={0} width={6*C} height={6*C} fill="#1FAB1F" rx={2}/>
+      <rect x={9*C} y={9*C} width={6*C} height={6*C} fill="#F0C000" rx={2}/>
+      <rect x={0} y={9*C} width={6*C} height={6*C} fill="#1E55E0" rx={2}/>
+      {([[C*0.55,C*0.55],[C*9.55,C*0.55],[C*9.55,C*9.55],[C*0.55,C*9.55]] as [number,number][]).map(([x,y],i) => (
+        <rect key={`sz${i}`} x={x} y={y} width={C*4.9} height={C*4.9} fill="white" rx={C*0.45}/>
+      ))}
+      {[1,2,3,4,5].map(c => <rect key={`rs${c}`} x={c*C+0.4} y={7*C+0.4} width={C-0.8} height={C-0.8} fill="#FF9999" rx={0.8}/>)}
+      {[1,2,3,4,5].map(r => <rect key={`gs${r}`} x={7*C+0.4} y={r*C+0.4} width={C-0.8} height={C-0.8} fill="#88DD88" rx={0.8}/>)}
+      {[9,10,11,12,13].map(c => <rect key={`ys${c}`} x={c*C+0.4} y={7*C+0.4} width={C-0.8} height={C-0.8} fill="#FFE066" rx={0.8}/>)}
+      {[9,10,11,12,13].map(r => <rect key={`bs${r}`} x={7*C+0.4} y={r*C+0.4} width={C-0.8} height={C-0.8} fill="#88AAFF" rx={0.8}/>)}
+      {([[2,6],[2,8],[6,2],[8,2],[12,6],[12,8],[6,12],[8,12]] as [number,number][]).map(([c,r],i) => (
+        <text key={`st${i}`} x={c*C+C/2} y={r*C+C/2+C*0.2} textAnchor="middle" fontSize={C*0.6} fill="#BBBBBB">★</text>
+      ))}
+      <polygon points={`${7*C},${6*C} ${9*C},${6*C} ${7.5*C},${7.5*C}`} fill="#E63030"/>
+      <polygon points={`${9*C},${6*C} ${9*C},${9*C} ${7.5*C},${7.5*C}`} fill="#F0C000"/>
+      <polygon points={`${9*C},${9*C} ${6*C},${9*C} ${7.5*C},${7.5*C}`} fill="#1FAB1F"/>
+      <polygon points={`${6*C},${9*C} ${6*C},${6*C} ${7.5*C},${7.5*C}`} fill="#1E55E0"/>
+      <rect x={0} y={0} width={S} height={S} fill="none" stroke="#CCCCCC" strokeWidth={1} rx={2}/>
+    </>
+  );
+}
+
+function LudoPawns({ C, color, offX, offY }: { C: number; color: string; offX: number; offY: number }) {
+  const r = C * 0.34;
+  const positions: [number,number][] = [
+    [offX + C*1.5, offY + C*1.5],
+    [offX + C*3.7, offY + C*1.5],
+    [offX + C*1.5, offY + C*3.7],
+    [offX + C*3.7, offY + C*3.7],
+  ];
+  return (
+    <>
+      {positions.map(([cx, cy], i) => (
+        <g key={i}>
+          <ellipse cx={cx+0.5} cy={cy+r*1.8+1} rx={r*1.1} ry={r*0.45} fill="rgba(0,0,0,0.22)"/>
+          <ellipse cx={cx} cy={cy+r*0.9} rx={r*0.88} ry={r*1.3} fill={color}/>
+          <circle cx={cx} cy={cy-r*0.2} r={r} fill={color}/>
+          <circle cx={cx-r*0.3} cy={cy-r*0.5} r={r*0.36} fill="rgba(255,255,255,0.5)"/>
+        </g>
+      ))}
+    </>
+  );
+}
+
+function LudoCardArt() {
+  const S = 148;
+  const C = S / 15;
+  return (
+    <div className="w-full h-full relative overflow-hidden" style={{ background: "#0E0E18" }}>
+      {/* Board background (slightly faded) */}
+      <svg
+        width="100%" height="100%"
+        viewBox={`0 0 ${S} ${S}`}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ position: "absolute", inset: 0, opacity: 0.75 }}
+      >
+        <LudoBoardBase S={S} C={C}/>
+        <LudoPawns C={C} color="#CC1111" offX={0} offY={0}/>
+        <LudoPawns C={C} color="#1A8E1A" offX={9*C} offY={0}/>
+        <LudoPawns C={C} color="#C89900" offX={9*C} offY={9*C}/>
+        <LudoPawns C={C} color="#1444BB" offX={0} offY={9*C}/>
+      </svg>
+
+      {/* Dark overlay for readability */}
+      <div className="absolute inset-0" style={{ background: "linear-gradient(160deg, rgba(14,14,24,0.15) 0%, rgba(14,14,24,0.55) 100%)" }}/>
+
+      {/* Gold Crown */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2">
+        <svg width="44" height="34" viewBox="0 0 44 34" fill="none">
+          <defs>
+            <linearGradient id="cg1" x1="22" y1="0" x2="22" y2="34" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#FFE566"/>
+              <stop offset="55%" stopColor="#F59E0B"/>
+              <stop offset="100%" stopColor="#B45309"/>
+            </linearGradient>
+            <linearGradient id="cg2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="white" stopOpacity="0.35"/>
+              <stop offset="100%" stopColor="white" stopOpacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M4 28 L40 28 L40 33 L4 33 Z" rx="1" fill="url(#cg1)"/>
+          <path d="M4 28 L8 10 L17 20 L22 4 L27 20 L36 10 L40 28 Z" fill="url(#cg1)"/>
+          <path d="M4 28 L8 10 L17 20 L22 4 L27 20 L36 10 L40 28 Z" fill="url(#cg2)"/>
+          <circle cx="22" cy="22" r="3.5" fill="#EF4444" stroke="#FFE566" strokeWidth="0.8"/>
+          <circle cx="11" cy="24" r="2.2" fill="#3B82F6" stroke="#FFE566" strokeWidth="0.8"/>
+          <circle cx="33" cy="24" r="2.2" fill="#22C55E" stroke="#FFE566" strokeWidth="0.8"/>
+          <line x1="9" y1="12" x2="12" y2="24" stroke="rgba(255,255,255,0.45)" strokeWidth="1.4" strokeLinecap="round"/>
+          <line x1="22" y1="6" x2="22" y2="17" stroke="rgba(255,255,255,0.45)" strokeWidth="1.4" strokeLinecap="round"/>
+          <line x1="35" y1="12" x2="32" y2="24" stroke="rgba(255,255,255,0.45)" strokeWidth="1.4" strokeLinecap="round"/>
+        </svg>
+      </div>
+
+      {/* LUDO letters */}
+      <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1.5">
+        {([["L","#E63030","#FF7777"],["U","#1FAB1F","#55DD55"],["D","#1E55E0","#5588FF"],["O","#CC9900","#FFD700"]] as [string,string,string][]).map(([l,bg,bd]) => (
+          <div key={l} style={{
+            width: 26, height: 26, borderRadius: "50%",
+            background: bg, border: `2px solid ${bd}`,
+            boxShadow: "0 2px 8px rgba(0,0,0,0.5)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 13, color: "white",
+          }}>{l}</div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   LUDO BANNER BOARD — Variant 1 style (static board + animated 3D dice)
+───────────────────────────────────────────── */
+
+const DICE_FACES: [number, number][][] = [
+  [[0.5,0.5]],
+  [[0.27,0.27],[0.73,0.73]],
+  [[0.27,0.27],[0.5,0.5],[0.73,0.73]],
+  [[0.27,0.27],[0.73,0.27],[0.27,0.73],[0.73,0.73]],
+  [[0.27,0.27],[0.73,0.27],[0.5,0.5],[0.27,0.73],[0.73,0.73]],
+  [[0.27,0.22],[0.73,0.22],[0.27,0.5],[0.73,0.5],[0.27,0.78],[0.73,0.78]],
 ];
 
-const PIECE_COLORS = ["#EF4444","#22C55E","#EAB308","#818CF8"];
-const PIECE_START = [0, 12, 25, 37]; // staggered start positions on track
-
+// Variant 1: static board + animated 3D dice (only dice animates)
 function LudoBoard({ size = 140 }: { size?: number }) {
-  const C = size / 15;
-  const [step, setStep] = useState(0);
-  const [diceVal, setDiceVal] = useState(5);
-  const [diceSpin, setDiceSpin] = useState(false);
+  const S = size;
+  const C = S / 15;
 
-  // Advance pieces every 480ms
-  useEffect(() => {
-    const t = setInterval(() => setStep(s => s + 1), 480);
-    return () => clearInterval(t);
-  }, []);
+  const [diceVal, setDiceVal] = useState(6);
+  const [rolling, setRolling] = useState(false);
 
-  // Roll dice every ~1.6s (every ~3.3 steps)
   useEffect(() => {
     const t = setInterval(() => {
-      setDiceSpin(true);
-      setTimeout(() => {
+      setRolling(true);
+      let n = 0;
+      const flicker = setInterval(() => {
         setDiceVal(Math.floor(Math.random() * 6) + 1);
-        setDiceSpin(false);
-      }, 200);
-    }, 1600);
+        n++;
+        if (n >= 6) { clearInterval(flicker); setRolling(false); }
+      }, 70);
+    }, 2200);
     return () => clearInterval(t);
   }, []);
 
-  const piecePx = PIECE_COLORS.map((_, i) => {
-    const idx = (PIECE_START[i] + step) % LUDO_TRACK.length;
-    const [col, row] = LUDO_TRACK[idx];
-    return { x: col * C + C / 2, y: row * C + C / 2 };
-  });
+  const dots = DICE_FACES[diceVal - 1];
 
-  // Dice dots layout for faces 1-6
-  const DICE_DOTS: [number, number][][] = [
-    [[0.5,0.5]],
-    [[0.25,0.25],[0.75,0.75]],
-    [[0.25,0.25],[0.5,0.5],[0.75,0.75]],
-    [[0.25,0.25],[0.75,0.25],[0.25,0.75],[0.75,0.75]],
-    [[0.25,0.25],[0.75,0.25],[0.5,0.5],[0.25,0.75],[0.75,0.75]],
-    [[0.25,0.25],[0.75,0.25],[0.25,0.5],[0.75,0.5],[0.25,0.75],[0.75,0.75]],
-  ];
-  const dots = DICE_DOTS[diceVal - 1];
-  const diceSize = C * 2.2;
-  const diceX = size - diceSize - C * 0.3;
-  const diceY = C * 0.3;
+  // Dice: big, sits bottom-left overlapping the blue home corner
+  const DW = S * 0.41;
+  const DEPTH = DW * 0.1;
+  const DR = DW * 0.11;
+  const DX = C * 0.4;
+  const DY = S - DW - C * 0.4;
 
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block", borderRadius: 6 }}>
-      {/* Board background */}
-      <rect width={size} height={size} fill="#F8F8F8"/>
+    <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} style={{ display: "block", borderRadius: 6 }}>
+      {/* ── STATIC BOARD ── */}
+      <LudoBoardBase S={S} C={C}/>
 
-      {/* Track cells — white cross */}
-      {/* Vertical arm cols 6-8 */}
-      {[6,7,8].map(c => (
-        <rect key={`va${c}`} x={c*C} y={0} width={C} height={size} fill="#FFFFFF"/>
-      ))}
-      {/* Horizontal arm rows 6-8 */}
-      {[6,7,8].map(r => (
-        <rect key={`ha${r}`} x={0} y={r*C} width={size} height={C} fill="#FFFFFF"/>
-      ))}
+      {/* Pawns in homes (static) */}
+      <LudoPawns C={C} color="#CC1111" offX={0} offY={0}/>
+      <LudoPawns C={C} color="#1A8E1A" offX={9*C} offY={0}/>
+      <LudoPawns C={C} color="#C89900" offX={9*C} offY={9*C}/>
+      <LudoPawns C={C} color="#1444BB" offX={0} offY={9*C}/>
 
-      {/* Home areas */}
-      <rect x={0} y={0} width={6*C} height={6*C} fill="#EF4444"/>
-      <rect x={9*C} y={0} width={6*C} height={6*C} fill="#22C55E"/>
-      <rect x={9*C} y={9*C} width={6*C} height={6*C} fill="#EAB308"/>
-      <rect x={0} y={9*C} width={6*C} height={6*C} fill="#3B82F6"/>
-
-      {/* Inner safe zones (white inset rounded rect) */}
-      {[
-        { x: C*0.7, y: C*0.7 },
-        { x: 9*C+C*0.7, y: C*0.7 },
-        { x: 9*C+C*0.7, y: 9*C+C*0.7 },
-        { x: C*0.7, y: 9*C+C*0.7 },
-      ].map((pos, i) => (
-        <rect key={`safe${i}`} x={pos.x} y={pos.y} width={C*4.6} height={C*4.6}
-          fill="rgba(255,255,255,0.28)" rx={C*0.5}/>
-      ))}
-
-      {/* Home circles (4 per corner) */}
-      {[
-        { cx: 2*C, cy: 2*C, color: "#FECACA" },
-        { cx: 4*C, cy: 2*C, color: "#FECACA" },
-        { cx: 2*C, cy: 4*C, color: "#FECACA" },
-        { cx: 4*C, cy: 4*C, color: "#FECACA" },
-        { cx: 11*C, cy: 2*C, color: "#BBF7D0" },
-        { cx: 13*C, cy: 2*C, color: "#BBF7D0" },
-        { cx: 11*C, cy: 4*C, color: "#BBF7D0" },
-        { cx: 13*C, cy: 4*C, color: "#BBF7D0" },
-        { cx: 11*C, cy: 11*C, color: "#FEF08A" },
-        { cx: 13*C, cy: 11*C, color: "#FEF08A" },
-        { cx: 11*C, cy: 13*C, color: "#FEF08A" },
-        { cx: 13*C, cy: 13*C, color: "#FEF08A" },
-        { cx: 2*C, cy: 11*C, color: "#BFDBFE" },
-        { cx: 4*C, cy: 11*C, color: "#BFDBFE" },
-        { cx: 2*C, cy: 13*C, color: "#BFDBFE" },
-        { cx: 4*C, cy: 13*C, color: "#BFDBFE" },
-      ].map((dot, i) => (
-        <circle key={`hc${i}`} cx={dot.cx} cy={dot.cy} r={C*0.72}
-          fill={dot.color} stroke="rgba(0,0,0,0.12)" strokeWidth={0.5}/>
-      ))}
-
-      {/* Home stretch lanes (tinted track lanes toward center) */}
-      {/* Red → row 7, cols 1-5 */}
-      {[1,2,3,4,5].map(c => <rect key={`rs${c}`} x={c*C+1} y={7*C+1} width={C-2} height={C-2} fill="#FCA5A5" rx={1}/>)}
-      {/* Green → col 7, rows 1-5 */}
-      {[1,2,3,4,5].map(r => <rect key={`gs${r}`} x={7*C+1} y={r*C+1} width={C-2} height={C-2} fill="#86EFAC" rx={1}/>)}
-      {/* Yellow → row 7, cols 9-13 */}
-      {[9,10,11,12,13].map(c => <rect key={`ys${c}`} x={c*C+1} y={7*C+1} width={C-2} height={C-2} fill="#FDE68A" rx={1}/>)}
-      {/* Blue → col 7, rows 9-13 */}
-      {[9,10,11,12,13].map(r => <rect key={`bs${r}`} x={7*C+1} y={r*C+1} width={C-2} height={C-2} fill="#93C5FD" rx={1}/>)}
-
-      {/* Track grid lines */}
-      {Array.from({length:15},(_,i) => (
-        <line key={`gl${i}`} x1={i*C} y1={0} x2={i*C} y2={size} stroke="#E2E2E2" strokeWidth={0.4}/>
-      ))}
-      {Array.from({length:15},(_,i) => (
-        <line key={`gr${i}`} x1={0} y1={i*C} x2={size} y2={i*C} stroke="#E2E2E2" strokeWidth={0.4}/>
-      ))}
-
-      {/* Safe squares (star markers on specific track squares) */}
-      {[[2,6],[2,8],[6,2],[8,2],[12,6],[12,8],[6,12],[8,12]].map(([c,r],i) => (
-        <rect key={`star${i}`} x={c*C+C*0.2} y={r*C+C*0.2} width={C*0.6} height={C*0.6}
-          fill="#6B7280" rx={1} transform={`rotate(45 ${c*C+C/2} ${r*C+C/2})`}/>
-      ))}
-
-      {/* Center finishing area — triangle star */}
-      {[
-        { points: `${7*C},${6*C} ${8*C},${7*C} ${7*C},${8*C} ${6*C},${7*C}`, fill: "#EF4444" },
-        { points: `${7*C},${6*C} ${9*C},${6*C} ${8*C},${7*C}`, fill: "#22C55E" },
-        { points: `${8*C},${7*C} ${9*C},${6*C} ${9*C},${9*C}`, fill: "#EAB308" },
-        { points: `${7*C},${8*C} ${8*C},${7*C} ${9*C},${9*C} ${6*C},${9*C}`, fill: "#3B82F6" },
-        { points: `${6*C},${6*C} ${7*C},${6*C} ${6*C},${7*C}`, fill: "#EF4444" },
-        { points: `${6*C},${7*C} ${7*C},${8*C} ${6*C},${9*C}`, fill: "#3B82F6" },
-      ].map((tri, i) => (
-        <polygon key={`ct${i}`} points={tri.points} fill={tri.fill} opacity={0.85}/>
-      ))}
-
-      {/* Board outer border */}
-      <rect x={0} y={0} width={size} height={size} fill="none" stroke="#9CA3AF" strokeWidth={1.5} rx={4}/>
-
-      {/* Animated Pieces */}
-      {piecePx.map((pos, i) => (
-        <motion.g
-          key={`piece${i}`}
-          animate={{ x: pos.x, y: pos.y }}
-          initial={{ x: pos.x, y: pos.y }}
-          transition={{ duration: 0.42, ease: [0.25, 0.46, 0.45, 0.94] }}
-        >
-          <circle r={C*0.38} fill="rgba(0,0,0,0.2)" cx={0.5} cy={C*0.18}/>
-          <circle r={C*0.38} fill={PIECE_COLORS[i]} stroke="rgba(255,255,255,0.8)" strokeWidth={0.9}/>
-          <circle r={C*0.18} fill="rgba(255,255,255,0.4)"/>
-          <circle r={C*0.1} cx={-C*0.12} cy={-C*0.12} fill="rgba(255,255,255,0.6)"/>
-        </motion.g>
-      ))}
-
-      {/* Animated Dice */}
+      {/* ── ANIMATED 3D DICE (only animated element) ── */}
       <motion.g
-        animate={{ rotate: diceSpin ? 15 : 0, scale: diceSpin ? 0.85 : 1 }}
-        style={{ transformOrigin: `${diceX + diceSize/2}px ${diceY + diceSize/2}px` }}
-        transition={{ duration: 0.15 }}
+        animate={rolling
+          ? { y: [0, -10, 0, -6, 0], rotate: [0, -8, 8, -4, 0] }
+          : { y: [0, -4, 0] }
+        }
+        transition={rolling
+          ? { duration: 0.5, times: [0, 0.25, 0.5, 0.75, 1] }
+          : { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
+        }
+        style={{ transformOrigin: `${DX + DW/2}px ${DY + DW/2}px` }}
       >
-        <rect x={diceX} y={diceY} width={diceSize} height={diceSize} fill="white"
-          stroke="#D1D5DB" strokeWidth={0.8} rx={C*0.3}
-          style={{ filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.25))" }}/>
-        {dots.map(([fx, fy], di) => (
-          <circle key={`d${di}`}
-            cx={diceX + fx * diceSize}
-            cy={diceY + fy * diceSize}
-            r={diceSize * 0.1}
-            fill="#1F2937"
+        {/* 3D right side */}
+        <rect x={DX+DW} y={DY+DEPTH*0.8} width={DEPTH} height={DW} fill="#BBBBBB" rx={2}/>
+        {/* 3D bottom side */}
+        <rect x={DX+DEPTH*0.8} y={DY+DW} width={DW} height={DEPTH} fill="#AAAAAA" rx={2}/>
+        {/* Main face — white with subtle shadow */}
+        <rect
+          x={DX} y={DY} width={DW} height={DW}
+          fill="white" rx={DR}
+          stroke="#E0E0E0" strokeWidth={0.8}
+          style={{ filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.45))" }}
+        />
+        {/* Dots */}
+        {dots.map(([fx, fy], i) => (
+          <circle key={i}
+            cx={DX + fx * DW} cy={DY + fy * DW}
+            r={DW * 0.088} fill="#111111"
           />
         ))}
       </motion.g>
@@ -524,7 +537,7 @@ function HeroBanner() {
           <motion.div
             key={slide.id}
             custom={dir}
-            variants={slideIn}
+            variants={slideIn as any}
             initial="initial"
             animate="animate"
             exit="exit"
@@ -664,7 +677,7 @@ const stagger = {
 
 const fadeUp = {
   hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } }
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" as const } }
 };
 
 /* ─────────────────────────────────────────────
@@ -757,9 +770,7 @@ export default function Home() {
               >
                 <div className="h-28 w-full relative overflow-hidden bg-slate-200">
                   {"ludoCard" in game && game.ludoCard ? (
-                    <div className="w-full h-full flex items-center justify-center" style={{ background: "#18181B" }}>
-                      <LudoBoard size={110} />
-                    </div>
+                    <LudoCardArt />
                   ) : game.image ? (
                     <>
                       <img
