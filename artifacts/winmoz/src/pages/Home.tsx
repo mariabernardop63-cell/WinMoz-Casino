@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Play, Home as HomeIcon, Gamepad2, Pause, User, Star, ChevronRight, ArrowDownLeft, TrendingUp } from "lucide-react";
+import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp } from "lucide-react";
+import BottomNav from "@/components/BottomNav";
 
 /* ─────────────────────────────────────────────
    SAQUES 24 HORAS
@@ -932,26 +933,7 @@ export default function Home() {
         <SaquesSection />
 
         {/* BOTTOM NAV */}
-        <nav className="fixed bottom-0 w-full max-w-[430px] bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 py-3 z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="flex flex-col items-center gap-1 text-blue-700">
-              <HomeIcon className="w-5 h-5"/>
-              <span className="text-[9px] font-semibold font-syne tracking-wide">Home</span>
-            </Link>
-            <Link href="/explorar" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors">
-              <Gamepad2 className="w-5 h-5"/>
-              <span className="text-[9px] font-medium font-syne tracking-wide">Explorar</span>
-            </Link>
-            <Link href="/carteira" className="flex flex-col items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors">
-              <Pause className="w-6 h-6"/>
-              <span className="text-[9px] font-medium font-syne tracking-wide">Carteira</span>
-            </Link>
-            <Link href="/perfil" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors">
-              <User className="w-5 h-5"/>
-              <span className="text-[9px] font-medium font-syne tracking-wide">Perfil</span>
-            </Link>
-          </div>
-        </nav>
+        <BottomNav />
 
       </div>
     </div>
