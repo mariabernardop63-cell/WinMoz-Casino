@@ -378,91 +378,37 @@ function LudoCardArt() {
 }
 
 /* ─────────────────────────────────────────────
-   LUDO BANNER BOARD — Variant 1 style (static board + animated 3D dice)
+   LUDO BANNER IMAGE — foto do tabuleiro com animação suave
 ───────────────────────────────────────────── */
 
-const DICE_FACES: [number, number][][] = [
-  [[0.5,0.5]],
-  [[0.27,0.27],[0.73,0.73]],
-  [[0.27,0.27],[0.5,0.5],[0.73,0.73]],
-  [[0.27,0.27],[0.73,0.27],[0.27,0.73],[0.73,0.73]],
-  [[0.27,0.27],[0.73,0.27],[0.5,0.5],[0.27,0.73],[0.73,0.73]],
-  [[0.27,0.22],[0.73,0.22],[0.27,0.5],[0.73,0.5],[0.27,0.78],[0.73,0.78]],
-];
-
-// Variant 1: static board + animated 3D dice (only dice animates)
-function LudoBoard({ size = 140 }: { size?: number }) {
-  const S = size;
-  const C = S / 15;
-
-  const [diceVal, setDiceVal] = useState(6);
-  const [rolling, setRolling] = useState(false);
-
-  useEffect(() => {
-    const t = setInterval(() => {
-      setRolling(true);
-      let n = 0;
-      const flicker = setInterval(() => {
-        setDiceVal(Math.floor(Math.random() * 6) + 1);
-        n++;
-        if (n >= 6) { clearInterval(flicker); setRolling(false); }
-      }, 70);
-    }, 2200);
-    return () => clearInterval(t);
-  }, []);
-
-  const dots = DICE_FACES[diceVal - 1];
-
-  // Dice: big, sits bottom-left overlapping the blue home corner
-  const DW = S * 0.41;
-  const DEPTH = DW * 0.1;
-  const DR = DW * 0.11;
-  const DX = C * 0.4;
-  const DY = S - DW - C * 0.4;
-
+function LudoBannerImage({ size = 136 }: { size?: number }) {
   return (
-    <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} style={{ display: "block", borderRadius: 6 }}>
-      {/* ── STATIC BOARD ── */}
-      <LudoBoardBase S={S} C={C}/>
-
-      {/* Pawns in homes (static) */}
-      <LudoPawns C={C} color="#CC1111" offX={0} offY={0}/>
-      <LudoPawns C={C} color="#1A8E1A" offX={9*C} offY={0}/>
-      <LudoPawns C={C} color="#C89900" offX={9*C} offY={9*C}/>
-      <LudoPawns C={C} color="#1444BB" offX={0} offY={9*C}/>
-
-      {/* ── ANIMATED 3D DICE (only animated element) ── */}
-      <motion.g
-        animate={rolling
-          ? { y: [0, -10, 0, -6, 0], rotate: [0, -8, 8, -4, 0] }
-          : { y: [0, -4, 0] }
-        }
-        transition={rolling
-          ? { duration: 0.5, times: [0, 0.25, 0.5, 0.75, 1] }
-          : { duration: 1.8, repeat: Infinity, ease: "easeInOut" }
-        }
-        style={{ transformOrigin: `${DX + DW/2}px ${DY + DW/2}px` }}
-      >
-        {/* 3D right side */}
-        <rect x={DX+DW} y={DY+DEPTH*0.8} width={DEPTH} height={DW} fill="#BBBBBB" rx={2}/>
-        {/* 3D bottom side */}
-        <rect x={DX+DEPTH*0.8} y={DY+DW} width={DW} height={DEPTH} fill="#AAAAAA" rx={2}/>
-        {/* Main face — white with subtle shadow */}
-        <rect
-          x={DX} y={DY} width={DW} height={DW}
-          fill="white" rx={DR}
-          stroke="#E0E0E0" strokeWidth={0.8}
-          style={{ filter: "drop-shadow(0 6px 16px rgba(0,0,0,0.45))" }}
-        />
-        {/* Dots */}
-        {dots.map(([fx, fy], i) => (
-          <circle key={i}
-            cx={DX + fx * DW} cy={DY + fy * DW}
-            r={DW * 0.088} fill="#111111"
-          />
-        ))}
-      </motion.g>
-    </svg>
+    <motion.div
+      style={{ width: size, height: size, display: "block" }}
+      animate={{
+        y: [0, -7, 0],
+        rotate: [4, 5.5, 4],
+        scale: [1, 1.025, 1],
+      }}
+      transition={{
+        duration: 3.2,
+        repeat: Infinity,
+        ease: "easeInOut",
+        times: [0, 0.5, 1],
+      }}
+    >
+      <img
+        src="/ludo-board-nobg.png"
+        alt="Ludo Board"
+        style={{
+          width: size,
+          height: size,
+          objectFit: "contain",
+          display: "block",
+          filter: "drop-shadow(0 10px 28px rgba(0,0,0,0.65)) drop-shadow(0 2px 6px rgba(167,139,250,0.35))",
+        }}
+      />
+    </motion.div>
   );
 }
 
@@ -473,7 +419,8 @@ const SLIDES = [
   {
     id: "damas",
     duration: 8000,
-    bg: "linear-gradient(135deg, #1A0A00 0%, #3D1A00 40%, #5C2A00 100%)",
+    bg: "linear-gradient(135deg, rgba(26,10,0,0.78) 0%, rgba(61,26,0,0.70) 40%, rgba(92,42,0,0.62) 100%)",
+    bgImage: "/wood-texture.jpg",
     accent: "#D4820A",
     badge: "Anúncio Patrocinado",
     title: "Domina o\nTabuleiro?",
@@ -484,9 +431,10 @@ const SLIDES = [
     id: "ludo",
     duration: 10000,
     bg: "linear-gradient(135deg, #0A0A1A 0%, #12122E 40%, #1A1A3D 100%)",
+    bgImage: null as string | null,
     accent: "#A78BFA",
     badge: "Anúncio Patrocinado",
-    title: "Gosta de Ludo\napostado?",
+    title: "Jogue ludo\napostado.",
     subtitle: "Desafia rivais online e multiplica o teu saldo.",
     cta: "Jogar Agora",
   },
@@ -522,7 +470,14 @@ function HeroBanner() {
     <section className="px-4 pt-5 pb-3">
       <div
         className="relative w-full rounded-3xl overflow-hidden shadow-2xl"
-        style={{ background: slide.bg, minHeight: 190, transition: "background 0.8s ease" }}
+        style={{
+          background: slide.bg,
+          backgroundImage: slide.bgImage ? `url(${slide.bgImage})` : undefined,
+          backgroundSize: slide.bgImage ? "cover" : undefined,
+          backgroundPosition: slide.bgImage ? "center" : undefined,
+          minHeight: 190,
+          transition: "background 0.8s ease",
+        }}
       >
         {/* Ambient glow */}
         <div
@@ -592,18 +547,7 @@ function HeroBanner() {
                   <DamasBoard size={136} />
                 </motion.div>
               ) : (
-                <motion.div
-                  initial={{ opacity: 0, rotate: 4, scale: 0.88 }}
-                  animate={{ opacity: 1, rotate: 4, scale: 1 }}
-                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
-                  style={{
-                    borderRadius: 10,
-                    overflow: "hidden",
-                    boxShadow: "0 8px 40px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4), 0 0 0 1.5px rgba(167,139,250,0.25)",
-                  }}
-                >
-                  <LudoBoard size={136} />
-                </motion.div>
+                <LudoBannerImage size={136} />
               )}
             </div>
           </motion.div>
@@ -653,8 +597,9 @@ const games = [
     rating: "4.9",
     players: "4.1K jogando",
     image: "/ludo-card.jpg",
-    imageFit: "cover" as const,
+    imageFit: "contain" as const,
     imagePos: "center",
+    cardBg: "#1A1A3D",
   },
   {
     id: "xadrez",
@@ -767,14 +712,17 @@ export default function Home() {
                 variants={fadeUp}
                 className="min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col"
               >
-                <div className="h-28 w-full relative overflow-hidden bg-slate-200">
+                <div
+                  className="h-28 w-full relative overflow-hidden"
+                  style={{ background: (game as any).cardBg || "#E2E8F0" }}
+                >
                   {game.image ? (
                     <>
                       <img
                         src={game.image}
                         alt={game.name}
-                        className="w-full h-full object-cover"
-                        style={{ objectPosition: game.imagePos }}
+                        className="w-full h-full"
+                        style={{ objectFit: game.imageFit || "cover", objectPosition: game.imagePos }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"/>
                     </>
