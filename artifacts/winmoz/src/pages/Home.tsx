@@ -256,6 +256,204 @@ function DamasBoard({ size = 140 }: { size?: number }) {
 }
 
 /* ─────────────────────────────────────────────
+   ANIMATED LUDO BOARD
+───────────────────────────────────────────── */
+
+// 50-square Ludo track (col, row) — clockwise from blue exit
+const LUDO_TRACK: [number, number][] = [
+  [1,8],[1,7],[1,6],
+  [2,5],[3,5],[4,5],[5,5],
+  [6,4],[6,3],[6,2],[6,1],[6,0],
+  [7,0],
+  [8,0],[8,1],[8,2],[8,3],[8,4],[8,5],
+  [9,5],[10,5],[11,5],[12,5],[13,5],
+  [13,6],[13,7],[13,8],
+  [13,9],[12,9],[11,9],[10,9],[9,9],
+  [8,9],[8,10],[8,11],[8,12],[8,13],[8,14],
+  [7,14],
+  [6,14],[6,13],[6,12],[6,11],[6,10],[6,9],
+  [5,9],[4,9],[3,9],[2,9],[1,9],
+];
+
+const PIECE_COLORS = ["#EF4444","#22C55E","#EAB308","#818CF8"];
+const PIECE_START = [0, 12, 25, 37]; // staggered start positions on track
+
+function LudoBoard({ size = 140 }: { size?: number }) {
+  const C = size / 15;
+  const [step, setStep] = useState(0);
+  const [diceVal, setDiceVal] = useState(5);
+  const [diceSpin, setDiceSpin] = useState(false);
+
+  // Advance pieces every 480ms
+  useEffect(() => {
+    const t = setInterval(() => setStep(s => s + 1), 480);
+    return () => clearInterval(t);
+  }, []);
+
+  // Roll dice every ~1.6s (every ~3.3 steps)
+  useEffect(() => {
+    const t = setInterval(() => {
+      setDiceSpin(true);
+      setTimeout(() => {
+        setDiceVal(Math.floor(Math.random() * 6) + 1);
+        setDiceSpin(false);
+      }, 200);
+    }, 1600);
+    return () => clearInterval(t);
+  }, []);
+
+  const piecePx = PIECE_COLORS.map((_, i) => {
+    const idx = (PIECE_START[i] + step) % LUDO_TRACK.length;
+    const [col, row] = LUDO_TRACK[idx];
+    return { x: col * C + C / 2, y: row * C + C / 2 };
+  });
+
+  // Dice dots layout for faces 1-6
+  const DICE_DOTS: [number, number][][] = [
+    [[0.5,0.5]],
+    [[0.25,0.25],[0.75,0.75]],
+    [[0.25,0.25],[0.5,0.5],[0.75,0.75]],
+    [[0.25,0.25],[0.75,0.25],[0.25,0.75],[0.75,0.75]],
+    [[0.25,0.25],[0.75,0.25],[0.5,0.5],[0.25,0.75],[0.75,0.75]],
+    [[0.25,0.25],[0.75,0.25],[0.25,0.5],[0.75,0.5],[0.25,0.75],[0.75,0.75]],
+  ];
+  const dots = DICE_DOTS[diceVal - 1];
+  const diceSize = C * 2.2;
+  const diceX = size - diceSize - C * 0.3;
+  const diceY = C * 0.3;
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block", borderRadius: 6 }}>
+      {/* Board background */}
+      <rect width={size} height={size} fill="#F8F8F8"/>
+
+      {/* Track cells — white cross */}
+      {/* Vertical arm cols 6-8 */}
+      {[6,7,8].map(c => (
+        <rect key={`va${c}`} x={c*C} y={0} width={C} height={size} fill="#FFFFFF"/>
+      ))}
+      {/* Horizontal arm rows 6-8 */}
+      {[6,7,8].map(r => (
+        <rect key={`ha${r}`} x={0} y={r*C} width={size} height={C} fill="#FFFFFF"/>
+      ))}
+
+      {/* Home areas */}
+      <rect x={0} y={0} width={6*C} height={6*C} fill="#EF4444"/>
+      <rect x={9*C} y={0} width={6*C} height={6*C} fill="#22C55E"/>
+      <rect x={9*C} y={9*C} width={6*C} height={6*C} fill="#EAB308"/>
+      <rect x={0} y={9*C} width={6*C} height={6*C} fill="#3B82F6"/>
+
+      {/* Inner safe zones (white inset rounded rect) */}
+      {[
+        { x: C*0.7, y: C*0.7 },
+        { x: 9*C+C*0.7, y: C*0.7 },
+        { x: 9*C+C*0.7, y: 9*C+C*0.7 },
+        { x: C*0.7, y: 9*C+C*0.7 },
+      ].map((pos, i) => (
+        <rect key={`safe${i}`} x={pos.x} y={pos.y} width={C*4.6} height={C*4.6}
+          fill="rgba(255,255,255,0.28)" rx={C*0.5}/>
+      ))}
+
+      {/* Home circles (4 per corner) */}
+      {[
+        { cx: 2*C, cy: 2*C, color: "#FECACA" },
+        { cx: 4*C, cy: 2*C, color: "#FECACA" },
+        { cx: 2*C, cy: 4*C, color: "#FECACA" },
+        { cx: 4*C, cy: 4*C, color: "#FECACA" },
+        { cx: 11*C, cy: 2*C, color: "#BBF7D0" },
+        { cx: 13*C, cy: 2*C, color: "#BBF7D0" },
+        { cx: 11*C, cy: 4*C, color: "#BBF7D0" },
+        { cx: 13*C, cy: 4*C, color: "#BBF7D0" },
+        { cx: 11*C, cy: 11*C, color: "#FEF08A" },
+        { cx: 13*C, cy: 11*C, color: "#FEF08A" },
+        { cx: 11*C, cy: 13*C, color: "#FEF08A" },
+        { cx: 13*C, cy: 13*C, color: "#FEF08A" },
+        { cx: 2*C, cy: 11*C, color: "#BFDBFE" },
+        { cx: 4*C, cy: 11*C, color: "#BFDBFE" },
+        { cx: 2*C, cy: 13*C, color: "#BFDBFE" },
+        { cx: 4*C, cy: 13*C, color: "#BFDBFE" },
+      ].map((dot, i) => (
+        <circle key={`hc${i}`} cx={dot.cx} cy={dot.cy} r={C*0.72}
+          fill={dot.color} stroke="rgba(0,0,0,0.12)" strokeWidth={0.5}/>
+      ))}
+
+      {/* Home stretch lanes (tinted track lanes toward center) */}
+      {/* Red → row 7, cols 1-5 */}
+      {[1,2,3,4,5].map(c => <rect key={`rs${c}`} x={c*C+1} y={7*C+1} width={C-2} height={C-2} fill="#FCA5A5" rx={1}/>)}
+      {/* Green → col 7, rows 1-5 */}
+      {[1,2,3,4,5].map(r => <rect key={`gs${r}`} x={7*C+1} y={r*C+1} width={C-2} height={C-2} fill="#86EFAC" rx={1}/>)}
+      {/* Yellow → row 7, cols 9-13 */}
+      {[9,10,11,12,13].map(c => <rect key={`ys${c}`} x={c*C+1} y={7*C+1} width={C-2} height={C-2} fill="#FDE68A" rx={1}/>)}
+      {/* Blue → col 7, rows 9-13 */}
+      {[9,10,11,12,13].map(r => <rect key={`bs${r}`} x={7*C+1} y={r*C+1} width={C-2} height={C-2} fill="#93C5FD" rx={1}/>)}
+
+      {/* Track grid lines */}
+      {Array.from({length:15},(_,i) => (
+        <line key={`gl${i}`} x1={i*C} y1={0} x2={i*C} y2={size} stroke="#E2E2E2" strokeWidth={0.4}/>
+      ))}
+      {Array.from({length:15},(_,i) => (
+        <line key={`gr${i}`} x1={0} y1={i*C} x2={size} y2={i*C} stroke="#E2E2E2" strokeWidth={0.4}/>
+      ))}
+
+      {/* Safe squares (star markers on specific track squares) */}
+      {[[2,6],[2,8],[6,2],[8,2],[12,6],[12,8],[6,12],[8,12]].map(([c,r],i) => (
+        <rect key={`star${i}`} x={c*C+C*0.2} y={r*C+C*0.2} width={C*0.6} height={C*0.6}
+          fill="#6B7280" rx={1} transform={`rotate(45 ${c*C+C/2} ${r*C+C/2})`}/>
+      ))}
+
+      {/* Center finishing area — triangle star */}
+      {[
+        { points: `${7*C},${6*C} ${8*C},${7*C} ${7*C},${8*C} ${6*C},${7*C}`, fill: "#EF4444" },
+        { points: `${7*C},${6*C} ${9*C},${6*C} ${8*C},${7*C}`, fill: "#22C55E" },
+        { points: `${8*C},${7*C} ${9*C},${6*C} ${9*C},${9*C}`, fill: "#EAB308" },
+        { points: `${7*C},${8*C} ${8*C},${7*C} ${9*C},${9*C} ${6*C},${9*C}`, fill: "#3B82F6" },
+        { points: `${6*C},${6*C} ${7*C},${6*C} ${6*C},${7*C}`, fill: "#EF4444" },
+        { points: `${6*C},${7*C} ${7*C},${8*C} ${6*C},${9*C}`, fill: "#3B82F6" },
+      ].map((tri, i) => (
+        <polygon key={`ct${i}`} points={tri.points} fill={tri.fill} opacity={0.85}/>
+      ))}
+
+      {/* Board outer border */}
+      <rect x={0} y={0} width={size} height={size} fill="none" stroke="#9CA3AF" strokeWidth={1.5} rx={4}/>
+
+      {/* Animated Pieces */}
+      {piecePx.map((pos, i) => (
+        <motion.g
+          key={`piece${i}`}
+          animate={{ x: pos.x, y: pos.y }}
+          initial={{ x: pos.x, y: pos.y }}
+          transition={{ duration: 0.42, ease: [0.25, 0.46, 0.45, 0.94] }}
+        >
+          <circle r={C*0.38} fill="rgba(0,0,0,0.2)" cx={0.5} cy={C*0.18}/>
+          <circle r={C*0.38} fill={PIECE_COLORS[i]} stroke="rgba(255,255,255,0.8)" strokeWidth={0.9}/>
+          <circle r={C*0.18} fill="rgba(255,255,255,0.4)"/>
+          <circle r={C*0.1} cx={-C*0.12} cy={-C*0.12} fill="rgba(255,255,255,0.6)"/>
+        </motion.g>
+      ))}
+
+      {/* Animated Dice */}
+      <motion.g
+        animate={{ rotate: diceSpin ? 15 : 0, scale: diceSpin ? 0.85 : 1 }}
+        style={{ transformOrigin: `${diceX + diceSize/2}px ${diceY + diceSize/2}px` }}
+        transition={{ duration: 0.15 }}
+      >
+        <rect x={diceX} y={diceY} width={diceSize} height={diceSize} fill="white"
+          stroke="#D1D5DB" strokeWidth={0.8} rx={C*0.3}
+          style={{ filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.25))" }}/>
+        {dots.map(([fx, fy], di) => (
+          <circle key={`d${di}`}
+            cx={diceX + fx * diceSize}
+            cy={diceY + fy * diceSize}
+            r={diceSize * 0.1}
+            fill="#1F2937"
+          />
+        ))}
+      </motion.g>
+    </svg>
+  );
+}
+
+/* ─────────────────────────────────────────────
    BANNER CAROUSEL
 ───────────────────────────────────────────── */
 const SLIDES = [
@@ -265,18 +463,18 @@ const SLIDES = [
     bg: "linear-gradient(135deg, #1A0A00 0%, #3D1A00 40%, #5C2A00 100%)",
     accent: "#D4820A",
     badge: "Anúncio Patrocinado",
-    title: "Domina o\nTabuleiro.",
-    subtitle: "Joga Damas Internacional, aposta real, vence a sério.",
+    title: "Domina o\nTabuleiro?",
+    subtitle: "Jogue Damas Online e multiplica o teu saldo.",
     cta: "Jogar Agora",
   },
   {
     id: "ludo",
     duration: 10000,
-    bg: "linear-gradient(135deg, #001A0D 0%, #003320 40%, #004D30 100%)",
-    accent: "#22C55E",
+    bg: "linear-gradient(135deg, #0A0A1A 0%, #12122E 40%, #1A1A3D 100%)",
+    accent: "#A78BFA",
     badge: "Anúncio Patrocinado",
-    title: "Conquista\no Dado.",
-    subtitle: "Joga Ludo, desafia rivais, multiplica o teu saldo.",
+    title: "Gosta de Ludo\napostado?",
+    subtitle: "Desafia rivais online e multiplica o teu saldo.",
     cta: "Jogar Agora",
   },
 ];
@@ -386,35 +584,12 @@ function HeroBanner() {
                   animate={{ opacity: 1, rotate: 4, scale: 1 }}
                   transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
                   style={{
-                    width: 136,
-                    height: 136,
                     borderRadius: 10,
                     overflow: "hidden",
-                    boxShadow: "0 8px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)",
-                    border: "2px solid rgba(255,255,255,0.08)",
-                    position: "relative",
+                    boxShadow: "0 8px 40px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4), 0 0 0 1.5px rgba(167,139,250,0.25)",
                   }}
                 >
-                  <img
-                    src="/ludo-board.png"
-                    alt="Ludo"
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                      objectPosition: "center 55%",
-                      display: "block",
-                    }}
-                  />
-                  {/* Mask sky at top */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: "linear-gradient(to bottom, #001A0D 0%, transparent 35%)",
-                      pointerEvents: "none",
-                    }}
-                  />
+                  <LudoBoard size={136} />
                 </motion.div>
               )}
             </div>
@@ -464,9 +639,10 @@ const games = [
     bet: "20–2.000 MT",
     rating: "4.9",
     players: "4.1K jogando",
-    image: "/ludo-board.png",
+    image: null,
     imageFit: "cover" as const,
-    imagePos: "center 60%",
+    imagePos: "center",
+    ludoCard: true,
   },
   {
     id: "xadrez",
@@ -580,7 +756,11 @@ export default function Home() {
                 className="min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col"
               >
                 <div className="h-28 w-full relative overflow-hidden bg-slate-200">
-                  {game.image ? (
+                  {"ludoCard" in game && game.ludoCard ? (
+                    <div className="w-full h-full flex items-center justify-center" style={{ background: "#18181B" }}>
+                      <LudoBoard size={110} />
+                    </div>
+                  ) : game.image ? (
                     <>
                       <img
                         src={game.image}
@@ -588,7 +768,6 @@ export default function Home() {
                         className="w-full h-full object-cover"
                         style={{ objectPosition: game.imagePos }}
                       />
-                      {/* overlay gradient for depth */}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"/>
                     </>
                   ) : (
