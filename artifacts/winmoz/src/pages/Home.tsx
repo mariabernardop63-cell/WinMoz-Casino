@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import { Play, Home as HomeIcon, Gamepad2, Wallet, User, Star, ChevronRight, ArrowDownLeft, TrendingUp } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
+/* ─────────────────────────────────────────────
+   SAQUES 24 HORAS
+───────────────────────────────────────────── */
 const SAQUES_POOL = [
   { id: "s1", name: "Isabel Martins", initials: "IM", bg: "from-violet-500 to-purple-700", amount: "3.500 MT", time: "agora mesmo" },
   { id: "s2", name: "Carlos Fonseca", initials: "CF", bg: "from-blue-500 to-indigo-700", amount: "12.000 MT", time: "há 1 min" },
@@ -17,18 +19,12 @@ const SAQUES_POOL = [
 
 function SaquesSection() {
   const [visible, setVisible] = useState(SAQUES_POOL.slice(0, 4));
-  const [entering, setEntering] = useState<string | null>(null);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const next = SAQUES_POOL[Math.floor(Math.random() * SAQUES_POOL.length)];
       const fresh = { ...next, id: next.id + Date.now(), time: "agora mesmo" };
-      setEntering(fresh.id);
-      setVisible(prev => {
-        const updated = [fresh, ...prev.slice(0, 3)];
-        return updated;
-      });
-      setTimeout(() => setEntering(null), 600);
+      setVisible(prev => [fresh, ...prev.slice(0, 3)]);
     }, 3500);
     return () => clearInterval(interval);
   }, []);
@@ -45,7 +41,6 @@ function SaquesSection() {
           </span>
         </div>
       </div>
-
       <div className="flex flex-col gap-2">
         <AnimatePresence initial={false}>
           {visible.map((saque) => (
@@ -56,20 +51,14 @@ function SaquesSection() {
               exit={{ opacity: 0, y: 8, scale: 0.97 }}
               transition={{ duration: 0.38, ease: "easeOut" }}
               className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm"
-              data-testid={`row-saque-${saque.id}`}
             >
-              {/* Avatar */}
               <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${saque.bg} flex items-center justify-center text-white font-syne font-bold text-sm flex-shrink-0 shadow-md`}>
                 {saque.initials}
               </div>
-
-              {/* Info */}
               <div className="flex-1 min-w-0">
                 <p className="font-syne font-bold text-slate-900 text-sm truncate">{saque.name}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">{saque.time}</p>
               </div>
-
-              {/* Amount + icon */}
               <div className="flex items-center gap-2 flex-shrink-0">
                 <div className="text-right">
                   <p className="font-syne font-extrabold text-emerald-600 text-sm">+{saque.amount}</p>
@@ -87,39 +76,410 @@ function SaquesSection() {
   );
 }
 
+/* ─────────────────────────────────────────────
+   LOGO
+───────────────────────────────────────────── */
 function WinMozLogo() {
   return (
-    <div className="flex items-center" data-testid="logo-winmoz">
+    <div className="flex items-center">
       <svg viewBox="0 0 230 46" height="34" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* Diagonal speed-slash */}
         <path d="M1 2 L11 2 L7 44 L0 44 Z" fill="#0D0D0D"/>
         <path d="M13 2 L20 2 L16 44 L10 44 Z" fill="#0D0D0D" opacity="0.18"/>
-
-        {/* "Poker" wordmark */}
-        <text
-          x="24"
-          y="40"
-          fontFamily="'Syne', sans-serif"
-          fontWeight="800"
-          fontSize="40"
-          letterSpacing="-1.5"
-          fill="#0D0D0D"
-        >Poker</text>
-
-        {/* ® */}
+        <text x="24" y="40" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="40" letterSpacing="-1.5" fill="#0D0D0D">Poker</text>
         <circle cx="218" cy="11" r="7" stroke="#0D0D0D" strokeWidth="1.8" fill="none"/>
-        <text
-          x="214.5"
-          y="15.5"
-          fontFamily="'Syne', sans-serif"
-          fontWeight="700"
-          fontSize="9"
-          fill="#0D0D0D"
-        >R</text>
+        <text x="214.5" y="15.5" fontFamily="'Syne', sans-serif" fontWeight="700" fontSize="9" fill="#0D0D0D">R</text>
       </svg>
     </div>
   );
 }
+
+/* ─────────────────────────────────────────────
+   INTERNATIONAL DRAUGHTS ANIMATED BOARD (10×10)
+───────────────────────────────────────────── */
+
+type Piece = { id: string; row: number; col: number; color: "white" | "black" };
+
+// Initial positions — International Draughts (10×10)
+// Dark squares: (row + col) % 2 === 1
+// Black: rows 0–3 (top), White: rows 6–9 (bottom)
+function initPieces(): Piece[] {
+  const pieces: Piece[] = [];
+  for (let r = 0; r <= 3; r++) {
+    for (let c = 0; c < 10; c++) {
+      if ((r + c) % 2 === 1) pieces.push({ id: `b${r}${c}`, row: r, col: c, color: "black" });
+    }
+  }
+  for (let r = 6; r <= 9; r++) {
+    for (let c = 0; c < 10; c++) {
+      if ((r + c) % 2 === 1) pieces.push({ id: `w${r}${c}`, row: r, col: c, color: "white" });
+    }
+  }
+  return pieces;
+}
+
+// Legal opening move sequence (International Draughts rules)
+// White moves UP (decreasing row), Black moves DOWN (increasing row)
+const MOVE_SEQ: [string, number, number][] = [
+  // [pieceId, targetRow, targetCol]
+  ["w76", 5, 7],   // white (6,7) → (5,7) — not dark: adjust
+  ["w63", 5, 4],   // white (6,3) → (5,4)
+  ["b32", 4, 3],   // black (3,2) → (4,3)
+  ["w74", 6, 3],   // white (7,4) → (6,3)
+  ["b34", 4, 5],   // black (3,4) → (4,5)
+  ["w65", 5, 6],   // white (6,5) → (5,6)
+  ["b30", 4, 1],   // black (3,0) → (4,1)
+  ["w78", 6, 7],   // white (7,8) → (6,7)
+];
+
+// Fix: only dark squares — recalculate valid moves
+const VALID_MOVES: [string, number, number][] = [
+  ["w63", 5, 2],   // white (6,3) → (5,2) ✓ dark
+  ["b32", 4, 3],   // black (3,2) → (4,3) ✓ dark
+  ["w65", 5, 4],   // white (6,5) → (5,4) ✓ dark
+  ["b34", 4, 5],   // black (3,4) → (4,5) ✓ dark
+  ["w67", 5, 6],   // white (6,7) → (5,6) ✓ dark? (5+6=11 odd ✓)
+  ["b36", 4, 7],   // black (3,6) → (4,7) ✓ dark? (4+7=11 odd ✓)
+];
+
+function DamasBoard({ size = 140 }: { size?: number }) {
+  const cell = size / 10;
+  const [pieces, setPieces] = useState<Piece[]>(initPieces);
+  const [moveIdx, setMoveIdx] = useState(0);
+  const animRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    animRef.current = setTimeout(() => {
+      const [id, tr, tc] = VALID_MOVES[moveIdx % VALID_MOVES.length];
+      setPieces(prev =>
+        prev.map(p => p.id === id ? { ...p, row: tr, col: tc } : p)
+      );
+      setMoveIdx(i => i + 1);
+    }, moveIdx === 0 ? 1200 : 1800);
+    return () => { if (animRef.current) clearTimeout(animRef.current); };
+  }, [moveIdx]);
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      style={{ borderRadius: 6, overflow: "hidden", display: "block" }}
+    >
+      {/* Board squares */}
+      {Array.from({ length: 10 }, (_, r) =>
+        Array.from({ length: 10 }, (_, c) => {
+          const dark = (r + c) % 2 === 1;
+          return (
+            <rect
+              key={`sq${r}${c}`}
+              x={c * cell}
+              y={r * cell}
+              width={cell}
+              height={cell}
+              fill={dark ? "#8B5E3C" : "#F5DEB3"}
+            />
+          );
+        })
+      )}
+
+      {/* Board grain texture lines on dark squares */}
+      {Array.from({ length: 10 }, (_, r) =>
+        Array.from({ length: 10 }, (_, c) => {
+          if ((r + c) % 2 !== 1) return null;
+          return (
+            <rect
+              key={`gr${r}${c}`}
+              x={c * cell + 1}
+              y={r * cell + 1}
+              width={cell - 2}
+              height={cell - 2}
+              fill="rgba(0,0,0,0.06)"
+              rx={1}
+            />
+          );
+        })
+      )}
+
+      {/* Pieces — use motion.g with x/y transform */}
+      {pieces.map(p => {
+        const px = p.col * cell + cell / 2;
+        const py = p.row * cell + cell / 2;
+        const r = cell * 0.36;
+        const isWhite = p.color === "white";
+        return (
+          <motion.g
+            key={p.id}
+            animate={{ x: px, y: py }}
+            initial={{ x: px, y: py }}
+            transition={{ duration: 0.75, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            {/* Shadow */}
+            <ellipse cx={1} cy={r * 0.55} rx={r} ry={r * 0.35} fill="rgba(0,0,0,0.28)" />
+            {/* Piece body */}
+            <circle
+              r={r}
+              fill={isWhite ? "#F0EDE6" : "#2C2C2C"}
+              stroke={isWhite ? "#C9BFA8" : "#111111"}
+              strokeWidth={0.9}
+            />
+            {/* Inner ring 1 */}
+            <circle
+              r={r * 0.72}
+              fill="none"
+              stroke={isWhite ? "rgba(255,255,255,0.65)" : "rgba(255,255,255,0.1)"}
+              strokeWidth={0.8}
+            />
+            {/* Inner ring 2 */}
+            <circle
+              r={r * 0.46}
+              fill="none"
+              stroke={isWhite ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.07)"}
+              strokeWidth={0.7}
+            />
+            {/* Highlight */}
+            <circle
+              cx={-r * 0.26}
+              cy={-r * 0.26}
+              r={r * 0.2}
+              fill={isWhite ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.14)"}
+            />
+          </motion.g>
+        );
+      })}
+
+      {/* Board border */}
+      <rect x={0} y={0} width={size} height={size} fill="none" stroke="#6B3F1C" strokeWidth={2.5} rx={4}/>
+      {/* Inner border */}
+      <rect x={2} y={2} width={size - 4} height={size - 4} fill="none" stroke="#A0714A" strokeWidth={1} rx={3}/>
+    </svg>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   BANNER CAROUSEL
+───────────────────────────────────────────── */
+const SLIDES = [
+  {
+    id: "damas",
+    duration: 8000,
+    bg: "linear-gradient(135deg, #1A0A00 0%, #3D1A00 40%, #5C2A00 100%)",
+    accent: "#D4820A",
+    badge: "Anúncio Patrocinado",
+    title: "Domina o\nTabuleiro.",
+    subtitle: "Joga Damas Internacional, aposta real, vence a sério.",
+    cta: "Jogar Agora",
+  },
+  {
+    id: "ludo",
+    duration: 10000,
+    bg: "linear-gradient(135deg, #001A0D 0%, #003320 40%, #004D30 100%)",
+    accent: "#22C55E",
+    badge: "Anúncio Patrocinado",
+    title: "Conquista\no Dado.",
+    subtitle: "Joga Ludo, desafia rivais, multiplica o teu saldo.",
+    cta: "Jogar Agora",
+  },
+];
+
+const slideIn = {
+  initial: (dir: number) => ({ opacity: 0, x: dir * 40, scale: 0.97 }),
+  animate: { opacity: 1, x: 0, scale: 1, transition: { duration: 0.65, ease: [0.22, 1, 0.36, 1] } },
+  exit: (dir: number) => ({ opacity: 0, x: dir * -40, scale: 0.97, transition: { duration: 0.5, ease: [0.55, 0, 1, 0.45] } }),
+};
+
+function HeroBanner() {
+  const [slideIdx, setSlideIdx] = useState(0);
+  const [dir, setDir] = useState(1);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const goTo = (next: number) => {
+    setDir(next > slideIdx ? 1 : -1);
+    setSlideIdx(next);
+  };
+
+  useEffect(() => {
+    const slide = SLIDES[slideIdx];
+    timerRef.current = setTimeout(() => {
+      goTo((slideIdx + 1) % SLIDES.length);
+    }, slide.duration);
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [slideIdx]);
+
+  const slide = SLIDES[slideIdx];
+
+  return (
+    <section className="px-4 pt-5 pb-3">
+      <div
+        className="relative w-full rounded-3xl overflow-hidden shadow-2xl"
+        style={{ background: slide.bg, minHeight: 190, transition: "background 0.8s ease" }}
+      >
+        {/* Ambient glow */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `radial-gradient(ellipse at 80% 50%, ${slide.accent}22 0%, transparent 65%)`,
+            transition: "background 0.8s ease",
+          }}
+        />
+
+        <AnimatePresence mode="wait" custom={dir}>
+          <motion.div
+            key={slide.id}
+            custom={dir}
+            variants={slideIn}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            className="relative z-10 flex items-center justify-between px-5 py-6 gap-3"
+            style={{ minHeight: 190 }}
+          >
+            {/* LEFT: text */}
+            <div className="flex-1 min-w-0">
+              {/* Badge */}
+              <div
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest mb-3 uppercase border"
+                style={{ borderColor: `${slide.accent}40`, background: `${slide.accent}15`, color: slide.accent }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: slide.accent }}/>
+                {slide.badge}
+              </div>
+
+              {/* Title */}
+              <h1 className="font-syne font-extrabold text-[1.55rem] leading-tight text-white mb-2 drop-shadow-md whitespace-pre-line">
+                {slide.title}
+              </h1>
+
+              {/* Subtitle */}
+              <p className="text-[11px] leading-relaxed mb-4 max-w-[155px]" style={{ color: `${slide.accent}CC` }}>
+                {slide.subtitle}
+              </p>
+
+              {/* CTA */}
+              <motion.button
+                whileTap={{ scale: 0.96 }}
+                className="font-syne font-bold text-sm px-5 py-2 rounded-xl shadow-lg transition-all duration-200"
+                style={{ background: slide.accent, color: "#000" }}
+              >
+                {slide.cta} →
+              </motion.button>
+            </div>
+
+            {/* RIGHT: board */}
+            <div className="flex-shrink-0 flex items-center justify-center">
+              {slide.id === "damas" ? (
+                <motion.div
+                  initial={{ opacity: 0, rotate: -4, scale: 0.88 }}
+                  animate={{ opacity: 1, rotate: -4, scale: 1 }}
+                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+                  style={{
+                    borderRadius: 10,
+                    boxShadow: "0 8px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)",
+                    border: "2px solid rgba(255,255,255,0.08)",
+                    overflow: "hidden",
+                  }}
+                >
+                  <DamasBoard size={136} />
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, rotate: 4, scale: 0.88 }}
+                  animate={{ opacity: 1, rotate: 4, scale: 1 }}
+                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+                  style={{
+                    width: 136,
+                    height: 136,
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    boxShadow: "0 8px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)",
+                    border: "2px solid rgba(255,255,255,0.08)",
+                    position: "relative",
+                  }}
+                >
+                  <img
+                    src="/ludo-board.png"
+                    alt="Ludo"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      objectPosition: "center 55%",
+                      display: "block",
+                    }}
+                  />
+                  {/* Mask sky at top */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: "linear-gradient(to bottom, #001A0D 0%, transparent 35%)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Slide dots */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+          {SLIDES.map((s, i) => (
+            <button
+              key={s.id}
+              onClick={() => goTo(i)}
+              className="transition-all duration-400"
+              style={{
+                width: i === slideIdx ? 20 : 6,
+                height: 6,
+                borderRadius: 4,
+                background: i === slideIdx ? slide.accent : "rgba(255,255,255,0.25)",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   GAME CARDS DATA
+───────────────────────────────────────────── */
+const games = [
+  {
+    id: "damas",
+    name: "DAMAS",
+    sub: "Jogo de Tabuleiro",
+    bet: "50–5.000 MT",
+    rating: "4.8",
+    players: "2.4K jogando",
+    image: "/damas-board.png",
+    imageFit: "cover" as const,
+    imagePos: "center 20%",
+  },
+  {
+    id: "ludo",
+    name: "LUDO",
+    sub: "Jogo de Dados",
+    bet: "20–2.000 MT",
+    rating: "4.9",
+    players: "4.1K jogando",
+    image: "/ludo-board.png",
+    imageFit: "cover" as const,
+    imagePos: "center 60%",
+  },
+  {
+    id: "xadrez",
+    name: "XADREZ",
+    sub: "Estratégia Real",
+    bet: "100–10.000 MT",
+    rating: "4.7",
+    players: "1.2K jogando",
+    image: null,
+    imageFit: "cover" as const,
+    imagePos: "center",
+  },
+];
 
 const stagger = {
   hidden: {},
@@ -131,152 +491,78 @@ const fadeUp = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } }
 };
 
-const games = [
-  {
-    id: "damas",
-    name: "DAMAS",
-    sub: "Jogo de Tabuleiro",
-    bet: "50–5.000 MT",
-    rating: "4.8",
-    players: "2.4K jogando",
-    art: (
-      <div className="w-full h-full bg-gradient-to-br from-blue-700 via-blue-800 to-indigo-900 flex items-center justify-center overflow-hidden relative">
-        <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 opacity-20">
-          {[...Array(16)].map((_, i) => (
-            <div key={i} className={`${(i + Math.floor(i / 4)) % 2 === 0 ? 'bg-white' : 'bg-transparent'}`}/>
-          ))}
-        </div>
-        <div className="relative z-10 flex gap-3">
-          <div className="w-9 h-9 rounded-full bg-amber-400 border-4 border-amber-200 shadow-xl"/>
-          <div className="w-9 h-9 rounded-full bg-slate-900 border-4 border-slate-600 shadow-xl mt-3"/>
-        </div>
-      </div>
-    )
-  },
-  {
-    id: "ludo",
-    name: "LUDO",
-    sub: "Jogo de Dados",
-    bet: "20–2.000 MT",
-    rating: "4.9",
-    players: "4.1K jogando",
-    art: (
-      <div className="w-full h-full bg-gradient-to-br from-emerald-600 via-teal-700 to-emerald-900 flex items-center justify-center overflow-hidden">
-        <div className="w-14 h-14 bg-white rounded-xl shadow-2xl flex items-center justify-center rotate-6">
-          <div className="grid grid-cols-2 gap-1.5 p-1">
-            <div className="w-3.5 h-3.5 rounded-full bg-red-500"/>
-            <div className="w-3.5 h-3.5 rounded-full bg-blue-600"/>
-            <div className="w-3.5 h-3.5 rounded-full bg-emerald-500"/>
-            <div className="w-3.5 h-3.5 rounded-full bg-amber-400"/>
-          </div>
-        </div>
-      </div>
-    )
-  },
-  {
-    id: "xadrez",
-    name: "XADREZ",
-    sub: "Estratégia Real",
-    bet: "100–10.000 MT",
-    rating: "4.7",
-    players: "1.2K jogando",
-    art: (
-      <div className="w-full h-full bg-gradient-to-br from-violet-700 via-purple-800 to-indigo-900 flex items-center justify-center overflow-hidden relative">
-        <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 opacity-15">
-          {[...Array(16)].map((_, i) => (
-            <div key={i} className={`${(i + Math.floor(i / 4)) % 2 === 0 ? 'bg-white' : 'bg-transparent'}`}/>
-          ))}
-        </div>
-        <svg viewBox="0 0 40 44" width="38" className="relative z-10 drop-shadow-xl" fill="none">
-          <rect x="10" y="34" width="20" height="4" rx="2" fill="white" fillOpacity="0.85"/>
-          <rect x="14" y="28" width="12" height="7" rx="1.5" fill="white" fillOpacity="0.85"/>
-          <rect x="16" y="20" width="8" height="10" rx="1.5" fill="white" fillOpacity="0.85"/>
-          <rect x="17" y="12" width="6" height="10" rx="1.5" fill="white" fillOpacity="0.9"/>
-          <circle cx="20" cy="8" r="4" fill="white" fillOpacity="0.9"/>
-          <rect x="17" y="4" width="6" height="6" rx="1" fill="white" fillOpacity="0.8"/>
-          <rect x="15" y="2" width="10" height="3" rx="1.5" fill="white"/>
-        </svg>
-      </div>
-    )
-  }
-];
-
+/* ─────────────────────────────────────────────
+   TOP GAMES
+───────────────────────────────────────────── */
 const topGames = [
-  { id: "dc", name: "Damas Clássico", players: "4.1K apostadores ativos", rank: 1, initials: "DC", from: "#1D4ED8", to: "#1E3A8A" },
-  { id: "lt", name: "Ludo Turbo", players: "3.8K apostadores ativos", rank: 2, initials: "LT", from: "#059669", to: "#064E3B" },
-  { id: "xr", name: "Xadrez Rápido", players: "2.5K apostadores ativos", rank: 3, initials: "XR", from: "#7C3AED", to: "#3B0764" },
-  { id: "dp", name: "Damas Pro", players: "1.9K apostadores ativos", rank: 4, initials: "DP", from: "#EA580C", to: "#7C2D12" },
+  {
+    id: "dc",
+    name: "Damas Clássico",
+    players: "4.1K apostadores ativos",
+    rank: 1,
+    image: "/damas-board.png",
+    imagePos: "center 15%",
+    from: "#1D4ED8",
+    to: "#1E3A8A",
+  },
+  {
+    id: "lt",
+    name: "Ludo Turbo",
+    players: "3.8K apostadores ativos",
+    rank: 2,
+    image: "/ludo-board.png",
+    imagePos: "center 60%",
+    from: "#059669",
+    to: "#064E3B",
+  },
+  {
+    id: "xr",
+    name: "Xadrez Rápido",
+    players: "2.5K apostadores ativos",
+    rank: 3,
+    image: null,
+    imagePos: "center",
+    from: "#7C3AED",
+    to: "#3B0764",
+  },
+  {
+    id: "dp",
+    name: "Damas Pro",
+    players: "1.9K apostadores ativos",
+    rank: 4,
+    image: "/damas-board.png",
+    imagePos: "center 25%",
+    from: "#EA580C",
+    to: "#7C2D12",
+  },
 ];
 
+/* ─────────────────────────────────────────────
+   MAIN EXPORT
+───────────────────────────────────────────── */
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white text-slate-900 w-full flex justify-center selection:bg-blue-100">
-      <div className="w-full max-w-[430px] flex flex-col relative pb-24 bg-white">
+    <div className="min-h-screen bg-[#F8F9FA] text-slate-900 w-full flex justify-center selection:bg-blue-100">
+      <div className="w-full max-w-[430px] flex flex-col relative pb-24 bg-[#F8F9FA]">
 
-        {/* TOP NAVIGATION BAR */}
+        {/* TOP NAV */}
         <header className="sticky top-0 z-50 flex items-center justify-between px-5 py-3.5 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
           <WinMozLogo />
           <Link href="/login">
-            <button
-              className="bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm px-5 py-2 rounded-xl transition-all duration-200 shadow-md hover:shadow-blue-200 hover:shadow-lg font-syne tracking-wide"
-              data-testid="button-register"
-            >
+            <button className="bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm px-5 py-2 rounded-xl transition-all duration-200 shadow-md hover:shadow-blue-200 hover:shadow-lg font-syne tracking-wide">
               Registar-se
             </button>
           </Link>
         </header>
 
         {/* HERO BANNER */}
-        <section className="px-4 pt-5 pb-3">
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="relative w-full rounded-2xl overflow-hidden shadow-xl"
-            data-testid="hero-banner"
-            style={{ background: "linear-gradient(135deg, #0F2060 0%, #1D4ED8 50%, #0369A1 100%)" }}
-          >
-            <div className="absolute inset-0 opacity-10" style={{
-              backgroundImage: "radial-gradient(circle at 70% 50%, rgba(255,255,255,0.15) 0%, transparent 60%)"
-            }}/>
-
-            <div className="relative z-10 p-6 flex justify-between items-center min-h-[160px]">
-              <div className="flex-1 pr-2">
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest bg-white/10 border border-white/20 text-blue-100 mb-3 uppercase">
-                  Anúncio Patrocinado
-                </div>
-                <h1 className="font-syne font-extrabold text-[1.65rem] leading-tight text-white mb-1.5 drop-shadow-md">
-                  Domina o<br/>Tabuleiro.
-                </h1>
-                <p className="text-xs text-blue-200 mb-4 leading-relaxed max-w-[160px]">
-                  Joga Damas, aposta real, ganha a sério.
-                </p>
-                <button
-                  className="bg-white text-blue-700 hover:bg-blue-50 font-bold text-sm px-5 py-2 rounded-xl transition-all duration-200 shadow-md font-syne"
-                  data-testid="button-play-now"
-                >
-                  Jogar Agora →
-                </button>
-              </div>
-
-              <div className="flex-shrink-0 w-28 h-28 relative">
-                <div className="absolute inset-0 grid grid-cols-4 grid-rows-4 rounded-lg overflow-hidden transform rotate-6 shadow-2xl border border-white/20">
-                  {[...Array(16)].map((_, i) => (
-                    <div key={i} className={(i + Math.floor(i / 4)) % 2 === 0 ? 'bg-white/15' : 'bg-white/5'}/>
-                  ))}
-                </div>
-                <div className="absolute top-4 left-4 w-8 h-8 rounded-full bg-amber-400 border-4 border-amber-200 shadow-xl z-10"/>
-                <div className="absolute bottom-4 right-4 w-8 h-8 rounded-full bg-slate-900 border-4 border-slate-600 shadow-xl z-10"/>
-              </div>
-            </div>
-          </motion.div>
-        </section>
+        <HeroBanner />
 
         {/* JOGOS EM DESTAQUE */}
         <section className="px-4 py-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-syne font-bold text-base text-slate-900">Jogos em Destaque</h2>
-            <Link href="/jogos" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center" data-testid="link-view-all-featured">
+            <Link href="/jogos" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center">
               Ver Todos <ChevronRight className="w-3 h-3 ml-0.5"/>
             </Link>
           </div>
@@ -292,24 +578,44 @@ export default function Home() {
                 key={game.id}
                 variants={fadeUp}
                 className="min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col"
-                data-testid={`card-featured-${game.id}`}
               >
-                <div className="h-28 w-full relative">
-                  {game.art}
+                <div className="h-28 w-full relative overflow-hidden bg-slate-200">
+                  {game.image ? (
+                    <>
+                      <img
+                        src={game.image}
+                        alt={game.name}
+                        className="w-full h-full object-cover"
+                        style={{ objectPosition: game.imagePos }}
+                      />
+                      {/* overlay gradient for depth */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"/>
+                    </>
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-violet-700 via-purple-800 to-indigo-900 flex items-center justify-center">
+                      <svg viewBox="0 0 40 44" width="38" className="drop-shadow-xl" fill="none">
+                        <rect x="10" y="34" width="20" height="4" rx="2" fill="white" fillOpacity="0.85"/>
+                        <rect x="14" y="28" width="12" height="7" rx="1.5" fill="white" fillOpacity="0.85"/>
+                        <rect x="16" y="20" width="8" height="10" rx="1.5" fill="white" fillOpacity="0.85"/>
+                        <rect x="17" y="12" width="6" height="10" rx="1.5" fill="white" fillOpacity="0.9"/>
+                        <circle cx="20" cy="8" r="4" fill="white" fillOpacity="0.9"/>
+                        <rect x="17" y="4" width="6" height="6" rx="1" fill="white" fillOpacity="0.8"/>
+                        <rect x="15" y="2" width="10" height="3" rx="1.5" fill="white"/>
+                      </svg>
+                    </div>
+                  )}
                   <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm rounded-full px-2 py-0.5 flex items-center gap-1">
                     <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400"/>
                     <span className="text-[10px] font-bold text-white">{game.rating}</span>
                   </div>
                 </div>
+
                 <div className="p-3 flex flex-col flex-1">
                   <h3 className="font-syne font-bold text-slate-900 text-sm tracking-wide">{game.name}</h3>
                   <p className="text-[10px] font-semibold text-blue-700 mt-0.5 uppercase tracking-wider">{game.bet}</p>
                   <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{game.players}</p>
                   <div className="mt-auto">
-                    <button
-                      className="w-full h-8 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-colors"
-                      data-testid={`button-play-${game.id}`}
-                    >
+                    <button className="w-full h-8 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-colors">
                       Jogar
                     </button>
                   </div>
@@ -320,36 +626,44 @@ export default function Home() {
         </section>
 
         {/* DIVIDER */}
-        <div className="mx-4 border-t border-slate-100 my-1"/>
+        <div className="mx-4 border-t border-slate-200 my-1"/>
 
         {/* POPULARES AGORA */}
         <section className="px-4 py-4 mb-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-syne font-bold text-base text-slate-900">Populares Agora</h2>
-            <Link href="/top" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center" data-testid="link-view-all-top">
+            <Link href="/top" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center">
               Ver Todos <ChevronRight className="w-3 h-3 ml-0.5"/>
             </Link>
           </div>
 
-          <motion.div
-            variants={stagger}
-            initial="hidden"
-            animate="show"
-            className="flex flex-col gap-2.5"
-          >
+          <motion.div variants={stagger} initial="hidden" animate="show" className="flex flex-col gap-2.5">
             {topGames.map((game) => (
               <motion.div
                 key={game.id}
                 variants={fadeUp}
                 className="flex items-center p-3 rounded-xl bg-white border border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 group shadow-sm"
-                data-testid={`row-top-${game.id}`}
               >
+                {/* Thumbnail */}
                 <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center text-white font-syne font-bold text-sm shadow-md flex-shrink-0 relative overflow-hidden"
-                  style={{ background: `linear-gradient(135deg, ${game.from}, ${game.to})` }}
+                  className="w-11 h-11 rounded-xl flex-shrink-0 relative overflow-hidden shadow-md"
+                  style={!game.image ? { background: `linear-gradient(135deg, ${game.from}, ${game.to})` } : {}}
                 >
-                  <div className="absolute inset-0 bg-black/10"/>
-                  <span className="relative z-10">{game.initials}</span>
+                  {game.image ? (
+                    <>
+                      <img
+                        src={game.image}
+                        alt={game.name}
+                        className="w-full h-full object-cover"
+                        style={{ objectPosition: game.imagePos }}
+                      />
+                      <div className="absolute inset-0 bg-black/15"/>
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-white font-syne font-bold text-sm">{game.id.toUpperCase()}</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="ml-3 flex-1 min-w-0">
@@ -364,10 +678,7 @@ export default function Home() {
                   <p className="text-[10px] text-slate-400 mt-0.5">{game.players}</p>
                 </div>
 
-                <button
-                  className="w-8 h-8 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center transition-colors shadow-md flex-shrink-0"
-                  data-testid={`button-play-row-${game.id}`}
-                >
+                <button className="w-8 h-8 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center transition-colors shadow-md flex-shrink-0">
                   <Play className="w-3.5 h-3.5 ml-0.5"/>
                 </button>
               </motion.div>
@@ -378,22 +689,22 @@ export default function Home() {
         {/* SAQUES 24 HORAS */}
         <SaquesSection />
 
-        {/* BOTTOM NAVIGATION BAR */}
+        {/* BOTTOM NAV */}
         <nav className="fixed bottom-0 w-full max-w-[430px] bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 py-3 z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex flex-col items-center gap-1 text-blue-700 group" data-testid="nav-home">
+            <Link href="/" className="flex flex-col items-center gap-1 text-blue-700">
               <HomeIcon className="w-5 h-5"/>
               <span className="text-[9px] font-semibold font-syne tracking-wide">Home</span>
             </Link>
-            <Link href="/explorar" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors" data-testid="nav-explorar">
+            <Link href="/explorar" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors">
               <Gamepad2 className="w-5 h-5"/>
               <span className="text-[9px] font-medium font-syne tracking-wide">Explorar</span>
             </Link>
-            <Link href="/carteira" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors" data-testid="nav-carteira">
+            <Link href="/carteira" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors">
               <Wallet className="w-5 h-5"/>
               <span className="text-[9px] font-medium font-syne tracking-wide">Carteira</span>
             </Link>
-            <Link href="/perfil" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors" data-testid="nav-perfil">
+            <Link href="/perfil" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors">
               <User className="w-5 h-5"/>
               <span className="text-[9px] font-medium font-syne tracking-wide">Perfil</span>
             </Link>
