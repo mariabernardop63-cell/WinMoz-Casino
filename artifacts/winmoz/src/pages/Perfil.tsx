@@ -8,21 +8,21 @@ import {
 
 function BottomNav() {
   return (
-    <nav className="fixed bottom-0 w-full max-w-[430px] bg-[#1a1a1a]/95 backdrop-blur-md border-t border-white/10 px-6 py-3 z-50">
+    <nav className="fixed bottom-0 w-full max-w-[430px] bg-white/95 backdrop-blur-md border-t border-slate-100 px-6 py-3 z-50 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
       <div className="flex items-center justify-between">
-        <Link href="/" className="flex flex-col items-center gap-1 text-slate-400 hover:text-white transition-colors">
+        <Link href="/" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors">
           <HomeIcon className="w-5 h-5" />
           <span className="text-[9px] font-medium font-syne tracking-wide">Home</span>
         </Link>
-        <Link href="/explorar" className="flex flex-col items-center gap-1 text-slate-400 hover:text-white transition-colors">
+        <Link href="/explorar" className="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-700 transition-colors">
           <Gamepad2 className="w-5 h-5" />
           <span className="text-[9px] font-medium font-syne tracking-wide">Explorar</span>
         </Link>
-        <Link href="/carteira" className="flex flex-col items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors">
+        <Link href="/carteira" className="flex flex-col items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors">
           <Pause className="w-6 h-6" />
           <span className="text-[9px] font-medium font-syne tracking-wide">Carteira</span>
         </Link>
-        <Link href="/perfil" className="flex flex-col items-center gap-1 text-white">
+        <Link href="/perfil" className="flex flex-col items-center gap-1 text-blue-700">
           <User className="w-5 h-5" />
           <span className="text-[9px] font-semibold font-syne tracking-wide">Perfil</span>
         </Link>
@@ -38,10 +38,8 @@ const TRANSACTIONS = [
     type: "Transferência",
     date: "27 Jan",
     amount: "+589 $MT",
-    positive: true,
     icon: ArrowUpRight,
-    iconBg: "#2a2a2a",
-    iconColor: "#34d399",
+    color: "#6b7280",
   },
   {
     id: 2,
@@ -49,10 +47,8 @@ const TRANSACTIONS = [
     type: "Transferência",
     date: "27 Jan",
     amount: "+150 $MT",
-    positive: true,
     icon: ArrowDownLeft,
-    iconBg: "#2a2a2a",
-    iconColor: "#34d399",
+    color: "#6b7280",
   },
   {
     id: 3,
@@ -60,189 +56,155 @@ const TRANSACTIONS = [
     type: "Transferência",
     date: "23 Jan",
     amount: "+457 $MT",
-    positive: true,
     icon: RefreshCcw,
-    iconBg: "#2a2a2a",
-    iconColor: "#34d399",
+    color: "#6b7280",
   },
 ];
 
 const GANHOS = [
-  {
-    id: "ludo",
-    icon: "/ludo-card.jpg",
-    label: "Ludo online",
-    value: "00,00 $MT",
-    sub: "$0 $MT",
-  },
-  {
-    id: "damas",
-    icon: "/damas-board.png",
-    label: "Damas",
-    value: "00,00 $MT",
-    sub: "$0 $MT",
-  },
-  {
-    id: "xadrez",
-    icon: null,
-    label: "Xadrez",
-    value: "00,00 $MT",
-    sub: "$0 $MT",
-  },
+  { id: "ludo",   icon: "/ludo-card.jpg",   label: "Ludo online", value: "00,00 $MT", sub: "$0 $MT" },
+  { id: "damas",  icon: "/damas-board.png", label: "Damas",       value: "00,00 $MT", sub: "$0 $MT" },
+  { id: "xadrez", icon: null,               label: "Xadrez",      value: "00,00 $MT", sub: "$0 $MT" },
 ];
 
 function XadrezIcon() {
   return (
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-      <circle cx="14" cy="14" r="14" fill="#3b3b3b" />
-      <text x="14" y="20" textAnchor="middle" fontSize="16" fill="white">♟</text>
-    </svg>
+    <div className="w-7 h-7 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0">
+      <span style={{ fontSize: 16, lineHeight: 1, color: "white" }}>♟</span>
+    </div>
   );
 }
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 18 },
-  show: (i: number) => ({
-    opacity: 1, y: 0,
-    transition: { delay: i * 0.07, duration: 0.42, ease: [0.22, 1, 0.36, 1] }
-  }),
-};
-
 export default function Perfil() {
   return (
-    <div className="min-h-screen bg-[#111111] text-white w-full flex justify-center selection:bg-blue-800/30">
-      <div className="w-full max-w-[430px] flex flex-col relative pb-28">
+    <div
+      className="min-h-screen w-full flex justify-center"
+      style={{ background: "#111111" }}
+    >
+      <div className="w-full max-w-[430px] flex flex-col relative">
 
-        {/* ── HEADER ── */}
-        <header className="flex items-center gap-3 px-5 pt-5 pb-4">
-          {/* Avatar */}
-          <div className="relative flex-shrink-0">
-            <div className="w-9 h-9 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center">
-              <User className="w-5 h-5 text-slate-300" />
+        {/* ── DARK TOP SECTION ── */}
+        <div className="px-5 pt-5 pb-0">
+
+          {/* Header */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className="relative flex-shrink-0">
+              <div className="w-9 h-9 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center">
+                <User className="w-5 h-5 text-slate-300" />
+              </div>
+              <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-[#111]" />
             </div>
-            <span className="absolute top-0 right-0 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-[#111111]" />
-          </div>
-
-          {/* Search bar */}
-          <div className="flex-1 flex items-center gap-2 bg-[#222222] rounded-2xl px-3 py-2 border border-white/8">
-            <Search className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-            <span className="text-sm text-slate-500 font-medium">Pesquisar</span>
-          </div>
-
-          {/* Bell */}
-          <button className="w-9 h-9 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center flex-shrink-0">
-            <Bell className="w-4.5 h-4.5 text-slate-300" style={{ width: 18, height: 18 }} />
-          </button>
-        </header>
-
-        {/* ── SALDO DISPONIVEL ── */}
-        <motion.section
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="px-5 pt-2 pb-5"
-        >
-          <p className="text-[12px] text-slate-400 font-medium mb-1 tracking-wide">Saldo disponivel</p>
-          <p className="text-[2.2rem] font-extrabold tracking-tight leading-tight text-white font-syne">
-            00,00 <span className="text-[1.4rem] text-slate-300">$MT</span>
-          </p>
-        </motion.section>
-
-        {/* ── ACTION BUTTONS ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.48, delay: 0.08, ease: [0.22, 1, 0.36, 1] }}
-          className="flex items-start justify-between px-7 pb-7"
-        >
-          {[
-            { icon: ArrowDownToLine, label: "Levantar" },
-            { icon: Plus, label: "Depositar" },
-            { icon: RefreshCw, label: "Recaregar" },
-            { icon: Settings, label: "Definições" },
-          ].map(({ icon: Icon, label }) => (
-            <button key={label} className="flex flex-col items-center gap-2.5 group">
-              <div className="w-14 h-14 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center group-hover:bg-[#333333] transition-colors shadow-md">
-                <Icon className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-[11px] text-slate-300 font-medium font-syne tracking-wide">{label}</span>
+            <div className="flex-1 flex items-center gap-2 bg-[#222] rounded-2xl px-3 py-2 border border-white/8">
+              <Search className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+              <span className="text-sm text-slate-500 font-medium">Pesquisar</span>
+            </div>
+            <button className="w-9 h-9 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center flex-shrink-0">
+              <Bell style={{ width: 18, height: 18 }} className="text-slate-300" />
             </button>
-          ))}
-        </motion.div>
+          </div>
 
-        {/* ── GANHOS NO GERAL ── */}
-        <div className="px-5 pb-3 flex items-center justify-between">
-          <h2 className="text-[15px] font-bold text-white font-syne">Ganhos no geral</h2>
-          <button className="text-[12px] text-slate-400 font-medium hover:text-white transition-colors">Pesquisar</button>
-        </div>
-
-        {/* ── CARDS DE GANHOS ── */}
-        <div className="flex gap-3 overflow-x-auto px-5 pb-5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-          {GANHOS.map((g, i) => (
-            <motion.div
-              key={g.id}
-              custom={i}
-              variants={fadeUp}
-              initial="hidden"
-              animate="show"
-              className="min-w-[155px] flex-shrink-0 bg-white rounded-2xl p-4 flex flex-col gap-3 shadow-sm"
+          {/* Saldo */}
+          <div className="mb-5">
+            <p className="text-[11px] text-slate-400 font-medium mb-1 tracking-wide">Saldo disponivel</p>
+            <p
+              className="text-white leading-none"
+              style={{
+                fontSize: "2.6rem",
+                fontWeight: 800,
+                letterSpacing: "-0.5px",
+                fontFamily: "'Inter', 'SF Pro Display', system-ui, sans-serif",
+              }}
             >
-              {/* Icon + Label */}
-              <div className="flex items-center gap-2">
-                {g.icon ? (
-                  <img
-                    src={g.icon}
-                    alt={g.label}
-                    className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-                  />
-                ) : (
-                  <XadrezIcon />
-                )}
-                <span className="text-[13px] font-semibold text-slate-800 font-syne">{g.label}</span>
-              </div>
-              {/* Value */}
-              <div>
-                <p className="text-[1.15rem] font-bold text-slate-900 font-syne leading-tight">{g.value}</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">{g.sub}</p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+              00,00 <span style={{ fontSize: "1.6rem", color: "#94a3b8" }}>$MT</span>
+            </p>
+          </div>
 
-        {/* ── TRANSAÇÕES ── */}
-        <div className="px-5 pb-3 flex items-center justify-between">
-          <h2 className="text-[15px] font-bold text-white font-syne">Transações</h2>
-          <button className="text-[12px] text-slate-400 font-medium hover:text-white transition-colors">Ver todas</button>
-        </div>
+          {/* Actions */}
+          <div className="flex items-start justify-between mb-5 px-1">
+            {[
+              { icon: ArrowDownToLine, label: "Levantar" },
+              { icon: Plus,            label: "Depositar" },
+              { icon: RefreshCw,       label: "Recaregar" },
+              { icon: Settings,        label: "Definições" },
+            ].map(({ icon: Icon, label }) => (
+              <button key={label} className="flex flex-col items-center gap-2 group">
+                <div className="w-13 h-13 rounded-full bg-[#2a2a2a] border border-white/10 flex items-center justify-center group-hover:bg-[#333] transition-colors shadow"
+                  style={{ width: 52, height: 52 }}>
+                  <Icon className="w-[18px] h-[18px] text-white" />
+                </div>
+                <span className="text-[10.5px] text-slate-300 font-medium font-syne">{label}</span>
+              </button>
+            ))}
+          </div>
 
-        <div className="px-5 flex flex-col gap-1">
-          {TRANSACTIONS.map((tx, i) => (
-            <motion.div
-              key={tx.id}
-              custom={i}
-              variants={fadeUp}
-              initial="hidden"
-              animate="show"
-              className="flex items-center gap-3 bg-[#1c1c1c] rounded-2xl px-4 py-3.5 border border-white/5"
-            >
-              {/* Icon */}
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ background: tx.iconBg }}
+          {/* Ganhos no geral header */}
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[14px] font-bold text-white font-syne">Ganhos no geral</h2>
+            <button className="text-[12px] text-slate-400 hover:text-white transition-colors">Pesquisar</button>
+          </div>
+
+          {/* Cards — straddle boundary */}
+          <div className="flex gap-3 overflow-x-auto pb-0 -mx-5 px-5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {GANHOS.map((g, i) => (
+              <motion.div
+                key={g.id}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.06, duration: 0.4 }}
+                className="min-w-[148px] flex-shrink-0 bg-white rounded-2xl px-4 pt-3.5 pb-4 flex flex-col gap-2.5 shadow-md"
               >
-                <tx.icon style={{ width: 16, height: 16, color: tx.iconColor }} />
-              </div>
+                <div className="flex items-center gap-2">
+                  {g.icon ? (
+                    <img src={g.icon} alt={g.label} className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <XadrezIcon />
+                  )}
+                  <span className="text-[12px] font-semibold text-slate-800 font-syne">{g.label}</span>
+                </div>
+                <div>
+                  <p className="text-[1.05rem] font-bold text-slate-900 font-syne leading-tight">{g.value}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{g.sub}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-white truncate">{tx.name}</p>
-                <p className="text-[11px] text-slate-500">{tx.type} · {tx.date}</p>
-              </div>
+        {/* ── WHITE BOTTOM SHEET ── */}
+        <div
+          className="flex-1 mt-4 px-5 pt-4 pb-28"
+          style={{
+            background: "#ffffff",
+            borderRadius: "28px 28px 0 0",
+          }}
+        >
+          {/* Transações header */}
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-[15px] font-bold text-slate-900 font-syne">Transações</h2>
+            <button className="text-[12px] text-slate-400 hover:text-slate-700 transition-colors font-medium">Ver todas</button>
+          </div>
 
-              {/* Amount */}
-              <p className="text-[13px] font-bold text-emerald-400 flex-shrink-0">{tx.amount}</p>
-            </motion.div>
-          ))}
+          {/* Transaction rows */}
+          <div className="flex flex-col gap-2.5">
+            {TRANSACTIONS.map((tx, i) => (
+              <motion.div
+                key={tx.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.15 + i * 0.07, duration: 0.38 }}
+                className="flex items-center gap-3 bg-[#f7f8fa] rounded-2xl px-4 py-3 border border-slate-100"
+              >
+                <div className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <tx.icon className="w-4 h-4 text-slate-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold text-slate-900 truncate">{tx.name}</p>
+                  <p className="text-[10.5px] text-slate-400">{tx.type} · {tx.date}</p>
+                </div>
+                <p className="text-[13px] font-bold text-emerald-500 flex-shrink-0">{tx.amount}</p>
+              </motion.div>
+            ))}
+          </div>
         </div>
 
         {/* ── BOTTOM NAV ── */}
