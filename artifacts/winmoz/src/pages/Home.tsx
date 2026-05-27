@@ -413,16 +413,77 @@ function LudoBannerImage({ size = 136 }: { size?: number }) {
 }
 
 /* ─────────────────────────────────────────────
+   SKELETON COMPONENTS — Airbnb-style shimmer
+───────────────────────────────────────────── */
+
+function BannerSkeleton() {
+  return (
+    <section className="px-4 pt-5 pb-3">
+      <div
+        className="relative w-full rounded-3xl overflow-hidden"
+        style={{ minHeight: 190, background: "#16142a" }}
+      >
+        <div className="absolute inset-0 skeleton-shimmer-dark" />
+        <div
+          className="relative z-10 flex items-center justify-between px-5 py-6 gap-3"
+          style={{ minHeight: 190 }}
+        >
+          {/* Left text area */}
+          <div className="flex-1 flex flex-col gap-3">
+            <div className="h-5 w-36 rounded-full skeleton-shimmer-dark" style={{ borderRadius: 99 }} />
+            <div className="flex flex-col gap-2">
+              <div className="h-7 w-40 rounded-lg skeleton-shimmer-dark" />
+              <div className="h-7 w-28 rounded-lg skeleton-shimmer-dark" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <div className="h-2.5 w-36 rounded skeleton-shimmer-dark" />
+              <div className="h-2.5 w-24 rounded skeleton-shimmer-dark" />
+            </div>
+            <div className="h-9 w-28 rounded-xl skeleton-shimmer-dark mt-1" />
+          </div>
+          {/* Right board area */}
+          <div className="w-[136px] h-[136px] rounded-xl flex-shrink-0 skeleton-shimmer-dark" />
+        </div>
+        {/* Dots */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+          <div className="w-5 h-1.5 rounded-full skeleton-shimmer-dark" />
+          <div className="w-1.5 h-1.5 rounded-full skeleton-shimmer-dark" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function GameCardSkeleton() {
+  return (
+    <div className="min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md flex flex-col">
+      <div className="h-28 w-full skeleton-shimmer" />
+      <div className="p-3 flex flex-col gap-2.5">
+        <div className="h-3.5 w-20 rounded skeleton-shimmer" />
+        <div className="h-2.5 w-16 rounded skeleton-shimmer" />
+        <div className="h-2.5 w-24 rounded skeleton-shimmer" />
+        <div className="h-8 w-full rounded-lg skeleton-shimmer mt-0.5" />
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    BANNER CAROUSEL
 ───────────────────────────────────────────── */
 const SLIDES = [
   {
     id: "damas",
     duration: 8000,
-    bg: "linear-gradient(135deg, rgba(26,10,0,0.78) 0%, rgba(61,26,0,0.70) 40%, rgba(92,42,0,0.62) 100%)",
-    bgImage: "/wood-texture.jpg",
-    accent: "#D4820A",
+    bg: "linear-gradient(135deg, rgba(8,4,0,0.72) 0%, rgba(22,9,0,0.66) 40%, rgba(38,15,0,0.60) 100%)",
+    bgImage: "/wood-texture.jpg" as string | null,
+    accent: "#F59E0B",
     badge: "Anúncio Patrocinado",
+    badgeBg: "rgba(0,0,0,0.50)",
+    badgeBorder: "rgba(255,255,255,0.22)",
+    badgeDot: "#F59E0B",
+    badgeText: "#FFFFFF",
+    subtitleColor: "rgba(255,255,255,0.82)",
     title: "Domina o\nTabuleiro?",
     subtitle: "Jogue Damas Online e multiplica o teu saldo.",
     cta: "Jogar Agora",
@@ -430,10 +491,15 @@ const SLIDES = [
   {
     id: "ludo",
     duration: 10000,
-    bg: "linear-gradient(135deg, #0A0A1A 0%, #12122E 40%, #1A1A3D 100%)",
-    bgImage: null as string | null,
+    bg: "linear-gradient(135deg, rgba(6,4,16,0.72) 0%, rgba(10,8,28,0.68) 40%, rgba(14,12,40,0.64) 100%)",
+    bgImage: "/ludo-bg.png" as string | null,
     accent: "#A78BFA",
     badge: "Anúncio Patrocinado",
+    badgeBg: "rgba(0,0,0,0.50)",
+    badgeBorder: "rgba(255,255,255,0.22)",
+    badgeDot: "#A78BFA",
+    badgeText: "#FFFFFF",
+    subtitleColor: "rgba(255,255,255,0.82)",
     title: "Jogue ludo\napostado.",
     subtitle: "Desafia rivais online e multiplica o teu saldo.",
     cta: "Jogar Agora",
@@ -449,7 +515,24 @@ const slideIn = {
 function HeroBanner() {
   const [slideIdx, setSlideIdx] = useState(0);
   const [dir, setDir] = useState(1);
+  const [ready, setReady] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const srcs = SLIDES.map(s => s.bgImage).filter(Boolean) as string[];
+    let loaded = 0;
+    const fallback = setTimeout(() => setReady(true), 900);
+    srcs.forEach(src => {
+      const img = new Image();
+      img.onload = img.onerror = () => {
+        loaded++;
+        if (loaded >= 1) { clearTimeout(fallback); setReady(true); }
+      };
+      img.src = src;
+    });
+    if (srcs.length === 0) { clearTimeout(fallback); setReady(true); }
+    return () => clearTimeout(fallback);
+  }, []);
 
   const goTo = (next: number) => {
     setDir(next > slideIdx ? 1 : -1);
@@ -457,12 +540,15 @@ function HeroBanner() {
   };
 
   useEffect(() => {
+    if (!ready) return;
     const slide = SLIDES[slideIdx];
     timerRef.current = setTimeout(() => {
       goTo((slideIdx + 1) % SLIDES.length);
     }, slide.duration);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [slideIdx]);
+  }, [slideIdx, ready]);
+
+  if (!ready) return <BannerSkeleton />;
 
   const slide = SLIDES[slideIdx];
 
@@ -503,10 +589,10 @@ function HeroBanner() {
             <div className="flex-1 min-w-0">
               {/* Badge */}
               <div
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest mb-3 uppercase border"
-                style={{ borderColor: `${slide.accent}40`, background: `${slide.accent}15`, color: slide.accent }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest mb-3 uppercase border backdrop-blur-sm"
+                style={{ borderColor: slide.badgeBorder, background: slide.badgeBg, color: slide.badgeText }}
               >
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: slide.accent }}/>
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: slide.badgeDot }}/>
                 {slide.badge}
               </div>
 
@@ -516,7 +602,7 @@ function HeroBanner() {
               </h1>
 
               {/* Subtitle */}
-              <p className="text-[11px] leading-relaxed mb-4 max-w-[155px]" style={{ color: `${slide.accent}CC` }}>
+              <p className="text-[11px] leading-relaxed mb-4 max-w-[155px]" style={{ color: slide.subtitleColor }}>
                 {slide.subtitle}
               </p>
 
@@ -674,6 +760,13 @@ const topGames = [
    MAIN EXPORT
 ───────────────────────────────────────────── */
 export default function Home() {
+  const [gamesReady, setGamesReady] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setGamesReady(true), 350);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-slate-900 w-full flex justify-center selection:bg-blue-100">
       <div className="w-full max-w-[430px] flex flex-col relative pb-24 bg-[#F8F9FA]">
@@ -700,11 +793,22 @@ export default function Home() {
             </Link>
           </div>
 
+          <div className="flex gap-3 overflow-x-auto pt-1 pb-1 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            {!gamesReady ? (
+              <>
+                <GameCardSkeleton />
+                <GameCardSkeleton />
+                <GameCardSkeleton />
+              </>
+            ) : null}
+          </div>
+
           <motion.div
             variants={stagger}
             initial="hidden"
-            animate="show"
+            animate={gamesReady ? "show" : "hidden"}
             className="flex gap-3 overflow-x-auto pt-1 pb-1 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            style={{ display: gamesReady ? undefined : "none" }}
           >
             {games.map((game) => (
               <motion.div
