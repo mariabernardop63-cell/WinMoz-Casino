@@ -557,12 +557,12 @@ function HeroBanner() {
       <div
         className="relative w-full rounded-3xl overflow-hidden shadow-2xl"
         style={{
-          background: slide.bg,
-          backgroundImage: slide.bgImage ? `url(${slide.bgImage})` : undefined,
-          backgroundSize: slide.bgImage ? "cover" : undefined,
-          backgroundPosition: slide.bgImage ? "center" : undefined,
+          backgroundImage: slide.bgImage
+            ? `${slide.bg}, url(${slide.bgImage})`
+            : slide.bg,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
           minHeight: 190,
-          transition: "background 0.8s ease",
         }}
       >
         {/* Ambient glow */}
