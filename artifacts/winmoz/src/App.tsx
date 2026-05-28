@@ -9,6 +9,7 @@ import Login from "@/pages/Login";
 import Registar from "@/pages/Registar";
 import EsqueceuSenha from "@/pages/EsqueceuSenha";
 import OTP from "@/pages/OTP";
+import SplashScreen from "@/pages/SplashScreen";
 import Perfil from "@/pages/Perfil";
 
 const queryClient = new QueryClient();
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/registar" component={Registar} />
       <Route path="/esqueceu-senha" component={EsqueceuSenha} />
       <Route path="/otp" component={OTP} />
+      <Route path="/splash" component={SplashScreen} />
       <Route path="/perfil" component={Perfil} />
       <Route component={NotFound} />
     </Switch>
