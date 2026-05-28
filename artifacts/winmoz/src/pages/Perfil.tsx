@@ -1,42 +1,56 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import {
   User, Eye, EyeOff,
   ArrowDownToLine, Plus, RefreshCw, MoreHorizontal,
   ArrowUpRight, ArrowDownLeft, RefreshCcw,
-  X, UserCog, UserPlus, FileText, Flag, Lock, HelpCircle, Settings, LogOut, ChevronRight, Shield
+  X, UserCog, UserPlus, FileText, Flag, Lock, HelpCircle, Settings, LogOut, ChevronRight, Shield, ScanLine
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
+function getBalance(): number {
+  return parseFloat(localStorage.getItem("winmoz_balance") || "0");
+}
+function fmtMZN(val: number): string {
+  const str = val.toFixed(2);
+  const [int, dec] = str.split(".");
+  return `${Number(int).toLocaleString("pt-PT")},${dec}`;
+}
+
 const TRANSACTIONS = [
-  { id: 1, name: "Para Sarah",    type: "Transferência", date: "27 Jan", amount: "+589 $MT", icon: ArrowUpRight  },
-  { id: 2, name: "De John Dack", type: "Transferência", date: "27 Jan", amount: "+150 $MT", icon: ArrowDownLeft },
-  { id: 3, name: "De John Dack", type: "Transferência", date: "23 Jan", amount: "+457 $MT", icon: RefreshCcw    },
+  { id: 1, name: "Para Sarah",    type: "Transferência", date: "27 Jan", amount: "+589 $MZN", icon: ArrowUpRight  },
+  { id: 2, name: "De John Dack", type: "Transferência", date: "27 Jan", amount: "+150 $MZN", icon: ArrowDownLeft },
+  { id: 3, name: "De John Dack", type: "Transferência", date: "23 Jan", amount: "+457 $MZN", icon: RefreshCcw    },
 ];
 
 const FERRAMENTAS = [
-  { icon: UserCog,   label: "Editar Perfil",    desc: "Altera o teu nome, foto e dados",   color: "#7c3aed", bg: "#f5f3ff" },
-  { icon: UserPlus,  label: "Convidar Amigos",  desc: "Convida e ganha bónus especiais",   color: "#0891b2", bg: "#ecfeff" },
-  { icon: FileText,  label: "Extratos",         desc: "Histórico completo de transações",  color: "#059669", bg: "#ecfdf5" },
-  { icon: Flag,      label: "Reportar",         desc: "Reporta um problema ou utilizador", color: "#dc2626", bg: "#fef2f2" },
-  { icon: Lock,      label: "Privacidade",      desc: "Gerir dados e permissões",          color: "#d97706", bg: "#fffbeb" },
-  { icon: HelpCircle,label: "Suporte",          desc: "Fala com a nossa equipa 24/7",      color: "#7c3aed", bg: "#f5f3ff" },
-  { icon: Settings,  label: "Definições",       desc: "Notificações, idioma e mais",       color: "#475569", bg: "#f8fafc" },
-  { icon: LogOut,    label: "Sair",             desc: "Terminar sessão da conta",          color: "#ef4444", bg: "#fef2f2", danger: true },
+  { icon: UserCog,    label: "Editar Perfil",    desc: "Altera o teu nome, foto e dados"   },
+  { icon: UserPlus,   label: "Convidar Amigos",  desc: "Convida e ganha bónus especiais"   },
+  { icon: FileText,   label: "Extratos",         desc: "Histórico completo de transações"  },
+  { icon: Flag,       label: "Reportar",         desc: "Reporta um problema ou utilizador" },
+  { icon: Lock,       label: "Privacidade",      desc: "Gerir dados e permissões"          },
+  { icon: HelpCircle, label: "Suporte",          desc: "Fala com a nossa equipa 24/7"      },
+  { icon: Settings,   label: "Definições",       desc: "Notificações, idioma e mais"       },
+  { icon: LogOut,     label: "Sair",             desc: "Terminar sessão da conta", danger: true },
 ];
 
 export default function Perfil() {
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [ferramentasOpen, setFerramentasOpen] = useState(false);
+  const [balance, setBalanceState] = useState(0);
   const [, setLocation] = useLocation();
 
+  useEffect(() => {
+    setBalanceState(getBalance());
+    const interval = setInterval(() => setBalanceState(getBalance()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleAction = (label: string) => {
-    if (label === "Recaregar") {
-      setLocation("/recarga");
-    } else if (label === "Mais") {
-      setFerramentasOpen(true);
-    }
+    if (label === "Levantar")  setLocation("/levantar");
+    if (label === "Recaregar") setLocation("/recarga");
+    if (label === "Mais")      setFerramentasOpen(true);
   };
 
   const handleFerramentaClick = (label: string) => {
@@ -47,10 +61,10 @@ export default function Perfil() {
   };
 
   const ACTIONS = [
-    { icon: ArrowDownToLine, label: "Levantar" },
+    { icon: ArrowDownToLine, label: "Levantar"  },
     { icon: Plus,            label: "Depositar" },
     { icon: RefreshCw,       label: "Recaregar" },
-    { icon: MoreHorizontal,  label: "Mais" },
+    { icon: MoreHorizontal,  label: "Mais"      },
   ];
 
   return (
@@ -60,17 +74,27 @@ export default function Perfil() {
         {/* ── DARK TOP SECTION ── */}
         <div className="px-5 pt-6 pb-0 relative">
 
-          <button
-            onClick={() => setBalanceVisible(v => !v)}
-            className="absolute top-6 right-5 flex items-center justify-center rounded-full transition-all"
-            style={{ width: 34, height: 34, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
-          >
-            {balanceVisible
-              ? <Eye   style={{ width: 16, height: 16, color: "#a1a1aa" }} />
-              : <EyeOff style={{ width: 16, height: 16, color: "#7c3aed" }} />
-            }
-          </button>
+          {/* Top right buttons: Scan + Eye */}
+          <div className="absolute top-6 right-5 flex items-center gap-2">
+            <button
+              className="flex items-center justify-center rounded-full transition-all"
+              style={{ width: 34, height: 34, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+            >
+              <ScanLine style={{ width: 16, height: 16, color: "#a1a1aa" }} />
+            </button>
+            <button
+              onClick={() => setBalanceVisible(v => !v)}
+              className="flex items-center justify-center rounded-full transition-all"
+              style={{ width: 34, height: 34, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}
+            >
+              {balanceVisible
+                ? <Eye   style={{ width: 16, height: 16, color: "#a1a1aa" }} />
+                : <EyeOff style={{ width: 16, height: 16, color: "#a1a1aa" }} />
+              }
+            </button>
+          </div>
 
+          {/* Avatar + Name */}
           <div className="flex items-center gap-4 mb-5">
             <div style={{
               width: 62, height: 62, borderRadius: 999,
@@ -89,9 +113,10 @@ export default function Perfil() {
             </div>
           </div>
 
+          {/* Balance */}
           <div className="mb-5">
             <p style={{ fontSize: 11, color: "#71717a", fontWeight: 500, letterSpacing: "0.5px", marginBottom: 4 }}>
-              Saldo disponivel
+              Saldo disponível
             </p>
             <p
               className="text-white leading-none"
@@ -102,10 +127,12 @@ export default function Perfil() {
                 transition: "filter 0.3s ease", userSelect: "none",
               }}
             >
-              00,00 <span style={{ fontSize: "1.5rem", color: "#94a3b8" }}>$MT</span>
+              {fmtMZN(balance)}{" "}
+              <span style={{ fontSize: "1.5rem", color: "#94a3b8" }}>$MZN</span>
             </p>
           </div>
 
+          {/* Action buttons */}
           <div className="flex items-start justify-between mb-6 px-1">
             {ACTIONS.map(({ icon: Icon, label }) => (
               <button
@@ -180,7 +207,7 @@ export default function Perfil() {
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  {FERRAMENTAS.map(({ icon: Icon, label, desc, color, bg, danger }, i) => (
+                  {FERRAMENTAS.map(({ icon: Icon, label, desc, danger }, i) => (
                     <motion.button
                       key={label}
                       initial={{ opacity: 0, y: 8 }}
@@ -190,25 +217,27 @@ export default function Perfil() {
                       className={`flex items-center gap-3.5 p-3.5 rounded-2xl border transition-all duration-200 text-left w-full group ${
                         danger
                           ? "border-red-100 bg-red-50/50 hover:bg-red-50 hover:border-red-200"
-                          : "border-slate-100 bg-white hover:bg-slate-50 hover:border-slate-200"
+                          : "border-slate-100 bg-white hover:bg-slate-50"
                       }`}
                     >
                       <div
-                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm"
-                        style={{ background: bg, border: `1px solid ${color}22` }}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{
+                          background: danger ? "#fef2f2" : "#f7f8fa",
+                          border: danger ? "1px solid #fecaca" : "1px solid #e2e8f0",
+                        }}
                       >
-                        <Icon style={{ width: 18, height: 18, color }} />
+                        <Icon style={{ width: 18, height: 18, color: danger ? "#dc2626" : "#111" }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`font-syne font-bold text-sm ${danger ? "text-red-600" : "text-slate-800"}`}>{label}</p>
                         <p className="text-slate-400 text-[11px] mt-0.5">{desc}</p>
                       </div>
-                      <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-colors ${danger ? "text-red-300 group-hover:text-red-500" : "text-slate-300 group-hover:text-slate-500"}`} />
+                      <ChevronRight className={`w-4 h-4 flex-shrink-0 ${danger ? "text-red-300" : "text-slate-300"}`} />
                     </motion.button>
                   ))}
                 </div>
 
-                {/* Security badge */}
                 <div className="flex items-center gap-2 mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
                   <Shield className="w-4 h-4 text-slate-400 flex-shrink-0" />
                   <p className="text-[11px] text-slate-400">A tua conta está protegida com encriptação de 256-bit.</p>

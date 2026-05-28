@@ -113,64 +113,69 @@ function SalaTab() {
   const [roomId, setRoomId] = useState("");
   const [view, setView] = useState<"main" | "entrar" | "criar">("main");
 
+  /* ── ENTRAR EM SALA ── */
   if (view === "entrar") {
     return (
-      <motion.div key="entrar" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.28 }} className="pb-4">
-        <button onClick={() => setView("main")} className="flex items-center gap-1.5 text-slate-500 text-sm font-medium mb-5 hover:text-slate-700 transition-colors">
-          <ChevronRight className="w-4 h-4 rotate-180" /> Voltar
-        </button>
-        <div className="relative rounded-3xl overflow-hidden mb-6 shadow-xl"
-          style={{ background: "linear-gradient(135deg, #4C1D95 0%, #6D28D9 50%, #5B21B6 100%)" }}>
-          <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/4 pointer-events-none" />
-          <div className="relative z-10 p-6">
-            <div className="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center mb-4 shadow-inner">
-              <Key className="w-7 h-7 text-white" />
-            </div>
-            <h2 className="font-syne font-extrabold text-xl text-white mb-1">Entrar em Sala</h2>
-            <p className="text-sm text-violet-200 leading-relaxed">Introduz o ID da sala para entrar numa partida privada.</p>
+      <motion.div key="entrar" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="pb-6">
+        {/* Back */}
+        <button onClick={() => setView("main")} className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-6 hover:text-slate-800 transition-colors">
+          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
+            <ChevronRight className="w-3.5 h-3.5 rotate-180 text-slate-600" />
           </div>
-        </div>
+          Voltar
+        </button>
 
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-md p-5 mb-5">
-          <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3">ID da Sala</label>
-          <div className="relative flex items-center">
-            <div className="absolute left-4 pointer-events-none"><Hash className="w-4 h-4 text-violet-400" /></div>
+        <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Entrar em Sala</h2>
+        <p className="text-slate-400 text-sm mb-6">Introduz o código da sala para participar numa partida privada.</p>
+
+        {/* Input */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4 shadow-sm">
+          <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Código da Sala</label>
+          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus-within:border-violet-500 transition-colors">
+            <Hash className="w-4 h-4 text-slate-400 flex-shrink-0" />
             <input
               type="text" placeholder="Ex: WM-4821" value={roomId}
               onChange={e => setRoomId(e.target.value.toUpperCase())}
               maxLength={10}
-              className="w-full pl-10 pr-4 py-4 bg-slate-50 border-2 border-slate-100 focus:border-violet-500 rounded-2xl text-slate-900 font-syne font-bold text-base outline-none transition-all duration-200 placeholder-slate-300 tracking-widest"
+              className="flex-1 bg-transparent text-slate-900 font-syne font-bold text-base outline-none placeholder-slate-300 tracking-widest"
             />
+            {roomId.length > 0 && (
+              <button onClick={() => setRoomId("")} className="text-slate-300 hover:text-slate-500">
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
           <button
             disabled={roomId.length < 3}
-            className={`w-full mt-4 py-4 rounded-2xl font-syne font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 shadow-lg ${
-              roomId.length >= 3 ? "bg-gradient-to-r from-violet-600 to-purple-700 text-white hover:from-violet-700 hover:to-purple-800" : "bg-slate-100 text-slate-300 cursor-not-allowed"
+            className={`w-full mt-3.5 h-12 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
+              roomId.length >= 3
+                ? "bg-slate-900 text-white hover:bg-slate-800"
+                : "bg-slate-100 text-slate-300 cursor-not-allowed"
             }`}
           >
-            {roomId.length >= 3 ? (<>Entrar na Sala <ArrowRight className="w-5 h-5" /></>) : (<>Introduz o ID da sala</>)}
+            {roomId.length >= 3 ? <>Entrar na Sala <ArrowRight className="w-4 h-4" /></> : "Introduz o código"}
           </button>
         </div>
 
-        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">Salas Recentes</p>
-        <div className="flex flex-col gap-2.5">
+        {/* Recent rooms */}
+        <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Salas Recentes</p>
+        <div className="flex flex-col gap-2">
           {RECENT_ROOMS.map((room, idx) => (
-            <motion.button key={room.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.08 }}
+            <motion.button key={room.id}
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.06 }}
               onClick={() => setRoomId(room.id)}
-              className="flex items-center gap-3 p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-violet-200 hover:shadow-md transition-all duration-200 text-left w-full group"
+              className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-100 hover:border-slate-300 hover:shadow-sm transition-all duration-200 text-left w-full group"
             >
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${room.color} flex items-center justify-center text-white font-syne font-bold text-sm shadow-md flex-shrink-0`}>{room.initials}</div>
+              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${room.color} flex items-center justify-center text-white font-syne font-bold text-sm flex-shrink-0`}>
+                {room.initials}
+              </div>
               <div className="flex-1 min-w-0">
                 <p className="font-syne font-bold text-slate-900 text-sm">{room.game}</p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-[10px] text-slate-400 font-mono tracking-widest">{room.id}</span>
-                  <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                  <span className="text-[10px] text-slate-400">{room.players} jogadores</span>
-                </div>
+                <p className="text-[10.5px] text-slate-400 font-mono mt-0.5">{room.id} · {room.players} jogadores</p>
               </div>
-              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                <span className="text-[11px] font-bold text-violet-700">{room.bet}</span>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-violet-500 transition-colors" />
+              <div className="text-right flex-shrink-0">
+                <p className="text-[11px] font-bold text-slate-700">{room.bet}</p>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-300 mt-0.5 ml-auto group-hover:text-slate-600 transition-colors" />
               </div>
             </motion.button>
           ))}
@@ -179,122 +184,145 @@ function SalaTab() {
     );
   }
 
+  /* ── CRIAR SALA ── */
   if (view === "criar") {
+    const games = [
+      { name: "Damas Clássico", desc: "12 modos de jogo", color: "from-blue-500 to-indigo-700",  initials: "DA" },
+      { name: "Ludo Turbo",     desc: "6 modos de jogo",  color: "from-emerald-500 to-teal-700", initials: "LU" },
+      { name: "Xadrez Rápido",  desc: "8 modos de jogo",  color: "from-violet-500 to-purple-800",initials: "XA" },
+    ];
     return (
-      <motion.div key="criar" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.28 }} className="pb-4">
-        <button onClick={() => setView("main")} className="flex items-center gap-1.5 text-slate-500 text-sm font-medium mb-5 hover:text-slate-700 transition-colors">
-          <ChevronRight className="w-4 h-4 rotate-180" /> Voltar
+      <motion.div key="criar" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="pb-6">
+        <button onClick={() => setView("main")} className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-6 hover:text-slate-800 transition-colors">
+          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
+            <ChevronRight className="w-3.5 h-3.5 rotate-180 text-slate-600" />
+          </div>
+          Voltar
         </button>
-        <div className="relative rounded-3xl overflow-hidden mb-6 shadow-xl"
-          style={{ background: "linear-gradient(135deg, #065f46 0%, #059669 50%, #047857 100%)" }}>
-          <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/4 pointer-events-none" />
-          <div className="relative z-10 p-6">
-            <div className="w-14 h-14 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center mb-4">
-              <Plus className="w-7 h-7 text-white" />
-            </div>
-            <h2 className="font-syne font-extrabold text-xl text-white mb-1">Criar Nova Sala</h2>
-            <p className="text-sm text-emerald-100 leading-relaxed">Cria uma sala privada e convida os teus amigos para jogar.</p>
-          </div>
+
+        <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Criar Nova Sala</h2>
+        <p className="text-slate-400 text-sm mb-6">Escolhe o jogo e convida os teus amigos para uma partida privada.</p>
+
+        <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Selecciona o Jogo</p>
+        <div className="flex flex-col gap-2 mb-5">
+          {games.map(g => (
+            <button key={g.name} className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-100 hover:border-slate-300 hover:shadow-sm transition-all duration-200 text-left group">
+              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${g.color} flex items-center justify-center text-white font-syne font-bold text-sm flex-shrink-0`}>
+                {g.initials}
+              </div>
+              <div className="flex-1">
+                <p className="font-syne font-bold text-slate-900 text-sm">{g.name}</p>
+                <p className="text-[10.5px] text-slate-400 mt-0.5">{g.desc}</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition-colors" />
+            </button>
+          ))}
         </div>
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-md p-5 mb-4">
-          <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3">Seleccionar Jogo</p>
-          <div className="flex flex-col gap-2">
-            {[{name:"Damas Clássico",color:"from-blue-500 to-indigo-700",initials:"DA"},{name:"Ludo Turbo",color:"from-emerald-500 to-teal-700",initials:"LU"},{name:"Xadrez Rápido",color:"from-violet-500 to-purple-800",initials:"XA"}].map(g => (
-              <button key={g.name} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 hover:border-emerald-300 hover:bg-emerald-50 transition-all duration-200 text-left group">
-                <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${g.color} flex items-center justify-center text-white font-bold text-xs shadow-md`}>{g.initials}</div>
-                <span className="font-syne font-semibold text-slate-800 text-sm">{g.name}</span>
-                <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-500 transition-colors ml-auto" />
-              </button>
-            ))}
-          </div>
+
+        <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-100 mb-5">
+          <span className="text-amber-500 flex-shrink-0 mt-0.5">⚡</span>
+          <p className="text-sm text-amber-700 leading-relaxed font-medium">
+            Criação de salas estará disponível em breve. Estamos a finalizar os últimos detalhes!
+          </p>
         </div>
-        <div className="flex items-center gap-2 p-4 bg-amber-50 rounded-2xl border border-amber-200 mb-5">
-          <span className="text-amber-500 text-lg">🚧</span>
-          <p className="text-[12px] text-amber-700 font-medium">Criação de salas em fase final de desenvolvimento. Disponível em breve!</p>
-        </div>
-        <button className="w-full py-4 rounded-2xl font-syne font-bold text-base bg-gradient-to-r from-emerald-600 to-teal-600 text-white flex items-center justify-center gap-2 shadow-lg opacity-60 cursor-not-allowed">
-          <Plus className="w-5 h-5" /> Criar Sala
+
+        <button disabled className="w-full h-12 rounded-xl font-syne font-bold text-sm bg-slate-100 text-slate-300 cursor-not-allowed flex items-center justify-center gap-2">
+          <Plus className="w-4 h-4" /> Criar Sala — Em Breve
         </button>
       </motion.div>
     );
   }
 
+  /* ── MAIN VIEW ── */
   return (
-    <motion.div key="main" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }} className="pb-4">
-      {/* Hero */}
-      <div className="relative rounded-3xl overflow-hidden mb-6 shadow-2xl"
-        style={{ background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 40%, #4338ca 100%)", minHeight: 160 }}>
-        <div className="absolute -top-8 -right-8 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
-        <div className="absolute -bottom-6 -left-6 w-36 h-36 rounded-full bg-white/5 pointer-events-none" />
-        <div className="relative z-10 p-6">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-            <span className="text-emerald-300 text-[10px] font-bold tracking-widest uppercase">Sistema Activo</span>
-          </div>
-          <h2 className="font-syne font-extrabold text-2xl text-white mb-1">Salas Privadas</h2>
-          <p className="text-indigo-200 text-sm leading-relaxed max-w-[220px]">Entra numa sala com código ou cria uma nova partida para os teus amigos.</p>
-        </div>
+    <motion.div key="main" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="pb-6">
+
+      {/* Title */}
+      <div className="mb-5">
+        <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Salas Privadas</h2>
+        <p className="text-slate-400 text-sm">Entra num jogo com código ou cria a tua própria sala.</p>
       </div>
 
-      {/* Two action cards */}
-      <div className="flex flex-col gap-3 mb-6">
-        {/* Entrar em Sala */}
+      {/* Stats strip */}
+      <div className="flex gap-2 mb-5">
+        {[
+          { label: "Salas Activas",   value: "247" },
+          { label: "Online Agora",    value: "1.8K" },
+          { label: "Apostas/Dia",     value: "92K MZN" },
+        ].map(s => (
+          <div key={s.label} className="flex-1 bg-white rounded-xl border border-slate-100 p-3 text-center shadow-sm">
+            <p className="font-syne font-bold text-slate-900 text-base leading-tight">{s.value}</p>
+            <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wide mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Action cards */}
+      <div className="flex flex-col gap-3">
+        {/* Entrar */}
         <motion.button
           whileTap={{ scale: 0.98 }}
           onClick={() => setView("entrar")}
-          className="relative flex items-center gap-4 p-5 bg-white rounded-3xl border border-slate-100 shadow-md hover:shadow-xl hover:border-violet-200 transition-all duration-300 text-left w-full group overflow-hidden"
+          className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-slate-300 hover:shadow-md transition-all duration-200 text-left w-full group"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-violet-50/0 to-violet-50/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-          <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0"
-            style={{ background: "linear-gradient(135deg, #7c3aed, #5b21b6)" }}>
-            <Key className="w-7 h-7 text-white" />
+          <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center flex-shrink-0 shadow-md group-hover:bg-slate-800 transition-colors">
+            <Key className="w-6 h-6 text-white" />
           </div>
-          <div className="relative flex-1 min-w-0">
-            <p className="font-syne font-extrabold text-slate-900 text-base mb-0.5">Entrar em Sala</p>
-            <p className="text-slate-500 text-[12px] leading-relaxed">Tens um código? Entra numa partida privada agora.</p>
-            <div className="flex items-center gap-1 mt-2">
-              <span className="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">
-                {RECENT_ROOMS.length} salas recentes
-              </span>
-            </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-syne font-bold text-slate-900 text-base">Entrar em Sala</p>
+            <p className="text-slate-400 text-[12.5px] mt-0.5">Tens um código? Junta-te a uma partida agora.</p>
+            <p className="text-[11px] font-semibold text-violet-600 mt-1.5">{RECENT_ROOMS.length} salas visitadas recentemente</p>
           </div>
-          <div className="relative w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-600 transition-colors duration-300">
-            <ArrowRight className="w-4 h-4 text-violet-600 group-hover:text-white transition-colors duration-300" />
+          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 group-hover:bg-slate-900 transition-colors">
+            <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-white transition-colors" />
           </div>
         </motion.button>
 
-        {/* Criar Sala */}
+        {/* Criar */}
         <motion.button
           whileTap={{ scale: 0.98 }}
           onClick={() => setView("criar")}
-          className="relative flex items-center gap-4 p-5 bg-white rounded-3xl border border-slate-100 shadow-md hover:shadow-xl hover:border-emerald-200 transition-all duration-300 text-left w-full group overflow-hidden"
+          className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-slate-300 hover:shadow-md transition-all duration-200 text-left w-full group"
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-50/0 to-emerald-50/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-          <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0"
-            style={{ background: "linear-gradient(135deg, #059669, #065f46)" }}>
-            <Plus className="w-7 h-7 text-white" />
+          <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center flex-shrink-0 group-hover:bg-slate-200 transition-colors">
+            <Plus className="w-6 h-6 text-slate-700" />
           </div>
-          <div className="relative flex-1 min-w-0">
-            <p className="font-syne font-extrabold text-slate-900 text-base mb-0.5">Criar Sala</p>
-            <p className="text-slate-500 text-[12px] leading-relaxed">Cria a tua sala privada e desafia quem queres.</p>
-            <div className="flex items-center gap-1 mt-2">
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Em breve</span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <p className="font-syne font-bold text-slate-900 text-base">Criar Sala</p>
+              <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Em breve</span>
             </div>
+            <p className="text-slate-400 text-[12.5px]">Cria a tua sala e desafia os teus amigos.</p>
           </div>
-          <div className="relative w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-600 transition-colors duration-300">
-            <ArrowRight className="w-4 h-4 text-emerald-600 group-hover:text-white transition-colors duration-300" />
+          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 group-hover:bg-slate-200 transition-colors">
+            <ArrowRight className="w-4 h-4 text-slate-400" />
           </div>
         </motion.button>
       </div>
 
-      {/* Stats bar */}
-      <div className="flex gap-2">
-        {[{label:"Salas Activas", value:"247", color:"text-violet-700 bg-violet-50 border-violet-200"},{label:"Jogadores Online", value:"1.8K", color:"text-emerald-700 bg-emerald-50 border-emerald-200"},{label:"Apostas Hoje", value:"92K MT", color:"text-amber-700 bg-amber-50 border-amber-200"}].map(s => (
-          <div key={s.label} className={`flex-1 rounded-2xl border p-3 text-center ${s.color}`}>
-            <p className="font-syne font-extrabold text-base">{s.value}</p>
-            <p className="text-[9px] font-semibold uppercase tracking-wide mt-0.5 opacity-70">{s.label}</p>
-          </div>
-        ))}
+      {/* Recent rooms preview */}
+      <div className="mt-6">
+        <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Salas Recentes</p>
+        <div className="flex flex-col gap-2">
+          {RECENT_ROOMS.map((room, idx) => (
+            <motion.div key={room.id}
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + idx * 0.06 }}
+              className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm"
+            >
+              <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${room.color} flex items-center justify-center text-white font-syne font-bold text-xs flex-shrink-0`}>
+                {room.initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-syne font-semibold text-slate-900 text-sm">{room.game}</p>
+                <p className="text-[10.5px] text-slate-400 font-mono">{room.id}</p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-[11px] font-bold text-slate-700">{room.bet}</p>
+                <p className="text-[9.5px] text-slate-400">{room.players} jogadores</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
       </div>
     </motion.div>
   );
