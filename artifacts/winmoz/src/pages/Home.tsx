@@ -887,7 +887,12 @@ export default function Home() {
                 className="flex items-center justify-center w-9 h-9 rounded-xl border-2 border-violet-400/50 hover:border-violet-500 transition-all duration-200 shadow-sm overflow-hidden"
                 style={{ background: "#1e1e2e" }}
               >
-                <User className="w-4.5 h-4.5 text-slate-300" style={{ width: 18, height: 18 }} />
+                {(() => {
+                  const avatar = localStorage.getItem("winmoz_user_avatar");
+                  return avatar
+                    ? <img src={avatar} alt="Perfil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : <User className="w-4.5 h-4.5 text-slate-300" style={{ width: 18, height: 18 }} />;
+                })()}
               </button>
             </div>
           ) : (

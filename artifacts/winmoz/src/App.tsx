@@ -13,6 +13,13 @@ import SplashScreen from "@/pages/SplashScreen";
 import Perfil from "@/pages/Perfil";
 import Recarga from "@/pages/Recarga";
 import Levantar from "@/pages/Levantar";
+import Depositar from "@/pages/Depositar";
+import EditarPerfil from "@/pages/EditarPerfil";
+import ConvidarAmigos from "@/pages/ConvidarAmigos";
+import Extratos from "@/pages/Extratos";
+import Reportar from "@/pages/Reportar";
+import Privacidade from "@/pages/Privacidade";
+import Definicoes from "@/pages/Definicoes";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +36,13 @@ function Router() {
       <Route path="/perfil" component={Perfil} />
       <Route path="/recarga" component={Recarga} />
       <Route path="/levantar" component={Levantar} />
+      <Route path="/depositar" component={Depositar} />
+      <Route path="/editar-perfil" component={EditarPerfil} />
+      <Route path="/convidar-amigos" component={ConvidarAmigos} />
+      <Route path="/extratos" component={Extratos} />
+      <Route path="/reportar" component={Reportar} />
+      <Route path="/privacidade" component={Privacidade} />
+      <Route path="/definicoes" component={Definicoes} />
       <Route component={NotFound} />
     </Switch>
   );
