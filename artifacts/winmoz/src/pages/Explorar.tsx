@@ -19,6 +19,8 @@ const jogosCards = [
   { id: "damas-pro",   name: "Damas Pro",        desc: "Jogo de Tabuleiro • 4 Modos",  players: "980 jogadores",  color: "from-orange-500 to-red-700",     initials: "DP", hot: false, category: "Damas" },
   { id: "ludo-classic",name: "Ludo Clássico",    desc: "Jogo de Dados • 3 Modos",      players: "760 jogadores",  color: "from-pink-500 to-rose-700",      initials: "LC", hot: false, category: "Ludo"  },
   { id: "padrao",      name: "Jogo Padrão",      desc: "Clássico • 5 Modos",           players: "1.8K jogadores", color: "from-amber-500 to-yellow-600",   initials: "JP", hot: false, category: "Padrão"},
+  { id: "bilhar",      name: "Bilhar Apostado",  desc: "Jogo de Mesa • 5 Modos",       players: "890 jogadores",  color: "from-cyan-500 to-blue-700",      initials: "BI", hot: false, category: "Padrão"},
+  { id: "roleta",      name: "Roleta da Sorte",  desc: "Sorte • 3 Modos",              players: "1.5K jogadores", color: "from-pink-600 to-rose-800",      initials: "RS", hot: true,  category: "Padrão"},
 ];
 
 const partidasTempoReal = [

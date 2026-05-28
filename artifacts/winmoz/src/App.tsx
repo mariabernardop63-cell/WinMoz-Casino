@@ -20,6 +20,10 @@ import Extratos from "@/pages/Extratos";
 import Reportar from "@/pages/Reportar";
 import Privacidade from "@/pages/Privacidade";
 import Definicoes from "@/pages/Definicoes";
+import Suporte from "@/pages/Suporte";
+import Notificacoes from "@/pages/Notificacoes";
+import GrupoChat from "@/pages/GrupoChat";
+import ScannerQR from "@/pages/ScannerQR";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +47,10 @@ function Router() {
       <Route path="/reportar" component={Reportar} />
       <Route path="/privacidade" component={Privacidade} />
       <Route path="/definicoes" component={Definicoes} />
+      <Route path="/suporte" component={Suporte} />
+      <Route path="/notificacoes" component={Notificacoes} />
+      <Route path="/grupo-chat" component={GrupoChat} />
+      <Route path="/scanner-qr" component={ScannerQR} />
       <Route component={NotFound} />
     </Switch>
   );

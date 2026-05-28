@@ -1,14 +1,42 @@
 import { useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Home, LayoutGrid, ScrollText, User, Search, X } from "lucide-react";
+import { User, Search, X, LayoutGrid } from "lucide-react";
+
+function HomeIcon({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 11.5L12 3L21 11.5" stroke={color} strokeWidth="2.1" />
+      <rect x="5" y="11" width="14" height="10" rx="1.5" stroke={color} strokeWidth="2" fill="none" />
+    </svg>
+  );
+}
+
+function PartidaIcon({ color }: { color: string }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <line x1="3" y1="6" x2="14" y2="6" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <line x1="3" y1="12" x2="11" y2="12" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <line x1="3" y1="18" x2="11" y2="18" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <polygon points="16,9 16,19 23,14" fill={color} />
+    </svg>
+  );
+}
 
 const NAV_ITEMS = [
-  { href: "/",         icon: Home,        label: "Home" },
-  { href: "/explorar", icon: LayoutGrid,  label: "Explorar" },
-  { href: "/partidas", icon: ScrollText,  label: "Partidas" },
-  { href: "/perfil",   icon: User,        label: "Perfil" },
+  { href: "/",         iconKey: "home",     label: "Home" },
+  { href: "/explorar", iconKey: "explorar", label: "Explorar" },
+  { href: "/partidas", iconKey: "partidas", label: "Partidas" },
+  { href: "/perfil",   iconKey: "perfil",   label: "Perfil" },
 ];
+
+function NavIcon({ iconKey, color }: { iconKey: string; color: string }) {
+  if (iconKey === "home") return <HomeIcon color={color} />;
+  if (iconKey === "explorar") return <LayoutGrid style={{ width: 18, height: 18, color }} />;
+  if (iconKey === "partidas") return <PartidaIcon color={color} />;
+  if (iconKey === "perfil") return <User style={{ width: 18, height: 18, color }} />;
+  return null;
+}
 
 export default function BottomNav() {
   const [location] = useLocation();
@@ -36,7 +64,6 @@ export default function BottomNav() {
     >
       <AnimatePresence mode="wait">
         {searching ? (
-          /* ── SEARCH MODE ── */
           <motion.div
             key="search"
             initial={{ scaleX: 0.85, opacity: 0 }}
@@ -44,11 +71,7 @@ export default function BottomNav() {
             exit={{ scaleX: 0.85, opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             className="flex items-center gap-2 px-4 py-3"
-            style={{
-              background: "#18181b",
-              borderRadius: 32,
-              boxShadow: "0 8px 40px rgba(0,0,0,0.45)",
-            }}
+            style={{ background: "#18181b", borderRadius: 32, boxShadow: "0 8px 40px rgba(0,0,0,0.45)" }}
           >
             <Search style={{ width: 17, height: 17, color: "#71717a", flexShrink: 0 }} />
             <input
@@ -67,7 +90,6 @@ export default function BottomNav() {
             </button>
           </motion.div>
         ) : (
-          /* ── NORMAL NAV MODE ── */
           <motion.div
             key="nav"
             initial={{ scaleX: 0.85, opacity: 0 }}
@@ -75,13 +97,9 @@ export default function BottomNav() {
             exit={{ scaleX: 0.85, opacity: 0 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             className="flex items-center justify-between px-3 py-2.5"
-            style={{
-              background: "#18181b",
-              borderRadius: 32,
-              boxShadow: "0 8px 40px rgba(0,0,0,0.45)",
-            }}
+            style={{ background: "#18181b", borderRadius: 32, boxShadow: "0 8px 40px rgba(0,0,0,0.45)" }}
           >
-            {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+            {NAV_ITEMS.map(({ href, iconKey, label }) => {
               const active = isActive(href);
               return (
                 <Link key={href} href={href}>
@@ -98,7 +116,7 @@ export default function BottomNav() {
                       transition: "background 0.25s ease, padding 0.25s ease",
                     }}
                   >
-                    <Icon style={{ width: 18, height: 18, color: active ? "#fff" : "#71717a", flexShrink: 0 }} />
+                    <NavIcon iconKey={iconKey} color={active ? "#fff" : "#71717a"} />
                     <AnimatePresence>
                       {active && (
                         <motion.span
@@ -117,8 +135,6 @@ export default function BottomNav() {
                 </Link>
               );
             })}
-
-            {/* Search button */}
             <button
               onClick={openSearch}
               className="flex items-center justify-center cursor-pointer select-none rounded-full transition-colors hover:bg-white/8"

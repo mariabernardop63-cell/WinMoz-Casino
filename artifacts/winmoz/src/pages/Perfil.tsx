@@ -61,7 +61,7 @@ const FERRAMENTAS = [
   { icon: FileText,   label: "Extratos",         desc: "Histórico completo de transações",  route: "/extratos"        },
   { icon: Flag,       label: "Reportar",         desc: "Reporta um problema ou utilizador", route: "/reportar"        },
   { icon: Lock,       label: "Privacidade",      desc: "Gerir dados e permissões",          route: "/privacidade"     },
-  { icon: HelpCircle, label: "Suporte",          desc: "Fala com a nossa equipa 24/7",      route: null               },
+  { icon: HelpCircle, label: "Suporte",          desc: "Fala com a nossa equipa 24/7",      route: "/suporte"         },
   { icon: Settings,   label: "Definições",       desc: "Notificações, idioma e mais",       route: "/definicoes"      },
   { icon: LogOut,     label: "Sair",             desc: "Terminar sessão da conta",          route: null, danger: true },
 ];
@@ -98,10 +98,6 @@ export default function Perfil() {
       setLocation("/");
       return;
     }
-    if (label === "Suporte") {
-      alert("Suporte 24/7: suporte@winmoz.app");
-      return;
-    }
     if (route) setLocation(route);
   };
 
@@ -120,7 +116,7 @@ export default function Perfil() {
         <div className="px-5 pt-6 pb-0 relative">
           {/* Top right buttons */}
           <div className="absolute top-6 right-5 flex items-center gap-2">
-            <button className="flex items-center justify-center rounded-full transition-all"
+            <button onClick={() => setLocation("/scanner-qr")} className="flex items-center justify-center rounded-full transition-all"
               style={{ width: 34, height: 34, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
               <ScanLine style={{ width: 16, height: 16, color: "#a1a1aa" }} />
             </button>

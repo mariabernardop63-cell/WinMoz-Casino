@@ -598,6 +598,22 @@ const SLIDES = [
     subtitle: "Desafia rivais online e multiplica o teu saldo.",
     cta: "Jogar Agora",
   },
+  {
+    id: "chat",
+    duration: 9000,
+    bg: "linear-gradient(135deg, rgba(0,8,22,0.92) 0%, rgba(0,26,44,0.88) 100%)",
+    bgImage: null as string | null,
+    accent: "#00D4B4",
+    badge: "Anúncio Patrocinado",
+    badgeBg: "rgba(0,0,0,0.50)",
+    badgeBorder: "rgba(0,212,180,0.35)",
+    badgeDot: "#00D4B4",
+    badgeText: "#FFFFFF",
+    subtitleColor: "rgba(255,255,255,0.80)",
+    title: "Converse em\ngrupo agora!",
+    subtitle: "Estratégias, amigos e diversão em tempo real.",
+    cta: "Conversar",
+  },
 ];
 
 const slideIn = {
@@ -606,11 +622,68 @@ const slideIn = {
   exit: (dir: number) => ({ opacity: 0, x: dir * -40, scale: 0.97, transition: { duration: 0.5, ease: [0.55, 0, 1, 0.45] } }),
 };
 
+function ChatBannerArt() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.82, x: 10 }}
+      animate={{ opacity: 1, scale: 1, x: 0 }}
+      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
+      style={{ position: "relative", width: 128, height: 128 }}
+    >
+      {/* Incoming bubble with typing dots */}
+      <motion.div
+        animate={{ y: [0, -3, 0] }}
+        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+        style={{ position: "absolute", top: 4, left: 0, background: "rgba(255,255,255,0.93)", borderRadius: "4px 16px 16px 16px", padding: "8px 12px", boxShadow: "0 4px 16px rgba(0,0,0,0.28)" }}
+      >
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          {[0, 0.18, 0.36].map((d, i) => (
+            <motion.div key={i} animate={{ y: [0, -4, 0] }} transition={{ duration: 0.65, repeat: Infinity, delay: d, ease: "easeInOut" }}
+              style={{ width: 5, height: 5, borderRadius: 999, background: "#9ca3af" }} />
+          ))}
+        </div>
+      </motion.div>
+      {/* Outgoing bubble (cyan) */}
+      <motion.div
+        animate={{ y: [0, -2.5, 0] }}
+        transition={{ duration: 3.1, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
+        style={{ position: "absolute", top: 46, right: 0, background: "linear-gradient(135deg, #00D4B4, #00a88e)", borderRadius: "16px 4px 16px 16px", padding: "8px 13px", boxShadow: "0 4px 18px rgba(0,212,180,0.45)" }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ height: 4, width: 54, background: "rgba(0,26,20,0.38)", borderRadius: 4 }} />
+          <div style={{ height: 4, width: 36, background: "rgba(0,26,20,0.28)", borderRadius: 4 }} />
+        </div>
+      </motion.div>
+      {/* Second incoming bubble */}
+      <motion.div
+        animate={{ y: [0, -3.5, 0] }}
+        transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut", delay: 1.1 }}
+        style={{ position: "absolute", bottom: 6, left: 4, background: "rgba(255,255,255,0.88)", borderRadius: "4px 16px 16px 16px", padding: "7px 11px", boxShadow: "0 3px 12px rgba(0,0,0,0.22)" }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <div style={{ height: 4, width: 46, background: "#e5e7eb", borderRadius: 4 }} />
+          <div style={{ height: 4, width: 28, background: "#e5e7eb", borderRadius: 4 }} />
+        </div>
+      </motion.div>
+      {/* Online badge */}
+      <motion.div
+        animate={{ scale: [1, 1.07, 1] }}
+        transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+        style={{ position: "absolute", top: 0, right: 0, background: "#22c55e", borderRadius: 20, padding: "3px 8px", display: "flex", alignItems: "center", gap: 3, boxShadow: "0 2px 8px rgba(34,197,94,0.55)" }}
+      >
+        <span style={{ width: 5, height: 5, borderRadius: 999, background: "#fff", display: "inline-block" }} />
+        <span style={{ color: "#fff", fontSize: 9, fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>39 online</span>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function HeroBanner() {
   const [slideIdx, setSlideIdx] = useState(0);
   const [dir, setDir] = useState(1);
   const [ready, setReady] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const srcs = SLIDES.map(s => s.bgImage).filter(Boolean) as string[];
@@ -706,8 +779,9 @@ function HeroBanner() {
               {/* CTA */}
               <motion.button
                 whileTap={{ scale: 0.96 }}
+                onClick={() => { if (slide.cta === "Conversar") setLocation("/grupo-chat"); }}
                 className="font-syne font-bold text-sm px-5 py-2 rounded-xl shadow-lg transition-all duration-200"
-                style={{ background: slide.accent, color: "#000" }}
+                style={{ background: slide.accent, color: slide.id === "chat" ? "#001a16" : "#000" }}
               >
                 {slide.cta} →
               </motion.button>
@@ -729,8 +803,10 @@ function HeroBanner() {
                 >
                   <DamasBoard size={136} />
                 </motion.div>
-              ) : (
+              ) : slide.id === "ludo" ? (
                 <LudoBannerImage size={136} />
+              ) : (
+                <ChatBannerArt />
               )}
             </div>
           </motion.div>
@@ -795,6 +871,30 @@ const games = [
     imageFit: "cover" as const,
     imagePos: "center",
   },
+  {
+    id: "bilhar",
+    name: "BILHAR",
+    sub: "Jogo de Mesa",
+    bet: "50–3.000 MT",
+    rating: "4.6",
+    players: "890 jogando",
+    image: null,
+    imageFit: "cover" as const,
+    imagePos: "center",
+    cardBg: "#0c2a3d",
+  },
+  {
+    id: "roleta",
+    name: "ROLETA",
+    sub: "Roleta da Sorte",
+    bet: "20–1.000 MT",
+    rating: "4.5",
+    players: "1.5K jogando",
+    image: null,
+    imageFit: "cover" as const,
+    imagePos: "center",
+    cardBg: "#2d0a1e",
+  },
 ];
 
 const stagger = {
@@ -851,6 +951,26 @@ const topGames = [
     from: "#EA580C",
     to: "#7C2D12",
   },
+  {
+    id: "bi",
+    name: "Bilhar Apostado",
+    players: "890 apostadores ativos",
+    rank: 5,
+    image: null,
+    imagePos: "center",
+    from: "#0891b2",
+    to: "#164e63",
+  },
+  {
+    id: "ro",
+    name: "Roleta da Sorte",
+    players: "1.5K apostadores ativos",
+    rank: 6,
+    image: null,
+    imagePos: "center",
+    from: "#be185d",
+    to: "#831843",
+  },
 ];
 
 /* ─────────────────────────────────────────────
@@ -877,7 +997,7 @@ export default function Home() {
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
               {/* Notification Bell */}
-              <button className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all duration-200 shadow-sm">
+              <button onClick={() => setLocation("/notificacoes")} className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all duration-200 shadow-sm">
                 <Bell className="w-4 h-4 text-slate-600" />
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
               </button>
@@ -1053,6 +1173,51 @@ export default function Home() {
 
         {/* ATUALIZAÇÕES */}
         <AtualizacoesSection />
+
+        {/* FLOATING SUPPORT BUTTON */}
+        {isLoggedIn && (
+          <motion.button
+            onClick={() => setLocation("/suporte")}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 1.2, type: "spring", damping: 14, stiffness: 220 }}
+            whileHover={{ scale: 1.08 }}
+            whileTap={{ scale: 0.92 }}
+            style={{
+              position: "fixed",
+              bottom: 92,
+              right: 18,
+              zIndex: 45,
+              width: 52,
+              height: 52,
+              borderRadius: 999,
+              background: "linear-gradient(135deg, #7c3aed, #4c1d95)",
+              border: "none",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 6px 24px rgba(124,58,237,0.55), 0 2px 8px rgba(0,0,0,0.3)",
+            }}
+          >
+            {/* Pulse ring */}
+            <motion.span
+              animate={{ scale: [1, 1.7, 1], opacity: [0.6, 0, 0.6] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
+              style={{ position: "absolute", inset: 0, borderRadius: 999, border: "2px solid #7c3aed" }}
+            />
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="white" fillOpacity="0.95" />
+              <circle cx="8.5" cy="11" r="1.5" fill="#7c3aed" />
+              <circle cx="12" cy="11" r="1.5" fill="#7c3aed" />
+              <circle cx="15.5" cy="11" r="1.5" fill="#7c3aed" />
+            </svg>
+            {/* 24/7 badge */}
+            <span style={{ position: "absolute", top: -4, right: -4, background: "#00D4B4", borderRadius: 10, padding: "1px 5px", fontSize: 8, fontWeight: 800, color: "#001a16", fontFamily: "'Syne', sans-serif", boxShadow: "0 2px 6px rgba(0,212,180,0.5)", whiteSpace: "nowrap" }}>
+              24/7
+            </span>
+          </motion.button>
+        )}
 
         {/* BOTTOM NAV */}
         <BottomNav />
