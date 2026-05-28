@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Eye, EyeOff, X } from "lucide-react";
 
 function PokerLogo() {
   return (
@@ -36,38 +36,42 @@ const TwitterXIcon = () => (
   </svg>
 );
 
-export default function Login() {
+export default function Registar() {
   const [, setLocation] = useLocation();
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [focused, setFocused] = useState<string | null>(null);
+  const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState("");
 
-  const inputStyle = (field: string) => ({
+  const inputStyle = (field: string): React.CSSProperties => ({
     width: "100%",
     padding: "15px 16px",
     borderRadius: 0,
-    border: focusedField === field ? "1.5px solid #000000" : "1px solid #d1d5db",
+    border: focused === field ? "1.5px solid #000" : "1px solid #d1d5db",
     background: "#ffffff",
     fontSize: 14,
     color: "#111",
     outline: "none",
     transition: "border 0.15s ease",
     fontFamily: "inherit",
-  } as React.CSSProperties);
+    boxSizing: "border-box",
+  });
 
   return (
     <div className="min-h-screen bg-white w-full flex justify-center">
-      <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col px-6 pt-16 pb-10 relative">
+      <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col px-6 pt-16 pb-10 relative overflow-y-auto">
 
-        {/* Back button */}
+        {/* Close / Back button */}
         <button
           onClick={() => setLocation("/")}
           className="absolute top-5 left-5 flex items-center justify-center transition-colors hover:bg-slate-100"
           style={{ width: 36, height: 36 }}
-          aria-label="Voltar"
+          aria-label="Fechar"
         >
-          <ArrowLeft style={{ width: 22, height: 22, color: "#111" }} />
+          <X style={{ width: 22, height: 22, color: "#111" }} />
         </button>
 
         {/* Logo */}
@@ -84,14 +88,29 @@ export default function Login() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.38, delay: 0.08 }}
-          className="flex flex-col gap-0"
         >
           <h1 className="font-syne font-bold text-[26px] text-[#0a0a0a] leading-tight mb-1">
-            Iniciar Sessão
+            Criar Conta
           </h1>
           <p className="text-[13.5px] text-slate-500 mb-7">
-            Bem-vindo de volta. Introduza os seus dados.
+            Junte-se a milhares de jogadores em Moçambique.
           </p>
+
+          {/* Nome completo */}
+          <div className="mb-4">
+            <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#374151", marginBottom: 7, letterSpacing: "0.2px" }}>
+              Nome Completo
+            </label>
+            <input
+              type="text"
+              placeholder="O seu nome completo"
+              value={nome}
+              onChange={e => setNome(e.target.value)}
+              onFocus={() => setFocused("nome")}
+              onBlur={() => setFocused(null)}
+              style={inputStyle("nome")}
+            />
+          </div>
 
           {/* Email */}
           <div className="mb-4">
@@ -103,47 +122,57 @@ export default function Login() {
               placeholder="exemplo@email.com"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              onFocus={() => setFocusedField("email")}
-              onBlur={() => setFocusedField(null)}
+              onFocus={() => setFocused("email")}
+              onBlur={() => setFocused(null)}
               style={inputStyle("email")}
             />
           </div>
 
           {/* Password */}
-          <div className="mb-3">
+          <div className="mb-4">
             <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#374151", marginBottom: 7, letterSpacing: "0.2px" }}>
               Palavra-passe
             </label>
             <div style={{ position: "relative" }}>
               <input
-                type={showPassword ? "text" : "password"}
-                placeholder="A sua palavra-passe"
+                type={showPw ? "text" : "password"}
+                placeholder="Mínimo 8 caracteres"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                onFocus={() => setFocusedField("password")}
-                onBlur={() => setFocusedField(null)}
+                onFocus={() => setFocused("password")}
+                onBlur={() => setFocused(null)}
                 style={{ ...inputStyle("password"), paddingRight: 48 }}
               />
-              <button
-                type="button"
-                onClick={() => setShowPassword(v => !v)}
-                style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center" }}
-              >
-                {showPassword ? <EyeOff style={{ width: 17, height: 17 }} /> : <Eye style={{ width: 17, height: 17 }} />}
+              <button type="button" onClick={() => setShowPw(v => !v)}
+                style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                {showPw ? <EyeOff style={{ width: 17, height: 17 }} /> : <Eye style={{ width: 17, height: 17 }} />}
               </button>
             </div>
           </div>
 
-          {/* Forgot password */}
-          <div className="flex justify-end mb-6">
-            <Link href="/esqueceu-senha">
-              <button className="text-[12.5px] font-semibold text-[#111] hover:underline">
-                Esqueceu a palavra-passe?
+          {/* Confirm password */}
+          <div className="mb-7">
+            <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#374151", marginBottom: 7, letterSpacing: "0.2px" }}>
+              Confirmar Palavra-passe
+            </label>
+            <div style={{ position: "relative" }}>
+              <input
+                type={showConfirm ? "text" : "password"}
+                placeholder="Repita a palavra-passe"
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
+                onFocus={() => setFocused("confirm")}
+                onBlur={() => setFocused(null)}
+                style={{ ...inputStyle("confirm"), paddingRight: 48 }}
+              />
+              <button type="button" onClick={() => setShowConfirm(v => !v)}
+                style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center" }}>
+                {showConfirm ? <EyeOff style={{ width: 17, height: 17 }} /> : <Eye style={{ width: 17, height: 17 }} />}
               </button>
-            </Link>
+            </div>
           </div>
 
-          {/* Sign in button */}
+          {/* Register button */}
           <button
             style={{
               width: "100%", padding: "15px", background: "#000", color: "#fff",
@@ -154,13 +183,13 @@ export default function Login() {
             onMouseEnter={e => (e.currentTarget.style.opacity = "0.88")}
             onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
           >
-            Iniciar Sessão
+            Criar Conta
           </button>
 
           {/* Divider */}
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-slate-200" />
-            <span style={{ fontSize: 11.5, color: "#9ca3af", fontWeight: 500, letterSpacing: "1.5px" }}>OU ENTRE COM</span>
+            <span style={{ fontSize: 11.5, color: "#9ca3af", fontWeight: 500, letterSpacing: "1.5px" }}>OU REGISTE-SE COM</span>
             <div className="flex-1 h-px bg-slate-200" />
           </div>
 
@@ -185,17 +214,16 @@ export default function Login() {
             ))}
           </div>
 
+          {/* Login link */}
+          <p className="text-center text-[13px] text-slate-500 mt-8">
+            Já tem conta?{" "}
+            <Link href="/login">
+              <button className="font-bold text-[#000] hover:underline text-[13px]">
+                Iniciar Sessão
+              </button>
+            </Link>
+          </p>
         </motion.div>
-
-        {/* Sign up link */}
-        <p className="text-center text-[13px] text-slate-500 mt-8">
-          Não tem conta?{" "}
-          <Link href="/registar">
-            <button className="font-bold text-[#000] hover:underline text-[13px]">
-              Registar-se
-            </button>
-          </Link>
-        </p>
 
       </div>
     </div>

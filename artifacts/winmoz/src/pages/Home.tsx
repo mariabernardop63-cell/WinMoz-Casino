@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
-import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp } from "lucide-react";
+import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp, Heart, MessageCircle, Share2 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
 /* ─────────────────────────────────────────────
@@ -83,33 +83,36 @@ function SaquesSection() {
 const POSTS = [
   {
     id: 1,
-    avatar: "W",
-    name: "WinMoz Oficial",
-    handle: "@winmoz",
+    image: "/ludo-card.jpg",
+    imageBg: null as string | null,
+    title: "Nova Temporada de Ludo Online",
+    content: "Prémios até 50.000 $MT para os melhores jogadores. Inscreve-te já e garante o teu lugar!",
     time: "2h",
-    content: "🎮 Nova temporada de Ludo Online começa hoje! Prémios até 50.000 $MT para os melhores jogadores. Inscreve-te já!",
     likes: 142,
-    reposts: 38,
+    comments: 29,
+    shares: 38,
   },
   {
     id: 2,
-    avatar: "W",
-    name: "WinMoz Oficial",
-    handle: "@winmoz",
+    image: null as string | null,
+    imageBg: "linear-gradient(135deg,#10b981,#059669)",
+    title: "Saques 24h Sem Complicações",
+    content: "Levanta os teus ganhos a qualquer hora, sem esperas nem taxas escondidas. Rápido e seguro.",
     time: "5h",
-    content: "💰 Saques 24h disponíveis! Levanta os teus ganhos a qualquer hora, sem esperas e sem taxas escondidas.",
     likes: 97,
-    reposts: 21,
+    comments: 14,
+    shares: 21,
   },
   {
     id: 3,
-    avatar: "W",
-    name: "WinMoz Oficial",
-    handle: "@winmoz",
+    image: "/damas-board.png",
+    imageBg: null as string | null,
+    title: "Torneio de Xadrez Semanal",
+    content: "Compete por 20.000 $MT em prémios nos nossos torneios semanais. Regista-te agora.",
     time: "1d",
-    content: "♟ Xadrez online está de volta com novos torneios semanais. Regista-te e compete por 20.000 $MT em prémios!",
     likes: 213,
-    reposts: 64,
+    comments: 47,
+    shares: 64,
   },
 ];
 
@@ -117,10 +120,7 @@ function AtualizacoesSection() {
   return (
     <section className="px-4 pt-2 pb-4">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-base">📢</span>
-          <h2 className="font-syne font-bold text-base text-slate-900">Atualizações</h2>
-        </div>
+        <h2 className="font-syne font-bold text-base text-slate-900">Atualizações</h2>
         <Link href="/explorar">
           <button className="text-xs font-semibold text-violet-700 hover:underline font-syne">Ver mais</button>
         </Link>
@@ -133,30 +133,43 @@ function AtualizacoesSection() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.06, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-            className="bg-white rounded-2xl border border-slate-100 px-4 py-3.5 shadow-sm"
+            className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex"
+            style={{ minHeight: 92 }}
           >
-            <div className="flex items-start gap-3">
-              {/* Avatar */}
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-                <span className="text-white font-syne font-bold text-xs">{post.avatar}</span>
+            {/* Left image / colour block */}
+            <div className="flex-shrink-0" style={{ width: 90 }}>
+              {post.image ? (
+                <img
+                  src={post.image}
+                  alt={post.title}
+                  style={{ width: 90, height: "100%", objectFit: "cover", display: "block", minHeight: 92 }}
+                />
+              ) : (
+                <div style={{ width: 90, minHeight: 92, height: "100%", background: post.imageBg ?? "#6366f1" }} />
+              )}
+            </div>
+
+            {/* Right content */}
+            <div className="flex-1 px-3 py-3 flex flex-col justify-between min-w-0">
+              <div>
+                <p className="font-syne font-bold text-slate-900 leading-tight mb-1" style={{ fontSize: 12.5 }}>
+                  {post.title}
+                </p>
+                <p className="text-slate-500 leading-relaxed" style={{ fontSize: 11.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                  {post.content}
+                </p>
               </div>
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                  <span className="font-syne font-bold text-slate-900 text-[12px]">{post.name}</span>
-                  <span className="text-slate-400 text-[11px]">{post.handle}</span>
-                  <span className="text-slate-300 text-[11px]">·</span>
-                  <span className="text-slate-400 text-[11px]">{post.time}</span>
-                </div>
-                <p className="text-slate-700 text-[12px] leading-relaxed">{post.content}</p>
-                <div className="flex items-center gap-4 mt-2">
-                  <span className="text-slate-400 text-[11px] flex items-center gap-1">
-                    <span>❤️</span> {post.likes}
-                  </span>
-                  <span className="text-slate-400 text-[11px] flex items-center gap-1">
-                    <span>🔁</span> {post.reposts}
-                  </span>
-                </div>
+              <div className="flex items-center gap-3 mt-2">
+                <span className="flex items-center gap-1 text-slate-400" style={{ fontSize: 11 }}>
+                  <Heart style={{ width: 11, height: 11 }} /> {post.likes}
+                </span>
+                <span className="flex items-center gap-1 text-slate-400" style={{ fontSize: 11 }}>
+                  <MessageCircle style={{ width: 11, height: 11 }} /> {post.comments}
+                </span>
+                <span className="flex items-center gap-1 text-slate-400" style={{ fontSize: 11 }}>
+                  <Share2 style={{ width: 11, height: 11 }} /> {post.shares}
+                </span>
+                <span className="ml-auto text-slate-400" style={{ fontSize: 10.5 }}>{post.time}</span>
               </div>
             </div>
           </motion.div>
@@ -867,7 +880,7 @@ export default function Home() {
         {/* TOP NAV */}
         <header className="sticky top-0 z-50 flex items-center justify-between px-5 py-3.5 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
           <WinMozLogo />
-          <Link href="/login">
+          <Link href="/registar">
             <button className="bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm px-5 py-2 rounded-xl transition-all duration-200 shadow-md hover:shadow-blue-200 hover:shadow-lg font-syne tracking-wide">
               Registar-se
             </button>

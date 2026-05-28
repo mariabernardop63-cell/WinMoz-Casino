@@ -6,6 +6,9 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Explorar from "@/pages/Explorar";
 import Login from "@/pages/Login";
+import Registar from "@/pages/Registar";
+import EsqueceuSenha from "@/pages/EsqueceuSenha";
+import OTP from "@/pages/OTP";
 import Perfil from "@/pages/Perfil";
 
 const queryClient = new QueryClient();
@@ -16,6 +19,9 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/explorar" component={Explorar} />
       <Route path="/login" component={Login} />
+      <Route path="/registar" component={Registar} />
+      <Route path="/esqueceu-senha" component={EsqueceuSenha} />
+      <Route path="/otp" component={OTP} />
       <Route path="/perfil" component={Perfil} />
       <Route component={NotFound} />
     </Switch>
