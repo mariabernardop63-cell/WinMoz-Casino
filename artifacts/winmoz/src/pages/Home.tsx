@@ -729,7 +729,7 @@ function HeroBanner() {
             : slide.bg,
           backgroundSize: "cover",
           backgroundPosition: "center",
-          minHeight: 190,
+          height: 190,
         }}
       >
         {/* Ambient glow */}
@@ -749,8 +749,8 @@ function HeroBanner() {
             initial="initial"
             animate="animate"
             exit="exit"
-            className="relative z-10 flex items-center justify-between px-5 py-6 gap-3"
-            style={{ minHeight: 190 }}
+            className="relative z-10 flex items-center justify-between px-5 py-5 gap-3"
+            style={{ height: 190, overflow: "hidden" }}
           >
             {/* LEFT: text */}
             <div className="flex-1 min-w-0">
@@ -766,7 +766,7 @@ function HeroBanner() {
               {/* Title */}
               <h1
                 className="font-syne font-extrabold leading-tight text-white mb-2 drop-shadow-md whitespace-pre-line"
-                style={{ fontSize: slide.id === "ludo" ? "1.32rem" : "1.55rem" }}
+                style={{ fontSize: slide.id === "chat" ? "1.32rem" : slide.id === "ludo" ? "1.28rem" : "1.55rem" }}
               >
                 {slide.title}
               </h1>
