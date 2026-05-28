@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link } from "wouter";
-import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp, Heart, MessageCircle, Share2 } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp, Bell, User } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
 /* ─────────────────────────────────────────────
@@ -116,6 +116,46 @@ const POSTS = [
   },
 ];
 
+export function AtualizacoesCards() {
+  return (
+    <div className="flex flex-col gap-2.5">
+      {POSTS.map((post, i) => (
+        <motion.div
+          key={post.id}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.06, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+          className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex"
+          style={{ minHeight: 92 }}
+        >
+          <div className="flex-shrink-0" style={{ width: 90 }}>
+            {post.image ? (
+              <img
+                src={post.image}
+                alt={post.title}
+                style={{ width: 90, height: "100%", objectFit: "cover", display: "block", minHeight: 92 }}
+              />
+            ) : (
+              <div style={{ width: 90, minHeight: 92, height: "100%", background: post.imageBg ?? "#6366f1" }} />
+            )}
+          </div>
+          <div className="flex-1 px-3 py-3 flex flex-col justify-between min-w-0">
+            <div>
+              <p className="font-syne font-bold text-slate-900 leading-tight mb-1" style={{ fontSize: 12.5 }}>
+                {post.title}
+              </p>
+              <p className="text-slate-500 leading-relaxed" style={{ fontSize: 11.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                {post.content}
+              </p>
+            </div>
+            <span className="mt-2 text-slate-400" style={{ fontSize: 10.5 }}>{post.time}</span>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
 function AtualizacoesSection() {
   return (
     <section className="px-4 pt-2 pb-4">
@@ -125,56 +165,7 @@ function AtualizacoesSection() {
           <button className="text-xs font-semibold text-violet-700 hover:underline font-syne">Ver mais</button>
         </Link>
       </div>
-
-      <div className="flex flex-col gap-2.5">
-        {POSTS.map((post, i) => (
-          <motion.div
-            key={post.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.06, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-            className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex"
-            style={{ minHeight: 92 }}
-          >
-            {/* Left image / colour block */}
-            <div className="flex-shrink-0" style={{ width: 90 }}>
-              {post.image ? (
-                <img
-                  src={post.image}
-                  alt={post.title}
-                  style={{ width: 90, height: "100%", objectFit: "cover", display: "block", minHeight: 92 }}
-                />
-              ) : (
-                <div style={{ width: 90, minHeight: 92, height: "100%", background: post.imageBg ?? "#6366f1" }} />
-              )}
-            </div>
-
-            {/* Right content */}
-            <div className="flex-1 px-3 py-3 flex flex-col justify-between min-w-0">
-              <div>
-                <p className="font-syne font-bold text-slate-900 leading-tight mb-1" style={{ fontSize: 12.5 }}>
-                  {post.title}
-                </p>
-                <p className="text-slate-500 leading-relaxed" style={{ fontSize: 11.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                  {post.content}
-                </p>
-              </div>
-              <div className="flex items-center gap-3 mt-2">
-                <span className="flex items-center gap-1 text-slate-400" style={{ fontSize: 11 }}>
-                  <Heart style={{ width: 11, height: 11 }} /> {post.likes}
-                </span>
-                <span className="flex items-center gap-1 text-slate-400" style={{ fontSize: 11 }}>
-                  <MessageCircle style={{ width: 11, height: 11 }} /> {post.comments}
-                </span>
-                <span className="flex items-center gap-1 text-slate-400" style={{ fontSize: 11 }}>
-                  <Share2 style={{ width: 11, height: 11 }} /> {post.shares}
-                </span>
-                <span className="ml-auto text-slate-400" style={{ fontSize: 10.5 }}>{post.time}</span>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      <AtualizacoesCards />
     </section>
   );
 }
@@ -867,9 +858,12 @@ const topGames = [
 ───────────────────────────────────────────── */
 export default function Home() {
   const [gamesReady, setGamesReady] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [, setLocation] = useLocation();
 
   useEffect(() => {
     const t = setTimeout(() => setGamesReady(true), 350);
+    setIsLoggedIn(!!localStorage.getItem("winmoz_logged_in"));
     return () => clearTimeout(t);
   }, []);
 
@@ -880,11 +874,29 @@ export default function Home() {
         {/* TOP NAV */}
         <header className="sticky top-0 z-50 flex items-center justify-between px-5 py-3.5 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
           <WinMozLogo />
-          <Link href="/registar">
-            <button className="bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm px-5 py-2 rounded-xl transition-all duration-200 shadow-md hover:shadow-blue-200 hover:shadow-lg font-syne tracking-wide">
-              Registar-se
-            </button>
-          </Link>
+          {isLoggedIn ? (
+            <div className="flex items-center gap-2">
+              {/* Notification Bell */}
+              <button className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all duration-200 shadow-sm">
+                <Bell className="w-4 h-4 text-slate-600" />
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+              </button>
+              {/* Profile Icon */}
+              <button
+                onClick={() => setLocation("/perfil")}
+                className="flex items-center justify-center w-9 h-9 rounded-xl border-2 border-violet-400/50 hover:border-violet-500 transition-all duration-200 shadow-sm overflow-hidden"
+                style={{ background: "#1e1e2e" }}
+              >
+                <User className="w-4.5 h-4.5 text-slate-300" style={{ width: 18, height: 18 }} />
+              </button>
+            </div>
+          ) : (
+            <Link href="/registar">
+              <button className="bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm px-5 py-2 rounded-xl transition-all duration-200 shadow-md hover:shadow-blue-200 hover:shadow-lg font-syne tracking-wide">
+                Registar-se
+              </button>
+            </Link>
+          )}
         </header>
 
         {/* HERO BANNER */}

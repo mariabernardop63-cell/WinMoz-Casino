@@ -11,6 +11,7 @@ import EsqueceuSenha from "@/pages/EsqueceuSenha";
 import OTP from "@/pages/OTP";
 import SplashScreen from "@/pages/SplashScreen";
 import Perfil from "@/pages/Perfil";
+import Recarga from "@/pages/Recarga";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/otp" component={OTP} />
       <Route path="/splash" component={SplashScreen} />
       <Route path="/perfil" component={Perfil} />
+      <Route path="/recarga" component={Recarga} />
       <Route component={NotFound} />
     </Switch>
   );
