@@ -628,51 +628,51 @@ function ChatBannerArt() {
       initial={{ opacity: 0, scale: 0.82, x: 10 }}
       animate={{ opacity: 1, scale: 1, x: 0 }}
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
-      style={{ position: "relative", width: 128, height: 128 }}
+      style={{ position: "relative", width: 106, height: 106, flexShrink: 0 }}
     >
       {/* Incoming bubble with typing dots */}
       <motion.div
-        animate={{ y: [0, -3, 0] }}
+        animate={{ y: [0, -2, 0] }}
         transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-        style={{ position: "absolute", top: 4, left: 0, background: "rgba(255,255,255,0.93)", borderRadius: "4px 16px 16px 16px", padding: "8px 12px", boxShadow: "0 4px 16px rgba(0,0,0,0.28)" }}
+        style={{ position: "absolute", top: 2, left: 0, background: "rgba(255,255,255,0.93)", borderRadius: "3px 12px 12px 12px", padding: "6px 9px", boxShadow: "0 3px 12px rgba(0,0,0,0.28)" }}
       >
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 3, alignItems: "center" }}>
           {[0, 0.18, 0.36].map((d, i) => (
-            <motion.div key={i} animate={{ y: [0, -4, 0] }} transition={{ duration: 0.65, repeat: Infinity, delay: d, ease: "easeInOut" }}
-              style={{ width: 5, height: 5, borderRadius: 999, background: "#9ca3af" }} />
+            <motion.div key={i} animate={{ y: [0, -3, 0] }} transition={{ duration: 0.65, repeat: Infinity, delay: d, ease: "easeInOut" }}
+              style={{ width: 4, height: 4, borderRadius: 999, background: "#9ca3af" }} />
           ))}
         </div>
       </motion.div>
       {/* Outgoing bubble (cyan) */}
       <motion.div
-        animate={{ y: [0, -2.5, 0] }}
+        animate={{ y: [0, -2, 0] }}
         transition={{ duration: 3.1, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
-        style={{ position: "absolute", top: 46, right: 0, background: "linear-gradient(135deg, #00D4B4, #00a88e)", borderRadius: "16px 4px 16px 16px", padding: "8px 13px", boxShadow: "0 4px 18px rgba(0,212,180,0.45)" }}
+        style={{ position: "absolute", top: 36, right: 0, background: "linear-gradient(135deg, #00D4B4, #00a88e)", borderRadius: "12px 3px 12px 12px", padding: "6px 10px", boxShadow: "0 3px 14px rgba(0,212,180,0.45)" }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <div style={{ height: 4, width: 54, background: "rgba(0,26,20,0.38)", borderRadius: 4 }} />
-          <div style={{ height: 4, width: 36, background: "rgba(0,26,20,0.28)", borderRadius: 4 }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ height: 3, width: 42, background: "rgba(0,26,20,0.38)", borderRadius: 4 }} />
+          <div style={{ height: 3, width: 28, background: "rgba(0,26,20,0.28)", borderRadius: 4 }} />
         </div>
       </motion.div>
       {/* Second incoming bubble */}
       <motion.div
-        animate={{ y: [0, -3.5, 0] }}
+        animate={{ y: [0, -2.5, 0] }}
         transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut", delay: 1.1 }}
-        style={{ position: "absolute", bottom: 6, left: 4, background: "rgba(255,255,255,0.88)", borderRadius: "4px 16px 16px 16px", padding: "7px 11px", boxShadow: "0 3px 12px rgba(0,0,0,0.22)" }}
+        style={{ position: "absolute", bottom: 4, left: 2, background: "rgba(255,255,255,0.88)", borderRadius: "3px 12px 12px 12px", padding: "5px 8px", boxShadow: "0 2px 10px rgba(0,0,0,0.22)" }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
-          <div style={{ height: 4, width: 46, background: "#e5e7eb", borderRadius: 4 }} />
-          <div style={{ height: 4, width: 28, background: "#e5e7eb", borderRadius: 4 }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ height: 3, width: 36, background: "#e5e7eb", borderRadius: 4 }} />
+          <div style={{ height: 3, width: 22, background: "#e5e7eb", borderRadius: 4 }} />
         </div>
       </motion.div>
       {/* Online badge */}
       <motion.div
         animate={{ scale: [1, 1.07, 1] }}
         transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-        style={{ position: "absolute", top: 0, right: 0, background: "#22c55e", borderRadius: 20, padding: "3px 8px", display: "flex", alignItems: "center", gap: 3, boxShadow: "0 2px 8px rgba(34,197,94,0.55)" }}
+        style={{ position: "absolute", top: -2, right: -2, background: "#22c55e", borderRadius: 20, padding: "2px 6px", display: "flex", alignItems: "center", gap: 3, boxShadow: "0 2px 6px rgba(34,197,94,0.55)" }}
       >
-        <span style={{ width: 5, height: 5, borderRadius: 999, background: "#fff", display: "inline-block" }} />
-        <span style={{ color: "#fff", fontSize: 9, fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>39 online</span>
+        <span style={{ width: 4, height: 4, borderRadius: 999, background: "#fff", display: "inline-block" }} />
+        <span style={{ color: "#fff", fontSize: 8, fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>39 online</span>
       </motion.div>
     </motion.div>
   );
@@ -729,7 +729,7 @@ function HeroBanner() {
             : slide.bg,
           backgroundSize: "cover",
           backgroundPosition: "center",
-          height: 190,
+          minHeight: 190,
         }}
       >
         {/* Ambient glow */}
@@ -749,8 +749,8 @@ function HeroBanner() {
             initial="initial"
             animate="animate"
             exit="exit"
-            className="relative z-10 flex items-center justify-between px-5 py-5 gap-3"
-            style={{ height: 190, overflow: "hidden" }}
+            className="relative z-10 flex items-center justify-between px-5 py-6 gap-3"
+            style={{ minHeight: 190 }}
           >
             {/* LEFT: text */}
             <div className="flex-1 min-w-0">
@@ -766,7 +766,7 @@ function HeroBanner() {
               {/* Title */}
               <h1
                 className="font-syne font-extrabold leading-tight text-white mb-2 drop-shadow-md whitespace-pre-line"
-                style={{ fontSize: slide.id === "chat" ? "1.32rem" : slide.id === "ludo" ? "1.28rem" : "1.55rem" }}
+                style={{ fontSize: slide.id === "chat" ? "1.18rem" : slide.id === "ludo" ? "1.32rem" : "1.55rem" }}
               >
                 {slide.title}
               </h1>
