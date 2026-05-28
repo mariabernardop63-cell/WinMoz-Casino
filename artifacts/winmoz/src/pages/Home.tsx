@@ -78,6 +78,95 @@ function SaquesSection() {
 }
 
 /* ─────────────────────────────────────────────
+   ATUALIZAÇÕES
+───────────────────────────────────────────── */
+const POSTS = [
+  {
+    id: 1,
+    avatar: "W",
+    name: "WinMoz Oficial",
+    handle: "@winmoz",
+    time: "2h",
+    content: "🎮 Nova temporada de Ludo Online começa hoje! Prémios até 50.000 $MT para os melhores jogadores. Inscreve-te já!",
+    likes: 142,
+    reposts: 38,
+  },
+  {
+    id: 2,
+    avatar: "W",
+    name: "WinMoz Oficial",
+    handle: "@winmoz",
+    time: "5h",
+    content: "💰 Saques 24h disponíveis! Levanta os teus ganhos a qualquer hora, sem esperas e sem taxas escondidas.",
+    likes: 97,
+    reposts: 21,
+  },
+  {
+    id: 3,
+    avatar: "W",
+    name: "WinMoz Oficial",
+    handle: "@winmoz",
+    time: "1d",
+    content: "♟ Xadrez online está de volta com novos torneios semanais. Regista-te e compete por 20.000 $MT em prémios!",
+    likes: 213,
+    reposts: 64,
+  },
+];
+
+function AtualizacoesSection() {
+  return (
+    <section className="px-4 pt-2 pb-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-base">📢</span>
+          <h2 className="font-syne font-bold text-base text-slate-900">Atualizações</h2>
+        </div>
+        <Link href="/explorar">
+          <button className="text-xs font-semibold text-violet-700 hover:underline font-syne">Ver mais</button>
+        </Link>
+      </div>
+
+      <div className="flex flex-col gap-2.5">
+        {POSTS.map((post, i) => (
+          <motion.div
+            key={post.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.06, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+            className="bg-white rounded-2xl border border-slate-100 px-4 py-3.5 shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              {/* Avatar */}
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <span className="text-white font-syne font-bold text-xs">{post.avatar}</span>
+              </div>
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                  <span className="font-syne font-bold text-slate-900 text-[12px]">{post.name}</span>
+                  <span className="text-slate-400 text-[11px]">{post.handle}</span>
+                  <span className="text-slate-300 text-[11px]">·</span>
+                  <span className="text-slate-400 text-[11px]">{post.time}</span>
+                </div>
+                <p className="text-slate-700 text-[12px] leading-relaxed">{post.content}</p>
+                <div className="flex items-center gap-4 mt-2">
+                  <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                    <span>❤️</span> {post.likes}
+                  </span>
+                  <span className="text-slate-400 text-[11px] flex items-center gap-1">
+                    <span>🔁</span> {post.reposts}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ─────────────────────────────────────────────
    LOGO
 ───────────────────────────────────────────── */
 function WinMozLogo() {
@@ -931,6 +1020,9 @@ export default function Home() {
 
         {/* SAQUES 24 HORAS */}
         <SaquesSection />
+
+        {/* ATUALIZAÇÕES */}
+        <AtualizacoesSection />
 
         {/* BOTTOM NAV */}
         <BottomNav />

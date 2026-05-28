@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
-const TABS = ["Jogos", "Assistir", "Sala", "Criar Sala"] as const;
+const TABS = ["Jogos", "Assistir", "Sala", "Criar Sala", "Novidades"] as const;
 type Tab = typeof TABS[number];
 
 const jogosCards = [
@@ -515,6 +515,54 @@ export default function Explorar() {
                 <p className="text-sm text-slate-400 max-w-[220px] leading-relaxed">
                   A funcionalidade de criar sala estará disponível em breve. Fica atento.
                 </p>
+              </motion.div>
+            )}
+
+            {activeTab === "Novidades" && (
+              <motion.div
+                key="novidades"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-2.5 pb-6"
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-base">📢</span>
+                  <h2 className="font-syne font-bold text-sm text-slate-900">Últimas Atualizações</h2>
+                </div>
+                {[
+                  { id:1, time:"2h",  likes:142, reposts:38,  content:"🎮 Nova temporada de Ludo Online começa hoje! Prémios até 50.000 $MT para os melhores jogadores." },
+                  { id:2, time:"5h",  likes:97,  reposts:21,  content:"💰 Saques 24h disponíveis! Levanta os teus ganhos a qualquer hora, sem esperas e sem taxas escondidas." },
+                  { id:3, time:"1d",  likes:213, reposts:64,  content:"♟ Xadrez online está de volta com novos torneios semanais. Compete por 20.000 $MT em prémios!" },
+                  { id:4, time:"2d",  likes:88,  reposts:17,  content:"🏆 Resultados do torneio de Damas: parabéns aos 10 finalistas. Próxima edição em breve!" },
+                  { id:5, time:"3d",  likes:176, reposts:45,  content:"📱 Novo sistema de notificações disponível. Ativa já para não perderes nenhuma partida ao vivo." },
+                ].map((post, i) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05, duration: 0.35 }}
+                    className="bg-white rounded-2xl border border-slate-100 px-4 py-3.5 shadow-sm"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-blue-600 flex items-center justify-center flex-shrink-0">
+                        <span className="text-white font-syne font-bold text-xs">W</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                          <span className="font-syne font-bold text-slate-900 text-[12px]">WinMoz Oficial</span>
+                          <span className="text-slate-400 text-[11px]">@winmoz · {post.time}</span>
+                        </div>
+                        <p className="text-slate-700 text-[12px] leading-relaxed">{post.content}</p>
+                        <div className="flex items-center gap-4 mt-2">
+                          <span className="text-slate-400 text-[11px]">❤️ {post.likes}</span>
+                          <span className="text-slate-400 text-[11px]">🔁 {post.reposts}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
               </motion.div>
             )}
           </AnimatePresence>
