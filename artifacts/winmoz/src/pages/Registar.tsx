@@ -138,15 +138,36 @@ export default function Registar() {
       const token = digits.join("");
 
       setLoading(true);
-      const { error } = await supabase.auth.verifyOtp({
+
+      let verifyError: any = null;
+
+      // Try 'signup' type first (used when account was created with signUp())
+      const { error: err1 } = await supabase.auth.verifyOtp({
         email: email.trim().toLowerCase(),
         token,
         type: "signup",
       });
+
+      if (err1) {
+        // Fallback: try 'email' type (used with signInWithOtp)
+        const { error: err2 } = await supabase.auth.verifyOtp({
+          email: email.trim().toLowerCase(),
+          token,
+          type: "email",
+        });
+        verifyError = err2;
+      }
+
       setLoading(false);
 
-      if (error) {
-        setGeneralError("Código inválido ou expirado. Verifique e tente novamente.");
+      if (verifyError) {
+        if (verifyError.message?.includes("expired")) {
+          setGeneralError("O código expirou. Clica em 'Reenviar código' para receber um novo.");
+        } else if (verifyError.message?.includes("invalid") || verifyError.message?.includes("not found")) {
+          setGeneralError("Código incorrecto. Verifica o email e introduz os 6 dígitos exactos.");
+        } else {
+          setGeneralError("Não foi possível verificar o código. Tenta novamente.");
+        }
         return;
       }
 
@@ -318,10 +339,15 @@ export default function Registar() {
                   <ShieldCheck style={{ width: 24, height: 24, color: "#111" }} />
                 </div>
                 <h1 className="font-syne font-bold text-[26px] text-[#0a0a0a] leading-tight mb-2">Verificação Final</h1>
-                <p className="text-[13.5px] text-slate-500 mb-8 leading-relaxed">
-                  Enviámos um código de 6 dígitos para{" "}
+                <p className="text-[13.5px] text-slate-500 mb-3 leading-relaxed">
+                  Enviámos um email para{" "}
                   <span className="font-semibold text-[#111]">{email}</span>.
                 </p>
+                <div className="mb-6 p-3.5" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 0 }}>
+                  <p style={{ fontSize: 12.5, color: "#15803d", margin: 0, lineHeight: 1.6 }}>
+                    📧 Procura no email um <strong>código de 6 dígitos</strong>. Não cliques em nenhum link — introduz apenas o código aqui.
+                  </p>
+                </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 9, marginBottom: 20, width: "100%" }} onPaste={handlePaste}>
                   {digits.map((digit, i) => (
