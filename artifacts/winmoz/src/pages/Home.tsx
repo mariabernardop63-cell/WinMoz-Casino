@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "wouter";
 import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp, Bell, User } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* ─────────────────────────────────────────────
    SAQUES 24 HORAS
@@ -1099,12 +1100,12 @@ const topGames = [
 ───────────────────────────────────────────── */
 export default function Home() {
   const [gamesReady, setGamesReady] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [, setLocation] = useLocation();
+  const { user, profile } = useAuth();
+  const isLoggedIn = !!user;
 
   useEffect(() => {
     const t = setTimeout(() => setGamesReady(true), 350);
-    setIsLoggedIn(!!localStorage.getItem("winmoz_logged_in"));
     return () => clearTimeout(t);
   }, []);
 
@@ -1128,12 +1129,9 @@ export default function Home() {
                 className="flex items-center justify-center w-9 h-9 rounded-full border-2 border-violet-400/50 hover:border-violet-500 transition-all duration-200 shadow-sm overflow-hidden"
                 style={{ background: "#1e1e2e" }}
               >
-                {(() => {
-                  const avatar = localStorage.getItem("winmoz_user_avatar");
-                  return avatar
-                    ? <img src={avatar} alt="Perfil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    : <User className="w-4.5 h-4.5 text-slate-300" style={{ width: 18, height: 18 }} />;
-                })()}
+                {profile?.avatar_url
+                  ? <img src={profile.avatar_url} alt="Perfil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <User className="w-4.5 h-4.5 text-slate-300" style={{ width: 18, height: 18 }} />}
               </button>
             </div>
           ) : (
