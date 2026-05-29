@@ -921,29 +921,49 @@ function HeroBanner() {
             animate="animate"
             exit="exit"
             className="relative z-10 flex items-center justify-between px-5 py-6 gap-3"
-            style={{ minHeight: 190 }}
+            style={{ minHeight: 190, maxHeight: 220 }}
           >
             {/* LEFT: text */}
-            <div className="flex-1 min-w-0">
+            <div style={{ flex: "1 1 0", minWidth: 0, maxWidth: "58%" }}>
               {/* Badge */}
               <div
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-widest mb-3 uppercase border backdrop-blur-sm"
-                style={{ borderColor: slide.badgeBorder, background: slide.badgeBg, color: slide.badgeText }}
+                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold uppercase border backdrop-blur-sm"
+                style={{
+                  borderColor: slide.badgeBorder,
+                  background: slide.badgeBg,
+                  color: slide.badgeText,
+                  fontSize: 8,
+                  letterSpacing: "0.08em",
+                  whiteSpace: "nowrap",
+                  marginBottom: 10,
+                }}
               >
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: slide.badgeDot }}/>
+                <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block flex-shrink-0" style={{ background: slide.badgeDot }}/>
                 {slide.badge}
               </div>
 
               {/* Title */}
               <h1
-                className="font-syne font-extrabold leading-tight text-white mb-2 drop-shadow-md whitespace-pre-line"
-                style={{ fontSize: slide.id === "chat" || slide.id === "xadrez" ? "1.26rem" : slide.id === "ludo" ? "1.32rem" : "1.55rem" }}
+                className="font-syne font-extrabold leading-tight text-white drop-shadow-md whitespace-pre-line"
+                style={{
+                  fontSize: "clamp(1rem, 4vw, 1.35rem)",
+                  marginBottom: 6,
+                  wordBreak: "break-word",
+                }}
               >
                 {slide.title}
               </h1>
 
               {/* Subtitle */}
-              <p className="text-[11px] leading-relaxed mb-4 max-w-[155px]" style={{ color: slide.subtitleColor }}>
+              <p
+                className="leading-relaxed"
+                style={{
+                  color: slide.subtitleColor,
+                  fontSize: "clamp(9px, 2.5vw, 11px)",
+                  marginBottom: 12,
+                  maxWidth: 150,
+                }}
+              >
                 {slide.subtitle}
               </p>
 
@@ -954,15 +974,22 @@ function HeroBanner() {
                   if (slide.cta === "Conversar") setLocation("/grupo-chat");
                   else if (slide.cta === "Jogar Agora") setLocation(`/apostar/${slide.id}`);
                 }}
-                className="font-syne font-bold text-sm px-5 py-2 rounded-xl shadow-lg transition-all duration-200"
-                style={{ background: slide.accent, color: slide.id === "chat" ? "#001a16" : "#000" }}
+                className="font-syne font-bold rounded-xl shadow-lg transition-all duration-200"
+                style={{
+                  background: slide.accent,
+                  color: slide.id === "chat" ? "#001a16" : "#000",
+                  fontSize: "clamp(11px, 3vw, 13px)",
+                  padding: "7px 16px",
+                  whiteSpace: "nowrap",
+                  display: "inline-block",
+                }}
               >
                 {slide.cta} →
               </motion.button>
             </div>
 
-            {/* RIGHT: board */}
-            <div className="flex-shrink-0 flex items-center justify-center">
+            {/* RIGHT: board — fixed size, never grows */}
+            <div style={{ flexShrink: 0, width: 130, display: "flex", alignItems: "center", justifyContent: "center" }}>
               {slide.id === "damas" ? (
                 <motion.div
                   initial={{ opacity: 0, rotate: -4, scale: 0.88 }}
@@ -975,14 +1002,14 @@ function HeroBanner() {
                     overflow: "hidden",
                   }}
                 >
-                  <DamasBoard size={136} />
+                  <DamasBoard size={126} />
                 </motion.div>
               ) : slide.id === "ludo" ? (
-                <LudoBannerImage size={136} />
+                <LudoBannerImage size={126} />
               ) : slide.id === "xadrez" ? (
-                <ChessBannerImage size={136} />
+                <ChessBannerImage size={126} />
               ) : slide.id === "bilhar" ? (
-                <BilharBannerImage size={140} />
+                <BilharBannerImage size={126} />
               ) : (
                 <ChatBannerArt />
               )}
