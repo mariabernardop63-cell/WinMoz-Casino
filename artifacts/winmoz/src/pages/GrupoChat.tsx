@@ -1,10 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import {
-  ArrowLeft, MoreVertical, Plus, Send, Image as ImageIcon, Mic, Smile,
-  Users, Pin, Search, Bell, Phone, Video, ChevronDown, Shield, Star
-} from "lucide-react";
+import { ArrowLeft, Plus, Send, Mic, Smile, Users } from "lucide-react";
 
 const CYAN = "#00D4B4";
 
@@ -103,7 +100,6 @@ export default function GrupoChat() {
   const [text, setText] = useState("");
   const [typing, setTyping] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [onlineCount] = useState(39);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -153,43 +149,23 @@ export default function GrupoChat() {
       <div className="w-full max-w-[430px] flex flex-col" style={{ height: "100dvh" }}>
 
         {/* Header */}
-        <div style={{ background: "#18181b", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingTop: 52, paddingBottom: 12, paddingLeft: 14, paddingRight: 14, flexShrink: 0 }}>
+        <div style={{ background: "#18181b", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingTop: 40, paddingBottom: 8, paddingLeft: 14, paddingRight: 14, flexShrink: 0 }}>
           <div className="flex items-center gap-3">
-            <button onClick={() => setLocation("/")} style={{ width: 36, height: 36, borderRadius: 999, background: "rgba(255,255,255,0.07)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
-              <ArrowLeft style={{ width: 17, height: 17, color: "#e2e8f0" }} />
+            <button onClick={() => setLocation("/")} style={{ width: 34, height: 34, borderRadius: 999, background: "rgba(255,255,255,0.07)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
+              <ArrowLeft style={{ width: 16, height: 16, color: "#e2e8f0" }} />
             </button>
             <button onClick={() => setShowInfo(v => !v)} className="flex items-center gap-2.5 flex-1 min-w-0">
-              <div style={{ width: 42, height: 42, borderRadius: 14, background: `linear-gradient(135deg, ${CYAN}33, #7C3AED33)`, border: `1.5px solid ${CYAN}55`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
-                <Users style={{ width: 19, height: 19, color: CYAN }} />
-                <span style={{ position: "absolute", bottom: -3, right: -3, width: 14, height: 14, borderRadius: 999, background: "#22c55e", border: "2px solid #18181b", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 999, background: "#fff" }} />
+              <div style={{ width: 38, height: 38, borderRadius: 12, background: `linear-gradient(135deg, ${CYAN}33, #7C3AED33)`, border: `1.5px solid ${CYAN}55`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
+                <Users style={{ width: 17, height: 17, color: CYAN }} />
+                <span style={{ position: "absolute", bottom: -3, right: -3, width: 12, height: 12, borderRadius: 999, background: "#22c55e", border: "2px solid #18181b", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ width: 5, height: 5, borderRadius: 999, background: "#fff" }} />
                 </span>
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p style={{ color: "#f1f5f9", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14.5 }}>Grupo em Equipe</p>
-                <p style={{ fontSize: 11, color: "#71717a", marginTop: 1 }}>125 participantes · {onlineCount} online</p>
+                <p style={{ color: "#f1f5f9", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14 }}>Grupo em Equipe</p>
+                <p style={{ fontSize: 10.5, color: "#71717a", marginTop: 1 }}>125 participantes · {onlineCount} online</p>
               </div>
             </button>
-            <div className="flex items-center gap-1.5">
-              <button style={{ width: 32, height: 32, borderRadius: 999, background: "rgba(255,255,255,0.06)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                <Search style={{ width: 14, height: 14, color: "#9ca3af" }} />
-              </button>
-              <button style={{ width: 32, height: 32, borderRadius: 999, background: "rgba(255,255,255,0.06)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-                <Phone style={{ width: 14, height: 14, color: "#9ca3af" }} />
-              </button>
-              <button onClick={() => setMenuOpen(v => !v)} style={{ width: 32, height: 32, borderRadius: 999, background: "rgba(255,255,255,0.06)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative" }}>
-                <MoreVertical style={{ width: 14, height: 14, color: "#9ca3af" }} />
-                {menuOpen && (
-                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} style={{ position: "absolute", top: 38, right: 0, background: "#27272a", borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.5)", padding: "6px 0", width: 200, zIndex: 100, border: "1px solid rgba(255,255,255,0.08)" }}>
-                    {["Ver participantes", "Silenciar grupo", "Pesquisar no chat", "Sair do grupo"].map(item => (
-                      <button key={item} onClick={() => setMenuOpen(false)} style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 16px", background: "none", border: "none", fontSize: 13, color: item === "Sair do grupo" ? "#f87171" : "#e2e8f0", cursor: "pointer", fontFamily: "inherit" }}>
-                        {item}
-                      </button>
-                    ))}
-                  </motion.div>
-                )}
-              </button>
-            </div>
           </div>
         </div>
 
@@ -214,17 +190,9 @@ export default function GrupoChat() {
           )}
         </AnimatePresence>
 
-        {/* Announcement banner */}
-        <div style={{ background: `linear-gradient(90deg, ${CYAN}18, #7C3AED18)`, borderBottom: `1px solid ${CYAN}22`, padding: "8px 14px", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <Pin style={{ width: 13, height: 13, color: CYAN, flexShrink: 0 }} />
-          <p style={{ fontSize: 11.5, color: "#e2e8f0", flex: 1, lineHeight: 1.4 }}>
-            <span style={{ color: CYAN, fontWeight: 700 }}>Anúncio:</span> Torneio de Damas às 20h00 — Prémio total: 5.000 MZN! Inscreve-te já.
-          </p>
-          <ChevronDown style={{ width: 13, height: 13, color: "#71717a", flexShrink: 0 }} />
-        </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-3" style={{ background: "#0f0f12" }} onClick={() => setMenuOpen(false)}>
+        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-3" style={{ background: "#0f0f12" }}>
           <AnimatePresence initial={false}>
             {messages.map((msg, i) => {
               const prevMsg = messages[i - 1];
@@ -307,9 +275,6 @@ export default function GrupoChat() {
                 placeholder="Escreve uma mensagem..."
                 style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13.5, color: "#e2e8f0", fontFamily: "inherit" }}
               />
-              <button onClick={() => fileRef.current?.click()} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center" }}>
-                <ImageIcon style={{ width: 17, height: 17, color: "#52525b" }} />
-              </button>
               <button style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center" }}>
                 <Smile style={{ width: 17, height: 17, color: "#52525b" }} />
               </button>

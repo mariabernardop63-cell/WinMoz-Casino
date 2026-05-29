@@ -350,6 +350,117 @@ function DamasBoard({ size = 140 }: { size?: number }) {
 }
 
 /* ─────────────────────────────────────────────
+   ANIMATED CHESS BOARD
+───────────────────────────────────────────── */
+type CPiece = { id: string; row: number; col: number; color: "w" | "b"; t: "p"|"n"|"b"|"r"|"q"|"k" };
+
+const INIT_CHESS: CPiece[] = [
+  { id:"br0",row:0,col:0,color:"b",t:"r"},{id:"bn0",row:0,col:1,color:"b",t:"n"},
+  { id:"bb0",row:0,col:2,color:"b",t:"b"},{id:"bq", row:0,col:3,color:"b",t:"q"},
+  { id:"bk", row:0,col:4,color:"b",t:"k"},{id:"bb1",row:0,col:5,color:"b",t:"b"},
+  { id:"bn1",row:0,col:6,color:"b",t:"n"},{id:"br1",row:0,col:7,color:"b",t:"r"},
+  ...Array.from({length:8},(_,i)=>({id:`bp${i}`,row:1,col:i,color:"b" as const,t:"p" as const})),
+  ...Array.from({length:8},(_,i)=>({id:`wp${i}`,row:6,col:i,color:"w" as const,t:"p" as const})),
+  { id:"wr0",row:7,col:0,color:"w",t:"r"},{id:"wn0",row:7,col:1,color:"w",t:"n"},
+  { id:"wb0",row:7,col:2,color:"w",t:"b"},{id:"wq", row:7,col:3,color:"w",t:"q"},
+  { id:"wk", row:7,col:4,color:"w",t:"k"},{id:"wb1",row:7,col:5,color:"w",t:"b"},
+  { id:"wn1",row:7,col:6,color:"w",t:"n"},{id:"wr1",row:7,col:7,color:"w",t:"r"},
+];
+
+const CHESS_MOVES: [string,number,number][] = [
+  ["wp4",4,4], // e2→e4
+  ["bp4",3,4], // e7→e5
+  ["wn1",5,5], // Ng1→f3
+  ["bn0",2,5], // Nb8→c6
+  ["wb1",4,2], // Bf1→c4
+  ["wp3",4,3], // d2→d4
+];
+
+function ChessBannerImage({ size = 136 }: { size?: number }) {
+  const cell = size / 8;
+  const [pieces, setPieces] = useState<CPiece[]>(INIT_CHESS);
+  const [moveIdx, setMoveIdx] = useState(0);
+  const animRef = useRef<ReturnType<typeof setTimeout>|null>(null);
+
+  useEffect(() => {
+    animRef.current = setTimeout(() => {
+      const [id, tr, tc] = CHESS_MOVES[moveIdx % CHESS_MOVES.length];
+      setPieces(prev => prev.map(p => p.id === id ? {...p, row:tr, col:tc} : p));
+      setMoveIdx(i => i + 1);
+    }, moveIdx === 0 ? 1400 : 2100);
+    return () => { if (animRef.current) clearTimeout(animRef.current); };
+  }, [moveIdx]);
+
+  return (
+    <motion.div
+      initial={{ opacity:0, rotate:-4, scale:0.88 }}
+      animate={{ opacity:1, rotate:-4, scale:1 }}
+      transition={{ duration:0.7, ease:[0.22,1,0.36,1], delay:0.1 }}
+      style={{ borderRadius:10, boxShadow:"0 8px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)", border:"2px solid rgba(255,255,255,0.08)", overflow:"hidden" }}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display:"block" }}>
+        {Array.from({length:8},(_,r)=>Array.from({length:8},(_,c)=>(
+          <rect key={`s${r}${c}`} x={c*cell} y={r*cell} width={cell} height={cell}
+            fill={(r+c)%2===0 ? "#c8c8d4" : "#1e1e2e"} />
+        )))}
+        {pieces.map(p => {
+          const cx = p.col*cell + cell/2;
+          const cy = p.row*cell + cell/2;
+          const r  = cell * 0.33;
+          const isW = p.color === "w";
+          const fill   = isW ? "#EFEFEF" : "#1e1e1e";
+          const stroke = isW ? "#aaa"    : "#666";
+          const accent = isW ? "#c0c0c0" : "#3a3a3a";
+          return (
+            <motion.g key={p.id}
+              animate={{x:cx,y:cy}} initial={{x:cx,y:cy}}
+              transition={{duration:0.9, ease:[0.25,0.46,0.45,0.94]}}>
+              <ellipse cx={0.7} cy={r*0.52} rx={r*0.88} ry={r*0.28} fill="rgba(0,0,0,0.35)" />
+              <circle r={r} fill={fill} stroke={stroke} strokeWidth={0.7} />
+              {/* pawn */}
+              {p.t==="p" && <><circle r={r*0.52} fill={accent}/><circle r={r*0.27} fill={isW?"#b8b8b8":"#444"}/></>}
+              {/* knight: stylised N */}
+              {p.t==="n" && <>
+                <circle r={r*0.52} fill={accent}/>
+                <path d={`M${-r*.2},${r*.3} Q${-r*.35},${-r*.55} 0,${-r*.6} Q${r*.3},${-r*.6} ${r*.3},${-r*.25} Q${r*.32},0 ${r*.1},${r*.3}Z`}
+                  fill={isW?"#b0b0b0":"#4a4a4a"}/>
+              </>}
+              {/* bishop: tall pillar */}
+              {p.t==="b" && <>
+                <circle r={r*0.52} fill={accent}/>
+                <line x1={0} y1={-r*.68} x2={0} y2={r*.28} stroke={isW?"#999":"#777"} strokeWidth={r*.26} strokeLinecap="round"/>
+                <circle cx={0} cy={-r*.62} r={r*.17} fill={isW?"#888":"#bbb"}/>
+              </>}
+              {/* rook: battlements */}
+              {p.t==="r" && <>
+                <rect x={-r*.38} y={-r*.55} width={r*.76} height={r*.78} fill={accent} rx={1}/>
+                {[-r*.38,-r*.13,r*.13].map((ox,i)=>(
+                  <rect key={i} x={ox} y={-r*.65} width={r*.22} height={r*.2} fill={isW?"#aaa":"#555"} rx={.5}/>
+                ))}
+              </>}
+              {/* queen: crown */}
+              {p.t==="q" && <>
+                <path d={`M 0,${-r*.72} L${r*.22},${-r*.18} L${r*.46},${-r*.46} L${r*.3},${r*.2} L${-r*.3},${r*.2} L${-r*.46},${-r*.46} L${-r*.22},${-r*.18}Z`}
+                  fill={accent} stroke={stroke} strokeWidth={.5}/>
+                <circle cx={0} cy={-r*.72} r={r*.14} fill={isW?"#e8c840":"#a08020"}/>
+              </>}
+              {/* king: cross */}
+              {p.t==="k" && <>
+                <circle r={r*.5} fill="none" stroke={isW?"#bbb":"#555"} strokeWidth={r*.14}/>
+                <rect x={-r*.07} y={-r*.78} width={r*.14} height={r*.52} fill={isW?"#999":"#bbb"} rx={1}/>
+                <rect x={-r*.24} y={-r*.66} width={r*.48} height={r*.14} fill={isW?"#999":"#bbb"} rx={1}/>
+              </>}
+              <circle cx={-r*.22} cy={-r*.22} r={r*.16} fill={isW?"rgba(255,255,255,0.6)":"rgba(255,255,255,0.1)"}/>
+            </motion.g>
+          );
+        })}
+        <rect x={0} y={0} width={size} height={size} fill="none" stroke="#0a0a14" strokeWidth={2} rx={4}/>
+      </svg>
+    </motion.div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    ANIMATED LUDO BOARD
 ───────────────────────────────────────────── */
 
@@ -602,17 +713,33 @@ const SLIDES = [
     id: "chat",
     duration: 9000,
     bg: "linear-gradient(135deg, rgba(0,8,22,0.92) 0%, rgba(0,26,44,0.88) 100%)",
-    bgImage: null as string | null,
+    bgImage: "/chat-bg.jpg" as string | null,
     accent: "#00D4B4",
     badge: "Anúncio Patrocinado",
-    badgeBg: "rgba(0,0,0,0.50)",
+    badgeBg: "rgba(0,0,0,0.55)",
     badgeBorder: "rgba(0,212,180,0.35)",
     badgeDot: "#00D4B4",
     badgeText: "#FFFFFF",
-    subtitleColor: "rgba(255,255,255,0.80)",
+    subtitleColor: "rgba(255,255,255,0.82)",
     title: "Converse em\ngrupo agora!",
     subtitle: "Estratégias, amigos e diversão em tempo real.",
     cta: "Conversar",
+  },
+  {
+    id: "xadrez",
+    duration: 9500,
+    bg: "linear-gradient(135deg, rgba(4,4,12,0.80) 0%, rgba(10,10,28,0.76) 40%, rgba(16,14,38,0.72) 100%)",
+    bgImage: "/chess-board.png" as string | null,
+    accent: "#94a3b8",
+    badge: "Anúncio Patrocinado",
+    badgeBg: "rgba(0,0,0,0.50)",
+    badgeBorder: "rgba(255,255,255,0.20)",
+    badgeDot: "#94a3b8",
+    badgeText: "#FFFFFF",
+    subtitleColor: "rgba(255,255,255,0.80)",
+    title: "Xadrez\nApostado.",
+    subtitle: "Desafia os melhores estrategas e multiplica o teu saldo.",
+    cta: "Jogar Agora",
   },
 ];
 
@@ -766,7 +893,7 @@ function HeroBanner() {
               {/* Title */}
               <h1
                 className="font-syne font-extrabold leading-tight text-white mb-2 drop-shadow-md whitespace-pre-line"
-                style={{ fontSize: slide.id === "chat" ? "1.18rem" : slide.id === "ludo" ? "1.32rem" : "1.55rem" }}
+                style={{ fontSize: slide.id === "chat" || slide.id === "xadrez" ? "1.26rem" : slide.id === "ludo" ? "1.32rem" : "1.55rem" }}
               >
                 {slide.title}
               </h1>
@@ -805,6 +932,8 @@ function HeroBanner() {
                 </motion.div>
               ) : slide.id === "ludo" ? (
                 <LudoBannerImage size={136} />
+              ) : slide.id === "xadrez" ? (
+                <ChessBannerImage size={136} />
               ) : (
                 <ChatBannerArt />
               )}
@@ -1175,8 +1304,7 @@ export default function Home() {
         <AtualizacoesSection />
 
         {/* FLOATING SUPPORT BUTTON */}
-        {isLoggedIn && (
-          <motion.button
+        <motion.button
             onClick={() => setLocation("/suporte")}
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -1217,7 +1345,6 @@ export default function Home() {
               24/7
             </span>
           </motion.button>
-        )}
 
         {/* BOTTOM NAV */}
         <BottomNav />
