@@ -1033,8 +1033,9 @@ const games = [
     rating: "4.9",
     players: "4.1K jogando",
     image: "/ludo-card2.png",
-    imageFit: "cover" as const,
-    imagePos: "center 65%",
+    imageFit: "contain" as const,
+    imagePos: "center",
+    cardBg: "#0d2218",
   },
   {
     id: "xadrez",
@@ -1117,14 +1118,14 @@ export default function Home() {
           {isLoggedIn ? (
             <div className="flex items-center gap-2">
               {/* Notification Bell */}
-              <button onClick={() => setLocation("/notificacoes")} className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all duration-200 shadow-sm">
+              <button onClick={() => setLocation("/notificacoes")} className="relative flex items-center justify-center w-9 h-9 rounded-full bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all duration-200 shadow-sm">
                 <Bell className="w-4 h-4 text-slate-600" />
                 <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
               </button>
               {/* Profile Icon */}
               <button
                 onClick={() => setLocation("/perfil")}
-                className="flex items-center justify-center w-9 h-9 rounded-xl border-2 border-violet-400/50 hover:border-violet-500 transition-all duration-200 shadow-sm overflow-hidden"
+                className="flex items-center justify-center w-9 h-9 rounded-full border-2 border-violet-400/50 hover:border-violet-500 transition-all duration-200 shadow-sm overflow-hidden"
                 style={{ background: "#1e1e2e" }}
               >
                 {(() => {
@@ -1217,11 +1218,11 @@ export default function Home() {
                   <p className="text-[10px] font-semibold text-blue-700 mt-0.5 uppercase tracking-wider">{game.bet}</p>
                   <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{game.players}</p>
                   <div className="mt-auto">
-                    <Link href={`/apostar/${game.id}`}>
-                      <button className="w-full h-8 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-colors">
-                        Jogar
-                      </button>
-                    </Link>
+                    <button
+                      onClick={() => isLoggedIn ? setLocation(`/apostar/${game.id}`) : setLocation("/login")}
+                      className="w-full h-8 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-colors">
+                      Jogar
+                    </button>
                   </div>
                 </div>
               </motion.div>
@@ -1282,11 +1283,11 @@ export default function Home() {
                   <p className="text-[10px] text-slate-400 mt-0.5">{game.players}</p>
                 </div>
 
-                <Link href={`/apostar/${game.gameRoute}`}>
-                  <button className="w-8 h-8 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center transition-colors shadow-md flex-shrink-0">
-                    <Play className="w-3.5 h-3.5 ml-0.5"/>
-                  </button>
-                </Link>
+                <button
+                  onClick={() => isLoggedIn ? setLocation(`/apostar/${game.gameRoute}`) : setLocation("/login")}
+                  className="w-8 h-8 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center transition-colors shadow-md flex-shrink-0">
+                  <Play className="w-3.5 h-3.5 ml-0.5"/>
+                </button>
               </motion.div>
             ))}
           </motion.div>

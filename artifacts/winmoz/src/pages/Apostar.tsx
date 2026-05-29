@@ -601,21 +601,22 @@ export default function Apostar() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "16px", background: "#1c1c1e", borderRadius: 20, marginBottom: 16, border: "1px solid #2c2c2e" }}
+            style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "16px", background: "#1c1c1e", borderRadius: 20, marginBottom: 16, border: "1px solid #2c2c2e", position: "relative" }}
           >
+            {/* Rating badge — top right */}
+            <div style={{ position: "absolute", top: 14, right: 14, display: "flex", alignItems: "center", gap: 4, background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)", borderRadius: 99, padding: "4px 9px", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <Star style={{ width: 11, height: 11, color: "#f59e0b", fill: "#f59e0b" }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{game.rating}</span>
+            </div>
             {/* Image */}
             <div style={{ width: 86, height: 86, borderRadius: 14, overflow: "hidden", flexShrink: 0, background: game.cardBg || "#2c2c2e" }}>
               <img src={game.image} alt={game.name} style={{ width: "100%", height: "100%", objectFit: (game.imageFit as any) || "cover", objectPosition: game.imagePos }} />
             </div>
             {/* Info */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0" style={{ paddingRight: 52 }}>
               <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 20, color: "#fff", letterSpacing: "1px", marginBottom: 2 }}>{game.name}</p>
               <p style={{ fontSize: 12, color: VIOLET, fontWeight: 600, marginBottom: 6 }}>{game.sub}</p>
-              <p style={{ fontSize: 12, color: "#8e8e93", lineHeight: 1.55, marginBottom: 8 }}>{game.description}</p>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <Star style={{ width: 13, height: 13, color: "#f59e0b", fill: "#f59e0b" }} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}>{game.rating}</span>
-              </div>
+              <p style={{ fontSize: 12, color: "#8e8e93", lineHeight: 1.55 }}>{game.description}</p>
             </div>
           </motion.div>
 
@@ -627,13 +628,12 @@ export default function Apostar() {
             style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}
           >
             {[
-              { icon: <Wifi style={{ width: 16, height: 16, color: "#22c55e" }} />, count: liveOnline.toLocaleString("pt-PT"), label: "Jogadores online", color: "#22c55e" },
-              { icon: <Gamepad2 style={{ width: 16, height: 16, color: VIOLET }} />, count: livePlaying.toLocaleString("pt-PT"), label: "Jogando agora", color: VIOLET },
+              { icon: <Users style={{ width: 15, height: 15, color: "#e4e4e7" }} />, count: liveOnline.toLocaleString("pt-PT"), label: "Jogadores online" },
+              { icon: <Gamepad2 style={{ width: 15, height: 15, color: "#e4e4e7" }} />, count: livePlaying.toLocaleString("pt-PT"), label: "Jogando agora" },
             ].map((stat, i) => (
               <div key={i} style={{ background: "#1c1c1e", border: "1px solid #2c2c2e", borderRadius: 16, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 4 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   {stat.icon}
-                  <div style={{ width: 5, height: 5, borderRadius: "50%", background: stat.color }} className="animate-pulse" />
                 </div>
                 <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: "#fff", lineHeight: 1.1 }}>{stat.count}</p>
                 <p style={{ fontSize: 11, color: "#71717a" }}>{stat.label}</p>
@@ -748,35 +748,43 @@ export default function Apostar() {
               whileTap={canStart ? { scale: 0.97 } : {}}
               style={{
                 width: "100%",
-                height: 58,
+                height: 60,
                 borderRadius: 99,
-                border: "none",
+                border: canStart ? "none" : "1.5px solid #2c2c2e",
                 cursor: canStart ? "pointer" : "not-allowed",
                 background: canStart
-                  ? `linear-gradient(135deg, ${VIOLET}, #6d28d9, #5b21b6)`
-                  : "#1c1c1e",
-                color: canStart ? "#fff" : "#52525b",
+                  ? `linear-gradient(135deg, ${VIOLET} 0%, #5b21b6 100%)`
+                  : "#141418",
+                color: canStart ? "#fff" : "#3f3f46",
                 fontFamily: "'Syne', sans-serif",
                 fontWeight: 800,
-                fontSize: 15,
+                fontSize: 14,
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
+                justifyContent: "space-between",
+                padding: "0 18px",
                 transition: "all 0.25s",
-                boxShadow: canStart ? `0 8px 32px ${VIOLET}55` : "none",
-                letterSpacing: "0.3px",
+                boxShadow: canStart ? `0 8px 32px ${VIOLET}55, inset 0 1px 0 rgba(255,255,255,0.15)` : "none",
+                letterSpacing: "0.4px",
               }}
             >
               {canStart ? (
                 <>
-                  <Zap style={{ width: 18, height: 18, fill: "#fff" }} />
-                  Começar Partida {selectedBet ? `· ${fmtMT(selectedBet)}` : ""}
+                  <div style={{ width: 38, height: 38, borderRadius: "50%", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Swords style={{ width: 17, height: 17, color: "#fff" }} />
+                  </div>
+                  <span style={{ flex: 1, textAlign: "center", fontSize: 15, fontWeight: 800, letterSpacing: "0.5px" }}>COMEÇAR PARTIDA</span>
+                  <div style={{ background: "rgba(0,0,0,0.28)", borderRadius: 99, padding: "7px 13px", flexShrink: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>{fmtMT(selectedBet!)}</span>
+                  </div>
                 </>
               ) : (
                 <>
-                  <Zap style={{ width: 18, height: 18, opacity: 0.3 }} />
-                  Escolhe o valor da aposta
+                  <div style={{ width: 38, height: 38, borderRadius: "50%", background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Zap style={{ width: 16, height: 16, color: "#3f3f46" }} />
+                  </div>
+                  <span style={{ flex: 1, textAlign: "center", fontSize: 13.5 }}>Escolhe o valor da aposta</span>
+                  <div style={{ width: 38 }} />
                 </>
               )}
             </motion.button>

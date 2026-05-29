@@ -44,17 +44,21 @@ function NavIcon({ iconKey, color }: { iconKey: string; color: string }) {
 
 /* ─── Resume Modal (bottom sheet) ─── */
 function ResumeModal({ onClose }: { onClose: () => void }) {
+  const [, setLocation] = useLocation();
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const stats = [
-    { icon: <Gamepad2 style={{ width: 16, height: 16, color: "#7c3aed" }} />, value: "5 Jogos", label: "Disponíveis", accent: "#7c3aed" },
-    { icon: <Zap style={{ width: 16, height: 16, color: "#f59e0b", fill: "#f59e0b" }} />, value: "Ao Vivo", label: "Partidas ativas", accent: "#f59e0b" },
-    { icon: <Search style={{ width: 16, height: 16, color: "#00D4B4" }} />, value: "+50K MT", label: "Em prémios", accent: "#00D4B4" },
+  const gameShortcuts = [
+    { id: "damas",  name: "Damas",  players: "2.4K", image: "/damas-card.jpg",  imagePos: "center" },
+    { id: "ludo",   name: "Ludo",   players: "4.1K", image: "/ludo-card2.png",  imagePos: "center" },
+    { id: "xadrez", name: "Xadrez", players: "1.2K", image: "/xadrez-card.jpg", imagePos: "center 30%" },
   ];
+
+  const go = (path: string) => { onClose(); setLocation(path); };
 
   return (
     <motion.div
@@ -65,88 +69,77 @@ function ResumeModal({ onClose }: { onClose: () => void }) {
       style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
       onClick={onClose}
     >
-      {/* Backdrop */}
-      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)" }} />
 
-      {/* Sheet */}
       <motion.div
-        initial={{ y: 80, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 80, opacity: 0 }}
-        transition={{ type: "spring", damping: 26, stiffness: 320, mass: 0.7 }}
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 32, stiffness: 350, mass: 0.55 }}
         onClick={e => e.stopPropagation()}
         style={{
           position: "relative",
           width: "100%",
           maxWidth: 430,
-          background: "#0f0f18",
+          background: "#0a0a0f",
           borderRadius: "24px 24px 0 0",
-          border: "1px solid rgba(124,58,237,0.3)",
-          borderBottom: "none",
-          boxShadow: "0 -8px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(124,58,237,0.12)",
           overflow: "hidden",
           zIndex: 1,
-          paddingBottom: "env(safe-area-inset-bottom, 16px)",
+          paddingBottom: "env(safe-area-inset-bottom, 20px)",
         }}
       >
-        {/* Top accent bar */}
-        <motion.div
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: 1 }}
-          transition={{ delay: 0.12, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          style={{ height: 3, background: "linear-gradient(90deg, #7c3aed, #a855f7, #7c3aed)", transformOrigin: "left" }}
-        />
-
-        {/* Drag handle */}
-        <div style={{ display: "flex", justifyContent: "center", paddingTop: 12, paddingBottom: 4 }}>
-          <div style={{ width: 36, height: 4, borderRadius: 99, background: "rgba(255,255,255,0.12)" }} />
+        {/* Handle */}
+        <div style={{ display: "flex", justifyContent: "center", paddingTop: 14, paddingBottom: 6 }}>
+          <div style={{ width: 32, height: 4, borderRadius: 99, background: "rgba(255,255,255,0.1)" }} />
         </div>
 
-        <div style={{ padding: "12px 22px 24px" }}>
-          {/* Header row */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Gamepad2 style={{ width: 20, height: 20, color: "#7c3aed" }} />
-              </div>
-              <div>
-                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 15, color: "#fff", lineHeight: 1.2 }}>Nenhuma Partida Ativa</p>
-                <p style={{ fontSize: 11.5, color: "#71717a", marginTop: 2 }}>Inicia um jogo para retomar aqui</p>
-              </div>
-            </div>
-            <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: "50%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-              <X style={{ width: 14, height: 14, color: "#71717a" }} />
-            </button>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "6px 22px 18px" }}>
+          <div>
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: "#fff", lineHeight: 1.15, marginBottom: 5 }}>Iniciar Jogo</p>
+            <p style={{ fontSize: 12.5, color: "#52525b", lineHeight: 1.5 }}>Nenhuma partida activa. Escolhe um jogo para começar.</p>
           </div>
+          <button
+            onClick={onClose}
+            style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, marginLeft: 14, marginTop: 2 }}
+          >
+            <X style={{ width: 14, height: 14, color: "#71717a" }} />
+          </button>
+        </div>
 
-          {/* Stats row */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-            {stats.map((s, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 + i * 0.06 }}
-                style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "11px 8px", textAlign: "center" }}
-              >
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 5 }}>{s.icon}</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#e4e4e7", fontFamily: "'Syne', sans-serif" }}>{s.value}</div>
-                <div style={{ fontSize: 9.5, color: "#52525b", marginTop: 2 }}>{s.label}</div>
-              </motion.div>
-            ))}
-          </div>
+        {/* Divider */}
+        <div style={{ height: 1, background: "rgba(255,255,255,0.05)", marginBottom: 20 }} />
 
-          {/* CTA Buttons */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Link href="/explorar">
-              <button
-                onClick={onClose}
-                style={{ width: "100%", height: 50, background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, border: "none", borderRadius: 14, cursor: "pointer", letterSpacing: "0.3px", boxShadow: "0 4px 20px rgba(124,58,237,0.4)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-              >
-                <Play style={{ width: 14, height: 14, fill: "#fff" }} /> Explorar Jogos
-              </button>
-            </Link>
-          </div>
+        {/* Game shortcuts */}
+        <div style={{ display: "flex", gap: 10, padding: "0 22px", marginBottom: 20 }}>
+          {gameShortcuts.map(g => (
+            <motion.button
+              key={g.id}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => go(`/apostar/${g.id}`)}
+              style={{ flex: 1, background: "#141418", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, overflow: "hidden", cursor: "pointer", textAlign: "left" }}
+            >
+              <div style={{ height: 70, overflow: "hidden", position: "relative" }}>
+                <img src={g.image} alt={g.name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: g.imagePos }} />
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.65), rgba(0,0,0,0.08))" }} />
+              </div>
+              <div style={{ padding: "9px 10px 11px" }}>
+                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12, color: "#fff", marginBottom: 2 }}>{g.name}</p>
+                <p style={{ fontSize: 10, color: "#52525b" }}>{g.players}K a jogar</p>
+              </div>
+            </motion.button>
+          ))}
+        </div>
+
+        {/* Primary CTA */}
+        <div style={{ padding: "0 22px 24px" }}>
+          <button
+            onClick={() => go("/explorar")}
+            style={{ width: "100%", height: 52, background: "#fff", color: "#0a0a0f", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, border: "none", borderRadius: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, letterSpacing: "0.2px" }}
+          >
+            <Play style={{ width: 13, height: 13, fill: "#0a0a0f" }} />
+            Ver Todos os Jogos
+          </button>
         </div>
       </motion.div>
     </motion.div>

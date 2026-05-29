@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, ChevronRight, Play, Users, Clock, Trophy, Zap, Plus, Hash, ArrowRight, Shield, SlidersHorizontal, X, CheckCircle2, Key
+  Search, ChevronRight, Play, Users, Clock, Trophy, Zap, Plus, Hash, ArrowRight, Shield, SlidersHorizontal, X, CheckCircle2, Key, Send
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import BottomNav from "@/components/BottomNav";
 import { AtualizacoesCards } from "./Home";
 
-const TABS = ["Jogos", "Assistir", "Sala", "Novidades"] as const;
+const TABS = ["Jogos", "Assistir", "Sala", "Novidades", "Chat"] as const;
 type Tab = typeof TABS[number];
 
 const GAME_FILTERS = ["Todos", "Damas", "Ludo", "Xadrez", "Padrão"] as const;
@@ -49,11 +49,16 @@ const stagger = {
 };
 
 function GameCard({ game }: { game: typeof jogosCards[0] }) {
+  const [, setLocation] = useLocation();
   const betId = game.id.split("-")[0];
+  const handlePlay = () => {
+    if (!localStorage.getItem("winmoz_logged_in")) { setLocation("/login"); return; }
+    setLocation(`/apostar/${betId}`);
+  };
   return (
-    <Link href={`/apostar/${betId}`} style={{ display: "block", textDecoration: "none" }}>
     <motion.div
       variants={fadeUp}
+      onClick={handlePlay}
       className="flex items-center p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 group cursor-pointer"
     >
       <div className="w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
@@ -82,11 +87,14 @@ function GameCard({ game }: { game: typeof jogosCards[0] }) {
       </div>
       <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-violet-500 transition-colors flex-shrink-0" />
     </motion.div>
-    </Link>
   );
 }
 
 function MatchCard({ match }: { match: typeof partidasTempoReal[0] }) {
+  const [, setLocation] = useLocation();
+  const handleWatch = () => {
+    if (!localStorage.getItem("winmoz_logged_in")) { setLocation("/login"); return; }
+  };
   return (
     <motion.div
       variants={fadeUp}
@@ -113,7 +121,9 @@ function MatchCard({ match }: { match: typeof partidasTempoReal[0] }) {
       </div>
       <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
         <span className="text-[10px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">{match.bet}</span>
-        <button className="w-8 h-8 rounded-full bg-violet-700 hover:bg-violet-800 text-white flex items-center justify-center transition-colors shadow-md">
+        <button
+          onClick={(e) => { e.stopPropagation(); handleWatch(); }}
+          className="w-8 h-8 rounded-full bg-violet-700 hover:bg-violet-800 text-white flex items-center justify-center transition-colors shadow-md">
           <Play className="w-3.5 h-3.5 ml-0.5" />
         </button>
       </div>
@@ -346,11 +356,110 @@ function SalaTab() {
   );
 }
 
+const CHAT_MSGS = [
+  { id: "1", user: "João M.", initials: "JM", bg: "linear-gradient(135deg,#3b82f6,#1d4ed8)", text: "Alguém quer um desafio de Damas? Aposto 500 MT! 🎯", time: "10:30", isMe: false },
+  { id: "2", user: "Maria S.", initials: "MS", bg: "linear-gradient(135deg,#ec4899,#9d174d)", text: "Aceito! Mas não perco fácil 😏", time: "10:31", isMe: false },
+  { id: "3", user: "Carlos F.", initials: "CF", bg: "linear-gradient(135deg,#10b981,#065f46)", text: "Eu também quero entrar! Ludo Turbo às 20h? 🚀", time: "10:33", isMe: false },
+  { id: "4", user: "Tu", initials: "EU", bg: "linear-gradient(135deg,#7c3aed,#6d28d9)", text: "Estou a ver tudo! Quando começa a partida?", time: "10:35", isMe: true },
+  { id: "5", user: "João M.", initials: "JM", bg: "linear-gradient(135deg,#3b82f6,#1d4ed8)", text: "Às 20h00! Vamos todos? Pode ser torneio em grupo 🏆", time: "10:36", isMe: false },
+  { id: "6", user: "Ana R.", initials: "AR", bg: "linear-gradient(135deg,#f59e0b,#b45309)", text: "Conta comigo! Já fiz a recarga 🔥", time: "10:38", isMe: false },
+  { id: "7", user: "Tu", initials: "EU", bg: "linear-gradient(135deg,#7c3aed,#6d28d9)", text: "Perfeito, às 20h então. Boa sorte a todos! 🎮", time: "10:39", isMe: true },
+];
+
+type ChatMsg = { id: string; user: string; initials: string; bg: string; text: string; time: string; isMe: boolean };
+
+function ChatTab() {
+  const [msgs, setMsgs] = useState<ChatMsg[]>(CHAT_MSGS);
+  const [inputVal, setInputVal] = useState("");
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [msgs]);
+
+  const sendMsg = () => {
+    if (!inputVal.trim()) return;
+    setMsgs(prev => [...prev, {
+      id: `m${Date.now()}`,
+      user: "Tu", initials: "EU", bg: "linear-gradient(135deg,#7c3aed,#6d28d9)",
+      text: inputVal.trim(),
+      time: new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }),
+      isMe: true,
+    }]);
+    setInputVal("");
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 136px)" }}>
+      {/* Members strip */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, paddingBottom: 12, borderBottom: "1px solid #f1f5f9", marginBottom: 12 }}>
+        {[
+          { initials: "JM", bg: "linear-gradient(135deg,#3b82f6,#1d4ed8)" },
+          { initials: "MS", bg: "linear-gradient(135deg,#ec4899,#9d174d)" },
+          { initials: "CF", bg: "linear-gradient(135deg,#10b981,#065f46)" },
+          { initials: "AR", bg: "linear-gradient(135deg,#f59e0b,#b45309)" },
+          { initials: "PA", bg: "linear-gradient(135deg,#8b5cf6,#4c1d95)" },
+        ].map((m, i) => (
+          <div key={i} style={{ width: 28, height: 28, borderRadius: "50%", background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: "#fff", flexShrink: 0, border: "2px solid #fff", boxShadow: "0 1px 4px rgba(0,0,0,0.1)" }}>{m.initials}</div>
+        ))}
+        <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8.5, fontWeight: 700, color: "#64748b", flexShrink: 0 }}>+120</div>
+        <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 500 }}>125 membros online</span>
+      </div>
+
+      {/* Messages */}
+      <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, paddingBottom: 8, scrollbarWidth: "none" }}>
+        {msgs.map(msg => (
+          <div key={msg.id} style={{ display: "flex", gap: 7, flexDirection: msg.isMe ? "row-reverse" : "row", alignItems: "flex-end" }}>
+            {!msg.isMe && (
+              <div style={{ width: 26, height: 26, borderRadius: "50%", background: msg.bg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 8.5, fontWeight: 700, color: "#fff", flexShrink: 0 }}>{msg.initials}</div>
+            )}
+            <div style={{ maxWidth: "72%", display: "flex", flexDirection: "column", alignItems: msg.isMe ? "flex-end" : "flex-start", gap: 3 }}>
+              {!msg.isMe && <span style={{ fontSize: 10, fontWeight: 600, color: "#94a3b8", marginLeft: 2 }}>{msg.user}</span>}
+              <div style={{ background: msg.isMe ? "#7c3aed" : "#fff", color: msg.isMe ? "#fff" : "#0f172a", padding: "9px 13px", borderRadius: msg.isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px", fontSize: 13, lineHeight: 1.5, border: msg.isMe ? "none" : "1px solid #f1f5f9", boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>{msg.text}</div>
+              <span style={{ fontSize: 9.5, color: "#cbd5e1" }}>{msg.time}</span>
+            </div>
+          </div>
+        ))}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div style={{ display: "flex", gap: 8, paddingTop: 10, borderTop: "1px solid #f1f5f9", paddingBottom: 4 }}>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 99, paddingLeft: 16, paddingRight: 12, height: 44 }}>
+          <input
+            value={inputVal}
+            onChange={e => setInputVal(e.target.value)}
+            onKeyDown={e => e.key === "Enter" && sendMsg()}
+            placeholder="Escreve uma mensagem..."
+            style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "#0f172a", fontFamily: "inherit" }}
+          />
+        </div>
+        <button
+          onClick={sendMsg}
+          style={{ width: 44, height: 44, borderRadius: "50%", background: "#7c3aed", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
+        >
+          <Send style={{ width: 16, height: 16, color: "#fff" }} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Explorar() {
   const [activeTab, setActiveTab] = useState<Tab>("Jogos");
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState<GameFilter>("Todos");
   const [filterOpen, setFilterOpen] = useState(false);
+  const [, setLocation] = useLocation();
+
+  const handleTabChange = (tab: Tab) => {
+    const protectedTabs: Tab[] = ["Sala", "Chat"];
+    if (protectedTabs.includes(tab) && !localStorage.getItem("winmoz_logged_in")) {
+      setLocation("/login");
+      return;
+    }
+    setActiveTab(tab);
+  };
 
   const filteredJogos = jogosCards.filter(g => {
     const matchSearch = !query || g.name.toLowerCase().includes(query.toLowerCase());
@@ -362,7 +471,8 @@ export default function Explorar() {
     <div className="min-h-screen bg-slate-50 text-slate-900 w-full flex justify-center">
       <div className="w-full max-w-[430px] flex flex-col relative pb-24">
 
-        {/* HEADER */}
+        {/* HEADER — hidden when Chat tab is active */}
+        {activeTab !== "Chat" && (
         <div className="relative pt-10 pb-6 px-5"
           style={{ background: "linear-gradient(160deg, #5B21B6 0%, #6D28D9 45%, #7C3AED 100%)" }}>
           <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/4 pointer-events-none" />
@@ -378,6 +488,7 @@ export default function Explorar() {
             </div>
           </div>
         </div>
+        )}
 
         {/* TABS — scrollable */}
         <div className="bg-white border-b border-slate-100 sticky top-0 z-40 shadow-sm">
@@ -385,7 +496,7 @@ export default function Explorar() {
             {TABS.map((tab) => (
               <button
                 key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => handleTabChange(tab)}
                 className={`py-3.5 px-4 text-sm font-syne font-semibold transition-all duration-200 relative border-b-2 whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab ? "text-violet-700 border-violet-600" : "text-slate-400 border-transparent hover:text-slate-600"
                 }`}
@@ -464,6 +575,12 @@ export default function Explorar() {
                   <h2 className="font-syne font-bold text-sm text-slate-900">Últimas Atualizações</h2>
                 </div>
                 <AtualizacoesCards />
+              </motion.div>
+            )}
+
+            {activeTab === "Chat" && (
+              <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                <ChatTab />
               </motion.div>
             )}
 
