@@ -83,7 +83,7 @@ function SaquesSection() {
 const POSTS = [
   {
     id: 1,
-    image: "/ludo-card.jpg",
+    image: "/ludo-card2.png",
     imageBg: null as string | null,
     title: "Nova Temporada de Ludo Online",
     content: "Prémios até 50.000 $MT para os melhores jogadores. Inscreve-te já e garante o teu lugar!",
@@ -94,8 +94,8 @@ const POSTS = [
   },
   {
     id: 2,
-    image: null as string | null,
-    imageBg: "linear-gradient(135deg,#10b981,#059669)",
+    image: "/saques-card.avif",
+    imageBg: null as string | null,
     title: "Saques 24h Sem Complicações",
     content: "Levanta os teus ganhos a qualquer hora, sem esperas nem taxas escondidas. Rápido e seguro.",
     time: "5h",
@@ -105,7 +105,7 @@ const POSTS = [
   },
   {
     id: 3,
-    image: "/damas-board.png",
+    image: "/xadrez-card.jpg",
     imageBg: null as string | null,
     title: "Torneio de Xadrez Semanal",
     content: "Compete por 20.000 $MT em prémios nos nossos torneios semanais. Regista-te agora.",
@@ -125,21 +125,21 @@ export function AtualizacoesCards() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.06, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-          className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex"
-          style={{ minHeight: 92 }}
+          className="bg-white rounded-2xl border border-slate-100 shadow-sm flex gap-3"
+          style={{ minHeight: 92, padding: "10px 10px 10px 10px" }}
         >
-          <div className="flex-shrink-0" style={{ width: 90 }}>
+          <div className="flex-shrink-0 rounded-xl overflow-hidden" style={{ width: 80, minHeight: 72 }}>
             {post.image ? (
               <img
                 src={post.image}
                 alt={post.title}
-                style={{ width: 90, height: "100%", objectFit: "cover", display: "block", minHeight: 92 }}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", minHeight: 72 }}
               />
             ) : (
-              <div style={{ width: 90, minHeight: 92, height: "100%", background: post.imageBg ?? "#6366f1" }} />
+              <div style={{ width: "100%", minHeight: 72, height: "100%", background: post.imageBg ?? "#6366f1", borderRadius: 12 }} />
             )}
           </div>
-          <div className="flex-1 px-3 py-3 flex flex-col justify-between min-w-0">
+          <div className="flex-1 py-0.5 flex flex-col justify-between min-w-0">
             <div>
               <p className="font-syne font-bold text-slate-900 leading-tight mb-1" style={{ fontSize: 12.5 }}>
                 {post.title}
@@ -1029,7 +1029,7 @@ const games = [
     bet: "20–2.000 MT",
     rating: "4.9",
     players: "4.1K jogando",
-    image: "/ludo-card.png",
+    image: "/ludo-card2.png",
     imageFit: "cover" as const,
     imagePos: "center",
   },
@@ -1098,7 +1098,7 @@ const topGames = [
     name: "Ludo Turbo",
     players: "3.8K apostadores ativos",
     rank: 2,
-    image: "/ludo-card.png",
+    image: "/ludo-card2.png",
     imagePos: "center",
     from: "#059669",
     to: "#064E3B",

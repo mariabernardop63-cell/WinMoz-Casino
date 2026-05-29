@@ -57,6 +57,8 @@ export default function Registar() {
   /* form data */
   const [nome,    setNome]    = useState("");
   const [email,   setEmail]   = useState("");
+  const [phone,   setPhone]   = useState("");
+  const [invite,  setInvite]  = useState("");
   const [password, setPassword] = useState("");
   const [confirm,  setConfirm]  = useState("");
   const [digits,   setDigits]   = useState(["", "", "", "", "", ""]);
@@ -116,6 +118,8 @@ export default function Registar() {
     if (step === 1) {
       if (nome.trim().length < 4) errs.nome = "O nome deve ter pelo menos 4 caracteres";
       if (!emailRe.test(email.trim())) errs.email = "Formato de email inválido";
+      if (!/^8[2-7]\d{7}$/.test(phone)) errs.phone = "Número inválido. Deve começar com 82–87 e ter 9 dígitos";
+      if (!/^[A-Z0-9]{6}$/.test(invite)) errs.invite = "Código inválido. 6 caracteres maiúsculos e/ou dígitos";
       if (Object.keys(errs).length) { setErrors(errs); return; }
       setDir(1); setStep(2); setErrors({});
 
@@ -235,7 +239,7 @@ export default function Registar() {
                 </div>
 
                 {/* Email */}
-                <div className="mb-7">
+                <div className="mb-4">
                   <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#374151", marginBottom: 7 }}>
                     Endereço de Email
                   </label>
@@ -250,6 +254,52 @@ export default function Registar() {
                   />
                   {errors.email && (
                     <p style={{ fontSize: 11.5, color: "#ef4444", marginTop: 5 }}>{errors.email}</p>
+                  )}
+                </div>
+
+                {/* Phone */}
+                <div className="mb-4">
+                  <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#374151", marginBottom: 7 }}>
+                    Número de Telefone
+                  </label>
+                  <div style={{ display: "flex", border: errors.phone ? "1.5px solid #ef4444" : focused === "phone" ? "1.5px solid #000" : "1px solid #d1d5db", borderRadius: 0, overflow: "hidden", transition: "border 0.15s ease" }}>
+                    <div style={{ padding: "15px 14px", background: "#f9fafb", borderRight: "1px solid #e5e7eb", fontSize: 14, fontWeight: 600, color: "#374151", whiteSpace: "nowrap", flexShrink: 0, fontFamily: "inherit" }}>
+                      +258
+                    </div>
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      placeholder="82 000 0000"
+                      value={phone}
+                      maxLength={9}
+                      onChange={e => { const v = e.target.value.replace(/\D/g, "").slice(0, 9); setPhone(v); clearError("phone"); }}
+                      onFocus={() => setFocused("phone")}
+                      onBlur={() => setFocused(null)}
+                      style={{ flex: 1, padding: "15px 14px", border: "none", background: "#fff", fontSize: 14, color: "#111", outline: "none", fontFamily: "inherit", boxSizing: "border-box" as const }}
+                    />
+                  </div>
+                  {errors.phone && (
+                    <p style={{ fontSize: 11.5, color: "#ef4444", marginTop: 5 }}>{errors.phone}</p>
+                  )}
+                </div>
+
+                {/* Invite code */}
+                <div className="mb-7">
+                  <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#374151", marginBottom: 7 }}>
+                    Código de Convite <span style={{ fontWeight: 400, color: "#9ca3af", fontSize: 11 }}>(6 caracteres)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="EX: WM1234"
+                    value={invite}
+                    maxLength={6}
+                    onChange={e => { const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6); setInvite(v); clearError("invite"); }}
+                    onFocus={() => setFocused("invite")}
+                    onBlur={() => setFocused(null)}
+                    style={{ ...inputStyle("invite"), letterSpacing: "0.18em", fontWeight: 700 }}
+                  />
+                  {errors.invite && (
+                    <p style={{ fontSize: 11.5, color: "#ef4444", marginTop: 5 }}>{errors.invite}</p>
                   )}
                 </div>
 
