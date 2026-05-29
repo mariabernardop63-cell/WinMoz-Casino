@@ -13,29 +13,29 @@ const GAME_FILTERS = ["Todos", "Damas", "Ludo", "Xadrez", "Padrão"] as const;
 type GameFilter = typeof GAME_FILTERS[number];
 
 const jogosCards = [
-  { id: "damas",       name: "Damas Clássico",  desc: "Jogo de Tabuleiro • 12 Modos", players: "2.4K jogadores", color: "from-blue-500 to-indigo-700",     initials: "DA", hot: true,  category: "Damas" },
-  { id: "ludo",        name: "Ludo Turbo",       desc: "Jogo de Dados • 6 Modos",      players: "4.1K jogadores", color: "from-emerald-500 to-teal-700",    initials: "LU", hot: true,  category: "Ludo"  },
-  { id: "xadrez",      name: "Xadrez Rápido",    desc: "Estratégia Real • 8 Modos",    players: "1.2K jogadores", color: "from-violet-500 to-purple-800",   initials: "XA", hot: false, category: "Xadrez"},
-  { id: "damas-pro",   name: "Damas Pro",        desc: "Jogo de Tabuleiro • 4 Modos",  players: "980 jogadores",  color: "from-orange-500 to-red-700",     initials: "DP", hot: false, category: "Damas" },
-  { id: "ludo-classic",name: "Ludo Clássico",    desc: "Jogo de Dados • 3 Modos",      players: "760 jogadores",  color: "from-pink-500 to-rose-700",      initials: "LC", hot: false, category: "Ludo"  },
-  { id: "padrao",      name: "Jogo Padrão",      desc: "Clássico • 5 Modos",           players: "1.8K jogadores", color: "from-amber-500 to-yellow-600",   initials: "JP", hot: false, category: "Padrão"},
-  { id: "bilhar",      name: "Bilhar Apostado",  desc: "Jogo de Mesa • 5 Modos",       players: "890 jogadores",  color: "from-cyan-500 to-blue-700",      initials: "BI", hot: false, category: "Padrão"},
-  { id: "roleta",      name: "Roleta da Sorte",  desc: "Sorte • 3 Modos",              players: "1.5K jogadores", color: "from-pink-600 to-rose-800",      initials: "RS", hot: true,  category: "Padrão"},
+  { id: "damas",       name: "Damas Clássico",  desc: "Jogo de Tabuleiro • 12 Modos", players: "2.4K jogadores", color: "from-blue-500 to-indigo-700",     initials: "DA", hot: true,  category: "Damas",  image: "/damas-card.jpg"   },
+  { id: "ludo",        name: "Ludo Turbo",       desc: "Jogo de Dados • 6 Modos",      players: "4.1K jogadores", color: "from-emerald-500 to-teal-700",    initials: "LU", hot: true,  category: "Ludo",   image: "/ludo-card.png"    },
+  { id: "xadrez",      name: "Xadrez Rápido",    desc: "Estratégia Real • 8 Modos",    players: "1.2K jogadores", color: "from-violet-500 to-purple-800",   initials: "XA", hot: false, category: "Xadrez", image: "/xadrez-card.jpg"  },
+  { id: "damas-pro",   name: "Damas Pro",        desc: "Jogo de Tabuleiro • 4 Modos",  players: "980 jogadores",  color: "from-orange-500 to-red-700",     initials: "DP", hot: false, category: "Damas",  image: "/damas-card.jpg"   },
+  { id: "ludo-classic",name: "Ludo Clássico",    desc: "Jogo de Dados • 3 Modos",      players: "760 jogadores",  color: "from-pink-500 to-rose-700",      initials: "LC", hot: false, category: "Ludo",   image: "/ludo-card.png"    },
+  { id: "padrao",      name: "Jogo Padrão",      desc: "Clássico • 5 Modos",           players: "1.8K jogadores", color: "from-amber-500 to-yellow-600",   initials: "JP", hot: false, category: "Padrão", image: null                },
+  { id: "bilhar",      name: "Bilhar Apostado",  desc: "Jogo de Mesa • 5 Modos",       players: "890 jogadores",  color: "from-cyan-500 to-blue-700",      initials: "BI", hot: false, category: "Padrão", image: "/bilhar-card.webp" },
+  { id: "roleta",      name: "Roleta da Sorte",  desc: "Sorte • 3 Modos",              players: "1.5K jogadores", color: "from-pink-600 to-rose-800",      initials: "RS", hot: true,  category: "Padrão", image: "/roleta-card.jpg"  },
 ];
 
 const partidasTempoReal = [
-  { id:"p1", game:"Damas Clássico",  players:"João M. vs Carlos F.",  viewers:"142", time:"8min",  bet:"500 MT",   status:"AO VIVO", color:"from-blue-500 to-indigo-700",   initials:"DA" },
-  { id:"p2", game:"Ludo Turbo",      players:"Maria S. vs Pedro A.",  viewers:"89",  time:"12min", bet:"200 MT",   status:"AO VIVO", color:"from-emerald-500 to-teal-700",  initials:"LU" },
-  { id:"p3", game:"Xadrez Rápido",   players:"Ana L. vs Bruno K.",    viewers:"310", time:"3min",  bet:"1.000 MT", status:"AO VIVO", color:"from-violet-500 to-purple-800", initials:"XA" },
+  { id:"p1", game:"Damas Clássico",  players:"João M. vs Carlos F.",  viewers:"142", time:"8min",  bet:"500 MT",   status:"AO VIVO", color:"from-blue-500 to-indigo-700",   initials:"DA", image:"/damas-card.jpg"   },
+  { id:"p2", game:"Ludo Turbo",      players:"Maria S. vs Pedro A.",  viewers:"89",  time:"12min", bet:"200 MT",   status:"AO VIVO", color:"from-emerald-500 to-teal-700",  initials:"LU", image:"/ludo-card.png"    },
+  { id:"p3", game:"Xadrez Rápido",   players:"Ana L. vs Bruno K.",    viewers:"310", time:"3min",  bet:"1.000 MT", status:"AO VIVO", color:"from-violet-500 to-purple-800", initials:"XA", image:"/xadrez-card.jpg"  },
 ];
 
 const partidasAssistir = [
-  { id:"a1", game:"Damas Pro",       players:"Ricardo M. vs Filipe O.", viewers:"528", time:"22min", bet:"2.500 MT", status:"AO VIVO", color:"from-orange-500 to-red-700",    initials:"DP" },
-  { id:"a2", game:"Damas Clássico",  players:"Tomás V. vs Nuno B.",     viewers:"201", time:"17min", bet:"750 MT",   status:"AO VIVO", color:"from-blue-500 to-indigo-700",   initials:"DA" },
-  { id:"a3", game:"Ludo Turbo",      players:"Celina R. vs Amina D.",   viewers:"134", time:"5min",  bet:"300 MT",   status:"AO VIVO", color:"from-emerald-500 to-teal-700",  initials:"LU" },
-  { id:"a4", game:"Xadrez Rápido",   players:"Hugo F. vs Paulo C.",     viewers:"440", time:"31min", bet:"3.000 MT", status:"AO VIVO", color:"from-violet-500 to-purple-800", initials:"XA" },
-  { id:"a5", game:"Damas Clássico",  players:"Lúcia M. vs Beatriz S.",  viewers:"97",  time:"9min",  bet:"400 MT",   status:"AO VIVO", color:"from-blue-500 to-indigo-700",   initials:"DA" },
-  { id:"a6", game:"Ludo Clássico",   players:"Marco T. vs Sandro P.",   viewers:"63",  time:"14min", bet:"150 MT",   status:"AO VIVO", color:"from-pink-500 to-rose-700",     initials:"LC" },
+  { id:"a1", game:"Damas Pro",       players:"Ricardo M. vs Filipe O.", viewers:"528", time:"22min", bet:"2.500 MT", status:"AO VIVO", color:"from-orange-500 to-red-700",    initials:"DP", image:"/damas-card.jpg"   },
+  { id:"a2", game:"Damas Clássico",  players:"Tomás V. vs Nuno B.",     viewers:"201", time:"17min", bet:"750 MT",   status:"AO VIVO", color:"from-blue-500 to-indigo-700",   initials:"DA", image:"/damas-card.jpg"   },
+  { id:"a3", game:"Ludo Turbo",      players:"Celina R. vs Amina D.",   viewers:"134", time:"5min",  bet:"300 MT",   status:"AO VIVO", color:"from-emerald-500 to-teal-700",  initials:"LU", image:"/ludo-card.png"    },
+  { id:"a4", game:"Xadrez Rápido",   players:"Hugo F. vs Paulo C.",     viewers:"440", time:"31min", bet:"3.000 MT", status:"AO VIVO", color:"from-violet-500 to-purple-800", initials:"XA", image:"/xadrez-card.jpg"  },
+  { id:"a5", game:"Damas Clássico",  players:"Lúcia M. vs Beatriz S.",  viewers:"97",  time:"9min",  bet:"400 MT",   status:"AO VIVO", color:"from-blue-500 to-indigo-700",   initials:"DA", image:"/damas-card.jpg"   },
+  { id:"a6", game:"Ludo Clássico",   players:"Marco T. vs Sandro P.",   viewers:"63",  time:"14min", bet:"150 MT",   status:"AO VIVO", color:"from-pink-500 to-rose-700",     initials:"LC", image:"/ludo-card.png"    },
 ];
 
 const fadeUp = {
@@ -53,8 +53,14 @@ function GameCard({ game }: { game: typeof jogosCards[0] }) {
       variants={fadeUp}
       className="flex items-center p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 group cursor-pointer"
     >
-      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${game.color} flex items-center justify-center text-white font-syne font-bold text-base shadow-md flex-shrink-0`}>
-        {game.initials}
+      <div className="w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
+        {game.image ? (
+          <img src={game.image} alt={game.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className={`w-full h-full bg-gradient-to-br ${game.color} flex items-center justify-center text-white font-syne font-bold text-base`}>
+            {game.initials}
+          </div>
+        )}
       </div>
       <div className="ml-3 flex-1 min-w-0">
         <div className="flex items-center gap-2">
@@ -82,8 +88,14 @@ function MatchCard({ match }: { match: typeof partidasTempoReal[0] }) {
       variants={fadeUp}
       className="flex items-center p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 group cursor-pointer"
     >
-      <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${match.color} flex items-center justify-center text-white font-syne font-bold text-sm shadow-md flex-shrink-0 relative`}>
-        {match.initials}
+      <div className="w-11 h-11 rounded-xl overflow-hidden shadow-md flex-shrink-0 relative">
+        {match.image ? (
+          <img src={match.image} alt={match.game} className="w-full h-full object-cover" />
+        ) : (
+          <div className={`w-full h-full bg-gradient-to-br ${match.color} flex items-center justify-center text-white font-syne font-bold text-sm`}>
+            {match.initials}
+          </div>
+        )}
         <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse" />
       </div>
       <div className="ml-3 flex-1 min-w-0">

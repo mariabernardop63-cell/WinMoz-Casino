@@ -461,6 +461,33 @@ function ChessBannerImage({ size = 136 }: { size?: number }) {
 }
 
 /* ─────────────────────────────────────────────
+   BILHAR BANNER IMAGE
+───────────────────────────────────────────── */
+function BilharBannerImage({ size = 140 }: { size?: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.82, rotate: 6 }}
+      animate={{ opacity: 1, scale: 1, rotate: 6 }}
+      transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
+      style={{ width: size, height: size }}
+    >
+      <motion.img
+        src="/bilhar-rack.png"
+        alt="Bilhar"
+        animate={{ y: [0, -7, 0], rotate: [0, 1.2, 0] }}
+        transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          filter: "drop-shadow(0 10px 32px rgba(0,0,0,0.75)) drop-shadow(0 2px 8px rgba(0,0,0,0.5))",
+        }}
+      />
+    </motion.div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    ANIMATED LUDO BOARD
 ───────────────────────────────────────────── */
 
@@ -738,7 +765,23 @@ const SLIDES = [
     badgeText: "#FFFFFF",
     subtitleColor: "rgba(255,255,255,0.80)",
     title: "Xadrez\nApostado.",
-    subtitle: "Desafia os melhores estrategas e multiplica o teu saldo.",
+    subtitle: "Desafia estrategas e\nmultiplica o teu saldo.",
+    cta: "Jogar Agora",
+  },
+  {
+    id: "bilhar",
+    duration: 9000,
+    bg: "linear-gradient(135deg, rgba(4,8,16,0.88) 0%, rgba(8,16,28,0.84) 50%, rgba(10,18,32,0.80) 100%)",
+    bgImage: "/bilhar-bg.jpg" as string | null,
+    accent: "#22d3ee",
+    badge: "Anúncio Patrocinado",
+    badgeBg: "rgba(0,0,0,0.52)",
+    badgeBorder: "rgba(34,211,238,0.38)",
+    badgeDot: "#22d3ee",
+    badgeText: "#FFFFFF",
+    subtitleColor: "rgba(255,255,255,0.82)",
+    title: "Bilhar\nApostado.",
+    subtitle: "Domine a mesa e\nmultiplique as apostas.",
     cta: "Jogar Agora",
   },
 ];
@@ -934,6 +977,8 @@ function HeroBanner() {
                 <LudoBannerImage size={136} />
               ) : slide.id === "xadrez" ? (
                 <ChessBannerImage size={136} />
+              ) : slide.id === "bilhar" ? (
+                <BilharBannerImage size={140} />
               ) : (
                 <ChatBannerArt />
               )}
@@ -973,9 +1018,9 @@ const games = [
     bet: "50–5.000 MT",
     rating: "4.8",
     players: "2.4K jogando",
-    image: "/damas-board.png",
+    image: "/damas-card.jpg",
     imageFit: "cover" as const,
-    imagePos: "center 20%",
+    imagePos: "center",
   },
   {
     id: "ludo",
@@ -984,10 +1029,9 @@ const games = [
     bet: "20–2.000 MT",
     rating: "4.9",
     players: "4.1K jogando",
-    image: "/ludo-card.jpg",
-    imageFit: "contain" as const,
+    image: "/ludo-card.png",
+    imageFit: "cover" as const,
     imagePos: "center",
-    cardBg: "#1A1A3D",
   },
   {
     id: "xadrez",
@@ -996,9 +1040,9 @@ const games = [
     bet: "100–10.000 MT",
     rating: "4.7",
     players: "1.2K jogando",
-    image: null,
+    image: "/xadrez-card.jpg",
     imageFit: "cover" as const,
-    imagePos: "center",
+    imagePos: "center 30%",
   },
   {
     id: "bilhar",
@@ -1007,10 +1051,9 @@ const games = [
     bet: "50–3.000 MT",
     rating: "4.6",
     players: "890 jogando",
-    image: null,
+    image: "/bilhar-card.webp",
     imageFit: "cover" as const,
     imagePos: "center",
-    cardBg: "#0c2a3d",
   },
   {
     id: "roleta",
@@ -1019,8 +1062,8 @@ const games = [
     bet: "20–1.000 MT",
     rating: "4.5",
     players: "1.5K jogando",
-    image: null,
-    imageFit: "cover" as const,
+    image: "/roleta-card.jpg",
+    imageFit: "contain" as const,
     imagePos: "center",
     cardBg: "#2d0a1e",
   },
@@ -1045,8 +1088,8 @@ const topGames = [
     name: "Damas Clássico",
     players: "4.1K apostadores ativos",
     rank: 1,
-    image: "/damas-board.png",
-    imagePos: "center 15%",
+    image: "/damas-card.jpg",
+    imagePos: "center",
     from: "#1D4ED8",
     to: "#1E3A8A",
   },
@@ -1055,7 +1098,7 @@ const topGames = [
     name: "Ludo Turbo",
     players: "3.8K apostadores ativos",
     rank: 2,
-    image: "/ludo-card.jpg",
+    image: "/ludo-card.png",
     imagePos: "center",
     from: "#059669",
     to: "#064E3B",
@@ -1065,8 +1108,8 @@ const topGames = [
     name: "Xadrez Rápido",
     players: "2.5K apostadores ativos",
     rank: 3,
-    image: null,
-    imagePos: "center",
+    image: "/xadrez-card.jpg",
+    imagePos: "center 30%",
     from: "#7C3AED",
     to: "#3B0764",
   },
@@ -1075,8 +1118,8 @@ const topGames = [
     name: "Damas Pro",
     players: "1.9K apostadores ativos",
     rank: 4,
-    image: "/damas-board.png",
-    imagePos: "center 25%",
+    image: "/damas-card.jpg",
+    imagePos: "center",
     from: "#EA580C",
     to: "#7C2D12",
   },
@@ -1085,7 +1128,7 @@ const topGames = [
     name: "Bilhar Apostado",
     players: "890 apostadores ativos",
     rank: 5,
-    image: null,
+    image: "/bilhar-card.webp",
     imagePos: "center",
     from: "#0891b2",
     to: "#164e63",
@@ -1095,7 +1138,7 @@ const topGames = [
     name: "Roleta da Sorte",
     players: "1.5K apostadores ativos",
     rank: 6,
-    image: null,
+    image: "/roleta-card.jpg",
     imagePos: "center",
     from: "#be185d",
     to: "#831843",
