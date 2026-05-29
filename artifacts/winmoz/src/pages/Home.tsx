@@ -1061,8 +1061,8 @@ const games = [
     rating: "4.9",
     players: "4.1K jogando",
     image: "/ludo-card2.png",
-    imageFit: "contain" as const,
-    imagePos: "center",
+    imageFit: "cover" as const,
+    imagePos: "center 40%",
     cardBg: "#0d2218",
   },
   {

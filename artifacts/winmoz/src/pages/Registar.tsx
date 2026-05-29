@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, X, ArrowLeft, ShieldCheck, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { DEMO_EMAIL, DEMO_STORAGE_KEY } from "@/contexts/AuthContext";
 
 function PokerLogo() {
   return (
@@ -106,6 +107,15 @@ export default function Registar() {
       if (confirm !== password) errs.confirm = "As senhas não coincidem";
       if (Object.keys(errs).length) { setErrors(errs); return; }
 
+      const isDemoEmail = email.trim().toLowerCase() === DEMO_EMAIL;
+
+      if (isDemoEmail) {
+        setDir(1); setStep(4); setErrors({});
+        setResendTimer(60);
+        setCanResend(false);
+        return;
+      }
+
       setLoading(true);
       const { error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
@@ -135,6 +145,15 @@ export default function Registar() {
 
     } else if (step === 4) {
       if (digits.some(d => d === "")) return;
+
+      const isDemoEmail = email.trim().toLowerCase() === DEMO_EMAIL;
+
+      if (isDemoEmail) {
+        localStorage.setItem(DEMO_STORAGE_KEY, "true");
+        setLocation("/splash");
+        return;
+      }
+
       const token = digits.join("");
 
       setLoading(true);
@@ -259,10 +278,6 @@ export default function Registar() {
                   {errors.email && <p style={{ fontSize: 11.5, color: "#ef4444", marginTop: 5 }}>{errors.email}</p>}
                 </div>
 
-                <p className="text-center text-[13px] text-slate-500 mt-4">
-                  Já tem conta?{" "}
-                  <Link href="/login"><button className="font-bold text-[#000] hover:underline text-[13px]">Iniciar Sessão</button></Link>
-                </p>
               </motion.div>
             )}
 
@@ -384,7 +399,7 @@ export default function Registar() {
             )}
           </AnimatePresence>
 
-          <div className="mt-auto pt-4">
+          <div className="pt-6">
             <button onClick={goNext}
               disabled={(step === 4 && !otpComplete) || loading}
               style={{
@@ -401,6 +416,12 @@ export default function Registar() {
                 <><Loader2 style={{ width: 16, height: 16, animation: "spin 1s linear infinite" }} /><span>A processar…</span></>
               ) : step === 4 ? "Criar Conta" : "Próximo"}
             </button>
+            {step === 1 && (
+              <p className="text-center text-[13px] text-slate-500 mt-5">
+                Já tem conta?{" "}
+                <Link href="/login"><button className="font-bold text-[#000] hover:underline text-[13px]">Iniciar Sessão</button></Link>
+              </p>
+            )}
           </div>
         </div>
       </div>

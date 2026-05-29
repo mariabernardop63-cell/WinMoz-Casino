@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { DEMO_EMAIL, DEMO_STORAGE_KEY } from "@/contexts/AuthContext";
 
 function PokerLogo() {
   return (
@@ -38,6 +39,15 @@ export default function Login() {
 
     setLoading(true);
     setErrors({});
+
+    const isDemoEmail = email.trim().toLowerCase() === DEMO_EMAIL;
+
+    if (isDemoEmail) {
+      localStorage.setItem(DEMO_STORAGE_KEY, "true");
+      setLoading(false);
+      setLocation("/");
+      return;
+    }
 
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim().toLowerCase(),
