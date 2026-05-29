@@ -33,7 +33,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "PORT=5000 pnpm --filter @workspace/winmoz run dev"
+args = "PORT=5000 pnpm --filter @workspace/winmoz run dev & node scripts/proxy.mjs & wait"
 waitForPort = 5000
 
 [[workflows.workflow]]
