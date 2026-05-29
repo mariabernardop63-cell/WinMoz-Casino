@@ -74,9 +74,9 @@ export default function Registar() {
   /* otp refs */
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  /* resend countdown (only active when step === 3) */
+  /* resend countdown (only active when step === 4) */
   useEffect(() => {
-    if (step !== 3) return;
+    if (step !== 4) return;
     if (resendTimer <= 0) { setCanResend(true); return; }
     const t = setTimeout(() => setResendTimer(v => v - 1), 1000);
     return () => clearTimeout(t);
@@ -118,18 +118,22 @@ export default function Registar() {
     if (step === 1) {
       if (nome.trim().length < 4) errs.nome = "O nome deve ter pelo menos 4 caracteres";
       if (!emailRe.test(email.trim())) errs.email = "Formato de email inválido";
-      if (!/^8[2-7]\d{7}$/.test(phone)) errs.phone = "Número inválido. Deve começar com 82–87 e ter 9 dígitos";
-      if (!/^[A-Z0-9]{6}$/.test(invite)) errs.invite = "Código inválido. 6 caracteres maiúsculos e/ou dígitos";
       if (Object.keys(errs).length) { setErrors(errs); return; }
       setDir(1); setStep(2); setErrors({});
 
     } else if (step === 2) {
-      if (password.length < 8) errs.password = "A senha deve ter pelo menos 8 caracteres";
-      if (confirm !== password) errs.confirm = "As senhas não coincidem";
+      if (!/^8[2-7]\d{7}$/.test(phone)) errs.phone = "Número inválido. Deve começar com 82–87 e ter 9 dígitos";
+      if (!/^[A-Z0-9]{6}$/.test(invite)) errs.invite = "Código inválido. 6 caracteres maiúsculos e/ou dígitos";
       if (Object.keys(errs).length) { setErrors(errs); return; }
       setDir(1); setStep(3); setErrors({});
 
     } else if (step === 3) {
+      if (password.length < 8) errs.password = "A senha deve ter pelo menos 8 caracteres";
+      if (confirm !== password) errs.confirm = "As senhas não coincidem";
+      if (Object.keys(errs).length) { setErrors(errs); return; }
+      setDir(1); setStep(4); setErrors({});
+
+    } else if (step === 4) {
       if (digits.some(d => d === "")) return;
       setLocation("/splash");
     }
@@ -160,7 +164,7 @@ export default function Registar() {
   const otpComplete = digits.every(d => d !== "");
 
   /* ── Progress bar ── */
-  const progress = ((step - 1) / 2) * 100;
+  const progress = ((step - 1) / 3) * 100;
 
   return (
     <div className="min-h-screen bg-white w-full flex justify-center">
@@ -257,6 +261,49 @@ export default function Registar() {
                   )}
                 </div>
 
+                {/* Social divider */}
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="flex-1 h-px bg-slate-200" />
+                  <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500, letterSpacing: "1.4px" }}>OU REGISTE-SE COM</span>
+                  <div className="flex-1 h-px bg-slate-200" />
+                </div>
+                <div className="flex gap-3 mb-8">
+                  {[{ icon: <GoogleIcon />, label: "Google" }, { icon: <FacebookIcon />, label: "Facebook" }, { icon: <TwitterXIcon />, label: "X" }].map(({ icon, label }) => (
+                    <button key={label} aria-label={label}
+                      className="flex-1 flex items-center justify-center hover:bg-slate-50 transition-colors"
+                      style={{ height: 50, border: "1px solid #e5e7eb", borderRadius: 0, background: "#fff", cursor: "pointer" }}>
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+
+                <p className="text-center text-[13px] text-slate-500">
+                  Já tem conta?{" "}
+                  <Link href="/login">
+                    <button className="font-bold text-[#000] hover:underline text-[13px]">Iniciar Sessão</button>
+                  </Link>
+                </p>
+              </motion.div>
+            )}
+
+            {/* STEP 2 — Telefone + Convite */}
+            {step === 2 && (
+              <motion.div
+                key="step2"
+                custom={dir}
+                variants={slideVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={slideTransition}
+              >
+                <h1 className="font-syne font-bold text-[26px] text-[#0a0a0a] leading-tight mb-1">
+                  Contacto & Convite
+                </h1>
+                <p className="text-[13.5px] text-slate-500 mb-7">
+                  Adicione o seu número e o código de quem o convidou.
+                </p>
+
                 {/* Phone */}
                 <div className="mb-4">
                   <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#374151", marginBottom: 7 }}>
@@ -302,36 +349,13 @@ export default function Registar() {
                     <p style={{ fontSize: 11.5, color: "#ef4444", marginTop: 5 }}>{errors.invite}</p>
                   )}
                 </div>
-
-                {/* Social divider */}
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="flex-1 h-px bg-slate-200" />
-                  <span style={{ fontSize: 11, color: "#9ca3af", fontWeight: 500, letterSpacing: "1.4px" }}>OU REGISTE-SE COM</span>
-                  <div className="flex-1 h-px bg-slate-200" />
-                </div>
-                <div className="flex gap-3 mb-8">
-                  {[{ icon: <GoogleIcon />, label: "Google" }, { icon: <FacebookIcon />, label: "Facebook" }, { icon: <TwitterXIcon />, label: "X" }].map(({ icon, label }) => (
-                    <button key={label} aria-label={label}
-                      className="flex-1 flex items-center justify-center hover:bg-slate-50 transition-colors"
-                      style={{ height: 50, border: "1px solid #e5e7eb", borderRadius: 0, background: "#fff", cursor: "pointer" }}>
-                      {icon}
-                    </button>
-                  ))}
-                </div>
-
-                <p className="text-center text-[13px] text-slate-500">
-                  Já tem conta?{" "}
-                  <Link href="/login">
-                    <button className="font-bold text-[#000] hover:underline text-[13px]">Iniciar Sessão</button>
-                  </Link>
-                </p>
               </motion.div>
             )}
 
-            {/* STEP 2 — Senha */}
-            {step === 2 && (
+            {/* STEP 3 — Senha */}
+            {step === 3 && (
               <motion.div
-                key="step2"
+                key="step3"
                 custom={dir}
                 variants={slideVariants}
                 initial="enter"
@@ -398,10 +422,10 @@ export default function Registar() {
               </motion.div>
             )}
 
-            {/* STEP 3 — OTP */}
-            {step === 3 && (
+            {/* STEP 4 — OTP */}
+            {step === 4 && (
               <motion.div
-                key="step3"
+                key="step4"
                 custom={dir}
                 variants={slideVariants}
                 initial="enter"
@@ -482,7 +506,7 @@ export default function Registar() {
           <div className="mt-auto pt-4">
             <button
               onClick={goNext}
-              disabled={step === 3 && !otpComplete}
+              disabled={step === 4 && !otpComplete}
               style={{
                 width: "100%",
                 padding: "15px",
@@ -492,19 +516,19 @@ export default function Registar() {
                 fontWeight: 700,
                 border: "none",
                 borderRadius: 0,
-                cursor: (step === 3 && !otpComplete) ? "default" : "pointer",
+                cursor: (step === 4 && !otpComplete) ? "default" : "pointer",
                 letterSpacing: "0.3px",
                 fontFamily: "'Syne', sans-serif",
-                opacity: (step === 3 && !otpComplete) ? 0.42 : 1,
+                opacity: (step === 4 && !otpComplete) ? 0.42 : 1,
                 transition: "opacity 0.2s",
               }}
             >
-              {step === 3 ? "Criar Conta" : "Próximo"}
+              {step === 4 ? "Criar Conta" : "Próximo"}
             </button>
 
             {/* Step counter */}
             <p className="text-center mt-4" style={{ fontSize: 11.5, color: "#9ca3af" }}>
-              Passo {step} de 3
+              Passo {step} de 4
             </p>
           </div>
 

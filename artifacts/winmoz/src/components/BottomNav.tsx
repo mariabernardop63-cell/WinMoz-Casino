@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Search, X, LayoutGrid, Play, Gamepad2 } from "lucide-react";
+import { User, Search, X, LayoutGrid, Play, Gamepad2, Zap } from "lucide-react";
 
 function HomeIcon({ color }: { color: string }) {
   return (
@@ -42,7 +42,7 @@ function NavIcon({ iconKey, color }: { iconKey: string; color: string }) {
   return null;
 }
 
-/* ─── Resume Modal ─── */
+/* ─── Resume Modal (bottom sheet) ─── */
 function ResumeModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -50,121 +50,103 @@ function ResumeModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
+  const stats = [
+    { icon: <Gamepad2 style={{ width: 16, height: 16, color: "#7c3aed" }} />, value: "5 Jogos", label: "Disponíveis", accent: "#7c3aed" },
+    { icon: <Zap style={{ width: 16, height: 16, color: "#f59e0b", fill: "#f59e0b" }} />, value: "Ao Vivo", label: "Partidas ativas", accent: "#f59e0b" },
+    { icon: <Search style={{ width: 16, height: 16, color: "#00D4B4" }} />, value: "+50K MT", label: "Em prémios", accent: "#00D4B4" },
+  ];
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.22 }}
-      style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 24px" }}
+      transition={{ duration: 0.2 }}
+      style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
       onClick={onClose}
     >
       {/* Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.62)", backdropFilter: "blur(4px)" }}
-      />
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }} />
 
-      {/* Card */}
+      {/* Sheet */}
       <motion.div
-        initial={{ scale: 0.82, opacity: 0, y: 24 }}
-        animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.88, opacity: 0, y: 12 }}
-        transition={{ type: "spring", damping: 22, stiffness: 280, mass: 0.8 }}
+        initial={{ y: 80, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 80, opacity: 0 }}
+        transition={{ type: "spring", damping: 26, stiffness: 320, mass: 0.7 }}
         onClick={e => e.stopPropagation()}
         style={{
           position: "relative",
           width: "100%",
-          maxWidth: 360,
-          background: "#0d0d14",
-          border: "1.5px solid rgba(239,68,68,0.7)",
-          borderRadius: "18px 18px 0 18px",
-          boxShadow: "0 0 0 1px rgba(239,68,68,0.15), 0 24px 64px rgba(0,0,0,0.7), 0 4px 16px rgba(239,68,68,0.18)",
+          maxWidth: 430,
+          background: "#0f0f18",
+          borderRadius: "24px 24px 0 0",
+          border: "1px solid rgba(124,58,237,0.3)",
+          borderBottom: "none",
+          boxShadow: "0 -8px 48px rgba(0,0,0,0.7), 0 0 0 1px rgba(124,58,237,0.12)",
           overflow: "hidden",
           zIndex: 1,
+          paddingBottom: "env(safe-area-inset-bottom, 16px)",
         }}
       >
-        {/* Red glow bar at top */}
+        {/* Top accent bar */}
         <motion.div
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
-          transition={{ delay: 0.18, duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          style={{ height: 3, background: "linear-gradient(90deg, transparent 0%, #ef4444 40%, #ff6b6b 100%)", transformOrigin: "left" }}
+          transition={{ delay: 0.12, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          style={{ height: 3, background: "linear-gradient(90deg, #7c3aed, #a855f7, #7c3aed)", transformOrigin: "left" }}
         />
 
-        {/* X button */}
-        <button
-          onClick={onClose}
-          style={{ position: "absolute", top: 14, right: 14, width: 28, height: 28, borderRadius: "50%", background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#a1a1aa", transition: "background 0.15s" }}
-          onMouseEnter={e => (e.currentTarget.style.background = "rgba(239,68,68,0.2)")}
-          onMouseLeave={e => (e.currentTarget.style.background = "rgba(255,255,255,0.07)")}
-        >
-          <X style={{ width: 14, height: 14 }} />
-        </button>
+        {/* Drag handle */}
+        <div style={{ display: "flex", justifyContent: "center", paddingTop: 12, paddingBottom: 4 }}>
+          <div style={{ width: 36, height: 4, borderRadius: 99, background: "rgba(255,255,255,0.12)" }} />
+        </div>
 
-        {/* Content */}
-        <div style={{ padding: "24px 24px 28px" }}>
-          {/* Icon */}
-          <motion.div
-            initial={{ scale: 0, rotate: -20 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ delay: 0.12, type: "spring", damping: 14, stiffness: 220 }}
-            style={{ width: 52, height: 52, borderRadius: 14, background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 18 }}
-          >
-            <Gamepad2 style={{ width: 24, height: 24, color: "#ef4444" }} />
-          </motion.div>
-
-          <motion.h2
-            initial={{ opacity: 0, x: -12 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2, duration: 0.35 }}
-            style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 18, color: "#fff", marginBottom: 10, lineHeight: 1.25 }}
-          >
-            Nenhuma Partida em Curso
-          </motion.h2>
-
-          <motion.p
-            initial={{ opacity: 0, x: -12 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.27, duration: 0.35 }}
-            style={{ fontSize: 13.5, color: "#a1a1aa", lineHeight: 1.6, marginBottom: 22 }}
-          >
-            Ainda não iniciaste nenhuma partida ativa. Escolhe um jogo, faz a tua aposta e regressa aqui para continuar de onde paraste — a qualquer momento.
-          </motion.p>
-
-          {/* Decorative stat row */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.34, duration: 0.35 }}
-            style={{ display: "flex", gap: 10, marginBottom: 22 }}
-          >
-            {[["🎮", "6 Jogos", "disponíveis"], ["⚡", "Ao Vivo", "partidas ativas"], ["🏆", "+50K MT", "em prémios"]].map(([emoji, val, label], i) => (
-              <div key={i} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, padding: "10px 8px", textAlign: "center" }}>
-                <div style={{ fontSize: 16, marginBottom: 3 }}>{emoji}</div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#e4e4e7", fontFamily: "'Syne', sans-serif" }}>{val}</div>
-                <div style={{ fontSize: 9.5, color: "#71717a", marginTop: 1 }}>{label}</div>
+        <div style={{ padding: "12px 22px 24px" }}>
+          {/* Header row */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Gamepad2 style={{ width: 20, height: 20, color: "#7c3aed" }} />
               </div>
-            ))}
-          </motion.div>
+              <div>
+                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 15, color: "#fff", lineHeight: 1.2 }}>Nenhuma Partida Ativa</p>
+                <p style={{ fontSize: 11.5, color: "#71717a", marginTop: 2 }}>Inicia um jogo para retomar aqui</p>
+              </div>
+            </div>
+            <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: "50%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+              <X style={{ width: 14, height: 14, color: "#71717a" }} />
+            </button>
+          </div>
 
-          {/* CTA */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.42, duration: 0.35 }}
-          >
+          {/* Stats row */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+            {stats.map((s, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 + i * 0.06 }}
+                style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "11px 8px", textAlign: "center" }}
+              >
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 5 }}>{s.icon}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#e4e4e7", fontFamily: "'Syne', sans-serif" }}>{s.value}</div>
+                <div style={{ fontSize: 9.5, color: "#52525b", marginTop: 2 }}>{s.label}</div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* CTA Buttons */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <Link href="/explorar">
               <button
                 onClick={onClose}
-                style={{ width: "100%", padding: "13px", background: "linear-gradient(135deg, #ef4444, #dc2626)", color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13.5, border: "none", borderRadius: 10, cursor: "pointer", letterSpacing: "0.3px", boxShadow: "0 4px 20px rgba(239,68,68,0.35)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+                style={{ width: "100%", height: 50, background: "linear-gradient(135deg, #7c3aed, #6d28d9)", color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, border: "none", borderRadius: 14, cursor: "pointer", letterSpacing: "0.3px", boxShadow: "0 4px 20px rgba(124,58,237,0.4)", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
               >
                 <Play style={{ width: 14, height: 14, fill: "#fff" }} /> Explorar Jogos
               </button>
             </Link>
-          </motion.div>
+          </div>
         </div>
       </motion.div>
     </motion.div>

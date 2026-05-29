@@ -949,7 +949,10 @@ function HeroBanner() {
               {/* CTA */}
               <motion.button
                 whileTap={{ scale: 0.96 }}
-                onClick={() => { if (slide.cta === "Conversar") setLocation("/grupo-chat"); }}
+                onClick={() => {
+                  if (slide.cta === "Conversar") setLocation("/grupo-chat");
+                  else if (slide.cta === "Jogar Agora") setLocation(`/apostar/${slide.id}`);
+                }}
                 className="font-syne font-bold text-sm px-5 py-2 rounded-xl shadow-lg transition-all duration-200"
                 style={{ background: slide.accent, color: slide.id === "chat" ? "#001a16" : "#000" }}
               >
@@ -1031,7 +1034,7 @@ const games = [
     players: "4.1K jogando",
     image: "/ludo-card2.png",
     imageFit: "cover" as const,
-    imagePos: "center",
+    imagePos: "center 65%",
   },
   {
     id: "xadrez",
@@ -1063,9 +1066,8 @@ const games = [
     rating: "4.5",
     players: "1.5K jogando",
     image: "/roleta-card.jpg",
-    imageFit: "contain" as const,
+    imageFit: "cover" as const,
     imagePos: "center",
-    cardBg: "#2d0a1e",
   },
 ];
 
@@ -1083,66 +1085,12 @@ const fadeUp = {
    TOP GAMES
 ───────────────────────────────────────────── */
 const topGames = [
-  {
-    id: "dc",
-    name: "Damas Clássico",
-    players: "4.1K apostadores ativos",
-    rank: 1,
-    image: "/damas-card.jpg",
-    imagePos: "center",
-    from: "#1D4ED8",
-    to: "#1E3A8A",
-  },
-  {
-    id: "lt",
-    name: "Ludo Turbo",
-    players: "3.8K apostadores ativos",
-    rank: 2,
-    image: "/ludo-card2.png",
-    imagePos: "center",
-    from: "#059669",
-    to: "#064E3B",
-  },
-  {
-    id: "xr",
-    name: "Xadrez Rápido",
-    players: "2.5K apostadores ativos",
-    rank: 3,
-    image: "/xadrez-card.jpg",
-    imagePos: "center 30%",
-    from: "#7C3AED",
-    to: "#3B0764",
-  },
-  {
-    id: "dp",
-    name: "Damas Pro",
-    players: "1.9K apostadores ativos",
-    rank: 4,
-    image: "/damas-card.jpg",
-    imagePos: "center",
-    from: "#EA580C",
-    to: "#7C2D12",
-  },
-  {
-    id: "bi",
-    name: "Bilhar Apostado",
-    players: "890 apostadores ativos",
-    rank: 5,
-    image: "/bilhar-card.webp",
-    imagePos: "center",
-    from: "#0891b2",
-    to: "#164e63",
-  },
-  {
-    id: "ro",
-    name: "Roleta da Sorte",
-    players: "1.5K apostadores ativos",
-    rank: 6,
-    image: "/roleta-card.jpg",
-    imagePos: "center",
-    from: "#be185d",
-    to: "#831843",
-  },
+  { id: "dc", gameRoute: "damas", name: "Damas Clássico", players: "4.1K apostadores ativos", rank: 1, image: "/damas-card.jpg", imagePos: "center", from: "#1D4ED8", to: "#1E3A8A" },
+  { id: "lt", gameRoute: "ludo",  name: "Ludo Turbo",     players: "3.8K apostadores ativos", rank: 2, image: "/ludo-card2.png", imagePos: "center 65%", from: "#059669", to: "#064E3B" },
+  { id: "xr", gameRoute: "xadrez",name: "Xadrez Rápido",  players: "2.5K apostadores ativos", rank: 3, image: "/xadrez-card.jpg", imagePos: "center 30%", from: "#7C3AED", to: "#3B0764" },
+  { id: "dp", gameRoute: "damas", name: "Damas Pro",       players: "1.9K apostadores ativos", rank: 4, image: "/damas-card.jpg", imagePos: "center", from: "#EA580C", to: "#7C2D12" },
+  { id: "bi", gameRoute: "bilhar",name: "Bilhar Apostado", players: "890 apostadores ativos",  rank: 5, image: "/bilhar-card.webp", imagePos: "center", from: "#0891b2", to: "#164e63" },
+  { id: "ro", gameRoute: "roleta",name: "Roleta da Sorte", players: "1.5K apostadores ativos", rank: 6, image: "/roleta-card.jpg", imagePos: "center", from: "#be185d", to: "#831843" },
 ];
 
 /* ─────────────────────────────────────────────
@@ -1269,9 +1217,11 @@ export default function Home() {
                   <p className="text-[10px] font-semibold text-blue-700 mt-0.5 uppercase tracking-wider">{game.bet}</p>
                   <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{game.players}</p>
                   <div className="mt-auto">
-                    <button className="w-full h-8 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-colors">
-                      Jogar
-                    </button>
+                    <Link href={`/apostar/${game.id}`}>
+                      <button className="w-full h-8 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-colors">
+                        Jogar
+                      </button>
+                    </Link>
                   </div>
                 </div>
               </motion.div>
@@ -1332,9 +1282,11 @@ export default function Home() {
                   <p className="text-[10px] text-slate-400 mt-0.5">{game.players}</p>
                 </div>
 
-                <button className="w-8 h-8 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center transition-colors shadow-md flex-shrink-0">
-                  <Play className="w-3.5 h-3.5 ml-0.5"/>
-                </button>
+                <Link href={`/apostar/${game.gameRoute}`}>
+                  <button className="w-8 h-8 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center transition-colors shadow-md flex-shrink-0">
+                    <Play className="w-3.5 h-3.5 ml-0.5"/>
+                  </button>
+                </Link>
               </motion.div>
             ))}
           </motion.div>

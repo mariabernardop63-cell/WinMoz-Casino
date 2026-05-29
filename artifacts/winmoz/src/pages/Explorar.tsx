@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Search, ChevronRight, Play, Users, Clock, Trophy, Zap, Plus, Hash, ArrowRight, Shield, SlidersHorizontal, X, CheckCircle2, Key
 } from "lucide-react";
+import { Link } from "wouter";
 import BottomNav from "@/components/BottomNav";
 import { AtualizacoesCards } from "./Home";
 
@@ -48,7 +49,9 @@ const stagger = {
 };
 
 function GameCard({ game }: { game: typeof jogosCards[0] }) {
+  const betId = game.id.split("-")[0];
   return (
+    <Link href={`/apostar/${betId}`} style={{ display: "block", textDecoration: "none" }}>
     <motion.div
       variants={fadeUp}
       className="flex items-center p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 group cursor-pointer"
@@ -79,6 +82,7 @@ function GameCard({ game }: { game: typeof jogosCards[0] }) {
       </div>
       <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-violet-500 transition-colors flex-shrink-0" />
     </motion.div>
+    </Link>
   );
 }
 

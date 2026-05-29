@@ -24,6 +24,7 @@ import Suporte from "@/pages/Suporte";
 import Notificacoes from "@/pages/Notificacoes";
 import GrupoChat from "@/pages/GrupoChat";
 import ScannerQR from "@/pages/ScannerQR";
+import Apostar from "@/pages/Apostar";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ function Router() {
       <Route path="/notificacoes" component={Notificacoes} />
       <Route path="/grupo-chat" component={GrupoChat} />
       <Route path="/scanner-qr" component={ScannerQR} />
+      <Route path="/apostar/:gameId" component={Apostar} />
       <Route component={NotFound} />
     </Switch>
   );
