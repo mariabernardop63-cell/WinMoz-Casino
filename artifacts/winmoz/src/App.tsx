@@ -2,6 +2,8 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/contexts/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Explorar from "@/pages/Explorar";
@@ -31,6 +33,7 @@ const queryClient = new QueryClient();
 function Router() {
   return (
     <Switch>
+      {/* Public routes */}
       <Route path="/" component={Home} />
       <Route path="/explorar" component={Explorar} />
       <Route path="/login" component={Login} />
@@ -38,21 +41,56 @@ function Router() {
       <Route path="/esqueceu-senha" component={EsqueceuSenha} />
       <Route path="/otp" component={OTP} />
       <Route path="/splash" component={SplashScreen} />
-      <Route path="/perfil" component={Perfil} />
-      <Route path="/recarga" component={Recarga} />
-      <Route path="/levantar" component={Levantar} />
-      <Route path="/depositar" component={Depositar} />
-      <Route path="/editar-perfil" component={EditarPerfil} />
-      <Route path="/convidar-amigos" component={ConvidarAmigos} />
-      <Route path="/extratos" component={Extratos} />
-      <Route path="/reportar" component={Reportar} />
-      <Route path="/privacidade" component={Privacidade} />
-      <Route path="/definicoes" component={Definicoes} />
-      <Route path="/suporte" component={Suporte} />
-      <Route path="/notificacoes" component={Notificacoes} />
-      <Route path="/grupo-chat" component={GrupoChat} />
-      <Route path="/scanner-qr" component={ScannerQR} />
-      <Route path="/apostar/:gameId" component={Apostar} />
+
+      {/* Protected routes — require login */}
+      <Route path="/perfil">
+        <ProtectedRoute><Perfil /></ProtectedRoute>
+      </Route>
+      <Route path="/notificacoes">
+        <ProtectedRoute><Notificacoes /></ProtectedRoute>
+      </Route>
+      <Route path="/grupo-chat">
+        <ProtectedRoute><GrupoChat /></ProtectedRoute>
+      </Route>
+      <Route path="/apostar/:gameId">
+        {(params) => (
+          <ProtectedRoute><Apostar /></ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/editar-perfil">
+        <ProtectedRoute><EditarPerfil /></ProtectedRoute>
+      </Route>
+      <Route path="/recarga">
+        <ProtectedRoute><Recarga /></ProtectedRoute>
+      </Route>
+      <Route path="/levantar">
+        <ProtectedRoute><Levantar /></ProtectedRoute>
+      </Route>
+      <Route path="/depositar">
+        <ProtectedRoute><Depositar /></ProtectedRoute>
+      </Route>
+      <Route path="/convidar-amigos">
+        <ProtectedRoute><ConvidarAmigos /></ProtectedRoute>
+      </Route>
+      <Route path="/extratos">
+        <ProtectedRoute><Extratos /></ProtectedRoute>
+      </Route>
+      <Route path="/reportar">
+        <ProtectedRoute><Reportar /></ProtectedRoute>
+      </Route>
+      <Route path="/privacidade">
+        <ProtectedRoute><Privacidade /></ProtectedRoute>
+      </Route>
+      <Route path="/definicoes">
+        <ProtectedRoute><Definicoes /></ProtectedRoute>
+      </Route>
+      <Route path="/suporte">
+        <ProtectedRoute><Suporte /></ProtectedRoute>
+      </Route>
+      <Route path="/scanner-qr">
+        <ProtectedRoute><ScannerQR /></ProtectedRoute>
+      </Route>
+
       <Route component={NotFound} />
     </Switch>
   );
@@ -62,10 +100,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
+        <AuthProvider>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <Router />
+          </WouterRouter>
+          <Toaster />
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

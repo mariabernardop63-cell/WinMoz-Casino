@@ -1,0 +1,1 @@
+- [Supabase auth setup](supabase-auth.md) — credentials stored as VITE_ env vars; migration SQL must be run manually in Supabase SQL editor (no programmatic DDL endpoint available)

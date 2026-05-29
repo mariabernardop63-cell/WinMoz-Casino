@@ -1,19 +1,12 @@
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
-import { ArrowLeft, Camera, User, Check } from "lucide-react";
-
-function getProfile() {
-  return {
-    name:   localStorage.getItem("winmoz_user_name")  || "SONIA DAUSSE F.",
-    email:  localStorage.getItem("winmoz_user_email") || "sonia.dausse@email.com",
-    phone:  localStorage.getItem("winmoz_user_phone") || "845678893",
-    avatar: localStorage.getItem("winmoz_user_avatar") || "",
-  };
-}
+import { ArrowLeft, Camera, User, Check, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 function formatPhone(digits: string) {
-  const d = digits.replace(/\D/g, "");
+  const d = (digits || "").replace(/\D/g, "");
   if (d.length <= 3) return d;
   if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
   return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
@@ -21,24 +14,33 @@ function formatPhone(digits: string) {
 
 export default function EditarPerfil() {
   const [, setLocation] = useLocation();
+  const { user, profile, refreshProfile } = useAuth();
+
   const [name,  setName]  = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [avatar, setAvatar] = useState("");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [focused, setFocused] = useState<string | null>(null);
   const [errors,  setErrors]  = useState<Record<string, string>>({});
   const [saving, setSaving]   = useState(false);
   const [saved,  setSaved]    = useState(false);
+  const [saveError, setSaveError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const p = getProfile();
-    setName(p.name); setEmail(p.email); setPhone(p.phone); setAvatar(p.avatar);
-  }, []);
+    if (profile) {
+      setName(profile.full_name ?? "");
+      setPhone(profile.phone ?? "");
+      setAvatar(profile.avatar_url ?? "");
+    }
+    if (user?.email) setEmail(user.email);
+  }, [profile, user]);
 
   const handleAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setAvatarFile(file);
     const reader = new FileReader();
     reader.onload = ev => { if (ev.target?.result) setAvatar(ev.target.result as string); };
     reader.readAsDataURL(file);
@@ -47,26 +49,70 @@ export default function EditarPerfil() {
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = "O nome não pode estar vazio";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errs.email = "Formato de email inválido";
     const digits = phone.replace(/\D/g, "");
-    if (digits.length < 9) errs.phone = "O número deve ter pelo menos 9 dígitos";
+    if (digits.length > 0 && digits.length < 9) errs.phone = "O número deve ter 9 dígitos";
     return errs;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (!user) return;
+
     setSaving(true);
-    setTimeout(() => {
-      localStorage.setItem("winmoz_user_name",  name.trim());
-      localStorage.setItem("winmoz_user_email", email.trim());
-      localStorage.setItem("winmoz_user_phone", phone.replace(/\D/g, ""));
-      if (avatar) localStorage.setItem("winmoz_user_avatar", avatar);
-      else localStorage.removeItem("winmoz_user_avatar");
+    setSaveError("");
+
+    try {
+      let avatarUrl = profile?.avatar_url ?? null;
+
+      if (avatarFile) {
+        const ext = avatarFile.name.split(".").pop() ?? "jpg";
+        const path = `${user.id}/avatar.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(path, avatarFile, { upsert: true, contentType: avatarFile.type });
+
+        if (uploadError) {
+          setSaveError("Erro ao enviar foto: " + uploadError.message);
+          setSaving(false);
+          return;
+        }
+
+        const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+        avatarUrl = urlData.publicUrl + "?t=" + Date.now();
+      } else if (!avatar && profile?.avatar_url) {
+        avatarUrl = null;
+      }
+
+      const profileData = {
+        full_name: name.trim(),
+        phone: phone.replace(/\D/g, ""),
+        avatar_url: avatarUrl,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .upsert({ id: user.id, ...profileData }, { onConflict: "id" });
+
+      if (profileError) {
+        setSaveError("Erro ao guardar perfil: " + profileError.message);
+        setSaving(false);
+        return;
+      }
+
+      await supabase.auth.updateUser({
+        data: { full_name: name.trim(), phone: phone.replace(/\D/g, ""), avatar_url: avatarUrl },
+      });
+
+      await refreshProfile();
       setSaving(false);
       setSaved(true);
       setTimeout(() => { setSaved(false); setLocation("/perfil"); }, 1200);
-    }, 1400);
+    } catch (err: any) {
+      setSaveError("Erro inesperado: " + (err?.message ?? "tente novamente"));
+      setSaving(false);
+    }
   };
 
   const inputBase: React.CSSProperties = {
@@ -84,7 +130,6 @@ export default function EditarPerfil() {
   return (
     <div className="min-h-screen bg-white w-full flex justify-center">
       <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col relative">
-        {/* Header */}
         <div className="flex items-center gap-3 px-5 pt-12 pb-6 border-b border-slate-100">
           <button onClick={() => setLocation("/perfil")}
             className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors"
@@ -98,7 +143,6 @@ export default function EditarPerfil() {
         </div>
 
         <div className="flex-1 px-6 py-6 overflow-y-auto pb-32">
-          {/* Avatar */}
           <motion.div className="flex flex-col items-center mb-8"
             initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
             <div className="relative">
@@ -121,16 +165,21 @@ export default function EditarPerfil() {
               Alterar foto de perfil
             </button>
             {avatar && (
-              <button onClick={() => setAvatar("")}
+              <button onClick={() => { setAvatar(""); setAvatarFile(null); }}
                 className="mt-1 text-[12px] text-slate-400 hover:text-red-500 transition-colors">
                 Remover foto
               </button>
             )}
           </motion.div>
 
-          {/* Fields */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.38 }}>
-            {/* Name */}
+
+            {saveError && (
+              <div className="mb-5 p-3.5" style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+                <p style={{ fontSize: 12.5, color: "#dc2626", margin: 0 }}>{saveError}</p>
+              </div>
+            )}
+
             <div className="mb-5">
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, letterSpacing: "0.3px" }}>
                 NOME COMPLETO
@@ -138,23 +187,19 @@ export default function EditarPerfil() {
               <input type="text" value={name} placeholder="O teu nome completo"
                 onChange={e => { setName(e.target.value); setErrors(p => { const n = {...p}; delete n.name; return n; }); }}
                 onFocus={() => setFocused("name")} onBlur={() => setFocused(null)}
-                style={inputStyle("name")} />
+                style={inputStyle("name")} disabled={saving} />
               {errors.name && <p style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>{errors.name}</p>}
             </div>
 
-            {/* Email */}
             <div className="mb-5">
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, letterSpacing: "0.3px" }}>
                 ENDEREÇO DE EMAIL
               </label>
-              <input type="email" value={email} placeholder="exemplo@email.com"
-                onChange={e => { setEmail(e.target.value); setErrors(p => { const n = {...p}; delete n.email; return n; }); }}
-                onFocus={() => setFocused("email")} onBlur={() => setFocused(null)}
-                style={inputStyle("email")} />
-              {errors.email && <p style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>{errors.email}</p>}
+              <input type="email" value={email} placeholder="exemplo@email.com" disabled
+                style={{ ...inputBase, border: "1px solid #e5e7eb", background: "#f9fafb", color: "#9ca3af", cursor: "not-allowed" }} />
+              <p style={{ fontSize: 11, color: "#9ca3af", marginTop: 4 }}>O email não pode ser alterado aqui.</p>
             </div>
 
-            {/* Phone */}
             <div className="mb-8">
               <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#374151", marginBottom: 6, letterSpacing: "0.3px" }}>
                 NÚMERO DE TELEMÓVEL
@@ -167,22 +212,19 @@ export default function EditarPerfil() {
                 <input type="tel" value={formatPhone(phone)} placeholder="84 123 4567"
                   onChange={e => { setPhone(e.target.value.replace(/\D/g, "").slice(0, 9)); setErrors(p => { const n = {...p}; delete n.phone; return n; }); }}
                   onFocus={() => setFocused("phone")} onBlur={() => setFocused(null)}
-                  style={{ ...inputBase, flex: 1, border: "none", background: "#fff" }} />
+                  style={{ ...inputBase, flex: 1, border: "none", background: "#fff" }} disabled={saving} />
               </div>
               {errors.phone && <p style={{ fontSize: 11, color: "#ef4444", marginTop: 4 }}>{errors.phone}</p>}
             </div>
 
-            {/* Divider */}
             <div className="border-t border-slate-100 mb-6" />
 
-            {/* Info notice */}
             <div className="p-4 mb-6" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
               <p style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>
-                As alterações ao perfil são aplicadas imediatamente em toda a aplicação. O teu email é usado para recuperar a conta.
+                As alterações ao perfil são guardadas na nuvem e aplicadas imediatamente.
               </p>
             </div>
 
-            {/* Save button */}
             <motion.button onClick={handleSave} disabled={saving || saved}
               whileTap={!saving && !saved ? { scale: 0.98 } : {}}
               style={{
@@ -194,12 +236,12 @@ export default function EditarPerfil() {
                 transition: "background 0.3s ease",
               }}>
               {saving ? (
-                <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                  <span>A guardar…</span></>
+                <><Loader2 style={{ width: 16, height: 16, animation: "spin 1s linear infinite" }} /><span>A guardar…</span></>
               ) : saved ? (
                 <><Check style={{ width: 18, height: 18 }} /><span>Guardado!</span></>
               ) : "Guardar Alterações"}
             </motion.button>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </motion.div>
         </div>
       </div>

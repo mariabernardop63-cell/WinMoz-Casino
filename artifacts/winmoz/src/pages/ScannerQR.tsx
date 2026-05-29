@@ -48,6 +48,7 @@ export default function ScannerQR() {
       }, 16);
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [scanning, result]);
 
   const startCamera = async () => {

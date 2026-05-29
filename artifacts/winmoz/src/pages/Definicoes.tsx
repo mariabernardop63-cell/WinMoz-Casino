@@ -5,6 +5,7 @@ import {
   ArrowLeft, Bell, Moon, Globe, Vibrate, Volume2, CreditCard,
   ChevronRight, Info, LogOut,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -47,6 +48,8 @@ const CURRENCIES = ["MZN — Metical", "USD — Dólar", "EUR — Euro"];
 
 export default function Definicoes() {
   const [, setLocation] = useLocation();
+  const { signOut } = useAuth();
+
   const [notifDepositos,  setNotifDepositos]  = useState(true);
   const [notifApostas,    setNotifApostas]    = useState(true);
   const [notifPromos,     setNotifPromos]     = useState(false);
@@ -58,6 +61,11 @@ export default function Definicoes() {
   const [lang,            setLang]            = useState("Português");
   const [currency,        setCurrency]        = useState("MZN — Metical");
   const [version]         = useState("1.0.0");
+
+  const handleSignOut = async () => {
+    await signOut();
+    setLocation("/");
+  };
 
   const SECTIONS = [
     {
@@ -80,20 +88,18 @@ export default function Definicoes() {
     {
       title: "Conta e Pagamento",
       items: [
-        { icon: CreditCard, label: "Moeda",              desc: "Moeda preferida para exibição",       onPress: () => setCurrModal(true), badge: currency.split(" ")[0] },
-        { icon: CreditCard, label: "Métodos de pagamento",desc: "Gere os teus métodos de depósito",   onPress: () => {} },
-        { icon: CreditCard, label: "Limite de apostas",   desc: "Define limites de gastos diários",   onPress: () => {} },
+        { icon: CreditCard, label: "Moeda",               desc: "Moeda preferida para exibição",       onPress: () => setCurrModal(true), badge: currency.split(" ")[0] },
+        { icon: CreditCard, label: "Métodos de pagamento", desc: "Gere os teus métodos de depósito",   onPress: () => {} },
+        { icon: CreditCard, label: "Limite de apostas",    desc: "Define limites de gastos diários",   onPress: () => {} },
       ],
     },
     {
       title: "Aplicação",
       items: [
-        { icon: Info,   label: "Versão",          desc: `WinMoz v${version}`,              onPress: () => {}, badge: version },
-        { icon: Info,   label: "Termos de serviço",desc: "Lê os nossos termos",             onPress: () => {} },
-        { icon: Info,   label: "Política de privacidade", desc: "Sabe como usamos os teus dados", onPress: () => setLocation("/privacidade") },
-        { icon: LogOut, label: "Terminar sessão", desc: "Sair da conta actual",
-          onPress: () => { localStorage.removeItem("winmoz_logged_in"); setLocation("/"); }
-        },
+        { icon: Info,   label: "Versão",                   desc: `WinMoz v${version}`,                    onPress: () => {}, badge: version },
+        { icon: Info,   label: "Termos de serviço",        desc: "Lê os nossos termos",                   onPress: () => {} },
+        { icon: Info,   label: "Política de privacidade",  desc: "Sabe como usamos os teus dados",        onPress: () => setLocation("/privacidade") },
+        { icon: LogOut, label: "Terminar sessão",          desc: "Sair da conta actual",                  onPress: handleSignOut },
       ],
     },
   ];
@@ -101,7 +107,6 @@ export default function Definicoes() {
   return (
     <div className="min-h-screen bg-white w-full flex justify-center">
       <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col">
-        {/* Header */}
         <div className="flex items-center gap-3 px-5 pt-12 pb-6 border-b border-slate-100">
           <button onClick={() => setLocation("/perfil")}
             className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors"
@@ -129,7 +134,6 @@ export default function Definicoes() {
           ))}
         </div>
 
-        {/* Language picker */}
         {langModal && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
             <motion.div className="w-full max-w-[430px] bg-white"
@@ -153,7 +157,6 @@ export default function Definicoes() {
           </div>
         )}
 
-        {/* Currency picker */}
         {currModal && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
             <motion.div className="w-full max-w-[430px] bg-white"

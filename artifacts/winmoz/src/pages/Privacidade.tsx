@@ -34,11 +34,11 @@ interface SettingRowProps {
 
 function SettingRow({ icon: Icon, label, desc, value, onChange, onPress, danger }: SettingRowProps) {
   const Tag = onChange !== undefined ? "div" : "button" as any;
+  const handleClick = onChange !== undefined ? () => onChange?.(!value) : onPress;
   return (
-    <Tag onClick={onPress || (onChange !== undefined ? undefined : undefined)}
+    <Tag onClick={handleClick}
       className="flex items-center gap-3.5 py-4 w-full text-left border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/50 cursor-pointer"
-      style={{ background: "none" }}
-      {...(onChange === undefined ? { onClick: onPress } : { onClick: () => onChange?.(!value) })}>
+      style={{ background: "none" }}>
       <div className="w-9 h-9 flex items-center justify-center flex-shrink-0"
         style={{ background: danger ? "#fef2f2" : "#f8fafc", border: danger ? "1px solid #fecaca" : "1px solid #e5e7eb" }}>
         <Icon style={{ width: 16, height: 16, color: danger ? "#dc2626" : "#374151" }} />

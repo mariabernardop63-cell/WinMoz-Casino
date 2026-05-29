@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import {
@@ -9,24 +9,15 @@ import {
   Gamepad2, CreditCard,
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import { useAuth } from "@/contexts/AuthContext";
 
-function getBalance(): number {
-  return parseFloat(localStorage.getItem("winmoz_balance") || "0");
-}
 function fmtMZN(val: number): string {
   const str = val.toFixed(2);
   const [int, dec] = str.split(".");
   return `${Number(int).toLocaleString("pt-PT")},${dec}`;
 }
-function getProfile() {
-  return {
-    name:   localStorage.getItem("winmoz_user_name")  || "SONIA DAUSSE F.",
-    phone:  localStorage.getItem("winmoz_user_phone") || "845678893",
-    avatar: localStorage.getItem("winmoz_user_avatar") || "",
-  };
-}
 function formatPhone(digits: string) {
-  const d = digits.replace(/\D/g, "");
+  const d = (digits || "").replace(/\D/g, "");
   if (d.length <= 3) return d;
   if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
   return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6)}`;
@@ -36,23 +27,11 @@ type TxIcon = typeof ArrowUpRight;
 interface Tx { id: number; name: string; type: string; date: string; amount: string; icon: TxIcon; color: string }
 
 function getRecentTransactions(): Tx[] {
-  const stored = JSON.parse(localStorage.getItem("winmoz_transactions") || "[]");
-  if (stored.length === 0) {
-    return [
-      { id: 1, name: "Para Sarah",    type: "Transferência", date: "27 Jan", amount: "+589 MZN", icon: ArrowUpRight,  color: "#22c55e" },
-      { id: 2, name: "De John Dack",  type: "Transferência", date: "27 Jan", amount: "+150 MZN", icon: ArrowDownLeft, color: "#22c55e" },
-      { id: 3, name: "Torneio Ludo",  type: "Aposta",        date: "23 Jan", amount: "+457 MZN", icon: Gamepad2,      color: "#a78bfa" },
-    ];
-  }
-  return stored.slice(0, 3).map((t: any, i: number) => ({
-    id: i,
-    name: t.name || t.type || "Transação",
-    type: t.type || "Movimento",
-    date: (t.date || "").split(" ").slice(0, 2).join(" "),
-    amount: `${t.sign || (t.type === "Depósito" || t.type === "Recarga" ? "+" : "-")}${t.amount || 0} MZN`,
-    icon: t.type === "Depósito" ? ArrowDownLeft : t.type === "Levamento" ? ArrowUpRight : t.type === "Aposta" ? Gamepad2 : CreditCard,
-    color: (t.type === "Depósito" || t.type === "Recarga") ? "#22c55e" : t.type === "Aposta" ? "#a78bfa" : "#ef4444",
-  }));
+  return [
+    { id: 1, name: "Para Sarah",   type: "Transferência", date: "27 Jan", amount: "+589 MZN", icon: ArrowUpRight,  color: "#22c55e" },
+    { id: 2, name: "De John Dack", type: "Transferência", date: "27 Jan", amount: "+150 MZN", icon: ArrowDownLeft, color: "#22c55e" },
+    { id: 3, name: "Torneio Ludo", type: "Aposta",        date: "23 Jan", amount: "+457 MZN", icon: Gamepad2,      color: "#a78bfa" },
+  ];
 }
 
 const FERRAMENTAS = [
@@ -69,19 +48,13 @@ const FERRAMENTAS = [
 export default function Perfil() {
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [ferramentasOpen, setFerramentasOpen] = useState(false);
-  const [balance, setBalanceState] = useState(0);
-  const [profile, setProfile] = useState({ name: "SONIA DAUSSE F.", phone: "845678893", avatar: "" });
   const [, setLocation] = useLocation();
+  const { profile, signOut } = useAuth();
 
-  useEffect(() => {
-    setBalanceState(getBalance());
-    setProfile(getProfile());
-    const interval = setInterval(() => {
-      setBalanceState(getBalance());
-      setProfile(getProfile());
-    }, 800);
-    return () => clearInterval(interval);
-  }, []);
+  const displayName = profile?.full_name ?? "Utilizador";
+  const displayPhone = profile?.phone ?? "";
+  const displayAvatar = profile?.avatar_url ?? "";
+  const balance = profile?.balance ?? 0;
 
   const transactions = getRecentTransactions();
 
@@ -92,9 +65,9 @@ export default function Perfil() {
     if (label === "Mais")      setFerramentasOpen(true);
   };
 
-  const handleFerramentaClick = (label: string, route: string | null) => {
+  const handleFerramentaClick = async (label: string, route: string | null) => {
     if (label === "Sair") {
-      localStorage.removeItem("winmoz_logged_in");
+      await signOut();
       setLocation("/");
       return;
     }
@@ -114,7 +87,6 @@ export default function Perfil() {
 
         {/* ── DARK TOP SECTION ── */}
         <div className="px-5 pt-6 pb-0 relative">
-          {/* Top right buttons */}
           <div className="absolute top-6 right-5 flex items-center gap-2">
             <button onClick={() => setLocation("/scanner-qr")} className="flex items-center justify-center rounded-full transition-all"
               style={{ width: 34, height: 34, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
@@ -130,7 +102,7 @@ export default function Perfil() {
             </button>
           </div>
 
-          {/* Avatar + Name */}
+          {/* Avatar + Name + Phone */}
           <button onClick={() => setLocation("/editar-perfil")} className="flex items-center gap-4 mb-5 group">
             <div style={{
               width: 62, height: 62, borderRadius: 999,
@@ -138,18 +110,18 @@ export default function Perfil() {
               display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
               overflow: "hidden",
             }}>
-              {profile.avatar
-                ? <img src={profile.avatar} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              {displayAvatar
+                ? <img src={displayAvatar} alt="Avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : <User style={{ width: 30, height: 30, color: "#94a3b8" }} />
               }
             </div>
-            <div className="flex flex-col gap-0.5">
-              <p className="text-white font-syne font-bold group-hover:opacity-80 transition-opacity" style={{ fontSize: 15, letterSpacing: "0.3px" }}>
-                {profile.name}
-              </p>
-              <p style={{ fontSize: 12, color: "#71717a", fontWeight: 400 }}>
-                +258 {formatPhone(profile.phone)}
-              </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+              <span className="text-white font-syne font-bold group-hover:opacity-80 transition-opacity" style={{ fontSize: 15, letterSpacing: "0.3px", margin: 0, padding: 0 }}>
+                {displayName.toUpperCase()}
+              </span>
+              <span style={{ fontSize: 12, color: "#71717a", fontWeight: 400, margin: 0, padding: 0 }}>
+                +258 {formatPhone(displayPhone)}
+              </span>
             </div>
           </button>
 
@@ -220,7 +192,6 @@ export default function Perfil() {
                   ))}
                 </div>
 
-                {/* Quick access ferramentas */}
                 <div className="mt-5">
                   <button onClick={() => setFerramentasOpen(true)}
                     className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-100"
@@ -261,10 +232,7 @@ export default function Perfil() {
                           : "border-slate-100 bg-white hover:bg-slate-50"
                       }`}>
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{
-                          background: danger ? "#fef2f2" : "#f7f8fa",
-                          border: danger ? "1px solid #fecaca" : "1px solid #e2e8f0",
-                        }}>
+                        style={{ background: danger ? "#fef2f2" : "#f7f8fa", border: danger ? "1px solid #fecaca" : "1px solid #e2e8f0" }}>
                         <Icon style={{ width: 18, height: 18, color: danger ? "#dc2626" : "#111" }} />
                       </div>
                       <div className="flex-1 min-w-0">
