@@ -14,6 +14,15 @@ function generateInviteCode(): string {
   return code;
 }
 
+function saveSession(req: any): Promise<void> {
+  return new Promise((resolve, reject) => {
+    req.session.save((err: Error | null) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
 router.post("/register", async (req, res) => {
   const { full_name, email, phone, password, invite_code_used } = req.body;
 
@@ -64,11 +73,15 @@ router.post("/register", async (req, res) => {
     })
     .returning();
 
-  const sess = req.session as any;
-  sess.userId = profile.id;
-
-  const { password_hash: _ph, ...safeProfile } = profile;
-  return res.status(201).json({ user: { id: profile.id, email: profile.email }, profile: safeProfile });
+  req.session.regenerate((err) => {
+    if (err) return res.status(500).json({ error: "Erro ao criar sessão." });
+    (req.session as any).userId = profile.id;
+    req.session.save((saveErr) => {
+      if (saveErr) return res.status(500).json({ error: "Erro ao guardar sessão." });
+      const { password_hash: _ph, ...safeProfile } = profile;
+      return res.status(201).json({ user: { id: profile.id, email: profile.email }, profile: safeProfile });
+    });
+  });
 });
 
 router.post("/login", async (req, res) => {
@@ -95,11 +108,15 @@ router.post("/login", async (req, res) => {
     return res.status(401).json({ error: "Email ou palavra-passe incorretos." });
   }
 
-  const sess = req.session as any;
-  sess.userId = profile.id;
-
-  const { password_hash: _ph, ...safeProfile } = profile;
-  return res.json({ user: { id: profile.id, email: profile.email }, profile: safeProfile });
+  req.session.regenerate((err) => {
+    if (err) return res.status(500).json({ error: "Erro ao criar sessão." });
+    (req.session as any).userId = profile.id;
+    req.session.save((saveErr) => {
+      if (saveErr) return res.status(500).json({ error: "Erro ao guardar sessão." });
+      const { password_hash: _ph, ...safeProfile } = profile;
+      return res.json({ user: { id: profile.id, email: profile.email }, profile: safeProfile });
+    });
+  });
 });
 
 router.post("/logout", (req, res) => {
@@ -123,7 +140,7 @@ router.get("/me", async (req, res) => {
     .limit(1);
 
   if (!profile) {
-    sess.destroy(() => {});
+    req.session.destroy(() => {});
     return res.status(401).json({ error: "Utilizador não encontrado." });
   }
 
