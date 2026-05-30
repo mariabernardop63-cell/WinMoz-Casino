@@ -749,7 +749,7 @@ const SLIDES = [
     badgeDot: "#00D4B4",
     badgeText: "#FFFFFF",
     subtitleColor: "rgba(255,255,255,0.82)",
-    title: "Converse em\ngrupo agora!",
+    title: "Conversas\nem Grupo!",
     subtitle: "Estratégias, amigos e diversão em tempo real.",
     cta: "Conversar",
   },

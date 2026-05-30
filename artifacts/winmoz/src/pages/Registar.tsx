@@ -3,7 +3,7 @@ import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, X, ArrowLeft, ShieldCheck, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { DEMO_EMAIL, DEMO_STORAGE_KEY } from "@/contexts/AuthContext";
+import { useAuth, DEMO_EMAIL, DEMO_STORAGE_KEY } from "@/contexts/AuthContext";
 
 function PokerLogo() {
   return (
@@ -27,6 +27,7 @@ const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Registar() {
   const [, setLocation] = useLocation();
+  const { forceRefresh } = useAuth();
 
   const [step, setStep] = useState(1);
   const [dir, setDir] = useState(1);
@@ -94,6 +95,34 @@ export default function Registar() {
       if (nome.trim().length < 4) errs.nome = "O nome deve ter pelo menos 4 caracteres";
       if (!emailRe.test(email.trim())) errs.email = "Formato de email inválido";
       if (Object.keys(errs).length) { setErrors(errs); return; }
+
+      const normEmail = email.trim().toLowerCase();
+      const isDemoEmail = normEmail === DEMO_EMAIL;
+
+      if (!isDemoEmail) {
+        setLoading(true);
+        const { error: signInErr } = await supabase.auth.signInWithPassword({
+          email: normEmail,
+          password: "__winmoz_check_only__",
+        });
+        setLoading(false);
+
+        if (signInErr) {
+          const msg = signInErr.message ?? "";
+          if (
+            msg.includes("Email not confirmed") ||
+            msg.includes("email not confirmed")
+          ) {
+            setErrors({ email: "Este email já está registado mas não confirmado. Verifique a sua caixa de entrada." });
+            return;
+          }
+        } else {
+          setErrors({ email: "Este email já está registado. Por favor, inicie sessão." });
+          await supabase.auth.signOut();
+          return;
+        }
+      }
+
       setDir(1); setStep(2); setErrors({});
 
     } else if (step === 2) {
@@ -117,7 +146,7 @@ export default function Registar() {
       }
 
       setLoading(true);
-      const { error } = await supabase.auth.signUp({
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
@@ -132,10 +161,17 @@ export default function Registar() {
 
       if (error) {
         if (error.message.includes("already registered") || error.message.includes("already been registered")) {
-          setGeneralError("Este email já está registado. Tente iniciar sessão.");
+          setGeneralError("Este email já está registado. Por favor, inicie sessão.");
+          setDir(-1); setStep(1);
         } else {
           setGeneralError(error.message);
         }
+        return;
+      }
+
+      if (signUpData.user && (signUpData.user.identities?.length === 0)) {
+        setGeneralError("Este email já está registado. Por favor, inicie sessão.");
+        setDir(-1); setStep(1);
         return;
       }
 
@@ -150,6 +186,7 @@ export default function Registar() {
 
       if (isDemoEmail) {
         localStorage.setItem(DEMO_STORAGE_KEY, "true");
+        await forceRefresh();
         setLocation("/splash");
         return;
       }
@@ -160,7 +197,6 @@ export default function Registar() {
 
       let verifyError: any = null;
 
-      // Try 'signup' type first (used when account was created with signUp())
       const { error: err1 } = await supabase.auth.verifyOtp({
         email: email.trim().toLowerCase(),
         token,
@@ -168,13 +204,16 @@ export default function Registar() {
       });
 
       if (err1) {
-        // Fallback: try 'email' type (used with signInWithOtp)
         const { error: err2 } = await supabase.auth.verifyOtp({
           email: email.trim().toLowerCase(),
           token,
           type: "email",
         });
         verifyError = err2;
+      }
+
+      if (!verifyError) {
+        await forceRefresh();
       }
 
       setLoading(false);

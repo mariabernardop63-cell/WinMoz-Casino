@@ -2,8 +2,8 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase, type Profile } from "@/lib/supabase";
 
-const DEMO_EMAIL = "12345678@gmail.com";
-const DEMO_STORAGE_KEY = "winmoz_demo_mode";
+export const DEMO_EMAIL = "12345678@gmail.com";
+export const DEMO_STORAGE_KEY = "winmoz_demo_mode";
 
 const DEMO_PROFILE: Profile = {
   id: "demo-user-id",
@@ -31,6 +31,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   refreshProfile: () => Promise<void>;
+  forceRefresh: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -81,6 +82,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) await loadProfile(user);
   };
 
+  const forceRefresh = async () => {
+    if (localStorage.getItem(DEMO_STORAGE_KEY) === "true") {
+      setUser(DEMO_USER);
+      setProfile(DEMO_PROFILE);
+      setLoading(false);
+      return;
+    }
+    const { data: { session: s } } = await supabase.auth.getSession();
+    setSession(s);
+    const u = s?.user ?? null;
+    setUser(u);
+    if (u) {
+      await loadProfile(u);
+    } else {
+      setProfile(null);
+    }
+    setLoading(false);
+  };
+
   const signOut = async () => {
     if (localStorage.getItem(DEMO_STORAGE_KEY) === "true") {
       localStorage.removeItem(DEMO_STORAGE_KEY);
@@ -115,12 +135,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setSession(session);
         const u = session?.user ?? null;
         setUser(u);
         if (u) {
-          loadProfile(u);
+          await loadProfile(u);
         } else {
           setProfile(null);
         }
@@ -131,7 +151,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, refreshProfile, signOut }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, refreshProfile, forceRefresh, signOut }}>
       {children}
     </AuthContext.Provider>
   );
@@ -142,5 +162,3 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be inside AuthProvider");
   return ctx;
 }
-
-export { DEMO_EMAIL, DEMO_STORAGE_KEY };

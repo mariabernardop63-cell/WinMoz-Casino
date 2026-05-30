@@ -10,6 +10,7 @@ import Explorar from "@/pages/Explorar";
 import Login from "@/pages/Login";
 import Registar from "@/pages/Registar";
 import EsqueceuSenha from "@/pages/EsqueceuSenha";
+import RedefinirSenha from "@/pages/RedefinirSenha";
 import OTP from "@/pages/OTP";
 import SplashScreen from "@/pages/SplashScreen";
 import Perfil from "@/pages/Perfil";
@@ -39,6 +40,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/registar" component={Registar} />
       <Route path="/esqueceu-senha" component={EsqueceuSenha} />
+      <Route path="/redefinir-senha" component={RedefinirSenha} />
       <Route path="/otp" component={OTP} />
       <Route path="/splash" component={SplashScreen} />
 

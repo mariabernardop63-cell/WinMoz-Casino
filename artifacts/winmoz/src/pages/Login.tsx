@@ -3,7 +3,7 @@ import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { DEMO_EMAIL, DEMO_STORAGE_KEY } from "@/contexts/AuthContext";
+import { useAuth, DEMO_EMAIL, DEMO_STORAGE_KEY } from "@/contexts/AuthContext";
 
 function PokerLogo() {
   return (
@@ -21,6 +21,7 @@ const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const { forceRefresh } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,6 +45,7 @@ export default function Login() {
 
     if (isDemoEmail) {
       localStorage.setItem(DEMO_STORAGE_KEY, "true");
+      await forceRefresh();
       setLoading(false);
       setLocation("/");
       return;
@@ -54,19 +56,20 @@ export default function Login() {
       password,
     });
 
-    setLoading(false);
-
     if (error) {
+      setLoading(false);
       if (error.message.includes("Invalid login credentials") || error.message.includes("invalid_credentials")) {
         setErrors({ general: "Email ou palavra-passe incorretos." });
       } else if (error.message.includes("Email not confirmed")) {
-        setErrors({ general: "Email ainda não confirmado. Verifique o seu email." });
+        setErrors({ general: "Email ainda não confirmado. Verifique a sua caixa de entrada." });
       } else {
         setErrors({ general: error.message });
       }
       return;
     }
 
+    await forceRefresh();
+    setLoading(false);
     setLocation("/");
   };
 
