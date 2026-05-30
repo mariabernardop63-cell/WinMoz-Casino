@@ -4,9 +4,25 @@ import net from "net";
 const FRONTEND_PORT = 5000;
 const BACKEND_PORT = 3000;
 const PROXY_PORT = 8081;
+const RETRY_ATTEMPTS = 6;
+const RETRY_DELAY_MS = 500;
 
-function buildHeaders(req, targetPort) {
-  const headers = { ...req.headers };
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildHeaders(req, targetPort, bodyLength) {
+  const headers = {};
+  for (const [key, value] of Object.entries(req.headers)) {
+    const lk = key.toLowerCase();
+    // drop hop-by-hop headers that should not be forwarded
+    if (lk === "transfer-encoding" || lk === "connection" || lk === "keep-alive" || lk === "upgrade" || lk === "proxy-authorization") {
+      continue;
+    }
+    headers[lk] = value;
+  }
+  // set a definite content-length (we have the full body buffered)
+  headers["content-length"] = String(bodyLength);
   if (targetPort === BACKEND_PORT) {
     headers["x-forwarded-proto"] = "https";
     headers["x-forwarded-host"] = req.headers.host || "";
@@ -14,34 +30,69 @@ function buildHeaders(req, targetPort) {
   return headers;
 }
 
-function forward(req, res, targetPort) {
-  const options = {
-    hostname: "localhost",
-    port: targetPort,
-    path: req.url,
-    method: req.method,
-    headers: buildHeaders(req, targetPort),
-  };
+function forwardOnce(req, body, targetPort) {
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: "localhost",
+      port: targetPort,
+      path: req.url,
+      method: req.method,
+      headers: buildHeaders(req, targetPort, body.length),
+    };
 
-  const proxyReq = http.request(options, (proxyRes) => {
-    res.writeHead(proxyRes.statusCode, proxyRes.headers);
-    proxyRes.pipe(res, { end: true });
+    const proxyReq = http.request(options, (proxyRes) => {
+      resolve(proxyRes);
+    });
+
+    proxyReq.on("error", reject);
+    if (body.length > 0) {
+      proxyReq.write(body);
+    }
+    proxyReq.end();
   });
+}
 
-  proxyReq.on("error", (err) => {
-    res.writeHead(502);
-    res.end(`Proxy error: ${err.message}`);
-  });
+async function forward(req, res, targetPort) {
+  // buffer the entire request body first
+  const chunks = [];
+  try {
+    for await (const chunk of req) {
+      chunks.push(chunk);
+    }
+  } catch {
+    // request aborted
+    return;
+  }
+  const body = Buffer.concat(chunks);
 
-  req.pipe(proxyReq, { end: true });
+  let lastErr;
+  for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      await sleep(RETRY_DELAY_MS);
+    }
+    try {
+      const proxyRes = await forwardOnce(req, body, targetPort);
+      if (!res.headersSent) {
+        res.writeHead(proxyRes.statusCode, proxyRes.headers);
+        proxyRes.pipe(res, { end: true });
+      }
+      return;
+    } catch (err) {
+      lastErr = err;
+      const transient = err.code === "ECONNREFUSED" || err.code === "ECONNRESET" || err.code === "ETIMEDOUT" || err.code === "ENOTFOUND";
+      if (!transient) break;
+    }
+  }
+
+  if (!res.headersSent) {
+    res.writeHead(503);
+    res.end(JSON.stringify({ error: "Serviço temporariamente indisponível. Tente novamente." }));
+  }
 }
 
 const proxy = http.createServer((req, res) => {
-  if (req.url && req.url.startsWith("/api")) {
-    forward(req, res, BACKEND_PORT);
-  } else {
-    forward(req, res, FRONTEND_PORT);
-  }
+  const isApi = req.url && req.url.startsWith("/api");
+  forward(req, res, isApi ? BACKEND_PORT : FRONTEND_PORT);
 });
 
 proxy.on("upgrade", (req, socket, head) => {

@@ -56,6 +56,18 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:3000",
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader("x-forwarded-proto", "https");
+            proxyReq.setHeader("x-forwarded-host", proxyReq.getHeader("host") || "");
+          });
+          proxy.on("error", (_err, _req, res) => {
+            if ("writeHead" in res && typeof res.writeHead === "function") {
+              res.writeHead(503, { "Content-Type": "application/json" });
+              res.end(JSON.stringify({ error: "Serviço temporariamente indisponível. Tente novamente." }));
+            }
+          });
+        },
       },
     },
   },
