@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, X, ArrowLeft, ShieldCheck, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { authApi } from "@/lib/api";
 import { useAuth, DEMO_EMAIL, DEMO_STORAGE_KEY } from "@/contexts/AuthContext";
 
 function PokerLogo() {
@@ -38,25 +38,15 @@ export default function Registar() {
   const [invite, setInvite] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [digits, setDigits] = useState(["", "", "", "", "", ""]);
 
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [focused, setFocused] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [resendTimer, setResendTimer] = useState(60);
-  const [canResend, setCanResend] = useState(false);
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState("");
 
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
-
-  useEffect(() => {
-    if (step !== 4) return;
-    if (resendTimer <= 0) { setCanResend(true); return; }
-    const t = setTimeout(() => setResendTimer(v => v - 1), 1000);
-    return () => clearTimeout(t);
-  }, [resendTimer, step]);
 
   const inputStyle = (field: string): React.CSSProperties => ({
     width: "100%",
@@ -95,34 +85,6 @@ export default function Registar() {
       if (nome.trim().length < 4) errs.nome = "O nome deve ter pelo menos 4 caracteres";
       if (!emailRe.test(email.trim())) errs.email = "Formato de email inválido";
       if (Object.keys(errs).length) { setErrors(errs); return; }
-
-      const normEmail = email.trim().toLowerCase();
-      const isDemoEmail = normEmail === DEMO_EMAIL;
-
-      if (!isDemoEmail) {
-        setLoading(true);
-        const { error: signInErr } = await supabase.auth.signInWithPassword({
-          email: normEmail,
-          password: "__winmoz_check_only__",
-        });
-        setLoading(false);
-
-        if (signInErr) {
-          const msg = signInErr.message ?? "";
-          if (
-            msg.includes("Email not confirmed") ||
-            msg.includes("email not confirmed")
-          ) {
-            setErrors({ email: "Este email já está registado mas não confirmado. Verifique a sua caixa de entrada." });
-            return;
-          }
-        } else {
-          setErrors({ email: "Este email já está registado. Por favor, inicie sessão." });
-          await supabase.auth.signOut();
-          return;
-        }
-      }
-
       setDir(1); setStep(2); setErrors({});
 
     } else if (step === 2) {
@@ -139,133 +101,38 @@ export default function Registar() {
       const isDemoEmail = email.trim().toLowerCase() === DEMO_EMAIL;
 
       if (isDemoEmail) {
-        setDir(1); setStep(4); setErrors({});
-        setResendTimer(60);
-        setCanResend(false);
-        return;
-      }
-
-      setLoading(true);
-      const { data: signUpData, error } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
-        password,
-        options: {
-          data: {
-            full_name: nome.trim(),
-            phone: phone,
-            invite_code_used: invite || null,
-          },
-        },
-      });
-      setLoading(false);
-
-      if (error) {
-        if (error.message.includes("already registered") || error.message.includes("already been registered")) {
-          setGeneralError("Este email já está registado. Por favor, inicie sessão.");
-          setDir(-1); setStep(1);
-        } else {
-          setGeneralError(error.message);
-        }
-        return;
-      }
-
-      if (signUpData.user && (signUpData.user.identities?.length === 0)) {
-        setGeneralError("Este email já está registado. Por favor, inicie sessão.");
-        setDir(-1); setStep(1);
-        return;
-      }
-
-      setDir(1); setStep(4); setErrors({});
-      setResendTimer(60);
-      setCanResend(false);
-
-    } else if (step === 4) {
-      if (digits.some(d => d === "")) return;
-
-      const isDemoEmail = email.trim().toLowerCase() === DEMO_EMAIL;
-
-      if (isDemoEmail) {
         localStorage.setItem(DEMO_STORAGE_KEY, "true");
         await forceRefresh();
         setLocation("/splash");
         return;
       }
 
-      const token = digits.join("");
-
       setLoading(true);
-
-      let verifyError: any = null;
-
-      const { error: err1 } = await supabase.auth.verifyOtp({
-        email: email.trim().toLowerCase(),
-        token,
-        type: "signup",
-      });
-
-      if (err1) {
-        const { error: err2 } = await supabase.auth.verifyOtp({
+      try {
+        await authApi.register({
+          full_name: nome.trim(),
           email: email.trim().toLowerCase(),
-          token,
-          type: "email",
+          phone,
+          password,
+          invite_code_used: invite || undefined,
         });
-        verifyError = err2;
-      }
-
-      if (!verifyError) {
         await forceRefresh();
-      }
-
-      setLoading(false);
-
-      if (verifyError) {
-        if (verifyError.message?.includes("expired")) {
-          setGeneralError("O código expirou. Clica em 'Reenviar código' para receber um novo.");
-        } else if (verifyError.message?.includes("invalid") || verifyError.message?.includes("not found")) {
-          setGeneralError("Código incorrecto. Verifica o email e introduz os 6 dígitos exactos.");
+        setLoading(false);
+        setLocation("/splash");
+      } catch (err: any) {
+        setLoading(false);
+        const msg = err?.message ?? "";
+        if (msg.includes("já está registado")) {
+          setGeneralError("Este email já está registado. Por favor, inicie sessão.");
+          setDir(-1); setStep(1);
         } else {
-          setGeneralError("Não foi possível verificar o código. Tenta novamente.");
+          setGeneralError(msg || "Erro ao criar conta.");
         }
-        return;
       }
-
-      setLocation("/splash");
     }
   };
 
-  const handleResend = async () => {
-    if (!canResend) return;
-    setCanResend(false);
-    setResendTimer(60);
-    setDigits(["", "", "", "", "", ""]);
-    setGeneralError("");
-    await supabase.auth.resend({ email: email.trim().toLowerCase(), type: "signup" });
-    otpRefs.current[0]?.focus();
-  };
-
-  const handleDigit = (i: number, value: string) => {
-    const ch = value.replace(/\D/g, "").slice(-1);
-    const next = [...digits];
-    next[i] = ch;
-    setDigits(next);
-    if (ch && i < 5) otpRefs.current[i + 1]?.focus();
-  };
-  const handleOtpKey = (i: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !digits[i] && i > 0) otpRefs.current[i - 1]?.focus();
-  };
-  const handlePaste = (e: React.ClipboardEvent) => {
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (pasted.length) {
-      const next = ["", "", "", "", "", ""];
-      pasted.split("").forEach((ch, i) => { next[i] = ch; });
-      setDigits(next);
-      otpRefs.current[Math.min(pasted.length, 5)]?.focus();
-    }
-    e.preventDefault();
-  };
-
-  const otpComplete = digits.every(d => d !== "");
-  const progress = ((step - 1) / 3) * 100;
+  const progress = ((step - 1) / 2) * 100;
 
   return (
     <div className="min-h-screen bg-white w-full flex justify-center">
@@ -316,7 +183,6 @@ export default function Registar() {
                     style={inputStyle("email")} />
                   {errors.email && <p style={{ fontSize: 11.5, color: "#ef4444", marginTop: 5 }}>{errors.email}</p>}
                 </div>
-
               </motion.div>
             )}
 
@@ -352,6 +218,9 @@ export default function Registar() {
 
             {step === 3 && (
               <motion.div key="step3" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={slideTransition}>
+                <div style={{ width: 54, height: 54, borderRadius: "50%", background: "#f4f4f5", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+                  <ShieldCheck style={{ width: 24, height: 24, color: "#111" }} />
+                </div>
                 <h1 className="font-syne font-bold text-[26px] text-[#0a0a0a] leading-tight mb-1">Defina a sua Senha</h1>
                 <p className="text-[13.5px] text-slate-500 mb-7">Escolha uma senha forte para proteger a sua conta.</p>
 
@@ -387,74 +256,25 @@ export default function Registar() {
               </motion.div>
             )}
 
-            {step === 4 && (
-              <motion.div key="step4" custom={dir} variants={slideVariants} initial="enter" animate="center" exit="exit" transition={slideTransition}>
-                <div style={{ width: 54, height: 54, borderRadius: "50%", background: "#f4f4f5", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
-                  <ShieldCheck style={{ width: 24, height: 24, color: "#111" }} />
-                </div>
-                <h1 className="font-syne font-bold text-[26px] text-[#0a0a0a] leading-tight mb-2">Verificação Final</h1>
-                <p className="text-[13.5px] text-slate-500 mb-3 leading-relaxed">
-                  Enviámos um email para{" "}
-                  <span className="font-semibold text-[#111]">{email}</span>.
-                </p>
-                <div className="mb-6 p-3.5" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 0 }}>
-                  <p style={{ fontSize: 12.5, color: "#15803d", margin: 0, lineHeight: 1.6 }}>
-                    📧 Procura no email um <strong>código de 6 dígitos</strong>. Não cliques em nenhum link — introduz apenas o código aqui.
-                  </p>
-                </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 9, marginBottom: 20, width: "100%" }} onPaste={handlePaste}>
-                  {digits.map((digit, i) => (
-                    <input key={i}
-                      ref={el => { otpRefs.current[i] = el; }}
-                      type="text" inputMode="numeric" maxLength={1} value={digit}
-                      onChange={e => handleDigit(i, e.target.value)}
-                      onKeyDown={e => handleOtpKey(i, e)}
-                      onFocus={() => setFocused(`otp${i}`)} onBlur={() => setFocused(null)}
-                      style={{
-                        width: "100%", height: 54, borderRadius: 0,
-                        border: focused === `otp${i}` ? "1.5px solid #000" : digit ? "1.5px solid #111" : "1px solid #d1d5db",
-                        background: digit ? "#f9f9f9" : "#fff",
-                        fontSize: 20, fontWeight: 700, textAlign: "center", color: "#111",
-                        outline: "none", transition: "border 0.15s ease",
-                        fontFamily: "'Syne', sans-serif", boxSizing: "border-box",
-                      }} />
-                  ))}
-                </div>
-
-                <div className="flex justify-center mb-8">
-                  {canResend ? (
-                    <button onClick={handleResend}
-                      style={{ fontSize: 13, fontWeight: 600, color: "#000", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
-                      Reenviar código
-                    </button>
-                  ) : (
-                    <p style={{ fontSize: 13, color: "#9ca3af" }}>
-                      Reenviar em <span style={{ fontWeight: 600, color: "#374151" }}>00:{String(resendTimer).padStart(2, "0")}</span>
-                    </p>
-                  )}
-                </div>
-              </motion.div>
-            )}
           </AnimatePresence>
 
           <div className="pt-6">
             <button onClick={goNext}
-              disabled={(step === 4 && !otpComplete) || loading}
+              disabled={loading}
               style={{
                 width: "100%", padding: "15px",
-                background: (step === 4 && !otpComplete) || loading ? "#555" : "#000",
+                background: loading ? "#555" : "#000",
                 color: "#fff", fontSize: 14.5, fontWeight: 700, border: "none", borderRadius: 0,
-                cursor: ((step === 4 && !otpComplete) || loading) ? "default" : "pointer",
+                cursor: loading ? "default" : "pointer",
                 letterSpacing: "0.3px", fontFamily: "'Syne', sans-serif",
-                opacity: (step === 4 && !otpComplete) ? 0.42 : 1,
                 transition: "opacity 0.2s, background 0.2s",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
               }}>
               {loading ? (
                 <><Loader2 style={{ width: 16, height: 16, animation: "spin 1s linear infinite" }} /><span>A processar…</span></>
-              ) : step === 4 ? "Criar Conta" : "Próximo"}
+              ) : step === 3 ? "Criar Conta" : "Próximo"}
             </button>
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             {step === 1 && (
               <p className="text-center text-[13px] text-slate-500 mt-5">
                 Já tem conta?{" "}

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { authApi } from "@/lib/api";
 import { useAuth, DEMO_EMAIL, DEMO_STORAGE_KEY } from "@/contexts/AuthContext";
 
 function PokerLogo() {
@@ -51,26 +51,19 @@ export default function Login() {
       return;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
-
-    if (error) {
+    try {
+      await authApi.login(email.trim().toLowerCase(), password);
+      await forceRefresh();
+      setLocation("/");
+    } catch (err: any) {
       setLoading(false);
-      if (error.message.includes("Invalid login credentials") || error.message.includes("invalid_credentials")) {
+      const msg = err?.message ?? "";
+      if (msg.includes("incorretos") || msg.includes("credentials")) {
         setErrors({ general: "Email ou palavra-passe incorretos." });
-      } else if (error.message.includes("Email not confirmed")) {
-        setErrors({ general: "Email ainda não confirmado. Verifique a sua caixa de entrada." });
       } else {
-        setErrors({ general: error.message });
+        setErrors({ general: msg || "Erro ao iniciar sessão." });
       }
-      return;
     }
-
-    await forceRefresh();
-    setLoading(false);
-    setLocation("/");
   };
 
   const inputStyle = (field: "email" | "password"): React.CSSProperties => ({

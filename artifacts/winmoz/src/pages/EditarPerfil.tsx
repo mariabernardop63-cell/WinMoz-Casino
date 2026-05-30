@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, Camera, User, Check, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { authApi } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 function formatPhone(digits: string) {
@@ -63,46 +63,23 @@ export default function EditarPerfil() {
     setSaveError("");
 
     try {
-      let avatarUrl = profile?.avatar_url ?? null;
+      let avatarUrl: string | null = profile?.avatar_url ?? null;
 
       if (avatarFile) {
-        const ext = avatarFile.name.split(".").pop() ?? "jpg";
-        const path = `${user.id}/avatar.${ext}`;
-        const { error: uploadError } = await supabase.storage
-          .from("avatars")
-          .upload(path, avatarFile, { upsert: true, contentType: avatarFile.type });
-
-        if (uploadError) {
-          setSaveError("Erro ao enviar foto: " + uploadError.message);
-          setSaving(false);
-          return;
-        }
-
-        const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
-        avatarUrl = urlData.publicUrl + "?t=" + Date.now();
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((resolve) => {
+          reader.onload = ev => resolve(ev.target?.result as string);
+          reader.readAsDataURL(avatarFile);
+        });
+        avatarUrl = dataUrl;
       } else if (!avatar && profile?.avatar_url) {
         avatarUrl = null;
       }
 
-      const profileData = {
+      await authApi.updateProfile({
         full_name: name.trim(),
         phone: phone.replace(/\D/g, ""),
         avatar_url: avatarUrl,
-        updated_at: new Date().toISOString(),
-      };
-
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .upsert({ id: user.id, ...profileData }, { onConflict: "id" });
-
-      if (profileError) {
-        setSaveError("Erro ao guardar perfil: " + profileError.message);
-        setSaving(false);
-        return;
-      }
-
-      await supabase.auth.updateUser({
-        data: { full_name: name.trim(), phone: phone.replace(/\D/g, ""), avatar_url: avatarUrl },
       });
 
       await refreshProfile();
@@ -110,7 +87,7 @@ export default function EditarPerfil() {
       setSaved(true);
       setTimeout(() => { setSaved(false); setLocation("/perfil"); }, 1200);
     } catch (err: any) {
-      setSaveError("Erro inesperado: " + (err?.message ?? "tente novamente"));
+      setSaveError("Erro ao guardar perfil: " + (err?.message ?? "tente novamente"));
       setSaving(false);
     }
   };

@@ -1,14 +1,14 @@
 import http from "http";
 import net from "net";
-import { URL } from "url";
 
-const TARGET_PORT = 5000;
+const FRONTEND_PORT = 5000;
+const BACKEND_PORT = 3000;
 const PROXY_PORT = 8081;
 
-const proxy = http.createServer((req, res) => {
+function forward(req, res, targetPort) {
   const options = {
     hostname: "localhost",
-    port: TARGET_PORT,
+    port: targetPort,
     path: req.url,
     method: req.method,
     headers: req.headers,
@@ -25,10 +25,19 @@ const proxy = http.createServer((req, res) => {
   });
 
   req.pipe(proxyReq, { end: true });
+}
+
+const proxy = http.createServer((req, res) => {
+  if (req.url && req.url.startsWith("/api")) {
+    forward(req, res, BACKEND_PORT);
+  } else {
+    forward(req, res, FRONTEND_PORT);
+  }
 });
 
 proxy.on("upgrade", (req, socket, head) => {
-  const target = net.createConnection(TARGET_PORT, "localhost", () => {
+  const targetPort = (req.url && req.url.startsWith("/api")) ? BACKEND_PORT : FRONTEND_PORT;
+  const target = net.createConnection(targetPort, "localhost", () => {
     target.write(
       `${req.method} ${req.url} HTTP/1.1\r\n` +
         Object.entries(req.headers)
@@ -46,5 +55,5 @@ proxy.on("upgrade", (req, socket, head) => {
 });
 
 proxy.listen(PROXY_PORT, "0.0.0.0", () => {
-  console.log(`Proxy listening on port ${PROXY_PORT} → forwarding to ${TARGET_PORT}`);
+  console.log(`Proxy listening on port ${PROXY_PORT} → /api → ${BACKEND_PORT}, rest → ${FRONTEND_PORT}`);
 });

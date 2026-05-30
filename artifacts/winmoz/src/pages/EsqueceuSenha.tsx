@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Mail, CheckCircle, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { authApi } from "@/lib/api";
 
 function PokerLogo() {
   return (
@@ -34,20 +34,12 @@ export default function EsqueceuSenha() {
     setError("");
     setLoading(true);
 
-    const redirectTo = `${window.location.origin}/redefinir-senha`;
-
-    const { error: supaErr } = await supabase.auth.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      { redirectTo }
-    );
-
-    setLoading(false);
-
-    if (supaErr) {
-      setError("Não foi possível enviar o email. Tente novamente.");
-      return;
+    try {
+      await authApi.forgotPassword(email.trim().toLowerCase());
+    } catch {
     }
 
+    setLoading(false);
     setSent(true);
   };
 

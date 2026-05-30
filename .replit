@@ -59,26 +59,16 @@ timeoutMs = 20000
 
 [[ports]]
 localPort = 3000
-externalPort = 3001
+externalPort = 3000
 
 [[ports]]
 localPort = 5000
 externalPort = 5000
 
 [[ports]]
-localPort = 8080
-externalPort = 8080
-
-[[ports]]
 localPort = 8081
 externalPort = 80
-
-[[ports]]
-localPort = 8082
-externalPort = 3000
 
 [userenv]
 
 [userenv.shared]
-VITE_SUPABASE_URL = "https://oekucnfyckmzhirkqglq.supabase.co"
-VITE_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9la3VjbmZ5Y2ttemhpcmtxZ2xxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNjEzNjYsImV4cCI6MjA5NTYzNzM2Nn0.VucL5OCuOepGd4RExNe-wcVNGincMIqXl5NCPrDxHF0"

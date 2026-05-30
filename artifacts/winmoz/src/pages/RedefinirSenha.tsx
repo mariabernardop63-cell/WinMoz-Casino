@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, Loader2, CheckCircle, KeyRound } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { authApi } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 function PokerLogo() {
   return (
@@ -18,8 +19,7 @@ function PokerLogo() {
 
 export default function RedefinirSenha() {
   const [, setLocation] = useLocation();
-  const [ready, setReady] = useState(false);
-  const [invalidLink, setInvalidLink] = useState(false);
+  const { user, signOut } = useAuth();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -28,23 +28,6 @@ export default function RedefinirSenha() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
-
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setReady(true);
-      }
-    });
-
-    const timeoutId = setTimeout(() => {
-      if (!ready) setInvalidLink(true);
-    }, 5000);
-
-    return () => {
-      subscription.unsubscribe();
-      clearTimeout(timeoutId);
-    };
-  }, []);
 
   const inputStyle = (field: string): React.CSSProperties => ({
     width: "100%",
@@ -71,20 +54,39 @@ export default function RedefinirSenha() {
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-
-    if (error) {
-      setErrors({ general: "Não foi possível atualizar a senha. O link pode ter expirado." });
-      return;
+    try {
+      await authApi.resetPassword(password);
+      setDone(true);
+      setTimeout(async () => {
+        await signOut();
+        setLocation("/login");
+      }, 2500);
+    } catch (err: any) {
+      setErrors({ general: err?.message || "Não foi possível atualizar a senha." });
     }
-
-    setDone(true);
-    setTimeout(async () => {
-      await supabase.auth.signOut();
-      setLocation("/login");
-    }, 2500);
+    setLoading(false);
   };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-white w-full flex justify-center">
+        <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col px-6 pt-16 pb-10 relative">
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} className="flex justify-center mb-9">
+            <PokerLogo />
+          </motion.div>
+          <div style={{ width: 54, height: 54, background: "#fef2f2", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 22 }}>
+            <KeyRound style={{ width: 24, height: 24, color: "#dc2626" }} />
+          </div>
+          <h1 className="font-syne font-bold text-[26px] text-[#0a0a0a] leading-tight mb-2">Acesso Necessário</h1>
+          <p className="text-[13.5px] text-slate-500 mb-8">Precisa de iniciar sessão para redefinir a palavra-passe.</p>
+          <button onClick={() => setLocation("/login")}
+            style={{ width: "100%", padding: "15px", background: "#000", color: "#fff", fontSize: 14.5, fontWeight: 700, border: "none", borderRadius: 0, cursor: "pointer", letterSpacing: "0.3px", fontFamily: "'Syne', sans-serif" }}>
+            Iniciar Sessão
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white w-full flex justify-center">
@@ -112,43 +114,6 @@ export default function RedefinirSenha() {
               </div>
               <h1 className="font-syne font-bold text-[24px] text-[#0a0a0a] mb-3">Senha Atualizada!</h1>
               <p className="text-[13.5px] text-slate-500">A redirecionar para o login…</p>
-            </motion.div>
-          ) : invalidLink && !ready ? (
-            <motion.div
-              key="invalid"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.38 }}
-            >
-              <div style={{ width: 54, height: 54, background: "#fef2f2", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 22 }}>
-                <KeyRound style={{ width: 24, height: 24, color: "#dc2626" }} />
-              </div>
-              <h1 className="font-syne font-bold text-[26px] text-[#0a0a0a] leading-tight mb-2">Link Inválido</h1>
-              <p className="text-[13.5px] text-slate-500 mb-8">
-                Este link de recuperação expirou ou é inválido. Solicite um novo.
-              </p>
-              <button
-                onClick={() => setLocation("/esqueceu-senha")}
-                style={{
-                  width: "100%", padding: "15px", background: "#000", color: "#fff",
-                  fontSize: 14.5, fontWeight: 700, border: "none", borderRadius: 0,
-                  cursor: "pointer", letterSpacing: "0.3px", fontFamily: "'Syne', sans-serif",
-                }}
-              >
-                Solicitar Novo Link
-              </button>
-            </motion.div>
-          ) : !ready ? (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-              style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 80, gap: 16 }}
-            >
-              <div style={{ width: 40, height: 40, borderRadius: "50%", border: "3px solid #e5e7eb", borderTopColor: "#111", animation: "spin 0.8s linear infinite" }} />
-              <p style={{ fontSize: 13.5, color: "#9ca3af" }}>A verificar o link…</p>
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </motion.div>
           ) : (
             <motion.div
@@ -231,6 +196,7 @@ export default function RedefinirSenha() {
                   : "Guardar Nova Senha"
                 }
               </button>
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </motion.div>
           )}
         </AnimatePresence>
