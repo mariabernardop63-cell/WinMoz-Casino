@@ -522,7 +522,8 @@ export default function Apostar() {
         onCancel={() => setScreen("bet")}
         onMatched={() => {
           setScreen("matched");
-          setTimeout(() => setLocation("/"), 2200);
+          const dest = (gameId === "ludo" || gameId === "ludo-classic") ? "/ludo-jogo" : "/";
+          setTimeout(() => setLocation(dest), 2200);
         }}
       />
     );

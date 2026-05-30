@@ -28,6 +28,7 @@ import Notificacoes from "@/pages/Notificacoes";
 import GrupoChat from "@/pages/GrupoChat";
 import ScannerQR from "@/pages/ScannerQR";
 import Apostar from "@/pages/Apostar";
+import LudoGame from "@/pages/LudoGame";
 
 const queryClient = new QueryClient();
 
@@ -91,6 +92,9 @@ function Router() {
       </Route>
       <Route path="/scanner-qr">
         <ProtectedRoute><ScannerQR /></ProtectedRoute>
+      </Route>
+      <Route path="/ludo-jogo">
+        <ProtectedRoute><LudoGame /></ProtectedRoute>
       </Route>
 
       <Route component={NotFound} />
