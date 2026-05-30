@@ -23,19 +23,6 @@ interface Tx {
   method?: string;
 }
 
-const DEMO_TXS: Tx[] = [
-  { id: "WM001", type: "Depósito",  name: "Depósito M-Pesa",     date: "28 Maio 2026", rawDate: new Date("2026-05-28"), amount: 500,   sign: "+", state: "Aprovado",  method: "M-Pesa" },
-  { id: "WM002", type: "Aposta",    name: "Damas — Partida #44", date: "28 Maio 2026", rawDate: new Date("2026-05-28"), amount: 50,    sign: "-", state: "Recusado" },
-  { id: "WM003", type: "Aposta",    name: "Ludo — Torneio",      date: "27 Maio 2026", rawDate: new Date("2026-05-27"), amount: 100,   sign: "-", state: "Aprovado" },
-  { id: "WM004", type: "Levamento", name: "Levamento M-Pesa",    date: "27 Maio 2026", rawDate: new Date("2026-05-27"), amount: 200,   sign: "-", state: "Aprovado",  method: "M-Pesa" },
-  { id: "WM005", type: "Recarga",   name: "Recarga Conta",       date: "26 Maio 2026", rawDate: new Date("2026-05-26"), amount: 1000,  sign: "+", state: "Aprovado" },
-  { id: "WM006", type: "Aposta",    name: "Xadrez — Amigável",   date: "25 Maio 2026", rawDate: new Date("2026-05-25"), amount: 75,    sign: "-", state: "Aprovado" },
-  { id: "WM007", type: "Aposta",    name: "Damas — Clássico",    date: "25 Maio 2026", rawDate: new Date("2026-05-25"), amount: 200,   sign: "+", state: "Aprovado" },
-  { id: "WM008", type: "Depósito",  name: "Depósito M-Pesa",     date: "24 Maio 2026", rawDate: new Date("2026-05-24"), amount: 2000,  sign: "+", state: "Aprovado",  method: "M-Pesa" },
-  { id: "WM009", type: "Levamento", name: "Levamento M-Pesa",    date: "23 Maio 2026", rawDate: new Date("2026-05-23"), amount: 500,   sign: "-", state: "Pendente",  method: "M-Pesa" },
-  { id: "WM010", type: "Recarga",   name: "Bónus de Convite",    date: "22 Maio 2026", rawDate: new Date("2026-05-22"), amount: 5,     sign: "+", state: "Aprovado" },
-];
-
 function getIcon(type: string) {
   if (type === "Depósito") return { Icon: ArrowDownLeft, color: "#22c55e" };
   if (type === "Levamento") return { Icon: ArrowUpRight, color: "#ef4444" };
@@ -73,19 +60,28 @@ export default function Extratos() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    const stored = JSON.parse(localStorage.getItem("winmoz_transactions") || "[]");
-    const mapped: Tx[] = stored.map((t: any, i: number) => ({
-      id: t.id || `TX${i}`,
-      type: t.type || "Depósito",
-      name: `${t.type || "Depósito"} ${t.method ? `(${t.method})` : ""}`.trim(),
-      date: t.date || new Date().toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" }),
-      rawDate: new Date(t.date || Date.now()),
-      amount: Math.abs(t.amount || 0),
-      sign: t.type === "Levamento" || t.type === "Aposta" ? "-" : "+",
-      state: t.state || "Aprovado",
-      method: t.method,
-    }));
-    setTransactions([...mapped, ...DEMO_TXS]);
+    try {
+      const stored = JSON.parse(localStorage.getItem("winmoz_transactions") || "[]");
+      if (!Array.isArray(stored) || stored.length === 0) {
+        setTransactions([]);
+        return;
+      }
+      const mapped: Tx[] = stored.map((t: any, i: number) => ({
+        id: t.id || `TX${String(i + 1).padStart(3, "0")}`,
+        type: t.type || "Depósito",
+        name: t.name || `${t.type || "Depósito"}${t.method ? ` (${t.method})` : ""}`.trim(),
+        date: t.date || new Date().toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" }),
+        rawDate: new Date(t.rawDate || t.date || Date.now()),
+        amount: Math.abs(t.amount || 0),
+        sign: (t.type === "Levamento" || t.type === "Aposta") ? "-" : "+",
+        state: t.state || "Aprovado",
+        method: t.method,
+      }));
+      mapped.sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime());
+      setTransactions(mapped);
+    } catch {
+      setTransactions([]);
+    }
   }, []);
 
   const filtered = transactions.filter(tx => {
@@ -174,9 +170,20 @@ export default function Extratos() {
         {/* Transactions list */}
         <div className="flex-1 px-5 pb-10 overflow-y-auto">
           {Object.keys(grouped).length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16">
-              <SlidersHorizontal style={{ width: 40, height: 40, color: "#3a3a3a" }} />
-              <p className="text-white/30 text-sm mt-3">Nenhuma transação encontrada</p>
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#1c1c1c", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <SlidersHorizontal style={{ width: 24, height: 24, color: "#3a3a3a" }} />
+              </div>
+              <p className="text-white/30 text-sm font-semibold" style={{ fontFamily: "'Syne', sans-serif" }}>
+                {activeFilter !== "Todos" || search
+                  ? "Nenhuma transação encontrada"
+                  : "Sem movimentos ainda"}
+              </p>
+              <p className="text-white/20 text-xs text-center" style={{ maxWidth: 220 }}>
+                {activeFilter !== "Todos" || search
+                  ? "Tente outro filtro ou termo de pesquisa."
+                  : "As suas transações aparecerão aqui depois do primeiro depósito ou aposta."}
+              </p>
             </div>
           ) : (
             Object.entries(grouped).map(([date, txs]) => (
@@ -193,12 +200,10 @@ export default function Extratos() {
                         <button onClick={() => setExpandedId(expanded ? null : tx.id)}
                           className="w-full flex items-center gap-3 p-3.5 rounded-2xl text-left transition-all"
                           style={{ background: "#1c1c1c", border: expanded ? `1px solid ${color}40` : "1px solid transparent" }}>
-                          {/* Icon */}
                           <div className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
                             style={{ background: color + "15", border: `1px solid ${color}30` }}>
                             <Icon style={{ width: 18, height: 18, color }} />
                           </div>
-                          {/* Info */}
                           <div className="flex-1 min-w-0">
                             <p className="font-semibold text-white text-sm truncate">{tx.name}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
@@ -209,7 +214,6 @@ export default function Extratos() {
                               <span className="text-white/30 text-[10px]">{tx.id}</span>
                             </div>
                           </div>
-                          {/* Amount */}
                           <div className="flex flex-col items-end flex-shrink-0 gap-1">
                             <p className="font-bold text-sm" style={{ color: tx.sign === "+" ? "#22c55e" : "#ef4444" }}>
                               {tx.sign}{fmtMZN(tx.amount)}
@@ -218,7 +222,6 @@ export default function Extratos() {
                           </div>
                         </button>
 
-                        {/* Expanded details */}
                         <AnimatePresence>
                           {expanded && (
                             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
