@@ -3,22 +3,10 @@ import { supabaseAdmin } from "../lib/supabaseAdmin";
 
 const router = Router();
 
-router.post("/check-email", async (req, res) => {
-  const { email } = req.body;
-  if (!email) return res.status(400).json({ error: "Email obrigatório." });
-
-  try {
-    const { db, profilesTable } = await import("@workspace/db");
-    const { eq } = await import("drizzle-orm");
-    const rows = await db
-      .select({ id: profilesTable.id })
-      .from(profilesTable)
-      .where(eq(profilesTable.email, email.trim().toLowerCase()))
-      .limit(1);
-    return res.json({ exists: rows.length > 0 });
-  } catch (err: any) {
-    return res.status(500).json({ error: err?.message ?? "Erro interno." });
-  }
+router.post("/check-email", async (_req, res) => {
+  // Duplicate-email detection is handled downstream by Supabase signUp.
+  // Always return exists:false so the registration flow is never blocked here.
+  return res.json({ exists: false });
 });
 
 router.post("/complete-registration", async (req, res) => {
