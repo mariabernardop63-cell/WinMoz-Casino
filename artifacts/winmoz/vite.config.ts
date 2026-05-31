@@ -49,7 +49,10 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
-    hmr: isReplit ? false : true,
+    hmr: false,
+    headers: {
+      "Cache-Control": "no-store",
+    },
     fs: {
       strict: true,
     },
