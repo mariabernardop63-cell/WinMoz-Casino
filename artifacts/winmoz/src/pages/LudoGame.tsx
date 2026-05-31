@@ -43,10 +43,10 @@ function getPieceCoord(p: GamePiece): [number,number] {
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const Q = {
-  red:    { main:"#E01010", bg:"#CC0E0E" },
-  green:  { main:"#16A832", bg:"#128A29" },
-  blue:   { main:"#1565D8", bg:"#0F52C0" },
-  yellow: { main:"#D4B000", bg:"#B89800" },
+  red:    { main:"#E8181C", bg:"#C41014" },
+  green:  { main:"#1CBF3C", bg:"#15992E" },
+  blue:   { main:"#1565E8", bg:"#0F50CC" },
+  yellow: { main:"#F5C800", bg:"#D4AA00" },
 };
 const STRETCH = {
   red:    "#F87171",
@@ -198,8 +198,8 @@ function BoardSVG() {
   const coloredStarts = new Set(["13,6","1,8","6,1","8,13"]);
 
   // Decorative pawn centers inside home areas (SVG coords, center of each slot)
-  const redPawnCenters:   [number,number][] = [[1,1],[1,3],[3,1],[3,3]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]);
-  const yellowPawnCenters:[number,number][] = [[10,10],[10,12],[12,10],[12,12]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]);
+  const bluePawnCenters:  [number,number][] = [[10,1],[10,3],[12,1],[12,3]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]);
+  const greenPawnCenters: [number,number][] = [[2,10],[2,12],[4,10],[4,12]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]);
 
   return (
     <svg
@@ -225,7 +225,7 @@ function BoardSVG() {
         const fill = cellColor(r,c);
         return (
           <rect key={`${r},${c}`} x={x} y={y} width={CS} height={CS}
-            fill={fill} stroke="#BBBBBB" strokeWidth="0.6"/>
+            fill={fill} stroke="#CCCCCC" strokeWidth="0.8"/>
         );
       })}
 
@@ -283,14 +283,14 @@ function BoardSVG() {
       <rect x={404} y={404} width={152} height={152} rx={18} fill="white"/>
       <rect x={404} y={404} width={152} height={152} rx={18} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={1}/>
 
-      {/* ── Decorative Red pawns in red home ── */}
-      {redPawnCenters.map(([px,py],i)=>(
-        <DecoSVGPawn key={i} cx={px} cy={py} color="red"/>
+      {/* ── Decorative Blue pawns in blue home ── */}
+      {bluePawnCenters.map(([px,py],i)=>(
+        <DecoSVGPawn key={i} cx={px} cy={py} color="blue"/>
       ))}
 
-      {/* ── Decorative Yellow pawns in yellow home ── */}
-      {yellowPawnCenters.map(([px,py],i)=>(
-        <DecoSVGPawn key={i} cx={px} cy={py} color="yellow"/>
+      {/* ── Decorative Green pawns in green home ── */}
+      {greenPawnCenters.map(([px,py],i)=>(
+        <DecoSVGPawn key={i} cx={px} cy={py} color="green"/>
       ))}
 
       {/* ── Overall board border ── */}
@@ -300,7 +300,7 @@ function BoardSVG() {
 }
 
 // Inline SVG pawn for decorative use inside the board SVG
-function DecoSVGPawn({ cx, cy, color }: { cx:number; cy:number; color:"red"|"yellow" }) {
+function DecoSVGPawn({ cx, cy, color }: { cx:number; cy:number; color:"red"|"yellow"|"blue"|"green" }) {
   const p = PAWN_PALETTE[color];
   const r = 14; // pawn "radius" in SVG units
   const id = `deco_${color}_${cx}_${cy}`;
@@ -402,17 +402,25 @@ const DOT_POS: Record<number,[number,number][]> = {
   6: [[27,22],[73,22],[27,50],[73,50],[27,78],[73,78]],
 };
 
-function DiceFace({ value, sz }: { value:number; sz:number }) {
+function DiceFace({ value, sz, faceId }: { value:number; sz:number; faceId:string }) {
   const dots = DOT_POS[value] || [];
   return (
     <svg viewBox="0 0 100 100" width={sz} height={sz} style={{display:"block"}}>
       <defs>
-        <filter id="dotShadow">
-          <feDropShadow dx="0.8" dy="1.2" stdDeviation="1" floodOpacity="0.35"/>
+        <radialGradient id={`dot_${faceId}_${value}`} cx="35%" cy="30%" r="70%">
+          <stop offset="0%" stopColor="#444444"/>
+          <stop offset="100%" stopColor="#0a0a0a"/>
+        </radialGradient>
+        <filter id={`dotInset_${faceId}`}>
+          <feDropShadow dx="0.5" dy="0.8" stdDeviation="0.8" floodOpacity="0.55"/>
+          <feDropShadow dx="-0.3" dy="-0.3" stdDeviation="0.4" floodColor="white" floodOpacity="0.15"/>
         </filter>
       </defs>
       {dots.map(([cx,cy],i)=>(
-        <circle key={i} cx={cx} cy={cy} r={9.5} fill="#C0140C" filter="url(#dotShadow)"/>
+        <circle key={i} cx={cx} cy={cy} r={10}
+          fill={`url(#dot_${faceId}_${value})`}
+          filter={`url(#dotInset_${faceId})`}
+        />
       ))}
     </svg>
   );
@@ -439,25 +447,26 @@ function Dice3D({ value, rolling, onClick, active, sz=54 }: {
   },[rolling,value]);
 
   const tr = faceRot[disp]||{rx:0,ry:0};
+  // face: [value, transform, bg-color, shading-dir]
   const faces: [number,string,string][] = [
-    [1,`translateZ(${h}px)`,                "#FFFEF2"],
-    [6,`rotateY(180deg) translateZ(${h}px)`,"#F3EFE0"],
-    [2,`rotateX(90deg) translateZ(${h}px)`, "#FAF8EA"],
-    [5,`rotateX(-90deg) translateZ(${h}px)`,"#EEE9D6"],
-    [3,`rotateY(90deg) translateZ(${h}px)`, "#F6F3E2"],
-    [4,`rotateY(-90deg) translateZ(${h}px)`,"#F0ECDB"],
+    [1,`translateZ(${h}px)`,                "#FAFAF8"],
+    [6,`rotateY(180deg) translateZ(${h}px)`,"#F0EEE8"],
+    [2,`rotateX(90deg) translateZ(${h}px)`, "#F5F4F0"],
+    [5,`rotateX(-90deg) translateZ(${h}px)`,"#E8E6E0"],
+    [3,`rotateY(90deg) translateZ(${h}px)`, "#F2F0EB"],
+    [4,`rotateY(-90deg) translateZ(${h}px)`,"#ECEAE4"],
   ];
-  const rad = sz * 0.14;
+  const rad = sz * 0.17;
 
   return (
     <div
       onClick={active&&!rolling ? onClick : undefined}
       style={{
-        perspective:"300px", width:sz, height:sz,
+        perspective:"400px", width:sz, height:sz,
         cursor: active&&!rolling ? "pointer" : "default",
         filter: active
-          ? "drop-shadow(0 5px 12px rgba(0,0,0,0.6)) drop-shadow(0 2px 4px rgba(0,0,0,0.4))"
-          : "drop-shadow(0 2px 6px rgba(0,0,0,0.4))",
+          ? "drop-shadow(0 6px 16px rgba(0,0,0,0.7)) drop-shadow(0 2px 5px rgba(0,0,0,0.45))"
+          : "drop-shadow(0 3px 8px rgba(0,0,0,0.5))",
       }}
     >
       <motion.div
@@ -465,21 +474,25 @@ function Dice3D({ value, rolling, onClick, active, sz=54 }: {
         animate={rolling
           ? {rotateX:[0,-180,-360,tr.rx+360], rotateY:[0,180,360,tr.ry+360]}
           : {rotateX:tr.rx, rotateY:tr.ry}}
-        transition={rolling ? {duration:0.7,ease:"easeOut"} : {duration:0.12}}
+        transition={rolling ? {duration:0.75,ease:"easeOut"} : {duration:0.14}}
         style={{ width:sz, height:sz, transformStyle:"preserve-3d", position:"relative" }}
       >
         {faces.map(([v,t,bg])=>(
           <div key={v} style={{
             position:"absolute", inset:0,
-            background:`radial-gradient(circle at 32% 28%, #FFFFE8, ${bg})`,
+            background:`radial-gradient(ellipse at 30% 25%, #FFFFFF, ${bg} 60%, #D8D5CC)`,
             borderRadius:rad,
-            border:"1px solid rgba(160,145,100,0.4)",
+            border:"1px solid rgba(140,135,120,0.35)",
             display:"flex", alignItems:"center", justifyContent:"center",
             backfaceVisibility:"hidden",
             transform:t,
-            boxShadow:"inset 1.5px 1.5px 3px rgba(255,255,255,0.9), inset -1px -1px 3px rgba(0,0,0,0.14)",
+            boxShadow:[
+              "inset 2px 2px 5px rgba(255,255,255,0.95)",
+              "inset -2px -2px 5px rgba(0,0,0,0.18)",
+              "inset 1px 1px 0px rgba(255,255,255,0.6)",
+            ].join(", "),
           }}>
-            <DiceFace value={v} sz={sz*0.78}/>
+            <DiceFace value={v} sz={sz*0.76} faceId={`f${v}`}/>
           </div>
         ))}
       </motion.div>
