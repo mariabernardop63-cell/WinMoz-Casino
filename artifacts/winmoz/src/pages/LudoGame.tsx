@@ -33,15 +33,12 @@ const HOME_SLOTS: Record<Player,[number,number][]> = {
 };
 const SAFE_IDX = [0,9,13,18,26,35,39,44]; // game logic: no captures at these TRACK positions
 const SAFE_COORDS = new Set(SAFE_IDX.map(i=>`${TRACK[i][0]},${TRACK[i][1]}`));
-// Stars shown visually (reorganised — moved away from home areas, removed first-block stars)
+// Stars shown visually — exactly 4, one per coloured path arm
 const STAR_DISPLAY: [number,number][] = [
-  [8,2],   // near blue home  (was [8,1] → moved one back)
-  [5,6],   // left arm middle
-  [6,4],   // red arm        (was [6,1] → 3 squares forward)
-  [2,8],   // near green home (was [1,8] → moved one back)
-  [6,13],  // right arm
-  [8,10],  // near yellow home (was [8,13] → 3 squares forward)
-  [9,8],   // center bottom
+  [8,2],   // Red path:    left arm, bottom row,  3rd house from left border
+  [2,6],   // Green path:  top arm,  left column, 3rd house from top border
+  [6,12],  // Yellow path: right arm, top row,    3rd house from right border
+  [12,8],  // Blue path:   bottom arm, right col,  3rd house from bottom border
 ];
 // Wrapper size (px) for every pawn overlay — gives SelectionRing a solid anchor
 const PIECE_BOX = 44;
