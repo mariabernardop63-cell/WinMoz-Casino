@@ -505,132 +505,126 @@ function TrophySVG({ size=72 }:{size?:number}) {
   );
 }
 
-// ─── Premium Player Panel ──────────────────────────────────────────────────────
+// ─── Compact Game HUD Strip ────────────────────────────────────────────────────
 function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRoll,
   finished, lives, timeLeft, isHuman }:{
   player:Player; name:string; balance:string; isActive:boolean; diceValue:number|null;
   rolling:boolean; onRoll:()=>void; finished:number; lives:number; timeLeft:number; isHuman:boolean;
 }) {
-  const color:PawnColor = player==="blue"?"blue":"green";
-  const p = PAWN_PAL[color];
-  const accentColor = player==="blue" ? "#4F8EF7" : "#34D469";
-  const cardBg = player==="blue"
-    ? "linear-gradient(135deg,#0D1B3E 0%,#111F45 100%)"
-    : "linear-gradient(135deg,#0A2318 0%,#0F2E1E 100%)";
-  const borderColor = isActive ? accentColor+"88" : "rgba(255,255,255,0.09)";
+  const color:PawnColor   = player==="blue" ? "blue" : "green";
+  const p                 = PAWN_PAL[color];
+  const accentColor       = player==="blue" ? "#4F8EF7" : "#34D469";
+  const cardBg            = player==="blue"
+    ? "linear-gradient(120deg,#0B1730 0%,#0F2040 100%)"
+    : "linear-gradient(120deg,#091E14 0%,#0E2A1B 100%)";
+  const borderColor       = isActive ? accentColor+"70" : "rgba(255,255,255,0.08)";
 
   return (
     <div style={{
       display:"flex", alignItems:"center",
       background: cardBg,
-      borderRadius:14,
+      borderRadius:12,
       border:`1.5px solid ${borderColor}`,
       overflow:"hidden",
       boxShadow: isActive
-        ? `0 0 0 1px ${accentColor}33, 0 6px 24px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)`
-        : "0 2px 10px rgba(0,0,0,0.4)",
-      transition:"all 0.3s",
-      opacity: isActive ? 1 : 0.7,
-      gap:0,
+        ? `0 0 0 1px ${accentColor}22, 0 4px 16px rgba(0,0,0,0.5)`
+        : "0 2px 8px rgba(0,0,0,0.35)",
+      transition:"border-color 0.3s, box-shadow 0.3s",
+      opacity: isActive ? 1 : 0.68,
+      height: 52,
     }}>
+
       {/* Left accent bar */}
       <div style={{
         width:3, alignSelf:"stretch", flexShrink:0,
         background: isActive
-          ? `linear-gradient(180deg,${accentColor},${accentColor}88)`
-          : "rgba(255,255,255,0.08)",
+          ? `linear-gradient(180deg,${accentColor},${accentColor}55)`
+          : "rgba(255,255,255,0.07)",
         transition:"background 0.3s",
       }}/>
 
-      {/* Avatar */}
-      <div style={{ padding:"10px 8px", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-        <div style={{
-          width:40, height:40, borderRadius:11, flexShrink:0,
-          background:`linear-gradient(145deg,${p.m}1A,${p.d}33)`,
-          border:`1.5px solid ${isActive ? p.m+"66" : "rgba(255,255,255,0.1)"}`,
-          display:"flex", alignItems:"center", justifyContent:"center",
-          boxShadow: isActive ? `0 0 12px ${p.m}33` : "none",
-          transition:"all 0.3s",
-        }}>
-          <Pawn color={color} size={22}/>
-        </div>
+      {/* Pawn avatar — compact */}
+      <div style={{
+        width:34, height:34, borderRadius:9, flexShrink:0,
+        margin:"0 8px",
+        background:`${p.m}1A`,
+        border:`1.5px solid ${isActive ? p.m+"55" : "rgba(255,255,255,0.08)"}`,
+        display:"flex", alignItems:"center", justifyContent:"center",
+        transition:"border-color 0.3s",
+      }}>
+        <Pawn color={color} size={18}/>
       </div>
 
-      {/* Info */}
-      <div style={{ flex:1, padding:"9px 0", minWidth:0 }}>
-        {/* Name + badge */}
-        <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:4 }}>
+      {/* Name + stats — flex-1 */}
+      <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", gap:3 }}>
+        {/* Row 1: name + tag + balance */}
+        <div style={{ display:"flex", alignItems:"center", gap:5 }}>
           <span style={{
-            fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:13,
-            color: isActive ? "#F0F4FF" : "rgba(255,255,255,0.45)",
+            fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:12,
+            color: isActive ? "#EEF2FF" : "rgba(255,255,255,0.4)",
             lineHeight:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
-            maxWidth:88, transition:"color 0.3s", letterSpacing:0.2,
+            maxWidth:80, transition:"color 0.3s",
           }}>{name}</span>
           <span style={{
-            fontSize:7.5, fontWeight:800, letterSpacing:1, textTransform:"uppercase",
-            color: isHuman ? accentColor : "rgba(255,255,255,0.25)",
+            fontSize:7, fontWeight:700, letterSpacing:0.8, textTransform:"uppercase",
+            color: isHuman ? accentColor : "rgba(255,255,255,0.2)",
             background: isHuman ? `${accentColor}18` : "rgba(255,255,255,0.05)",
-            border:`1px solid ${isHuman ? accentColor+"40" : "rgba(255,255,255,0.08)"}`,
-            borderRadius:4, padding:"2px 5px", flexShrink:0,
+            border:`1px solid ${isHuman ? accentColor+"35" : "rgba(255,255,255,0.07)"}`,
+            borderRadius:3, padding:"1.5px 4px", flexShrink:0,
           }}>{isHuman?"Tu":"IA"}</span>
-        </div>
-
-        {/* Balance */}
-        <div style={{ marginBottom:5 }}>
           <span style={{
-            fontSize:11.5, fontWeight:700,
-            color: isActive ? accentColor : "rgba(255,255,255,0.25)",
-            fontFamily:"'Syne',sans-serif",
+            fontSize:10, fontWeight:600,
+            color: isActive ? accentColor : "rgba(255,255,255,0.2)",
+            fontFamily:"'Syne',sans-serif", flexShrink:0,
             transition:"color 0.3s",
           }}>{balance}</span>
         </div>
-
-        {/* Lives + pieces done */}
-        <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-          <div style={{ display:"flex", gap:2.5 }}>
+        {/* Row 2: lives ❤ + pieces ● */}
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:2 }}>
             {Array.from({length:5}).map((_,i)=>(
               <div key={i} style={{
-                width:5.5, height:5.5, borderRadius:"50%",
+                width:5, height:5, borderRadius:"50%",
                 background: i<lives ? "#F05555" : "rgba(255,255,255,0.1)",
-                boxShadow: i<lives ? "0 0 4px #F0555577" : "none",
-                transition:"all 0.3s",
+                boxShadow: i<lives ? "0 0 3px #F0555566" : "none",
+                transition:"all 0.25s",
               }}/>
             ))}
           </div>
-          <div style={{ width:1, height:9, background:"rgba(255,255,255,0.1)" }}/>
-          <div style={{ display:"flex", gap:2.5 }}>
+          <div style={{ width:1, height:8, background:"rgba(255,255,255,0.1)", flexShrink:0 }}/>
+          <div style={{ display:"flex", alignItems:"center", gap:2 }}>
             {Array.from({length:4}).map((_,i)=>(
               <motion.div key={i}
-                animate={{ scale: i===finished-1 ? [1,1.5,1] : 1 }}
-                transition={{ duration:0.3 }}
+                animate={{ scale: i===finished-1 ? [1,1.4,1] : 1 }}
+                transition={{ duration:0.25 }}
                 style={{
-                  width:5.5, height:5.5, borderRadius:"50%",
+                  width:5, height:5, borderRadius:"50%",
                   background: i<finished ? accentColor : "rgba(255,255,255,0.1)",
-                  boxShadow: i<finished ? `0 0 5px ${accentColor}88` : "none",
-                  transition:"background 0.3s, box-shadow 0.3s",
+                  boxShadow: i<finished ? `0 0 4px ${accentColor}77` : "none",
+                  transition:"background 0.25s",
                 }}/>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Timer + Dice */}
+      {/* Right: timer arc (human only) + dice */}
       <div style={{
-        padding:"8px 10px",
-        display:"flex", flexDirection:"column", alignItems:"center", gap:4,
-        flexShrink:0,
+        display:"flex", alignItems:"center", gap:5,
+        padding:"0 8px 0 4px", flexShrink:0,
       }}>
         {isHuman && isActive
-          ? <TimerArc timeLeft={timeLeft} size={26}/>
-          : <div style={{ height:26 }}/>
+          ? <TimerArc timeLeft={timeLeft} size={22}/>
+          : <div style={{ width:22 }}/>
         }
         <div style={{
-          background:"rgba(0,0,0,0.45)",
-          borderRadius:10, padding:"4px",
-          border:`1.5px solid ${isActive ? accentColor+"40" : "rgba(255,255,255,0.07)"}`,
-          boxShadow: isActive ? `0 0 10px ${accentColor}20` : "none",
+          background:"rgba(0,0,0,0.4)",
+          borderRadius:9, padding:"3px",
+          border:`1.5px solid ${isActive ? accentColor+"35" : "rgba(255,255,255,0.06)"}`,
+          boxShadow: isActive ? `0 0 8px ${accentColor}18` : "none",
+          transition:"border-color 0.3s",
         }}>
-          <Dice3D value={diceValue} rolling={rolling} onClick={onRoll} active={isActive} sz={40}/>
+          <Dice3D value={diceValue} rolling={rolling} onClick={onRoll} active={isActive} sz={34}/>
         </div>
       </div>
     </div>
@@ -1091,7 +1085,7 @@ export default function LudoGame() {
         </div>
 
         {/* ── Green panel (AI — top) */}
-        <div style={{ padding:"7px 12px 4px", flexShrink:0 }}>
+        <div style={{ padding:"5px 10px 3px", flexShrink:0 }}>
           <PlayerPanel
             player="green" name={opponentName} balance={opponentBal}
             isActive={turn==="green"&&!winner}
@@ -1102,20 +1096,17 @@ export default function LudoGame() {
           />
         </div>
 
-        {/* ── Status message */}
-        <div style={{ padding:"3px 12px 3px", flexShrink:0 }}>
+        {/* ── Status message — slim single line */}
+        <div style={{ padding:"2px 10px", flexShrink:0 }}>
           <AnimatePresence mode="wait">
             <motion.div key={msg}
-              initial={{opacity:0,y:-3}} animate={{opacity:1,y:0}} exit={{opacity:0,y:3}}
-              style={{
-                background:"rgba(6,14,38,0.75)",
-                border:"1px solid rgba(255,255,255,0.08)",
-                borderRadius:9, padding:"5px 12px",
-                textAlign:"center",
-              }}>
+              initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              transition={{duration:0.18}}
+              style={{ textAlign:"center" }}>
               <p style={{
-                fontSize:11, fontWeight:600,
-                color:"rgba(220,230,255,0.7)", letterSpacing:0.2,
+                fontSize:10.5, fontWeight:600,
+                color:"rgba(200,215,255,0.6)", letterSpacing:0.2,
+                lineHeight:1,
               }}>{msg}</p>
             </motion.div>
           </AnimatePresence>
@@ -1124,7 +1115,7 @@ export default function LudoGame() {
         {/* ── Board — takes remaining space, stays square */}
         <div style={{
           flex:1, minHeight:0,
-          padding:"0 10px",
+          padding:"0 8px",
           display:"flex", alignItems:"center", justifyContent:"center",
         }}>
           <div style={{ width:"100%", maxHeight:"100%", aspectRatio:"1" }}>
@@ -1132,24 +1123,24 @@ export default function LudoGame() {
           </div>
         </div>
 
-        {/* ── Turn indicator pill */}
-        <div style={{ padding:"3px 12px 2px", display:"flex", justifyContent:"center", flexShrink:0 }}>
+        {/* ── Turn indicator pill — merged with bottom spacing */}
+        <div style={{ padding:"2px 10px 2px", display:"flex", justifyContent:"center", flexShrink:0 }}>
           <motion.div
-            animate={{ opacity:[0.65,1,0.65] }}
+            animate={{ opacity:[0.6,1,0.6] }}
             transition={{ duration:1.8, repeat:Infinity }}
             style={{
-              display:"flex", alignItems:"center", gap:5,
-              background:"rgba(5,12,32,0.7)",
-              border:"1px solid rgba(255,255,255,0.09)",
-              borderRadius:20, padding:"4px 12px",
+              display:"flex", alignItems:"center", gap:4,
+              background:"rgba(5,12,32,0.65)",
+              border:"1px solid rgba(255,255,255,0.08)",
+              borderRadius:20, padding:"3px 10px",
             }}>
             <div style={{
-              width:5, height:5, borderRadius:"50%",
+              width:4.5, height:4.5, borderRadius:"50%",
               background: turn==="blue" ? "#4F8EF7" : "#34D469",
-              boxShadow: turn==="blue" ? "0 0 5px #4F8EF7" : "0 0 5px #34D469",
+              boxShadow: turn==="blue" ? "0 0 4px #4F8EF7" : "0 0 4px #34D469",
             }}/>
             <span style={{
-              fontSize:9.5, fontWeight:700, letterSpacing:1, textTransform:"uppercase",
+              fontSize:9, fontWeight:700, letterSpacing:0.8, textTransform:"uppercase",
               color: turn==="blue" ? "#4F8EF7" : "#34D469",
             }}>
               Vez de {turn==="blue" ? playerName.split(" ")[0] : opponentName}
@@ -1158,7 +1149,7 @@ export default function LudoGame() {
         </div>
 
         {/* ── Blue panel (human — bottom) */}
-        <div style={{ padding:"2px 12px 8px", flexShrink:0 }}>
+        <div style={{ padding:"2px 10px 7px", flexShrink:0 }}>
           <PlayerPanel
             player="blue" name={playerName} balance={playerBal}
             isActive={turn==="blue"&&!winner}
