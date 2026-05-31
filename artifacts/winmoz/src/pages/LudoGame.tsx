@@ -861,7 +861,7 @@ export default function LudoGame() {
       setTimeout(()=>{
         setPieces(prev=>prev.map(p=>p.id!==id?p:{...p,pos:curPos+s}));
         if(s===steps) setTimeout(onDone,140);
-      },s*200);
+      },s*270);
     }
   }
 
@@ -898,11 +898,11 @@ export default function LudoGame() {
     if(finishedCount(piecesRef.current,currentTurn)===4){
       setWinner(currentTurn); setPhase("done"); return;
     }
-    // Extra turn: rolled 6, captured opponent, or entered home triangle
-    const enteredTriangle = mover.pos>=51 && prevPos<=50;
-    const extraTurn = diceVal===6 || captured || enteredTriangle;
+    // Extra turn: rolled 6, captured opponent, or reached home centre (pos 57)
+    const enteredHome = mover.pos===57 && prevPos<57;
+    const extraTurn = diceVal===6 || captured || enteredHome;
     if(extraTurn){
-      const reason = diceVal===6 ? "tirou 6" : captured ? "capturou uma peça" : "entrou no triângulo";
+      const reason = diceVal===6 ? "tirou 6" : captured ? "capturou uma peça" : "chegou ao centro!";
       setMsg(`${currentTurn==="blue"?playerName.split(" ")[0]:opponentName} ${reason} — joga de novo!`);
       setMovable([]);
       setTimeout(()=>{setPhase("roll");if(currentTurn==="blue")setDiceBlue(null);else setDiceGreen(null);},400);

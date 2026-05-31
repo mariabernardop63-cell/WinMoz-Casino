@@ -59,33 +59,34 @@ function GameCard({ game }: { game: typeof jogosCards[0] }) {
     <motion.div
       variants={fadeUp}
       onClick={handlePlay}
-      className="flex items-center p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 group cursor-pointer"
+      className="flex items-center p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 group cursor-pointer"
     >
-      <div className="w-12 h-12 rounded-xl overflow-hidden shadow-md flex-shrink-0">
+      <div className="w-10 h-10 rounded-lg overflow-hidden shadow-sm flex-shrink-0">
         {game.image ? (
           <img src={game.image} alt={game.name} className="w-full h-full object-cover" />
         ) : (
-          <div className={`w-full h-full bg-gradient-to-br ${game.color} flex items-center justify-center text-white font-syne font-bold text-base`}>
+          <div className={`w-full h-full bg-gradient-to-br ${game.color} flex items-center justify-center text-white font-syne font-bold text-sm`}>
             {game.initials}
           </div>
         )}
       </div>
-      <div className="ml-3 flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <h4 className="font-syne font-bold text-slate-900 text-sm truncate">{game.name}</h4>
+      <div className="ml-2.5 flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <h4 className="font-syne font-bold text-slate-900 text-[13px] truncate">{game.name}</h4>
           {game.hot && (
-            <span className="bg-orange-50 text-orange-600 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-orange-200 flex-shrink-0 flex items-center gap-0.5">
-              <Zap className="w-2 h-2" /> QUENTE
+            <span className="bg-orange-50 text-orange-600 text-[8px] font-bold px-1 py-0.5 rounded-full border border-orange-200 flex-shrink-0 flex items-center gap-0.5">
+              <Zap className="w-2 h-2" /> HOT
             </span>
           )}
         </div>
-        <p className="text-[11px] text-slate-400 mt-0.5">{game.desc}</p>
-        <div className="flex items-center gap-1 mt-1">
-          <Users className="w-3 h-3 text-violet-400" />
-          <span className="text-[10px] text-violet-600 font-medium">{game.players}</span>
+        <div className="flex items-center gap-2 mt-0.5">
+          <span className="text-[10px] text-slate-400">{game.desc}</span>
+          <span className="text-[10px] text-violet-600 font-medium flex items-center gap-0.5">
+            <Users className="w-2.5 h-2.5" />{game.players}
+          </span>
         </div>
       </div>
-      <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-violet-500 transition-colors flex-shrink-0" />
+      <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-violet-500 transition-colors flex-shrink-0" />
     </motion.div>
   );
 }
@@ -98,33 +99,32 @@ function MatchCard({ match }: { match: typeof partidasTempoReal[0] }) {
   return (
     <motion.div
       variants={fadeUp}
-      className="flex items-center p-3.5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 group cursor-pointer"
+      className="flex items-center p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 group cursor-pointer"
     >
-      <div className="w-11 h-11 rounded-xl overflow-hidden shadow-md flex-shrink-0 relative">
+      <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 relative">
         {match.image ? (
           <img src={match.image} alt={match.game} className="w-full h-full object-cover" />
         ) : (
-          <div className={`w-full h-full bg-gradient-to-br ${match.color} flex items-center justify-center text-white font-syne font-bold text-sm`}>
+          <div className={`w-full h-full bg-gradient-to-br ${match.color} flex items-center justify-center text-white font-syne font-bold text-xs`}>
             {match.initials}
           </div>
         )}
-        <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse" />
+        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-white animate-pulse" />
       </div>
-      <div className="ml-3 flex-1 min-w-0">
-        <p className="font-syne font-bold text-slate-900 text-sm truncate">{match.players}</p>
-        <p className="text-[10px] text-slate-400 truncate">{match.game}</p>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-[9px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full border border-red-200">{match.status}</span>
-          <span className="flex items-center gap-0.5 text-[10px] text-slate-400"><Users className="w-2.5 h-2.5" /> {match.viewers}</span>
-          <span className="flex items-center gap-0.5 text-[10px] text-slate-400"><Clock className="w-2.5 h-2.5" /> {match.time}</span>
+      <div className="ml-2.5 flex-1 min-w-0">
+        <p className="font-syne font-semibold text-slate-900 text-[12px] truncate">{match.players}</p>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="text-[8.5px] font-bold text-red-600 bg-red-50 px-1 py-0.5 rounded border border-red-200">{match.status}</span>
+          <span className="text-[10px] text-slate-400">{match.game}</span>
+          <span className="flex items-center gap-0.5 text-[10px] text-slate-400"><Users className="w-2.5 h-2.5" />{match.viewers}</span>
         </div>
       </div>
-      <div className="flex flex-col items-end gap-1.5 flex-shrink-0 ml-2">
-        <span className="text-[10px] font-bold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">{match.bet}</span>
+      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+        <span className="text-[10px] font-bold text-violet-700">{match.bet}</span>
         <button
           onClick={(e) => { e.stopPropagation(); handleWatch(); }}
-          className="w-8 h-8 rounded-full bg-violet-700 hover:bg-violet-800 text-white flex items-center justify-center transition-colors shadow-md">
-          <Play className="w-3.5 h-3.5 ml-0.5" />
+          className="w-7 h-7 rounded-full bg-violet-700 hover:bg-violet-800 text-white flex items-center justify-center transition-colors">
+          <Play className="w-3 h-3 ml-0.5" />
         </button>
       </div>
     </motion.div>
@@ -473,17 +473,16 @@ export default function Explorar() {
 
         {/* HEADER — hidden when Chat tab is active */}
         {activeTab !== "Chat" && (
-        <div className="relative pt-10 pb-6 px-5"
+        <div className="relative pt-6 pb-4 px-4"
           style={{ background: "linear-gradient(160deg, #5B21B6 0%, #6D28D9 45%, #7C3AED 100%)" }}>
-          <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-white/5 -translate-y-1/2 translate-x-1/4 pointer-events-none" />
-          <h1 className="font-syne font-extrabold text-2xl text-white mb-5 relative z-10">Explorar</h1>
+          <h1 className="font-syne font-extrabold text-xl text-white mb-3 relative z-10">Explorar</h1>
           <div className="relative z-10">
-            <div className="flex items-center bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl px-4 py-3 gap-3">
-              <Search className="w-4 h-4 text-white/70 flex-shrink-0" />
+            <div className="flex items-center bg-white/15 backdrop-blur-sm border border-white/20 rounded-xl px-3 py-2.5 gap-2">
+              <Search className="w-3.5 h-3.5 text-white/70 flex-shrink-0" />
               <input
                 type="text" placeholder="Pesquisar jogos, partidas..." value={query}
                 onChange={e => setQuery(e.target.value)}
-                className="flex-1 bg-transparent text-white placeholder-white/50 text-sm outline-none font-medium"
+                className="flex-1 bg-transparent text-white placeholder-white/50 text-[13px] outline-none font-medium"
               />
             </div>
           </div>

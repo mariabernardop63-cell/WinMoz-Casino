@@ -8,13 +8,14 @@ router.post("/check-email", async (req, res) => {
   if (!email) return res.status(400).json({ error: "Email obrigatório." });
 
   try {
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers();
-    if (error) return res.status(500).json({ error: error.message });
-
-    const exists = data.users.some(
-      (u) => u.email?.toLowerCase() === email.trim().toLowerCase()
-    );
-    return res.json({ exists });
+    const { db, profilesTable } = await import("@workspace/db");
+    const { eq } = await import("drizzle-orm");
+    const rows = await db
+      .select({ id: profilesTable.id })
+      .from(profilesTable)
+      .where(eq(profilesTable.email, email.trim().toLowerCase()))
+      .limit(1);
+    return res.json({ exists: rows.length > 0 });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message ?? "Erro interno." });
   }

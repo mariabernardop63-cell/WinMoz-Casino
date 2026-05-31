@@ -250,7 +250,7 @@ export default function Registar() {
                   <ShieldCheck style={{ width: 24, height: 24, color: "#111" }} />
                 </div>
                 <h1 className="font-syne font-bold text-[26px] text-[#0a0a0a] leading-tight mb-1">Defina a sua Senha</h1>
-                <p className="text-[13.5px] text-slate-500 mb-7">Após criar a conta, receberá um link de verificação no seu email.</p>
+                <p className="text-[13.5px] text-slate-500 mb-7">Após criar a conta, receberá um código OTP de 6 dígitos no seu email.</p>
 
                 <div className="mb-4">
                   <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#374151", marginBottom: 7 }}>Palavra-passe</label>

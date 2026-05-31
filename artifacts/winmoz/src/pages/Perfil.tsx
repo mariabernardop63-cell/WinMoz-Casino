@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import {
   User, Eye, EyeOff,
   ArrowDownToLine, Plus, RefreshCw, MoreHorizontal,
-  ArrowUpRight, ArrowDownLeft, RefreshCcw,
+  ArrowUpRight, ArrowDownLeft,
   X, UserCog, UserPlus, FileText, Flag, Lock, HelpCircle, Settings, LogOut, ChevronRight, Shield, ScanLine,
-  Gamepad2, CreditCard,
+  Gamepad2,
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
@@ -116,11 +115,12 @@ export default function Perfil() {
                 : <User style={{ width: 30, height: 30, color: "#94a3b8" }} />
               }
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-              <span className="text-white font-syne font-bold group-hover:opacity-80 transition-opacity" style={{ fontSize: 15, letterSpacing: "0.3px", margin: 0, padding: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, alignItems: "flex-start" }}>
+              <span className="text-white font-syne font-bold group-hover:opacity-80 transition-opacity"
+                style={{ fontSize: 15, letterSpacing: "0.3px", lineHeight: 1, display: "block" }}>
                 {displayName.toUpperCase()}
               </span>
-              <span style={{ fontSize: 12, color: "#71717a", fontWeight: 400, margin: 0, padding: 0 }}>
+              <span style={{ fontSize: 12, color: "#71717a", fontWeight: 400, lineHeight: 1, display: "block" }}>
                 +258 {formatPhone(displayPhone)}
               </span>
             </div>
@@ -160,98 +160,90 @@ export default function Perfil() {
 
         {/* ── WHITE BOTTOM SHEET ── */}
         <div className="flex-1 px-5 pt-5 pb-32" style={{ background: "#ffffff", borderRadius: "28px 28px 0 0" }}>
-          <AnimatePresence mode="wait">
-            {!ferramentasOpen ? (
-              <motion.div key="transacoes" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-syne font-bold text-slate-900" style={{ fontSize: 16 }}>Transações</h2>
-                  <button onClick={() => setLocation("/extratos")}
-                    className="font-medium text-slate-400 hover:text-slate-700 transition-colors" style={{ fontSize: 12 }}>
-                    Ver todas
-                  </button>
-                </div>
-                <div className="flex flex-col gap-2.5">
-                  {transactions.map((tx, i) => (
-                    <motion.div key={tx.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 + i * 0.06, duration: 0.38 }}
-                      className="flex items-center gap-3 rounded-2xl px-4 py-3.5 border border-slate-100"
-                      style={{ background: "#f7f8fa" }}>
-                      <div style={{
-                        width: 38, height: 38, borderRadius: 999, background: "#fff",
-                        border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                      }}>
-                        <tx.icon style={{ width: 15, height: 15, color: tx.color }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-900 truncate" style={{ fontSize: 13 }}>{tx.name}</p>
-                        <p style={{ fontSize: 11, color: "#94a3b8" }}>{tx.type} · {tx.date}</p>
-                      </div>
-                      <p className="font-bold flex-shrink-0" style={{ fontSize: 13, color: tx.color }}>{tx.amount}</p>
-                    </motion.div>
-                  ))}
-                </div>
-
-                <div className="mt-5">
-                  <button onClick={() => setFerramentasOpen(true)}
-                    className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-100"
+          {!ferramentasOpen ? (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-syne font-bold text-slate-900" style={{ fontSize: 16 }}>Transações</h2>
+                <button onClick={() => setLocation("/extratos")}
+                  className="font-medium text-slate-400 hover:text-slate-700 transition-colors" style={{ fontSize: 12 }}>
+                  Ver todas
+                </button>
+              </div>
+              <div className="flex flex-col gap-2.5">
+                {transactions.map((tx) => (
+                  <div key={tx.id}
+                    className="flex items-center gap-3 rounded-2xl px-4 py-3.5 border border-slate-100"
                     style={{ background: "#f7f8fa" }}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-xl bg-slate-200 flex items-center justify-center">
-                        <Settings style={{ width: 14, height: 14, color: "#64748b" }} />
-                      </div>
-                      <span className="font-syne font-semibold text-slate-700 text-sm">Ferramentas da conta</span>
+                    <div style={{
+                      width: 38, height: 38, borderRadius: 999, background: "#fff",
+                      border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    }}>
+                      <tx.icon style={{ width: 15, height: 15, color: tx.color }} />
                     </div>
-                    <ChevronRight className="w-4 h-4 text-slate-300" />
-                  </button>
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div key="ferramentas" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
-                <div className="flex items-center justify-between mb-5">
-                  <div>
-                    <h2 className="font-syne font-bold text-slate-900" style={{ fontSize: 16 }}>Ferramentas</h2>
-                    <p className="text-slate-400 text-xs mt-0.5">Gerir a tua conta e preferências</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-slate-900 truncate" style={{ fontSize: 13 }}>{tx.name}</p>
+                      <p style={{ fontSize: 11, color: "#94a3b8" }}>{tx.type} · {tx.date}</p>
+                    </div>
+                    <p className="font-bold flex-shrink-0" style={{ fontSize: 13, color: tx.color }}>{tx.amount}</p>
                   </div>
-                  <button onClick={() => setFerramentasOpen(false)}
-                    className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
-                    <X className="w-4 h-4 text-slate-600" />
+                ))}
+              </div>
+
+              <div className="mt-5">
+                <button onClick={() => setFerramentasOpen(true)}
+                  className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-100"
+                  style={{ background: "#f7f8fa" }}>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-slate-200 flex items-center justify-center">
+                      <Settings style={{ width: 14, height: 14, color: "#64748b" }} />
+                    </div>
+                    <span className="font-syne font-semibold text-slate-700 text-sm">Ferramentas da conta</span>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="font-syne font-bold text-slate-900" style={{ fontSize: 16 }}>Ferramentas</h2>
+                  <p className="text-slate-400 text-xs mt-0.5">Gerir a tua conta e preferências</p>
+                </div>
+                <button onClick={() => setFerramentasOpen(false)}
+                  className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center hover:bg-slate-200 transition-colors">
+                  <X className="w-4 h-4 text-slate-600" />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                {FERRAMENTAS.map(({ icon: Icon, label, desc, route, danger }) => (
+                  <button key={label}
+                    onClick={() => handleFerramentaClick(label, route ?? null)}
+                    className={`flex items-center gap-3.5 p-3.5 rounded-2xl border transition-all duration-200 text-left w-full group ${
+                      danger
+                        ? "border-red-100 bg-red-50/50 hover:bg-red-50 hover:border-red-200"
+                        : "border-slate-100 bg-white hover:bg-slate-50"
+                    }`}>
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: danger ? "#fef2f2" : "#f7f8fa", border: danger ? "1px solid #fecaca" : "1px solid #e2e8f0" }}>
+                      <Icon style={{ width: 18, height: 18, color: danger ? "#dc2626" : "#111" }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-syne font-bold text-sm ${danger ? "text-red-600" : "text-slate-800"}`}>{label}</p>
+                      <p className="text-slate-400 text-[11px] mt-0.5">{desc}</p>
+                    </div>
+                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${danger ? "text-red-300" : "text-slate-300"}`} />
                   </button>
-                </div>
+                ))}
+              </div>
 
-                <div className="flex flex-col gap-2">
-                  {FERRAMENTAS.map(({ icon: Icon, label, desc, route, danger }, i) => (
-                    <motion.button key={label}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: i * 0.04, duration: 0.28 }}
-                      onClick={() => handleFerramentaClick(label, route ?? null)}
-                      className={`flex items-center gap-3.5 p-3.5 rounded-2xl border transition-all duration-200 text-left w-full group ${
-                        danger
-                          ? "border-red-100 bg-red-50/50 hover:bg-red-50 hover:border-red-200"
-                          : "border-slate-100 bg-white hover:bg-slate-50"
-                      }`}>
-                      <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ background: danger ? "#fef2f2" : "#f7f8fa", border: danger ? "1px solid #fecaca" : "1px solid #e2e8f0" }}>
-                        <Icon style={{ width: 18, height: 18, color: danger ? "#dc2626" : "#111" }} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-syne font-bold text-sm ${danger ? "text-red-600" : "text-slate-800"}`}>{label}</p>
-                        <p className="text-slate-400 text-[11px] mt-0.5">{desc}</p>
-                      </div>
-                      <ChevronRight className={`w-4 h-4 flex-shrink-0 ${danger ? "text-red-300" : "text-slate-300"}`} />
-                    </motion.button>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2 mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <Shield className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                  <p className="text-[11px] text-slate-400">A tua conta está protegida com encriptação de 256-bit.</p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              <div className="flex items-center gap-2 mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                <Shield className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <p className="text-[11px] text-slate-400">A tua conta está protegida com encriptação de 256-bit.</p>
+              </div>
+            </div>
+          )}
         </div>
 
         <BottomNav />
