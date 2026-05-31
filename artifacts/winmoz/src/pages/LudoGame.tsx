@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { ArrowLeft, Trophy } from "lucide-react";
+import { ArrowLeft, Trophy, MessageCircle, Mic, MicOff, Volume2, VolumeX, Heart } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Player = "blue" | "green";
@@ -31,8 +31,20 @@ const HOME_SLOTS: Record<Player,[number,number][]> = {
   blue:  [[10,1],[10,3],[12,1],[12,3]],
   green: [[2,10],[2,12],[4,10],[4,12]],
 };
-const SAFE_IDX = [0,9,13,18,26,35,39,44];
+const SAFE_IDX = [0,9,13,18,26,35,39,44]; // game logic: no captures at these TRACK positions
 const SAFE_COORDS = new Set(SAFE_IDX.map(i=>`${TRACK[i][0]},${TRACK[i][1]}`));
+// Stars shown visually (reorganised — moved away from home areas, removed first-block stars)
+const STAR_DISPLAY: [number,number][] = [
+  [8,2],   // near blue home  (was [8,1] → moved one back)
+  [5,6],   // left arm middle
+  [6,4],   // red arm        (was [6,1] → 3 squares forward)
+  [2,8],   // near green home (was [1,8] → moved one back)
+  [6,13],  // right arm
+  [8,10],  // near yellow home (was [8,13] → 3 squares forward)
+  [9,8],   // center bottom
+];
+// Wrapper size (px) for every pawn overlay — gives SelectionRing a solid anchor
+const PIECE_BOX = 44;
 
 function getPieceCoord(p: GamePiece): [number,number] {
   if (p.pos === -1) return HOME_SLOTS[p.player][parseInt(p.id[1])];
@@ -226,25 +238,11 @@ function BoardSVG({ pieces }: { pieces: GamePiece[] }) {
       <line x1={240} y1={360} x2={300} y2={300} stroke="white" strokeWidth="1.5" opacity="0.8"/>
       <rect x={240} y={240} width={120} height={120} fill="none" stroke="#BBBBBB" strokeWidth="0.7"/>
 
-      {/* ── Safe square stars (gray outline) ── */}
-      {SAFE_IDX.map(i=>{
-        const [r,c] = TRACK[i];
-        const key = `${r},${c}`;
-        if (coloredStarts.has(key)) return null;
-        return (
-          <StarShape key={key} cx={(c+0.5)*CS} cy={(r+0.5)*CS} r={CS*0.33}
-            fill="none" stroke="#AAAAAA" strokeWidth={1.6} opacity={0.85}/>
-        );
-      })}
-
-      {/* ── Start square stars (white filled) ── */}
-      {["13,6","1,8","6,1","8,13"].map(key=>{
-        const [r,c] = key.split(",").map(Number);
-        return (
-          <StarShape key={key} cx={(c+0.5)*CS} cy={(r+0.5)*CS} r={CS*0.33}
-            fill="white" opacity={0.92}/>
-        );
-      })}
+      {/* ── Safe square stars (reorganised positions, no colored-start stars) ── */}
+      {STAR_DISPLAY.map(([r,c])=>(
+        <StarShape key={`${r},${c}`} cx={(c+0.5)*CS} cy={(r+0.5)*CS} r={CS*0.33}
+          fill="none" stroke="#AAAAAA" strokeWidth={1.6} opacity={0.85}/>
+      ))}
 
       {/* ── Directional arrows ── */}
       {ARROWS.map(({r,c,sym})=>(
@@ -347,21 +345,17 @@ function DecoSVGPawn({ cx, cy, color, showPin }: {
   );
 }
 
-// ─── Selection ring: rotating dots around a selectable pawn ───────────────────
-function SelectionRing({ size }: { size: number }) {
+// ─── Selection ring: tight rotating dots — fills PIECE_BOX parent exactly ─────
+function SelectionRing() {
   const N = 10;
-  const R = size * 0.72;
-  const dotR = size * 0.09;
+  const cx = PIECE_BOX / 2;
+  const dotR = 3.2;
+  const R = cx - dotR - 2;
   return (
     <motion.div
       animate={{ rotate: 360 }}
-      transition={{ duration: 2.2, repeat: Infinity, ease: "linear" }}
-      style={{
-        position:"absolute",
-        width: size*2, height: size*2,
-        left: -size*0.5, top: -size*0.5,
-        pointerEvents:"none",
-      }}
+      transition={{ duration: 2.0, repeat: Infinity, ease: "linear" }}
+      style={{ position:"absolute", inset:0, pointerEvents:"none" }}
     >
       {Array.from({length:N},(_,i)=>{
         const angle = (i*360/N)*Math.PI/180;
@@ -370,10 +364,10 @@ function SelectionRing({ size }: { size: number }) {
             position:"absolute",
             width: dotR*2, height: dotR*2,
             borderRadius:"50%",
-            background: i%2===0 ? "white" : "rgba(255,255,255,0.55)",
-            left: size + R*Math.cos(angle) - dotR,
-            top:  size + R*Math.sin(angle) - dotR,
-            boxShadow:"0 1px 3px rgba(0,0,0,0.45)",
+            background: i%2===0 ? "white" : "rgba(255,255,255,0.5)",
+            left: cx + R*Math.cos(angle) - dotR,
+            top:  cx + R*Math.sin(angle) - dotR,
+            boxShadow:"0 1px 2px rgba(0,0,0,0.4)",
           }}/>
         );
       })}
@@ -385,10 +379,9 @@ function SelectionRing({ size }: { size: number }) {
 function Board({ pieces, movable, onSelectPiece }: {
   pieces: GamePiece[]; movable: PieceId[]; onSelectPiece: (id:PieceId)=>void;
 }) {
-  // For collision detection on path cells only
   const cellMap = new Map<string, GamePiece[]>();
   pieces.forEach(p => {
-    if (p.pos === -1) return; // home pieces handled separately
+    if (p.pos === -1) return;
     const [r,c] = getPieceCoord(p);
     const k = `${r},${c}`;
     cellMap.set(k, [...(cellMap.get(k)||[]), p]);
@@ -396,53 +389,46 @@ function Board({ pieces, movable, onSelectPiece }: {
 
   return (
     <div style={{
-      position:"relative",
-      width:"100%",
-      aspectRatio:"1",
-      borderRadius:6,
-      overflow:"hidden",
+      position:"relative", width:"100%", aspectRatio:"1",
+      borderRadius:6, overflow:"hidden",
       boxShadow:"0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.4)",
     }}>
       <BoardSVG pieces={pieces}/>
 
-      {/* Piece overlay */}
       {pieces.map(p => {
         const selectable = movable.includes(p.id);
         const color: PawnColor = p.player === "blue" ? "blue" : "green";
-        const pawnSize = 26;
         const isHome = p.pos === -1;
 
-        // Home pieces: positioned at centered slot; SVG handles the visual,
-        // we just need an invisible clickable/ring layer here.
         if (isHome) {
+          // Home piece: SVG draws the pin; we put a PIECE_BOX-sized div here
+          // so SelectionRing fills it correctly and the click area exists.
           const slotIdx = +p.id[1];
           const [svgX, svgY] = ALL_SLOT_DISPLAY[p.player][slotIdx];
-          const leftPct = svgX / SZ * 100;
-          const topPct  = svgY / SZ * 100;
           return (
             <div
               key={p.id}
               onClick={selectable ? () => onSelectPiece(p.id) : undefined}
               style={{
                 position:"absolute",
-                left:`${leftPct}%`,
-                top:`${topPct}%`,
+                width: PIECE_BOX, height: PIECE_BOX,
+                left:`${svgX / SZ * 100}%`,
+                top:`${svgY / SZ * 100}%`,
                 transform:"translate(-50%, -50%)",
                 zIndex: selectable ? 25 : 5,
                 cursor: selectable ? "pointer" : "default",
-                display:"flex", alignItems:"center", justifyContent:"center",
               }}
             >
-              {selectable && <SelectionRing size={pawnSize}/>}
+              {selectable && <SelectionRing/>}
             </div>
           );
         }
 
-        // On-board pieces
+        // On-board piece
         const [r,c] = getPieceCoord(p);
         const here = cellMap.get(`${r},${c}`) || [];
         const idx = here.findIndex(x => x.id === p.id);
-        const OFFSETS = [[0,0],[-5,-4],[5,-4],[-5,4],[5,4]];
+        const OFFSETS: [number,number][] = [[0,0],[-5,-4],[5,-4],[-5,4],[5,4]];
         const [offX, offY] = here.length > 1 ? (OFFSETS[idx] ?? [0,0]) : [0,0];
 
         return (
@@ -451,6 +437,7 @@ function Board({ pieces, movable, onSelectPiece }: {
             onClick={selectable ? () => onSelectPiece(p.id) : undefined}
             style={{
               position:"absolute",
+              width: PIECE_BOX, height: PIECE_BOX,
               left:`${(c + 0.5) / 15 * 100}%`,
               top:`${(r + 0.5) / 15 * 100}%`,
               transform:`translate(calc(-50% + ${offX}px), calc(-50% + ${offY}px))`,
@@ -459,9 +446,9 @@ function Board({ pieces, movable, onSelectPiece }: {
               display:"flex", alignItems:"center", justifyContent:"center",
             }}
           >
-            {selectable && <SelectionRing size={pawnSize}/>}
+            {selectable && <SelectionRing/>}
             <div style={{ position:"relative", zIndex:1 }}>
-              <Pawn color={color} size={pawnSize} glow={selectable}/>
+              <Pawn color={color} size={26} glow={selectable}/>
             </div>
           </div>
         );
@@ -578,71 +565,159 @@ function Dice3D({ value, rolling, onClick, active, sz=54 }: {
   );
 }
 
-// ─── Player Panel ─────────────────────────────────────────────────────────────
-function PlayerPanel({ player, name, isActive, diceValue, rolling, onRoll, showArrow, finished }: {
-  player: Player; name:string; isActive:boolean; diceValue:number|null;
-  rolling:boolean; onRoll:()=>void; showArrow:boolean; finished:number;
+// ─── Circular Timer Arc ───────────────────────────────────────────────────────
+function TimerArc({ timeLeft, total=30, size=32 }: { timeLeft:number; total?:number; size?:number }) {
+  const r = (size - 5) / 2;
+  const circ = 2 * Math.PI * r;
+  const fill = timeLeft / total;
+  const dashoffset = circ * (1 - fill);
+  const col = timeLeft > 12 ? "#4ade80" : timeLeft > 6 ? "#fbbf24" : "#ef4444";
+  return (
+    <div style={{ position:"relative", width:size, height:size, flexShrink:0 }}>
+      <svg width={size} height={size} style={{ transform:"rotate(-90deg)", display:"block" }}>
+        <circle cx={size/2} cy={size/2} r={r}
+          fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={3}/>
+        <circle cx={size/2} cy={size/2} r={r}
+          fill="none" stroke={col} strokeWidth={3}
+          strokeDasharray={circ} strokeDashoffset={dashoffset}
+          strokeLinecap="round"
+          style={{ transition:"stroke-dashoffset 0.85s linear, stroke 0.3s" }}/>
+      </svg>
+      <div style={{
+        position:"absolute", inset:0,
+        display:"flex", alignItems:"center", justifyContent:"center",
+      }}>
+        <span style={{ fontSize:9.5, fontWeight:800, color:col, lineHeight:1, fontFamily:"'Syne',sans-serif" }}>
+          {timeLeft}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Premium icon button ───────────────────────────────────────────────────────
+function IconBtn({ icon: Icon, active=false, onClick }: {
+  icon: React.ElementType; active?: boolean; onClick?: ()=>void;
 }) {
+  return (
+    <button onClick={onClick} style={{
+      width:28, height:28, borderRadius:8,
+      background: active ? "rgba(255,255,255,0.13)" : "rgba(255,255,255,0.05)",
+      border:`1px solid ${active ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.07)"}`,
+      display:"flex", alignItems:"center", justifyContent:"center",
+      cursor:"pointer", flexShrink:0, padding:0,
+      transition:"background 0.2s, border 0.2s",
+    }}>
+      <Icon style={{ width:13, height:13, color: active ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.3)" }}/>
+    </button>
+  );
+}
+
+// ─── Player Panel ─────────────────────────────────────────────────────────────
+function PlayerPanel({ player, name, isActive, diceValue, rolling, onRoll, finished, lives, timeLeft }: {
+  player: Player; name:string; isActive:boolean; diceValue:number|null;
+  rolling:boolean; onRoll:()=>void; finished:number;
+  lives:number; timeLeft:number;
+}) {
+  const [micOn, setMicOn] = useState(false);
+  const [muted, setMuted] = useState(false);
+
   const color: PawnColor = player === "blue" ? "blue" : "green";
-  const p = PAWN_PALETTE[color];
+  const pal = PAWN_PALETTE[color];
+  const isHuman = player === "blue";
+  const balance = isHuman ? "1.250 MT" : "843 MT";
+
   return (
     <div style={{
-      display:"flex", alignItems:"center", gap:10, padding:"8px 12px",
-      background: isActive ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.03)",
-      borderRadius:16,
-      border: isActive ? `2px solid ${p.m}55` : "2px solid transparent",
-      boxShadow: isActive ? `0 0 18px ${p.m}22` : "none",
-      transition:"all 0.3s",
+      display:"flex", alignItems:"center", gap:10, padding:"10px 12px",
+      background: isActive ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.025)",
+      borderRadius:18,
+      border: isActive ? `1.5px solid ${pal.m}44` : "1.5px solid rgba(255,255,255,0.06)",
+      boxShadow: isActive ? `0 0 24px ${pal.m}18, inset 0 1px 0 rgba(255,255,255,0.05)` : "none",
+      transition:"all 0.35s",
     }}>
-      {/* Avatar */}
+
+      {/* ── Avatar ── */}
       <div style={{
-        width:42, height:42, borderRadius:13,
-        background:`linear-gradient(135deg,${p.s}40,${p.d}80)`,
-        border:`2px solid ${p.m}66`,
-        display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
-        boxShadow:`0 2px 8px ${p.d}55`,
+        width:46, height:46, borderRadius:14, flexShrink:0,
+        background:`linear-gradient(145deg,${pal.s}28,${pal.d}60)`,
+        border:`2px solid ${isActive ? pal.m+"55" : "rgba(255,255,255,0.1)"}`,
+        display:"flex", alignItems:"center", justifyContent:"center",
+        boxShadow: isActive ? `0 2px 12px ${pal.d}44` : "none",
+        transition:"border 0.35s, box-shadow 0.35s",
       }}>
         <Pawn color={color} size={24}/>
       </div>
-      {/* Name + progress */}
-      <div style={{flex:1,minWidth:0}}>
-        <p style={{
-          fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:13,
-          color: isActive ? "#fff" : "rgba(255,255,255,0.4)", lineHeight:1,
-        }}>{name}</p>
-        <div style={{display:"flex", gap:4, marginTop:5}}>
-          {Array.from({length:4}).map((_,i)=>(
-            <div key={i} style={{
-              width:9, height:9, borderRadius:"50%",
-              background: i<finished ? p.m : "rgba(255,255,255,0.12)",
-              border:`1.5px solid ${i<finished ? p.d : "rgba(255,255,255,0.08)"}`,
-              boxShadow: i<finished ? `0 0 5px ${p.m}` : "none",
-              transition:"all 0.3s",
-            }}/>
-          ))}
+
+      {/* ── Name + balance + lives + icons ── */}
+      <div style={{ flex:1, minWidth:0 }}>
+        {/* Row 1: name + balance */}
+        <div style={{ display:"flex", alignItems:"baseline", gap:6 }}>
+          <p style={{
+            fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:12.5,
+            color: isActive ? "#ffffff" : "rgba(255,255,255,0.38)",
+            lineHeight:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+            transition:"color 0.35s",
+          }}>{name}</p>
+          <span style={{ fontSize:9.5, color:"rgba(255,255,255,0.28)", fontWeight:500, whiteSpace:"nowrap" }}>
+            {balance}
+          </span>
+        </div>
+
+        {/* Row 2: lives + finished pieces */}
+        <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:5 }}>
+          {/* Lives (5 hearts) */}
+          <div style={{ display:"flex", gap:3 }}>
+            {Array.from({length:5}).map((_,i)=>(
+              <div key={i} style={{
+                width:7, height:7, borderRadius:"50%",
+                background: i < lives ? "#ef4444" : "rgba(255,255,255,0.09)",
+                boxShadow: i < lives ? "0 0 5px #ef444488" : "none",
+                transition:"all 0.3s",
+              }}/>
+            ))}
+          </div>
+          {/* Separator */}
+          <div style={{ width:1, height:8, background:"rgba(255,255,255,0.1)" }}/>
+          {/* Finished pieces */}
+          <div style={{ display:"flex", gap:3 }}>
+            {Array.from({length:4}).map((_,i)=>(
+              <div key={i} style={{
+                width:7, height:7, borderRadius:"50%",
+                background: i < finished ? pal.m : "rgba(255,255,255,0.09)",
+                boxShadow: i < finished ? `0 0 5px ${pal.m}` : "none",
+                transition:"all 0.3s",
+              }}/>
+            ))}
+          </div>
+        </div>
+
+        {/* Row 3: action icons */}
+        <div style={{ display:"flex", gap:4, marginTop:5 }}>
+          <IconBtn icon={MessageCircle}/>
+          <IconBtn icon={micOn ? Mic : MicOff} active={micOn} onClick={()=>setMicOn(v=>!v)}/>
+          <IconBtn icon={muted ? VolumeX : Volume2} active={!muted} onClick={()=>setMuted(v=>!v)}/>
+          <IconBtn icon={Heart}/>
         </div>
       </div>
-      {/* Dice */}
-      <div style={{display:"flex", alignItems:"center", gap:8}}>
-        <AnimatePresence>
-          {showArrow && (
-            <motion.div
-              initial={{opacity:0, x: player==="blue" ? 8 : -8}}
-              animate={{opacity:1, x:0}} exit={{opacity:0}}
-              style={{fontSize:16, lineHeight:1}}
-            >
-              {player==="blue" ? "👉" : "👈"}
-            </motion.div>
-          )}
-        </AnimatePresence>
+
+      {/* ── Timer + Dice ── */}
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:5, flexShrink:0 }}>
+        {isHuman && isActive && (
+          <TimerArc timeLeft={timeLeft} size={30}/>
+        )}
+        {(!isHuman || !isActive) && (
+          <div style={{ width:30, height:isHuman ? 30 : 0 }}/>
+        )}
         <div style={{
-          background:"rgba(0,0,0,0.28)", borderRadius:12, padding:6,
-          border: isActive ? `1.5px solid ${p.m}44` : "1.5px solid rgba(255,255,255,0.07)",
-          boxShadow: isActive ? `0 0 14px ${p.m}33` : "none",
+          background:"rgba(0,0,0,0.32)", borderRadius:12, padding:5,
+          border: isActive ? `1.5px solid ${pal.m}38` : "1.5px solid rgba(255,255,255,0.06)",
+          boxShadow: isActive ? `0 0 16px ${pal.m}28` : "none",
         }}>
-          <Dice3D value={diceValue} rolling={rolling} onClick={onRoll} active={isActive} sz={54}/>
+          <Dice3D value={diceValue} rolling={rolling} onClick={onRoll} active={isActive} sz={46}/>
         </div>
       </div>
+
     </div>
   );
 }
@@ -669,9 +744,45 @@ export default function LudoGame() {
   const [movable,setMovable]               = useState<PieceId[]>([]);
   const [winner,setWinner]                 = useState<Player|null>(null);
   const [msg,setMsg]                       = useState("Jogador Azul – clica nos dados para começar!");
+  const [lives,setLives]                   = useState({ blue:5, green:5 });
+  const [timeLeft,setTimeLeft]             = useState(30);
   const scriptIdx                          = useRef(0);
   const piecesRef                          = useRef(pieces);
   useEffect(()=>{ piecesRef.current=pieces; },[pieces]);
+
+  // ── 30-second countdown timer (blue / human player only) ──────────────────
+  useEffect(()=>{
+    setTimeLeft(30);
+    if (winner || phase!=="roll" || turn!=="blue") return;
+    const tick = setInterval(()=>{
+      setTimeLeft(prev=>{
+        if (prev<=1){
+          clearInterval(tick);
+          // Lose a life on timeout — schedule outside setter
+          setTimeout(()=>{
+            setLives(l=>{
+              const nb = l.blue-1;
+              if(nb<=0){
+                setWinner("green"); setPhase("done");
+                setMsg("Jogador Verde venceu! Azul perdeu todas as vidas! 🏆");
+              } else {
+                setMsg(`⚠️ Tempo esgotado! Azul perdeu 1 vida (${nb} restante${nb===1?"":"s"})`);
+                setTimeout(()=>{
+                  setTurn("green"); setPhase("roll");
+                  setDiceBlue(null);
+                },900);
+              }
+              return {...l, blue:nb};
+            });
+          }, 0);
+          return 30;
+        }
+        return prev-1;
+      });
+    }, 1000);
+    return ()=>clearInterval(tick);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[turn, phase, winner]);
 
   const other = (p:Player):Player => p==="blue"?"green":"blue";
 
@@ -708,6 +819,15 @@ export default function LudoGame() {
     }
   }
 
+  // Smooth capture animation: slide piece back along its path step by step
+  function returnPieceToHome(capturedId:PieceId, fromPos:number) {
+    function step(pos:number){
+      setPieces(prev=>prev.map(p=>p.id===capturedId?{...p,pos:Math.max(-1,pos)}:p));
+      if(pos>-1) setTimeout(()=>step(pos-1), 80);
+    }
+    step(fromPos);
+  }
+
   function handleMoveComplete(pieceId:PieceId,diceVal:number,currentTurn:Player) {
     setPhase("moving");
     const ps=piecesRef.current;
@@ -721,8 +841,9 @@ export default function LudoGame() {
         return pr===moverCoord[0]&&pc===moverCoord[1];
       });
       if(captured.length>0){
-        setPieces(prev=>prev.map(p=>captured.some(c=>c.id===p.id)?{...p,pos:-1}:p));
         setMsg(`${currentTurn==="blue"?"Azul":"Verde"} capturou uma peça! 💥`);
+        // Animate each captured piece sliding back to home along its path
+        captured.forEach(c=>returnPieceToHome(c.id as PieceId, c.pos));
       }
     }
     const updatedPs=piecesRef.current;
@@ -857,8 +978,9 @@ export default function LudoGame() {
             isActive={turn==="green"&&!winner}
             diceValue={diceGreen} rolling={rollingGreen}
             onRoll={()=>doRoll("green")}
-            showArrow={turn==="green"&&phase==="roll"&&!winner}
             finished={greenFinished}
+            lives={lives.green}
+            timeLeft={30}
           />
         </div>
 
@@ -888,8 +1010,9 @@ export default function LudoGame() {
             isActive={turn==="blue"&&!winner}
             diceValue={diceBlue} rolling={rollingBlue}
             onRoll={()=>doRoll("blue")}
-            showArrow={turn==="blue"&&phase==="roll"&&!winner}
             finished={blueFinished}
+            lives={lives.blue}
+            timeLeft={timeLeft}
           />
         </div>
 
