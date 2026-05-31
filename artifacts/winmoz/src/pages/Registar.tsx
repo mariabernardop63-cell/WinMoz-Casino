@@ -79,31 +79,6 @@ export default function Registar() {
       if (nome.trim().length < 4) errs.nome = "O nome deve ter pelo menos 4 caracteres";
       if (!emailRe.test(email.trim())) errs.email = "Formato de email inválido";
       if (Object.keys(errs).length) { setErrors(errs); return; }
-
-      setLoading(true);
-      try {
-        const res = await fetch("/api/check-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: email.trim().toLowerCase() }),
-        });
-        if (!res.ok) {
-          setGeneralError("Não foi possível verificar o email. Tente novamente.");
-          setLoading(false);
-          return;
-        }
-        const data = await res.json();
-        if (data.exists) {
-          setErrors({ email: "Este email já está registado. Por favor, inicie sessão." });
-          setLoading(false);
-          return;
-        }
-      } catch {
-        setGeneralError("Erro de ligação ao servidor. Verifique a sua ligação e tente novamente.");
-        setLoading(false);
-        return;
-      }
-      setLoading(false);
       setDir(1); setStep(2); setErrors({});
 
     } else if (step === 2) {
