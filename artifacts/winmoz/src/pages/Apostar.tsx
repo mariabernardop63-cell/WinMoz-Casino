@@ -6,6 +6,8 @@ import {
   XCircle, RotateCcw, AlertTriangle, Swords, Users,
   CreditCard, Smartphone, CheckCircle2, Clock, X
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* ── Theme ── */
 const VIOLET = "#7c3aed";
@@ -243,33 +245,62 @@ function RejectedScreen({ amount, onRetry, onRecharge }: { amount: number; onRet
 
 /* ── Matchmaking Screen ── */
 function MatchmakingScreen({
-  onTimeout,
   onCancel,
   onMatched,
+  userId,
+  displayName,
+  betAmount,
+  gameType,
 }: {
-  onTimeout: () => void;
   onCancel: () => void;
-  onMatched: () => void;
+  onMatched: (gameId: string, color: string, oppName: string) => void;
+  userId: string;
+  displayName: string;
+  betAmount: number;
+  gameType: string;
 }) {
   const TOTAL = 180;
   const [remaining, setRemaining] = useState(TOTAL);
   const [found, setFound] = useState(false);
-  const avatar = typeof window !== "undefined" ? localStorage.getItem("winmoz_user_avatar") : null;
-
-  /* Random match time: 8–18 seconds */
-  const matchTimeRef = useRef(8000 + Math.random() * 10000);
+  const matchedRef = useRef(false);
 
   useEffect(() => {
-    const matchTimer = setTimeout(() => {
-      setFound(true);
-      setTimeout(() => onMatched(), 2000);
-    }, matchTimeRef.current);
-    return () => clearTimeout(matchTimer);
+    const channelName = `matchmaking_${gameType}_${betAmount}`;
+    const channel = supabase.channel(channelName, {
+      config: { presence: { key: userId } },
+    });
+
+    channel.on("presence", { event: "sync" }, () => {
+      if (matchedRef.current) return;
+      const state = channel.presenceState<{ userId: string; displayName: string }>();
+      const presentIds = Object.keys(state).sort();
+      if (presentIds.length >= 2) {
+        matchedRef.current = true;
+        const myIdx = presentIds.indexOf(userId);
+        const color = myIdx === 0 ? "blue" : "green";
+        const oppId = presentIds.find(id => id !== userId) ?? presentIds[myIdx === 0 ? 1 : 0];
+        const oppPresence = state[oppId]?.[0];
+        const oppName = (oppPresence as { displayName?: string })?.displayName ?? "Adversário";
+        const gameId = `${presentIds[0]}_${presentIds[1]}`;
+        setFound(true);
+        supabase.removeChannel(channel);
+        setTimeout(() => onMatched(gameId, color, oppName), 1500);
+      }
+    });
+
+    channel.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await channel.track({ userId, displayName });
+      }
+    });
+
+    return () => { supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (found) return;
-    if (remaining <= 0) { onTimeout(); return; }
+    if (remaining <= 0) { onCancel(); return; }
     const t = setInterval(() => setRemaining(r => r - 1), 1000);
     return () => clearInterval(t);
   }, [remaining, found]);
@@ -344,10 +375,9 @@ function MatchmakingScreen({
           {/* User avatar */}
           <div className="flex flex-col items-center gap-2">
             <div style={{ width: 80, height: 80, borderRadius: "50%", background: `linear-gradient(135deg, ${VIOLET}, #6d28d9)`, border: `3px solid ${VIOLET}66`, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", boxShadow: `0 0 28px ${VIOLET}44` }}>
-              {avatar
-                ? <img src={avatar} alt="Tu" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                : <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: "#fff" }}>EU</span>
-              }
+              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: "#fff" }}>
+                {displayName.charAt(0).toUpperCase() || "EU"}
+              </span>
             </div>
             <span style={{ fontSize: 11, color: "#8e8e93", fontWeight: 600 }}>Tu</span>
           </div>
@@ -459,6 +489,7 @@ function SegmentedToggle<T extends string>({
 export default function Apostar() {
   const [, params] = useRoute("/apostar/:gameId");
   const [, setLocation] = useLocation();
+  const { user, profile } = useAuth();
 
   const gameId = params?.gameId ?? "damas";
   const game = GAMES_DATA[gameId] ?? FALLBACK_GAME;
@@ -487,7 +518,7 @@ export default function Apostar() {
     if (!canStart) return;
     setScreen("processing");
     setTimeout(() => {
-      const balance = parseFloat(localStorage.getItem("winmoz_balance") || "0");
+      const balance = parseFloat(String(profile?.balance ?? "0"));
       if (balance >= (selectedBet ?? 0)) {
         setScreen("matchmaking");
       } else {
@@ -518,13 +549,18 @@ export default function Apostar() {
   if (screen === "matchmaking") {
     return (
       <MatchmakingScreen
-        onTimeout={() => setScreen("timeout")}
         onCancel={() => setScreen("bet")}
-        onMatched={() => {
+        onMatched={(gId, color, oppName) => {
           setScreen("matched");
-          const dest = (gameId === "ludo" || gameId === "ludo-classic") ? "/ludo-jogo" : "/";
+          const dest = (gameId === "ludo" || gameId === "ludo-classic")
+            ? `/ludo-jogo?gameId=${gId}&color=${color}&bet=${selectedBet ?? 0}&opp=${encodeURIComponent(oppName)}`
+            : "/";
           setTimeout(() => setLocation(dest), 2200);
         }}
+        userId={user?.id ?? ""}
+        displayName={profile?.full_name ?? "Jogador"}
+        betAmount={selectedBet ?? 0}
+        gameType={gameId}
       />
     );
   }

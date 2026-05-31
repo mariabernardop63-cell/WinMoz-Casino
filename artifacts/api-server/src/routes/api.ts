@@ -51,6 +51,50 @@ router.post("/complete-registration", async (req, res) => {
   }
 });
 
+router.post("/recharge", async (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Não autenticado." });
+  }
+  const token = authHeader.slice(7);
+
+  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+  if (authError || !user) return res.status(401).json({ error: "Token inválido." });
+
+  const { amount } = req.body;
+  if (!amount || typeof amount !== "number" || amount <= 0) {
+    return res.status(400).json({ error: "Valor inválido." });
+  }
+
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("balance")
+      .eq("id", user.id)
+      .single();
+
+    const currentBalance = parseFloat(String(profile?.balance ?? "0"));
+    const newBalance = parseFloat((currentBalance + amount).toFixed(2));
+
+    await supabaseAdmin
+      .from("profiles")
+      .update({ balance: newBalance })
+      .eq("id", user.id);
+
+    await supabaseAdmin.from("transactions").insert({
+      user_id: user.id,
+      type: "recharge",
+      amount,
+      description: "Recarga de código",
+      status: "completed",
+    });
+
+    return res.json({ ok: true, balance: newBalance });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message ?? "Erro interno." });
+  }
+});
+
 router.post("/withdraw", async (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {

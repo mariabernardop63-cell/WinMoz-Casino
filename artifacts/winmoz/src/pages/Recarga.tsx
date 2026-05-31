@@ -4,16 +4,11 @@ import { useLocation } from "wouter";
 import {
   ChevronLeft, Bell, CheckCircle2, XCircle, AlertTriangle, RotateCcw, Zap, Delete
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CYAN = "#00D4B4";
 
-function getBalance(): number {
-  return parseFloat(localStorage.getItem("winmoz_balance") || "0");
-}
-function addBalance(amount: number) {
-  const current = getBalance();
-  localStorage.setItem("winmoz_balance", (current + amount).toFixed(2));
-}
 function fmtMZN(val: number) {
   return val.toFixed(2).replace(".", ",");
 }
@@ -37,6 +32,7 @@ type Screen = "input" | "processing" | "success" | "error";
 
 export default function Recarga() {
   const [, setLocation] = useLocation();
+  const { refreshProfile } = useAuth();
   const [digits, setDigits] = useState("");
   const [screen, setScreen] = useState<Screen>("input");
   const [amount, setAmount] = useState(0);
@@ -52,7 +48,7 @@ export default function Recarga() {
   const handleBackspace = () => setDigits(prev => prev.slice(0, -1));
   const handleClear = () => setDigits("");
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!isComplete) return;
     const firstDigit = digits[0];
 
@@ -63,16 +59,30 @@ export default function Recarga() {
       resolved = CODE_MAP[firstDigit];
     }
 
+    if (!resolved) { setScreen("error"); return; }
     setScreen("processing");
-    setTimeout(() => {
-      if (resolved > 0) {
-        addBalance(resolved);
-        setAmount(resolved);
-        setScreen("success");
-      } else {
-        setScreen("error");
-      }
-    }, 2000);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setScreen("error"); return; }
+
+      const res = await fetch("/api/recharge", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ amount: resolved }),
+      });
+
+      if (!res.ok) { setScreen("error"); return; }
+
+      await refreshProfile();
+      setAmount(resolved);
+      setScreen("success");
+    } catch {
+      setScreen("error");
+    }
   };
 
   const handleRetry = () => {

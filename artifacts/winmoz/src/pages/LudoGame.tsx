@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import bgImg from "@assets/Gemini_Generated_Image_grc2w7grc2w7grc2_1780220609974.png";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -505,102 +506,101 @@ function TrophySVG({ size=72 }:{size?:number}) {
   );
 }
 
-// ─── Compact Game HUD Strip ────────────────────────────────────────────────────
+
+// ─── Professional Player Panel — white card ─────────────────────────────────────
 function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRoll,
-  finished, lives, timeLeft, isHuman }:{
+  finished, lives, timeLeft, isMe }:{
   player:Player; name:string; balance:string; isActive:boolean; diceValue:number|null;
-  rolling:boolean; onRoll:()=>void; finished:number; lives:number; timeLeft:number; isHuman:boolean;
+  rolling:boolean; onRoll:()=>void; finished:number; lives:number; timeLeft:number; isMe:boolean;
 }) {
-  const color:PawnColor   = player==="blue" ? "blue" : "green";
-  const p                 = PAWN_PAL[color];
-  const accentColor       = player==="blue" ? "#4F8EF7" : "#34D469";
-  const cardBg            = player==="blue"
-    ? "linear-gradient(120deg,#0B1730 0%,#0F2040 100%)"
-    : "linear-gradient(120deg,#091E14 0%,#0E2A1B 100%)";
-  const borderColor       = isActive ? accentColor+"70" : "rgba(255,255,255,0.08)";
+  const color:PawnColor = player==="blue" ? "blue" : "green";
+  const accentColor     = player==="blue" ? "#3B82F6" : "#22C55E";
+  const accentDark      = player==="blue" ? "#1D4ED8" : "#15803D";
 
   return (
     <div style={{
       display:"flex", alignItems:"center",
-      background: cardBg,
-      borderRadius:12,
-      border:`1.5px solid ${borderColor}`,
+      background:"#FFFFFF",
+      borderRadius:14,
+      border:`2px solid ${isActive ? accentColor : "#E2E8F0"}`,
       overflow:"hidden",
       boxShadow: isActive
-        ? `0 0 0 1px ${accentColor}22, 0 4px 16px rgba(0,0,0,0.5)`
-        : "0 2px 8px rgba(0,0,0,0.35)",
+        ? `0 4px 20px ${accentColor}28, 0 1px 4px rgba(0,0,0,0.06)`
+        : "0 1px 6px rgba(0,0,0,0.07)",
       transition:"border-color 0.3s, box-shadow 0.3s",
-      opacity: isActive ? 1 : 0.68,
-      height: 52,
+      height:62,
     }}>
 
       {/* Left accent bar */}
       <div style={{
-        width:3, alignSelf:"stretch", flexShrink:0,
+        width:4, alignSelf:"stretch", flexShrink:0,
         background: isActive
-          ? `linear-gradient(180deg,${accentColor},${accentColor}55)`
-          : "rgba(255,255,255,0.07)",
+          ? `linear-gradient(180deg,${accentColor},${accentDark})`
+          : "#E2E8F0",
         transition:"background 0.3s",
       }}/>
 
-      {/* Pawn avatar — compact */}
+      {/* Pawn avatar */}
       <div style={{
-        width:34, height:34, borderRadius:9, flexShrink:0,
-        margin:"0 8px",
-        background:`${p.m}1A`,
-        border:`1.5px solid ${isActive ? p.m+"55" : "rgba(255,255,255,0.08)"}`,
+        width:38, height:38, borderRadius:11, flexShrink:0,
+        margin:"0 10px",
+        background:`${accentColor}12`,
+        border:`2px solid ${isActive ? accentColor+"50" : "#E2E8F0"}`,
         display:"flex", alignItems:"center", justifyContent:"center",
         transition:"border-color 0.3s",
       }}>
-        <Pawn color={color} size={18}/>
+        <Pawn color={color} size={22}/>
       </div>
 
-      {/* Name + stats — flex-1 */}
+      {/* Name + stats */}
       <div style={{ flex:1, minWidth:0, display:"flex", flexDirection:"column", gap:3 }}>
-        {/* Row 1: name + tag + balance */}
-        <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+        {/* Row 1: name + badge */}
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
           <span style={{
-            fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:12,
-            color: isActive ? "#EEF2FF" : "rgba(255,255,255,0.4)",
-            lineHeight:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
-            maxWidth:80, transition:"color 0.3s",
+            fontFamily:"system-ui,-apple-system,'Segoe UI',sans-serif",
+            fontWeight:700, fontSize:13,
+            color: isActive ? "#0F172A" : "#94A3B8",
+            lineHeight:1,
+            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+            maxWidth:120,
+            transition:"color 0.3s",
           }}>{name}</span>
           <span style={{
-            fontSize:7, fontWeight:700, letterSpacing:0.8, textTransform:"uppercase",
-            color: isHuman ? accentColor : "rgba(255,255,255,0.2)",
-            background: isHuman ? `${accentColor}18` : "rgba(255,255,255,0.05)",
-            border:`1px solid ${isHuman ? accentColor+"35" : "rgba(255,255,255,0.07)"}`,
-            borderRadius:3, padding:"1.5px 4px", flexShrink:0,
-          }}>{isHuman?"Tu":"IA"}</span>
+            fontSize:9, fontWeight:700, letterSpacing:0.5, textTransform:"uppercase",
+            color: isMe ? "#FFFFFF" : "#64748B",
+            background: isMe ? accentColor : "#E2E8F0",
+            borderRadius:4, padding:"2px 6px", flexShrink:0,
+          }}>{isMe?"Tu":"Rival"}</span>
+        </div>
+        {/* Row 2: balance + lives + pieces */}
+        <div style={{ display:"flex", alignItems:"center", gap:7 }}>
           <span style={{
-            fontSize:10, fontWeight:600,
-            color: isActive ? accentColor : "rgba(255,255,255,0.2)",
-            fontFamily:"'Syne',sans-serif", flexShrink:0,
+            fontFamily:"system-ui,-apple-system,sans-serif",
+            fontWeight:600, fontSize:11,
+            color: isActive ? accentColor : "#CBD5E1",
             transition:"color 0.3s",
           }}>{balance}</span>
-        </div>
-        {/* Row 2: lives ❤ + pieces ● */}
-        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-          <div style={{ display:"flex", alignItems:"center", gap:2 }}>
+          <div style={{ width:1, height:10, background:"#E2E8F0", flexShrink:0 }}/>
+          {/* Lives */}
+          <div style={{ display:"flex", alignItems:"center", gap:2.5 }}>
             {Array.from({length:5}).map((_,i)=>(
               <div key={i} style={{
                 width:5, height:5, borderRadius:"50%",
-                background: i<lives ? "#F05555" : "rgba(255,255,255,0.1)",
-                boxShadow: i<lives ? "0 0 3px #F0555566" : "none",
+                background: i<lives ? "#EF4444" : "#E2E8F0",
                 transition:"all 0.25s",
               }}/>
             ))}
           </div>
-          <div style={{ width:1, height:8, background:"rgba(255,255,255,0.1)", flexShrink:0 }}/>
-          <div style={{ display:"flex", alignItems:"center", gap:2 }}>
+          <div style={{ width:1, height:10, background:"#E2E8F0", flexShrink:0 }}/>
+          {/* Finished pieces */}
+          <div style={{ display:"flex", alignItems:"center", gap:2.5 }}>
             {Array.from({length:4}).map((_,i)=>(
               <motion.div key={i}
                 animate={{ scale: i===finished-1 ? [1,1.4,1] : 1 }}
                 transition={{ duration:0.25 }}
                 style={{
                   width:5, height:5, borderRadius:"50%",
-                  background: i<finished ? accentColor : "rgba(255,255,255,0.1)",
-                  boxShadow: i<finished ? `0 0 4px ${accentColor}77` : "none",
+                  background: i<finished ? accentColor : "#E2E8F0",
                   transition:"background 0.25s",
                 }}/>
             ))}
@@ -608,23 +608,27 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
         </div>
       </div>
 
-      {/* Right: timer arc (human only) + dice */}
+      {/* Right: timer + dice */}
       <div style={{
-        display:"flex", alignItems:"center", gap:5,
-        padding:"0 8px 0 4px", flexShrink:0,
+        display:"flex", alignItems:"center", gap:6,
+        padding:"0 10px 0 4px", flexShrink:0,
       }}>
-        {isHuman && isActive
-          ? <TimerArc timeLeft={timeLeft} size={22}/>
-          : <div style={{ width:22 }}/>
+        {isMe && isActive
+          ? <TimerArc timeLeft={timeLeft} size={24}/>
+          : <div style={{ width:24 }}/>
         }
         <div style={{
-          background:"rgba(0,0,0,0.4)",
-          borderRadius:9, padding:"3px",
-          border:`1.5px solid ${isActive ? accentColor+"35" : "rgba(255,255,255,0.06)"}`,
-          boxShadow: isActive ? `0 0 8px ${accentColor}18` : "none",
-          transition:"border-color 0.3s",
+          background: isActive ? "#F8FAFC" : "#F1F5F9",
+          borderRadius:10, padding:"4px",
+          border:`1.5px solid ${isActive ? accentColor+"60" : "#E2E8F0"}`,
+          transition:"border-color 0.3s, background 0.3s",
         }}>
-          <Dice3D value={diceValue} rolling={rolling} onClick={onRoll} active={isActive} sz={34}/>
+          <Dice3D
+            value={diceValue} rolling={rolling}
+            onClick={onRoll}
+            active={isActive && isMe}
+            sz={34}
+          />
         </div>
       </div>
     </div>
@@ -779,22 +783,30 @@ function WinScreen({ winner, winnerName, loserName, betAmount, onReplay, onQuit 
   );
 }
 
-// ─── Scripted first rolls ───────────────────────────────────────────────────────
-const SCRIPTED=[6,5,2,2,6,5];
 
 // ─── Main Game Component ────────────────────────────────────────────────────────
 export default function LudoGame() {
   const [,setLocation] = useLocation();
   const { profile } = useAuth();
 
-  const playerName = profile?.full_name ?? "Jogador Azul";
-  const playerBal  = profile?.balance
+  // ── URL params ─────────────────────────────────────────────────────────────────
+  const searchParams = new URLSearchParams(
+    typeof window !== "undefined" ? window.location.search : ""
+  );
+  const gameId      = searchParams.get("gameId") ?? "local";
+  const myColor     = (searchParams.get("color") ?? "blue") as Player;
+  const BET_AMOUNT  = parseInt(searchParams.get("bet") ?? "0");
+  const oppFromUrl  = searchParams.get("opp") ?? "";
+  const opponentColor: Player = myColor === "blue" ? "green" : "blue";
+
+  const playerName  = profile?.full_name ?? (myColor === "blue" ? "Azul" : "Verde");
+  const playerBal   = profile?.balance
     ? `${Number(profile.balance).toLocaleString("pt-MZ")} MT`
     : "0 MT";
-  const opponentName = "Rival Verde";
-  const opponentBal  = "843 MT";
-  const BET_AMOUNT   = 100; // MT — fixed demo bet per game
+  const opponentName = oppFromUrl ? decodeURIComponent(oppFromUrl) : "Adversário";
+  const opponentBal  = "—";
 
+  // ── State ──────────────────────────────────────────────────────────────────────
   const initialPieces=():GamePiece[]=>([
     {id:"B0",player:"blue",pos:-1},{id:"B1",player:"blue",pos:-1},
     {id:"B2",player:"blue",pos:-1},{id:"B3",player:"blue",pos:-1},
@@ -811,27 +823,31 @@ export default function LudoGame() {
   const [rollingGreen,setRollingG] = useState(false);
   const [movable,setMovable]       = useState<PieceId[]>([]);
   const [winner,setWinner]         = useState<Player|null>(null);
-  const [msg,setMsg]               = useState(`${playerName.split(" ")[0]} — clica nos dados!`);
   const [lives,setLives]           = useState({blue:5,green:5});
   const [timeLeft,setTimeLeft]     = useState(30);
 
-  const scriptIdx   = useRef(0);
-  const piecesRef   = useRef(pieces);
-  const phaseRef    = useRef(phase);
-  const movableRef  = useRef(movable);
-  const diceBlueRef = useRef(diceBlue);
+  const myTurnMsg  = `${playerName.split(" ")[0]} — clica nos dados!`;
+  const oppTurnMsg = `A aguardar ${opponentName}…`;
+  const [msg,setMsg] = useState(myColor==="blue" ? myTurnMsg : oppTurnMsg);
+
+  const piecesRef    = useRef(pieces);
+  const phaseRef     = useRef(phase);
+  const movableRef   = useRef(movable);
+  const diceBlueRef  = useRef(diceBlue);
+  const diceGreenRef = useRef(diceGreen);
+  const turnRef      = useRef(turn);
+  const winnerRef    = useRef(winner);
+  const channelRef   = useRef<ReturnType<typeof supabase.channel>|null>(null);
 
   useEffect(()=>{piecesRef.current=pieces;},[pieces]);
   useEffect(()=>{phaseRef.current=phase;},[phase]);
   useEffect(()=>{movableRef.current=movable;},[movable]);
   useEffect(()=>{diceBlueRef.current=diceBlue;},[diceBlue]);
+  useEffect(()=>{diceGreenRef.current=diceGreen;},[diceGreen]);
+  useEffect(()=>{turnRef.current=turn;},[turn]);
+  useEffect(()=>{winnerRef.current=winner;},[winner]);
 
   const other=(p:Player):Player=>p==="blue"?"green":"blue";
-
-  function rollDice():number {
-    const idx=scriptIdx.current++;
-    return idx<SCRIPTED.length?SCRIPTED[idx]:Math.floor(Math.random()*6)+1;
-  }
 
   function calcMovable(ps:GamePiece[],pl:Player,d:number):PieceId[] {
     return ps.filter(p=>p.player===pl).filter(p=>{
@@ -869,10 +885,10 @@ export default function LudoGame() {
       .filter(p=>p.player===opp&&p.pos>=0&&p.pos<=50)
       .forEach(p=>{
         const [pr,pc]=getPieceCoord(p);
-        // Only capture if defender is NOT on a safe/star square
         if(pr===mr&&pc===mc && !SAFE_COORDS.has(`${pr},${pc}`)){
           captured = true;
-          setMsg(`${mover.player==="blue"?playerName.split(" ")[0]:opponentName} capturou uma peça! +1 jogada`);
+          const capturerName=mover.player===myColor?playerName.split(" ")[0]:opponentName;
+          setMsg(`${capturerName} capturou uma peça! +1 jogada`);
           let pos=p.pos;
           function stepBack(){
             setPieces(prev=>prev.map(x=>x.id!==p.id?x:{...x,pos:Math.max(-1,pos)}));
@@ -892,12 +908,12 @@ export default function LudoGame() {
     if(finishedCount(piecesRef.current,currentTurn)===4){
       setWinner(currentTurn); setPhase("done"); return;
     }
-    // Extra turn: rolled 6, captured opponent, or reached home centre (pos 57)
     const enteredHome = mover.pos===57 && prevPos<57;
     const extraTurn = diceVal===6 || captured || enteredHome;
     if(extraTurn){
-      const reason = diceVal===6 ? "tirou 6" : captured ? "capturou uma peça" : "chegou ao centro!";
-      setMsg(`${currentTurn==="blue"?playerName.split(" ")[0]:opponentName} ${reason} — joga de novo!`);
+      const reason = diceVal===6?"tirou 6":captured?"capturou uma peça":"chegou ao centro!";
+      const plName=currentTurn===myColor?playerName.split(" ")[0]:opponentName;
+      setMsg(`${plName} ${reason} — joga de novo!`);
       setMovable([]);
       setTimeout(()=>{setPhase("roll");if(currentTurn==="blue")setDiceBlue(null);else setDiceGreen(null);},400);
     } else {
@@ -905,8 +921,8 @@ export default function LudoGame() {
       setMovable([]);
       setTimeout(()=>{
         setTurn(next); setPhase("roll");
-        if(next==="blue"){setDiceBlue(null);setMsg(`${playerName.split(" ")[0]} — clica nos dados!`);}
-        else{setDiceGreen(null);setMsg(`${opponentName} — a pensar…`);}
+        if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
+        setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
       },500);
     }
   }
@@ -916,76 +932,130 @@ export default function LudoGame() {
     const piece=ps.find(p=>p.id===pid)!;
     const isExit=piece.pos===-1;
     const prevPos=piece.pos;
+    const plName=pl===myColor?playerName.split(" ")[0]:opponentName;
     if(isExit){
-      setMsg(`${pl==="blue"?playerName.split(" ")[0]:opponentName} coloca peça no tabuleiro!`);
+      setMsg(`${plName} coloca peça no tabuleiro!`);
       movePieceSteps(pid,-1,1,true,()=>handleMoveComplete(pid,diceVal,pl,0));
     } else {
-      setMsg(`${pl==="blue"?playerName.split(" ")[0]:opponentName} move ${diceVal} ${diceVal===1?"casa":"casas"}!`);
+      setMsg(`${plName} move ${diceVal} ${diceVal===1?"casa":"casas"}!`);
       movePieceSteps(pid,piece.pos,diceVal,false,()=>handleMoveComplete(pid,diceVal,pl,prevPos));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[playerName,opponentName]);
+  },[playerName,opponentName,myColor]);
 
-  const doRoll=useCallback((pl:Player)=>{
-    if(phaseRef.current!=="roll"||turn!==pl) return;
+  // ── Apply a dice roll locally (no broadcast) ────────────────────────────────
+  const applyRoll=useCallback((pl:Player,val:number)=>{
     const setR=pl==="blue"?setRollingB:setRollingG;
     const setD=pl==="blue"?setDiceBlue:setDiceGreen;
     setR(true);
     setTimeout(()=>{
-      const val=rollDice();
       setD(val); setR(false);
       const mv=calcMovable(piecesRef.current,pl,val);
+      const plName=pl===myColor?playerName.split(" ")[0]:opponentName;
       if(mv.length===0){
         setMsg(val===6
-          ?`${pl==="blue"?playerName.split(" ")[0]:opponentName} — 6 mas sem movimento!`
-          :`${pl==="blue"?playerName.split(" ")[0]:opponentName} — ${val} sem jogadas.`);
+          ?`${plName} — 6 mas sem movimento!`
+          :`${plName} — ${val} sem jogadas.`);
         setTimeout(()=>{
           const next=other(pl); setTurn(next); setPhase("roll");
-          if(next==="blue"){setDiceBlue(null);setMsg(`${playerName.split(" ")[0]} — clica nos dados!`);}
-          else{setDiceGreen(null);setMsg(`${opponentName} — a pensar…`);}
+          if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
+          setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
         },1300);
       } else if(mv.length===1){
-        setMsg(`${pl==="blue"?playerName.split(" ")[0]:opponentName} tirou ${val}!`);
+        setMsg(`${plName} tirou ${val}!`);
         doSelectPiece(mv[0],val,pl,piecesRef.current);
       } else {
         setMovable(mv); setPhase("select");
-        setMsg(`${pl==="blue"?playerName.split(" ")[0]:opponentName} — ${val}! Escolhe uma peça.`);
+        setMsg(`${plName} — ${val}! ${pl===myColor?"Escolhe uma peça.":""}`);
       }
     },800);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[turn,playerName,opponentName]);
+  },[myColor,playerName,opponentName,doSelectPiece]);
 
+  // ── Roll my color dice — generates, broadcasts, and applies ────────────────
+  const doRoll=useCallback(()=>{
+    if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current) return;
+    const val=Math.floor(Math.random()*6)+1;
+    channelRef.current?.send({
+      type:"broadcast",
+      event:"dice_rolled",
+      payload:{ player:myColor, value:val },
+    });
+    applyRoll(myColor,val);
+  },[myColor,applyRoll]);
+
+  // ── Select piece — broadcasts + applies ────────────────────────────────────
   function handleSelectPiece(pid:PieceId){
-    if(phase!=="select") return;
-    const dv=turn==="blue"?diceBlue:diceGreen;
+    if(phase!=="select"||turn!==myColor) return;
+    const dv=myColor==="blue"?diceBlueRef.current:diceGreenRef.current;
     if(dv===null) return;
-    doSelectPiece(pid,dv,turn,piecesRef.current);
+    channelRef.current?.send({
+      type:"broadcast",
+      event:"piece_selected",
+      payload:{ pieceId:pid, diceVal:dv, player:myColor },
+    });
+    doSelectPiece(pid,dv,myColor,piecesRef.current);
   }
 
-  // ── Timer — runs during roll + select for human player ─────────────────────
+  // ── Supabase Realtime channel ──────────────────────────────────────────────
+  useEffect(()=>{
+    if(gameId==="local") return;
+    const channel=supabase.channel(`ludo_game_${gameId}`,{
+      config:{ broadcast:{ self:false } },
+    });
+    channelRef.current=channel;
+
+    channel.on("broadcast",{ event:"dice_rolled" },({ payload })=>{
+      if(payload.player!==myColor){
+        applyRoll(payload.player as Player, payload.value);
+      }
+    });
+
+    channel.on("broadcast",{ event:"piece_selected" },({ payload })=>{
+      if(payload.player!==myColor){
+        doSelectPiece(
+          payload.pieceId as PieceId,
+          payload.diceVal,
+          payload.player as Player,
+          piecesRef.current
+        );
+      }
+    });
+
+    channel.subscribe(async(status)=>{
+      if(status==="SUBSCRIBED"&&profile?.id){
+        await channel.track({ userId:profile.id, color:myColor });
+      }
+    });
+
+    return()=>{ supabase.removeChannel(channel); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[gameId,myColor]);
+
+  // ── Timer — only counts down when it's MY turn ─────────────────────────────
   const autoPlayRef=useRef<(()=>void)|null>(null);
   autoPlayRef.current=()=>{
     setLives(l=>{
-      const nb=l.blue-1;
+      const nb=l[myColor]-1;
       if(nb<=0){
-        setWinner("green"); setPhase("done");
+        setWinner(opponentColor); setPhase("done");
         setMsg(`${opponentName} venceu! ${playerName.split(" ")[0]} perdeu todas as vidas.`);
-        return {...l,blue:0};
+        return {...l,[myColor]:0};
       }
       setMsg(`Tempo esgotado! ${playerName.split(" ")[0]} perde 1 vida (${nb} restante${nb===1?"":"s"}).`);
       const cur=phaseRef.current;
       const mv=movableRef.current;
-      const dv=diceBlueRef.current;
-      if(cur==="roll") setTimeout(()=>doRoll("blue"),200);
+      const dv=myColor==="blue"?diceBlueRef.current:diceGreenRef.current;
+      if(cur==="roll") setTimeout(()=>doRoll(),200);
       else if(cur==="select"&&mv.length>0&&dv!==null)
-        setTimeout(()=>doSelectPiece(mv[Math.floor(Math.random()*mv.length)],dv,"blue",piecesRef.current),200);
-      return {...l,blue:nb};
+        setTimeout(()=>doSelectPiece(mv[Math.floor(Math.random()*mv.length)],dv,myColor,piecesRef.current),200);
+      return {...l,[myColor]:nb};
     });
   };
 
   useEffect(()=>{
     setTimeLeft(30);
-    if(winner||(phase!=="roll"&&phase!=="select")||turn!=="blue") return;
+    if(winner||(phase!=="roll"&&phase!=="select")||turn!==myColor) return;
     const tick=setInterval(()=>{
       setTimeLeft(prev=>{
         if(prev<=1){ clearInterval(tick); setTimeout(()=>autoPlayRef.current?.(),0); return 30; }
@@ -994,31 +1064,13 @@ export default function LudoGame() {
     },1000);
     return()=>clearInterval(tick);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[turn,phase,winner]);
-
-  // ── AI: auto-play green ───────────────────────────────────────────────────
-  useEffect(()=>{
-    if(turn!=="green"||winner) return undefined;
-    if(phase==="roll"){
-      const t=setTimeout(()=>doRoll("green"),1300); return()=>clearTimeout(t);
-    }
-    if(phase==="select"&&movable.length>0){
-      const t=setTimeout(()=>{
-        const pick=movable[Math.floor(Math.random()*movable.length)];
-        if(diceGreen!==null) doSelectPiece(pick,diceGreen,"green",piecesRef.current);
-      },900);
-      return()=>clearTimeout(t);
-    }
-    return undefined;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[turn,phase,movable,winner]);
+  },[turn,phase,winner,myColor]);
 
   function resetGame(){
     setPieces(initialPieces()); setTurn("blue"); setPhase("roll");
     setDiceBlue(null); setDiceGreen(null); setRollingB(false); setRollingG(false);
     setMovable([]); setWinner(null); setLives({blue:5,green:5}); setTimeLeft(30);
-    scriptIdx.current=0;
-    setMsg(`${playerName.split(" ")[0]} — clica nos dados!`);
+    setMsg(myColor==="blue"?myTurnMsg:oppTurnMsg);
   }
 
   const blueFinished  = finishedCount(pieces,"blue");
@@ -1060,7 +1112,7 @@ export default function LudoGame() {
             border:"1px solid rgba(255,255,255,0.12)",
             display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer",
           }}>
-            <ArrowLeft style={{width:16,height:16,color:"#9BB4E8"}}/>
+            <ArrowLeft style={{ width:16, height:16, color:"#9BB4E8" }}/>
           </button>
           <div style={{ textAlign:"center" }}>
             <p style={{
@@ -1079,40 +1131,41 @@ export default function LudoGame() {
             borderRadius:8,
           }}>
             <span style={{ fontSize:10, color:"#FFD700", fontWeight:700, fontFamily:"'Syne',sans-serif" }}>
-              {BET_AMOUNT} MT
+              {BET_AMOUNT>0?`${BET_AMOUNT} MT`:"Demo"}
             </span>
           </div>
         </div>
 
-        {/* ── Green panel (AI — top) */}
+        {/* ── Green panel */}
         <div style={{ padding:"5px 10px 3px", flexShrink:0 }}>
           <PlayerPanel
-            player="green" name={opponentName} balance={opponentBal}
+            player="green"
+            name={myColor==="green" ? playerName : opponentName}
+            balance={myColor==="green" ? playerBal : opponentBal}
             isActive={turn==="green"&&!winner}
             diceValue={diceGreen} rolling={rollingGreen}
-            onRoll={()=>doRoll("green")}
+            onRoll={doRoll}
             finished={greenFinished} lives={lives.green}
-            timeLeft={30} isHuman={false}
+            timeLeft={timeLeft} isMe={myColor==="green"}
           />
         </div>
 
-        {/* ── Status message — slim single line */}
+        {/* ── Status message */}
         <div style={{ padding:"2px 10px", flexShrink:0 }}>
           <AnimatePresence mode="wait">
             <motion.div key={msg}
               initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
               transition={{duration:0.18}}
-              style={{ textAlign:"center" }}>
+              style={{textAlign:"center"}}>
               <p style={{
                 fontSize:10.5, fontWeight:600,
-                color:"rgba(200,215,255,0.6)", letterSpacing:0.2,
-                lineHeight:1,
+                color:"rgba(200,215,255,0.6)", letterSpacing:0.2, lineHeight:1,
               }}>{msg}</p>
             </motion.div>
           </AnimatePresence>
         </div>
 
-        {/* ── Board — takes remaining space, stays square */}
+        {/* ── Board */}
         <div style={{
           flex:1, minHeight:0,
           padding:"0 8px",
@@ -1123,7 +1176,7 @@ export default function LudoGame() {
           </div>
         </div>
 
-        {/* ── Turn indicator pill — merged with bottom spacing */}
+        {/* ── Turn indicator */}
         <div style={{ padding:"2px 10px 2px", display:"flex", justifyContent:"center", flexShrink:0 }}>
           <motion.div
             animate={{ opacity:[0.6,1,0.6] }}
@@ -1136,27 +1189,32 @@ export default function LudoGame() {
             }}>
             <div style={{
               width:4.5, height:4.5, borderRadius:"50%",
-              background: turn==="blue" ? "#4F8EF7" : "#34D469",
-              boxShadow: turn==="blue" ? "0 0 4px #4F8EF7" : "0 0 4px #34D469",
+              background:turn==="blue"?"#4F8EF7":"#34D469",
+              boxShadow:turn==="blue"?"0 0 4px #4F8EF7":"0 0 4px #34D469",
             }}/>
             <span style={{
               fontSize:9, fontWeight:700, letterSpacing:0.8, textTransform:"uppercase",
-              color: turn==="blue" ? "#4F8EF7" : "#34D469",
+              color:turn==="blue"?"#4F8EF7":"#34D469",
             }}>
-              Vez de {turn==="blue" ? playerName.split(" ")[0] : opponentName}
+              {turn===myColor
+                ?`Tua vez — ${playerName.split(" ")[0]}`
+                :`Vez de ${opponentName}`
+              }
             </span>
           </motion.div>
         </div>
 
-        {/* ── Blue panel (human — bottom) */}
+        {/* ── Blue panel */}
         <div style={{ padding:"2px 10px 7px", flexShrink:0 }}>
           <PlayerPanel
-            player="blue" name={playerName} balance={playerBal}
+            player="blue"
+            name={myColor==="blue" ? playerName : opponentName}
+            balance={myColor==="blue" ? playerBal : opponentBal}
             isActive={turn==="blue"&&!winner}
             diceValue={diceBlue} rolling={rollingBlue}
-            onRoll={()=>doRoll("blue")}
+            onRoll={doRoll}
             finished={blueFinished} lives={lives.blue}
-            timeLeft={timeLeft} isHuman={true}
+            timeLeft={timeLeft} isMe={myColor==="blue"}
           />
         </div>
 
@@ -1167,8 +1225,8 @@ export default function LudoGame() {
         {winner && (
           <WinScreen
             winner={winner}
-            winnerName={winner==="blue"?playerName:opponentName}
-            loserName={winner==="blue"?opponentName:playerName}
+            winnerName={winner===myColor?playerName:opponentName}
+            loserName={winner===myColor?opponentName:playerName}
             betAmount={BET_AMOUNT}
             onReplay={resetGame}
             onQuit={()=>setLocation("/")}
