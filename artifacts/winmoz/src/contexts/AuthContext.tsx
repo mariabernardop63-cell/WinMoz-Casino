@@ -40,13 +40,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     if (localStorage.getItem(DEMO_STORAGE_KEY) === "true") return;
-    const result = await authApi.me();
-    if (result) {
-      setUser(result.user);
-      setProfile(result.profile);
-    } else {
-      setUser(null);
-      setProfile(null);
+    try {
+      const result = await authApi.me();
+      if (result) {
+        setUser(result.user);
+        setProfile(result.profile);
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+    } catch {
+      // backend unavailable — keep current state
     }
   };
 
@@ -57,11 +61,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    const result = await authApi.me();
-    if (result) {
-      setUser(result.user);
-      setProfile(result.profile);
-    } else {
+    try {
+      const result = await authApi.me();
+      if (result) {
+        setUser(result.user);
+        setProfile(result.profile);
+      } else {
+        setUser(null);
+        setProfile(null);
+      }
+    } catch {
       setUser(null);
       setProfile(null);
     }
@@ -94,6 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(result.user);
         setProfile(result.profile);
       }
+      setLoading(false);
+    }).catch(() => {
+      // backend unavailable — just finish loading so the UI unblocks
       setLoading(false);
     });
   }, []);
