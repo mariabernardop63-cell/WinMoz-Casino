@@ -49,13 +49,7 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
-    hmr: isReplit
-      ? {
-          clientPort: 443,
-          protocol: "wss",
-          host: process.env.REPLIT_DEV_DOMAIN,
-        }
-      : true,
+    hmr: isReplit ? false : true,
     fs: {
       strict: true,
     },
