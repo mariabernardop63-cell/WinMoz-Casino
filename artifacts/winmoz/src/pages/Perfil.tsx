@@ -11,8 +11,9 @@ import {
 import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 
-function fmtMZN(val: number): string {
-  const str = val.toFixed(2);
+function fmtMZN(val: string | number): string {
+  const n = typeof val === "string" ? parseFloat(val) || 0 : (isFinite(val) ? val : 0);
+  const str = n.toFixed(2);
   const [int, dec] = str.split(".");
   return `${Number(int).toLocaleString("pt-PT")},${dec}`;
 }

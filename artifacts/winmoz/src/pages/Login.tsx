@@ -54,6 +54,7 @@ export default function Login() {
     try {
       await authApi.login(email.trim().toLowerCase(), password);
       await forceRefresh();
+      setLoading(false);
       setLocation("/");
     } catch (err: any) {
       setLoading(false);
