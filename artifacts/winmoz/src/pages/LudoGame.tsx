@@ -9,7 +9,7 @@ type PieceId = "B0"|"B1"|"B2"|"B3"|"G0"|"G1"|"G2"|"G3";
 type Phase = "roll"|"select"|"moving"|"done";
 interface GamePiece { id: PieceId; player: Player; pos: number; }
 
-// ─── Board Geometry ───────────────────────────────────────────────────────────
+// ─── Board Geometry (unchanged) ───────────────────────────────────────────────
 const TRACK: [number,number][] = [
   [13,6],[12,6],[11,6],[10,6],[9,6],
   [8,5],[8,4],[8,3],[8,2],[8,1],[8,0],
@@ -31,8 +31,6 @@ const HOME_SLOTS: Record<Player,[number,number][]> = {
   blue:  [[10,1],[10,3],[12,1],[12,3]],
   green: [[2,10],[2,12],[4,10],[4,12]],
 };
-const RED_SLOTS:    [number,number][] = [[2,1],[2,3],[4,1],[4,3]];
-const YELLOW_SLOTS: [number,number][] = [[10,10],[10,12],[12,10],[12,12]];
 const SAFE_IDX = [0,9,13,18,26,35,39,44];
 const SAFE_COORDS = new Set(SAFE_IDX.map(i=>`${TRACK[i][0]},${TRACK[i][1]}`));
 
@@ -43,334 +41,350 @@ function getPieceCoord(p: GamePiece): [number,number] {
   return [7,7];
 }
 
-// ─── Cell background ──────────────────────────────────────────────────────────
-function cellBg(r:number,c:number):string {
-  if (c===7&&r>=8&&r<=13) return "#93c5fd";
-  if (c===7&&r>=1&&r<=6)  return "#86efac";
-  if (r===7&&c>=1&&c<=6)  return "#fca5a5";
-  if (r===7&&c>=8&&c<=13) return "#fde047";
-  if (r>=9&&c<=5) { if(r>=10&&r<=13&&c>=1&&c<=4) return "#dbeafe"; return "#2563eb"; }
-  if (r<=5&&c>=9) { if(r>=1&&r<=4&&c>=10&&c<=13) return "#dcfce7"; return "#16a34a"; }
-  if (r<=5&&c<=5) { if(r>=1&&r<=4&&c>=1&&c<=4)   return "#fee2e2"; return "#dc2626"; }
-  if (r>=9&&c>=9) { if(r>=10&&r<=13&&c>=10&&c<=13)return "#fef9c3"; return "#ca8a04"; }
-  if (r>=6&&r<=8&&c>=6&&c<=8) {
-    if(r===7&&c===7) return "transparent";
-    if(r===8&&c===7) return "#93c5fd";
-    if(r===6&&c===7) return "#86efac";
-    if(r===7&&c===6) return "#fca5a5";
-    if(r===7&&c===8) return "#fde047";
-    return "#f1f5f9";
-  }
-  return "#ffffff";
-}
-
-const BOARD_BG = Array.from({length:15},(_,r)=>Array.from({length:15},(_,c)=>cellBg(r,c)));
-
-// ─── Is a home circle slot ────────────────────────────────────────────────────
-function isHomeCircle(r:number,c:number): string|null {
-  if(r>=1&&r<=4&&c>=1&&c<=4) return "red";
-  if(r>=1&&r<=4&&c>=10&&c<=13) return "green";
-  if(r>=10&&r<=13&&c>=1&&c<=4) return "blue";
-  if(r>=10&&r<=13&&c>=10&&c<=13) return "yellow";
-  return null;
-}
-
-// ─── Center triangle SVG ──────────────────────────────────────────────────────
-function CenterStar() {
-  return (
-    <svg viewBox="0 0 3 3" width="100%" height="100%" style={{display:"block"}}>
-      {/* 4 triangles */}
-      <polygon points="0,0 3,0 1.5,1.5" fill="#fca5a5" opacity="0.9"/>
-      <polygon points="3,0 3,3 1.5,1.5" fill="#fde047" opacity="0.9"/>
-      <polygon points="3,3 0,3 1.5,1.5" fill="#93c5fd" opacity="0.9"/>
-      <polygon points="0,3 0,0 1.5,1.5" fill="#86efac" opacity="0.9"/>
-      {/* border lines */}
-      <line x1="0" y1="0" x2="1.5" y2="1.5" stroke="white" strokeWidth="0.06" opacity="0.6"/>
-      <line x1="3" y1="0" x2="1.5" y2="1.5" stroke="white" strokeWidth="0.06" opacity="0.6"/>
-      <line x1="3" y1="3" x2="1.5" y2="1.5" stroke="white" strokeWidth="0.06" opacity="0.6"/>
-      <line x1="0" y1="3" x2="1.5" y2="1.5" stroke="white" strokeWidth="0.06" opacity="0.6"/>
-      {/* center circle */}
-      <circle cx="1.5" cy="1.5" r="0.45" fill="white" opacity="0.9"/>
-      <circle cx="1.5" cy="1.5" r="0.3" fill="#f8fafc"/>
-    </svg>
-  );
-}
-
-// ─── Dice Dots (red on ivory) ─────────────────────────────────────────────────
-const DOT_POSITIONS: Record<number, [number,number][]> = {
-  1: [[50,50]],
-  2: [[25,25],[75,75]],
-  3: [[25,25],[50,50],[75,75]],
-  4: [[25,25],[75,25],[25,75],[75,75]],
-  5: [[25,25],[75,25],[50,50],[25,75],[75,75]],
-  6: [[25,20],[75,20],[25,50],[75,50],[25,80],[75,80]],
+// ─── Colors ───────────────────────────────────────────────────────────────────
+const Q = {
+  red:    { main:"#E01010", bg:"#CC0E0E" },
+  green:  { main:"#16A832", bg:"#128A29" },
+  blue:   { main:"#1565D8", bg:"#0F52C0" },
+  yellow: { main:"#D4B000", bg:"#B89800" },
+};
+const STRETCH = {
+  red:    "#F87171",
+  green:  "#4ADE80",
+  blue:   "#60A5FA",
+  yellow: "#FACC15",
 };
 
-function DiceFace({ value, sz }: { value: number; sz: number }) {
-  const dots = DOT_POSITIONS[value] || [];
-  const dotR = sz * 0.095;
-  return (
-    <svg viewBox="0 0 100 100" width={sz} height={sz} style={{display:"block"}}>
-      {dots.map(([cx,cy], i) => (
-        <circle key={i} cx={cx} cy={cy} r={dotR*100/sz} fill="#C0140C"
-          filter="url(#ds)"/>
-      ))}
-      <defs>
-        <filter id="ds" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="1" dy="1" stdDeviation="1" floodOpacity="0.3"/>
-        </filter>
-      </defs>
-    </svg>
-  );
-}
-
-// ─── 3D Ivory Dice ────────────────────────────────────────────────────────────
-function Dice3D({value,rolling,onClick,active,sz=58}:{
-  value:number|null; rolling:boolean; onClick:()=>void; active:boolean; sz?:number;
-}) {
-  const h = sz/2;
-  const [rollKey, setRollKey] = useState(0);
-  const [disp, setDisp] = useState(1);
-
-  const targetFaceRot: Record<number,{rx:number,ry:number}> = {
-    1:{rx:0,ry:0}, 2:{rx:-90,ry:0}, 3:{rx:0,ry:-90},
-    4:{rx:0,ry:90}, 5:{rx:90,ry:0}, 6:{rx:0,ry:180}
-  };
-
-  useEffect(()=>{
-    if(!rolling){ if(value!==null) setDisp(value); return; }
-    setRollKey(k=>k+1);
-    let n=0;
-    const iv=setInterval(()=>{ setDisp(Math.floor(Math.random()*6)+1); n++; if(n>12) clearInterval(iv); },50);
-    return ()=>clearInterval(iv);
-  },[rolling,value]);
-
-  const tr = targetFaceRot[disp]||{rx:0,ry:0};
-
-  // face: [value, transform, shade]
-  const faces: [number, string, string][] = [
-    [1, `translateZ(${h}px)`,                "#FFFEF2"],
-    [6, `rotateY(180deg) translateZ(${h}px)`, "#F5F0E0"],
-    [2, `rotateX(90deg) translateZ(${h}px)`,  "#FAF7E8"],
-    [5, `rotateX(-90deg) translateZ(${h}px)`, "#F0EBD8"],
-    [3, `rotateY(90deg) translateZ(${h}px)`,  "#F7F3E5"],
-    [4, `rotateY(-90deg) translateZ(${h}px)`, "#F2EDE0"],
-  ];
-
-  const r = sz * 0.16;
-
-  return (
-    <div
-      onClick={active&&!rolling ? onClick : undefined}
-      style={{
-        perspective: "280px", width:sz, height:sz,
-        cursor: active&&!rolling ? "pointer" : "default",
-        filter: active ? "drop-shadow(0 4px 10px rgba(0,0,0,0.5))" : "drop-shadow(0 2px 5px rgba(0,0,0,0.3))",
-      }}
-    >
-      <motion.div
-        key={rollKey}
-        animate={rolling
-          ? {rotateX:[0,-180,-360,tr.rx+360], rotateY:[0,180,360,tr.ry+360]}
-          : {rotateX:tr.rx, rotateY:tr.ry}}
-        transition={rolling ? {duration:0.75,ease:"easeOut"} : {duration:0.15}}
-        style={{width:sz, height:sz, transformStyle:"preserve-3d", position:"relative"}}
-      >
-        {faces.map(([v,t,bg])=>(
-          <div key={v} style={{
-            position:"absolute", inset:0,
-            background: `radial-gradient(circle at 32% 28%, #FFFFF8, ${bg})`,
-            borderRadius: r,
-            border: "1px solid rgba(160,140,100,0.4)",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            backfaceVisibility:"hidden",
-            transform: t,
-            boxShadow: "inset 1px 1px 3px rgba(255,255,255,0.9), inset -1px -1px 3px rgba(0,0,0,0.12)",
-          }}>
-            <DiceFace value={v} sz={sz*0.8}/>
-          </div>
-        ))}
-      </motion.div>
-    </div>
-  );
-}
-
-// ─── 3D Pawn ──────────────────────────────────────────────────────────────────
-const PAWN_COLORS: Record<Player,{fill:string;mid:string;dark:string;shine:string}> = {
-  blue:  {fill:"#4f9ef8", mid:"#2563eb", dark:"#1d4ed8", shine:"#93c5fd"},
-  green: {fill:"#4ade80", mid:"#16a34a", dark:"#166534", shine:"#86efac"},
+// ─── 3D Pawn SVG ──────────────────────────────────────────────────────────────
+type PawnColor = "red"|"green"|"blue"|"yellow";
+const PAWN_PALETTE: Record<PawnColor,{s:string;m:string;d:string;sh:string}> = {
+  red:    { s:"#FCA5A5", m:"#EF4444", d:"#B91C1C", sh:"#7F1D1D" },
+  green:  { s:"#86EFAC", m:"#22C55E", d:"#15803D", sh:"#14532D" },
+  blue:   { s:"#93C5FD", m:"#3B82F6", d:"#1D4ED8", sh:"#1E3A8A" },
+  yellow: { s:"#FDE68A", m:"#EAB308", d:"#A16207", sh:"#713F12" },
 };
 
-function Pawn({player,size=20,vibrate=false,glow=false}:{
-  player:Player; size?:number; vibrate?:boolean; glow?:boolean;
+function Pawn({ color, size=28, vibrate=false, glow=false }: {
+  color: PawnColor; size?: number; vibrate?: boolean; glow?: boolean;
 }) {
-  const {fill,mid,dark,shine} = PAWN_COLORS[player];
-  const id = `pg_${player}_${size}`;
+  const p = PAWN_PALETTE[color];
+  const id = `pw_${color}_${size}`;
   return (
     <motion.div
-      animate={vibrate ? {y:[0,-2.5,0,-2.5,0]} : {y:0}}
-      transition={vibrate ? {duration:0.5,repeat:Infinity,ease:"easeInOut"} : {}}
+      animate={vibrate ? { y:[0,-3,0,-3,0] } : { y:0 }}
+      transition={vibrate ? { duration:0.55, repeat:Infinity, ease:"easeInOut" } : {}}
       style={{
-        filter: glow ? `drop-shadow(0 0 6px ${fill}) drop-shadow(0 0 2px ${fill})` : "drop-shadow(0 2px 2px rgba(0,0,0,0.5))",
+        filter: glow
+          ? `drop-shadow(0 0 8px ${p.m}) drop-shadow(0 3px 5px rgba(0,0,0,0.55))`
+          : "drop-shadow(0 3px 5px rgba(0,0,0,0.5))",
         display:"flex", flexShrink:0,
       }}
     >
-      <svg viewBox="0 0 28 38" width={size} height={Math.round(size*38/28)}>
+      <svg viewBox="0 0 100 130" width={size} height={Math.round(size*130/100)}>
         <defs>
-          <radialGradient id={`hg_${id}`} cx="35%" cy="30%" r="65%">
-            <stop offset="0%" stopColor={shine}/>
-            <stop offset="60%" stopColor={fill}/>
-            <stop offset="100%" stopColor={mid}/>
+          <radialGradient id={`hd_${id}`} cx="34%" cy="30%" r="66%">
+            <stop offset="0%"   stopColor={p.s}/>
+            <stop offset="40%"  stopColor={p.m}/>
+            <stop offset="100%" stopColor={p.d}/>
           </radialGradient>
-          <radialGradient id={`bg_${id}`} cx="35%" cy="25%" r="70%">
-            <stop offset="0%" stopColor={fill}/>
-            <stop offset="100%" stopColor={dark}/>
+          <radialGradient id={`bd_${id}`} cx="38%" cy="28%" r="72%">
+            <stop offset="0%"   stopColor={p.m}/>
+            <stop offset="100%" stopColor={p.d}/>
           </radialGradient>
-          <radialGradient id={`sg_${id}`} cx="50%" cy="40%" r="60%">
-            <stop offset="0%" stopColor={mid}/>
-            <stop offset="100%" stopColor={dark}/>
+          <radialGradient id={`bs_${id}`} cx="38%" cy="38%" r="65%">
+            <stop offset="0%"   stopColor={p.m}/>
+            <stop offset="100%" stopColor={p.sh}/>
           </radialGradient>
         </defs>
-        {/* Shadow */}
-        <ellipse cx="14" cy="36.5" rx="8" ry="2.2" fill="rgba(0,0,0,0.28)"/>
-        {/* Base */}
-        <ellipse cx="14" cy="33" rx="8.5" ry="3.2" fill={`url(#sg_${id})`}/>
-        <ellipse cx="14" cy="33" rx="8.5" ry="3.2" fill="none" stroke={dark} strokeWidth="0.7" opacity="0.6"/>
-        {/* Skirt */}
-        <path d="M5.5 30 Q6 26 10 24.5 Q14 23.5 18 24.5 Q22 26 22.5 30 Q18 32.5 10 32.5 Z"
-          fill={`url(#bg_${id})`} stroke={dark} strokeWidth="0.6" opacity="0.9"/>
-        {/* Stem */}
-        <rect x="11" y="16" width="6" height="10" rx="2.5"
-          fill={`url(#bg_${id})`} stroke={dark} strokeWidth="0.6"/>
-        {/* Collar */}
-        <ellipse cx="14" cy="17" rx="5.5" ry="2" fill={mid} stroke={dark} strokeWidth="0.5"/>
-        {/* Head */}
-        <circle cx="14" cy="10" r="8.5" fill={`url(#hg_${id})`} stroke={dark} strokeWidth="0.8"/>
-        {/* Head shine */}
-        <ellipse cx="11" cy="7" rx="3.5" ry="2.2" fill="white" opacity="0.35"/>
-        <ellipse cx="11.5" cy="6.5" rx="1.8" ry="1.1" fill="white" opacity="0.5"/>
+
+        {/* Drop shadow */}
+        <ellipse cx="50" cy="127" rx="28" ry="5.5" fill="rgba(0,0,0,0.22)"/>
+
+        {/* Base disc bottom */}
+        <ellipse cx="50" cy="120" rx="29" ry="9"   fill={p.sh} opacity="0.7"/>
+        {/* Base disc top */}
+        <ellipse cx="50" cy="116" rx="29" ry="9"   fill={`url(#bs_${id})`}/>
+        {/* Base rim highlight */}
+        <ellipse cx="50" cy="113" rx="26" ry="5"   fill={p.m}  opacity="0.25"/>
+
+        {/* Bell / skirt */}
+        <path
+          d="M21 109 Q23 90 31 85 Q39 80 50 80 Q61 80 69 85 Q77 90 79 109 Q65 117 50 117 Q35 117 21 109Z"
+          fill={`url(#bd_${id})`}
+        />
+        {/* Skirt inner highlight */}
+        <path
+          d="M26 107 Q28 93 35 89 Q42 85 50 85 Q58 85 65 89 Q72 93 74 107"
+          fill="none" stroke={p.s} strokeWidth="1.5" opacity="0.25"
+        />
+
+        {/* Neck */}
+        <rect x="40" y="66" width="20" height="17" rx="8" fill={`url(#bd_${id})`}/>
+
+        {/* Collar ring */}
+        <ellipse cx="50" cy="68" rx="18" ry="6.5" fill={p.d}/>
+        <ellipse cx="50" cy="67" rx="16" ry="4.5" fill={p.m} opacity="0.55"/>
+
+        {/* Head shadow ring */}
+        <circle cx="50" cy="44"  r="35" fill={p.sh} opacity="0.22"/>
+        {/* Head sphere */}
+        <circle cx="50" cy="41"  r="33" fill={`url(#hd_${id})`}/>
+        {/* Head outline */}
+        <circle cx="50" cy="41"  r="33" fill="none" stroke={p.d} strokeWidth="0.6" opacity="0.4"/>
+
+        {/* Specular highlight – large */}
+        <ellipse cx="37" cy="27" rx="13" ry="10"  fill="white" opacity="0.38"/>
+        {/* Specular highlight – sharp */}
+        <ellipse cx="34" cy="24" rx="7"  ry="5.5" fill="white" opacity="0.58"/>
       </svg>
     </motion.div>
   );
 }
 
-// ─── Board ────────────────────────────────────────────────────────────────────
-function Board({pieces,movable,onSelectPiece}:{
-  pieces:GamePiece[]; movable:PieceId[]; onSelectPiece:(id:PieceId)=>void;
+// ─── Star shape helper ─────────────────────────────────────────────────────────
+function StarShape({ cx, cy, r, fill, stroke, strokeWidth=0, opacity=1 }:{
+  cx:number; cy:number; r:number; fill:string; stroke?:string; strokeWidth?:number; opacity?:number;
 }) {
-  const cellMap = new Map<string,GamePiece[]>();
-  pieces.forEach(p=>{
-    const [r,c]=getPieceCoord(p);
-    cellMap.set(`${r},${c}`,[...(cellMap.get(`${r},${c}`)||[]),p]);
+  const pts: string[] = [];
+  for (let i=0;i<10;i++) {
+    const angle = (i*36 - 90) * Math.PI/180;
+    const rad = i%2===0 ? r : r*0.42;
+    pts.push(`${cx+Math.cos(angle)*rad},${cy+Math.sin(angle)*rad}`);
+  }
+  return (
+    <polygon
+      points={pts.join(" ")}
+      fill={fill}
+      stroke={stroke}
+      strokeWidth={strokeWidth}
+      opacity={opacity}
+    />
+  );
+}
+
+// ─── SVG Board Background ─────────────────────────────────────────────────────
+const CS = 40; // cell size in SVG units
+const SZ = 15 * CS; // 600
+
+function cellColor(r:number, c:number): string {
+  // Colored home stretches
+  if (c===7 && r>=1 && r<=6)  return STRETCH.green;
+  if (c===7 && r>=8 && r<=13) return STRETCH.blue;
+  if (r===7 && c>=1 && c<=6)  return STRETCH.red;
+  if (r===7 && c>=8 && c<=13) return STRETCH.yellow;
+  // Starting squares (colored with player color + will get star)
+  if (r===13 && c===6) return Q.blue.main;    // blue start
+  if (r===1  && c===8) return Q.green.main;   // green start
+  if (r===6  && c===1) return Q.red.main;     // red start
+  if (r===8  && c===13) return Q.yellow.main; // yellow start
+  return "#FFFFFF";
+}
+
+function BoardSVG() {
+  // Path cells: everything NOT in 6x6 corner quadrants
+  const pathCells: [number,number][] = [];
+  for (let r=0;r<15;r++) {
+    for (let c=0;c<15;c++) {
+      const inQ = (r<=5&&c<=5)||(r<=5&&c>=9)||(r>=9&&c<=5)||(r>=9&&c>=9);
+      if (!inQ) pathCells.push([r,c]);
+    }
+  }
+
+  // Safe squares that are NOT starting squares (show gray outline star)
+  const grayStarCoords = new Set(
+    SAFE_IDX.map(i => `${TRACK[i][0]},${TRACK[i][1]}`)
+  );
+  // Remove the colored starting squares (they get white star below)
+  const coloredStarts = new Set(["13,6","1,8","6,1","8,13"]);
+
+  // Decorative pawn centers inside home areas (SVG coords, center of each slot)
+  const redPawnCenters:   [number,number][] = [[1,1],[1,3],[3,1],[3,3]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]);
+  const yellowPawnCenters:[number,number][] = [[10,10],[10,12],[12,10],[12,12]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]);
+
+  return (
+    <svg
+      viewBox={`0 0 ${SZ} ${SZ}`}
+      width="100%" height="100%"
+      style={{ display:"block", position:"absolute", inset:0 }}
+      preserveAspectRatio="xMidYMid meet"
+    >
+      {/* Outer navy background */}
+      <rect x={0} y={0} width={SZ} height={SZ} fill="#0E1B4A" rx={6}/>
+
+      {/* ── Quadrant fills ── */}
+      <rect x={0}   y={0}   width={240} height={240} fill={Q.red.main}/>
+      <rect x={360} y={0}   width={240} height={240} fill={Q.green.main}/>
+      <rect x={0}   y={360} width={240} height={240} fill={Q.blue.main}/>
+      <rect x={360} y={360} width={240} height={240} fill={Q.yellow.main}/>
+
+      {/* ── Path cells (white + colored stretches) ── */}
+      {pathCells.map(([r,c])=>{
+        const x=c*CS, y=r*CS;
+        const isCenter = r>=6&&r<=8&&c>=6&&c<=8;
+        if (isCenter) return null; // center handled separately
+        const fill = cellColor(r,c);
+        return (
+          <rect key={`${r},${c}`} x={x} y={y} width={CS} height={CS}
+            fill={fill} stroke="#BBBBBB" strokeWidth="0.6"/>
+        );
+      })}
+
+      {/* ── Center 3×3 with colored triangles ── */}
+      {/* Background */}
+      <rect x={240} y={240} width={120} height={120} fill="#FFFFFF" stroke="#BBBBBB" strokeWidth="0.6"/>
+      {/* Green (from top) */}
+      <polygon points={`240,240 360,240 300,300`} fill={Q.green.main}/>
+      {/* Yellow (from right) */}
+      <polygon points={`360,240 360,360 300,300`} fill={Q.yellow.main}/>
+      {/* Blue (from bottom) */}
+      <polygon points={`360,360 240,360 300,300`} fill={Q.blue.main}/>
+      {/* Red (from left) */}
+      <polygon points={`240,360 240,240 300,300`} fill={Q.red.main}/>
+      {/* Center dividers */}
+      <line x1={240} y1={240} x2={300} y2={300} stroke="white" strokeWidth="1.2" opacity="0.7"/>
+      <line x1={360} y1={240} x2={300} y2={300} stroke="white" strokeWidth="1.2" opacity="0.7"/>
+      <line x1={360} y1={360} x2={300} y2={300} stroke="white" strokeWidth="1.2" opacity="0.7"/>
+      <line x1={240} y1={360} x2={300} y2={300} stroke="white" strokeWidth="1.2" opacity="0.7"/>
+      {/* Center border */}
+      <rect x={240} y={240} width={120} height={120} fill="none" stroke="#BBBBBB" strokeWidth="0.6"/>
+
+      {/* ── Safe square stars (gray outline on white cells) ── */}
+      {SAFE_IDX.map(i=>{
+        const [r,c] = TRACK[i];
+        const key = `${r},${c}`;
+        if (coloredStarts.has(key)) return null; // skip colored starts
+        const cx = (c+0.5)*CS, cy = (r+0.5)*CS;
+        return (
+          <StarShape key={key} cx={cx} cy={cy} r={CS*0.36}
+            fill="none" stroke="#AAAAAA" strokeWidth={1.8} opacity={0.9}/>
+        );
+      })}
+
+      {/* ── Starting square stars (white filled on colored cells) ── */}
+      {[["13,6"],["1,8"],["6,1"],["8,13"]].map(([key])=>{
+        const [r,c] = key.split(",").map(Number);
+        return (
+          <StarShape key={key} cx={(c+0.5)*CS} cy={(r+0.5)*CS} r={CS*0.36}
+            fill="white" opacity={0.9}/>
+        );
+      })}
+
+      {/* ── Home area white rounded rectangles ── */}
+      {/* Red home */}
+      <rect x={44} y={44} width={152} height={152} rx={18} fill="white"/>
+      <rect x={44} y={44} width={152} height={152} rx={18} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={1}/>
+      {/* Green home */}
+      <rect x={404} y={44} width={152} height={152} rx={18} fill="white"/>
+      <rect x={404} y={44} width={152} height={152} rx={18} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={1}/>
+      {/* Blue home */}
+      <rect x={44} y={404} width={152} height={152} rx={18} fill="white"/>
+      <rect x={44} y={404} width={152} height={152} rx={18} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={1}/>
+      {/* Yellow home */}
+      <rect x={404} y={404} width={152} height={152} rx={18} fill="white"/>
+      <rect x={404} y={404} width={152} height={152} rx={18} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={1}/>
+
+      {/* ── Decorative Red pawns in red home ── */}
+      {redPawnCenters.map(([px,py],i)=>(
+        <DecoSVGPawn key={i} cx={px} cy={py} color="red"/>
+      ))}
+
+      {/* ── Decorative Yellow pawns in yellow home ── */}
+      {yellowPawnCenters.map(([px,py],i)=>(
+        <DecoSVGPawn key={i} cx={px} cy={py} color="yellow"/>
+      ))}
+
+      {/* ── Overall board border ── */}
+      <rect x={0} y={0} width={SZ} height={SZ} fill="none" stroke="#0A1440" strokeWidth={4} rx={6}/>
+    </svg>
+  );
+}
+
+// Inline SVG pawn for decorative use inside the board SVG
+function DecoSVGPawn({ cx, cy, color }: { cx:number; cy:number; color:"red"|"yellow" }) {
+  const p = PAWN_PALETTE[color];
+  const r = 14; // pawn "radius" in SVG units
+  const id = `deco_${color}_${cx}_${cy}`;
+  return (
+    <g transform={`translate(${cx},${cy-r*0.6})`}>
+      <defs>
+        <radialGradient id={`dhd_${id}`} cx="34%" cy="30%" r="66%">
+          <stop offset="0%"   stopColor={p.s}/>
+          <stop offset="45%"  stopColor={p.m}/>
+          <stop offset="100%" stopColor={p.d}/>
+        </radialGradient>
+      </defs>
+      {/* Shadow */}
+      <ellipse cx={0} cy={r*2.05} rx={r*0.9} ry={r*0.22} fill="rgba(0,0,0,0.18)"/>
+      {/* Base */}
+      <ellipse cx={0} cy={r*1.8}  rx={r*0.9} ry={r*0.3}  fill={p.d}/>
+      <ellipse cx={0} cy={r*1.68} rx={r*0.9} ry={r*0.3}  fill={p.m}/>
+      {/* Skirt */}
+      <path
+        d={`M${-r*0.65} ${r*1.5} Q${-r*0.7} ${r*1.0} ${-r*0.35} ${r*0.82} Q0 ${r*0.7} 0 ${r*0.7} Q0 ${r*0.7} ${r*0.35} ${r*0.82} Q${r*0.7} ${r*1.0} ${r*0.65} ${r*1.5} Z`}
+        fill={p.m}
+      />
+      {/* Neck */}
+      <rect x={-r*0.22} y={r*0.28} width={r*0.44} height={r*0.44} rx={r*0.15} fill={p.m}/>
+      {/* Head */}
+      <circle cx={0} cy={0} r={r*0.7} fill={`url(#dhd_${id})`}/>
+      {/* Highlight */}
+      <ellipse cx={-r*0.2} cy={-r*0.2} rx={r*0.25} ry={r*0.2} fill="white" opacity={0.45}/>
+    </g>
+  );
+}
+
+// ─── Board Component ───────────────────────────────────────────────────────────
+function Board({ pieces, movable, onSelectPiece }: {
+  pieces: GamePiece[]; movable: PieceId[]; onSelectPiece: (id:PieceId)=>void;
+}) {
+  const cellMap = new Map<string, GamePiece[]>();
+  pieces.forEach(p => {
+    const [r,c] = getPieceCoord(p);
+    const k = `${r},${c}`;
+    cellMap.set(k, [...(cellMap.get(k)||[]), p]);
   });
-
-  const safeCoordSet = SAFE_COORDS;
-
-  // Home slot coords per player
-  const blueHomeSet = new Set(HOME_SLOTS.blue.map(([r,c])=>`${r},${c}`));
-  const greenHomeSet = new Set(HOME_SLOTS.green.map(([r,c])=>`${r},${c}`));
-  const redSet = new Set(RED_SLOTS.map(([r,c])=>`${r},${c}`));
-  const yellowSet = new Set(YELLOW_SLOTS.map(([r,c])=>`${r},${c}`));
 
   return (
     <div style={{
-      display:"grid", gridTemplateColumns:"repeat(15,1fr)", gridTemplateRows:"repeat(15,1fr)",
-      width:"100%", aspectRatio:"1",
-      border:"3px solid #1e3a5f",
-      borderRadius:8, overflow:"hidden",
-      boxShadow:"0 8px 32px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.05)",
+      position:"relative",
+      width:"100%",
+      aspectRatio:"1",
+      borderRadius:8,
+      overflow:"hidden",
+      boxShadow:"0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.4)",
     }}>
-      {Array.from({length:225},(_,i)=>{
-        const r=Math.floor(i/15), c=i%15;
-        const k=`${r},${c}`;
-        const bg=BOARD_BG[r][c];
-        const here=(cellMap.get(k)||[]);
-        const isCenter=r===7&&c===7;
-        const isSafe = safeCoordSet.has(k);
-        const isHomeCircle_ = isHomeCircle(r,c);
-        const isBlueHome = blueHomeSet.has(k);
-        const isGreenHome = greenHomeSet.has(k);
-        const isRedDeco = redSet.has(k);
-        const isYellowDeco = yellowSet.has(k);
+      <BoardSVG/>
 
-        let circleColor: string|null = null;
-        if (isBlueHome)   circleColor = "#1d4ed8";
-        else if (isGreenHome)  circleColor = "#15803d";
-        else if (isRedDeco)    circleColor = "#b91c1c";
-        else if (isYellowDeco) circleColor = "#a16207";
+      {/* Piece overlay */}
+      {pieces.map(p => {
+        const [r,c] = getPieceCoord(p);
+        const here = cellMap.get(`${r},${c}`) || [];
+        const idx = here.findIndex(x => x.id === p.id);
+        const selectable = movable.includes(p.id);
+        const color: PawnColor = p.player === "blue" ? "blue" : "green";
 
+        // Offset if multiple pieces on same cell
+        let offX = 0, offY = 0;
+        if (here.length > 1) {
+          offX = idx === 0 ? -4 : 4;
+          offY = idx === 0 ? -3 : 3;
+        }
+
+        const pawnSize = 22;
         return (
-          <div key={i} style={{
-            background: isCenter ? "transparent" : bg,
-            border: "0.5px solid rgba(0,0,0,0.1)",
-            display:"flex", alignItems:"center", justifyContent:"center",
-            position:"relative", overflow:"visible",
-          }}>
-            {/* Center triangles */}
-            {isCenter && <CenterStar/>}
-
-            {/* Home circle slots */}
-            {circleColor && here.length===0 && (
-              <div style={{
-                width:"72%", height:"72%", borderRadius:"50%",
-                border: `2.5px solid ${circleColor}`,
-                background: `${circleColor}18`,
-                boxShadow: `inset 0 1px 3px rgba(0,0,0,0.15)`,
-              }}/>
-            )}
-
-            {/* Safe square star */}
-            {isSafe && here.length===0 && !isHomeCircle_ && (
-              <div style={{
-                width:"62%", height:"62%",
-                display:"flex", alignItems:"center", justifyContent:"center",
-              }}>
-                <svg viewBox="0 0 24 24" width="100%" height="100%">
-                  <polygon points="12,2 14.9,9.3 22.5,9.3 16.5,14 18.8,21.3 12,17 5.2,21.3 7.5,14 1.5,9.3 9.1,9.3"
-                    fill="none" stroke="rgba(0,0,0,0.25)" strokeWidth="2" strokeLinejoin="round"/>
-                </svg>
-              </div>
-            )}
-
-            {/* Arrow in home stretch cells pointing toward center */}
-            {c===7&&r>=8&&r<=12&&here.length===0 && (
-              <div style={{
-                width:"45%", height:"45%", display:"flex", alignItems:"center", justifyContent:"center",
-              }}>
-                <svg viewBox="0 0 10 10" width="100%" height="100%">
-                  <polygon points="5,1 9,8 5,6.5 1,8" fill="#1d4ed8" opacity="0.35"/>
-                </svg>
-              </div>
-            )}
-            {c===7&&r>=2&&r<=6&&here.length===0 && (
-              <div style={{
-                width:"45%", height:"45%", display:"flex", alignItems:"center", justifyContent:"center",
-              }}>
-                <svg viewBox="0 0 10 10" width="100%" height="100%">
-                  <polygon points="5,9 9,2 5,3.5 1,2" fill="#15803d" opacity="0.35"/>
-                </svg>
-              </div>
-            )}
-
-            {/* Pieces */}
-            {here.map((p,pi)=>{
-              const selectable=movable.includes(p.id);
-              const offX = here.length>1 ? (pi===0?-3:3) : 0;
-              const offY = here.length>1 ? (pi===0?-2:2) : 0;
-              return (
-                <div key={p.id}
-                  style={{
-                    position:"absolute",
-                    transform:`translate(${offX}px,${offY}px)`,
-                    zIndex:selectable?12:6,
-                    cursor:selectable?"pointer":"default",
-                  }}
-                  onClick={selectable ? ()=>onSelectPiece(p.id) : undefined}
-                >
-                  <Pawn player={p.player} size={15} vibrate={selectable} glow={selectable}/>
-                </div>
-              );
-            })}
+          <div
+            key={p.id}
+            onClick={selectable ? () => onSelectPiece(p.id) : undefined}
+            style={{
+              position:"absolute",
+              left:`${(c + 0.5) / 15 * 100}%`,
+              top:`${(r + 0.5) / 15 * 100}%`,
+              transform:`translate(calc(-50% + ${offX}px), calc(-50% + ${offY}px))`,
+              zIndex: selectable ? 20 : 10,
+              cursor: selectable ? "pointer" : "default",
+            }}
+          >
+            <Pawn color={color} size={pawnSize} vibrate={selectable} glow={selectable}/>
           </div>
         );
       })}
@@ -378,67 +392,164 @@ function Board({pieces,movable,onSelectPiece}:{
   );
 }
 
+// ─── Dice ─────────────────────────────────────────────────────────────────────
+const DOT_POS: Record<number,[number,number][]> = {
+  1: [[50,50]],
+  2: [[27,27],[73,73]],
+  3: [[27,27],[50,50],[73,73]],
+  4: [[27,27],[73,27],[27,73],[73,73]],
+  5: [[27,27],[73,27],[50,50],[27,73],[73,73]],
+  6: [[27,22],[73,22],[27,50],[73,50],[27,78],[73,78]],
+};
+
+function DiceFace({ value, sz }: { value:number; sz:number }) {
+  const dots = DOT_POS[value] || [];
+  return (
+    <svg viewBox="0 0 100 100" width={sz} height={sz} style={{display:"block"}}>
+      <defs>
+        <filter id="dotShadow">
+          <feDropShadow dx="0.8" dy="1.2" stdDeviation="1" floodOpacity="0.35"/>
+        </filter>
+      </defs>
+      {dots.map(([cx,cy],i)=>(
+        <circle key={i} cx={cx} cy={cy} r={9.5} fill="#C0140C" filter="url(#dotShadow)"/>
+      ))}
+    </svg>
+  );
+}
+
+function Dice3D({ value, rolling, onClick, active, sz=54 }: {
+  value:number|null; rolling:boolean; onClick:()=>void; active:boolean; sz?:number;
+}) {
+  const h = sz/2;
+  const [rollKey, setRollKey] = useState(0);
+  const [disp, setDisp] = useState(1);
+
+  const faceRot: Record<number,{rx:number;ry:number}> = {
+    1:{rx:0,ry:0}, 2:{rx:-90,ry:0}, 3:{rx:0,ry:-90},
+    4:{rx:0,ry:90}, 5:{rx:90,ry:0}, 6:{rx:0,ry:180},
+  };
+
+  useEffect(()=>{
+    if (!rolling) { if (value!==null) setDisp(value); return; }
+    setRollKey(k=>k+1);
+    let n=0;
+    const iv=setInterval(()=>{ setDisp(Math.floor(Math.random()*6)+1); n++; if(n>14) clearInterval(iv); },45);
+    return ()=>clearInterval(iv);
+  },[rolling,value]);
+
+  const tr = faceRot[disp]||{rx:0,ry:0};
+  const faces: [number,string,string][] = [
+    [1,`translateZ(${h}px)`,                "#FFFEF2"],
+    [6,`rotateY(180deg) translateZ(${h}px)`,"#F3EFE0"],
+    [2,`rotateX(90deg) translateZ(${h}px)`, "#FAF8EA"],
+    [5,`rotateX(-90deg) translateZ(${h}px)`,"#EEE9D6"],
+    [3,`rotateY(90deg) translateZ(${h}px)`, "#F6F3E2"],
+    [4,`rotateY(-90deg) translateZ(${h}px)`,"#F0ECDB"],
+  ];
+  const rad = sz * 0.14;
+
+  return (
+    <div
+      onClick={active&&!rolling ? onClick : undefined}
+      style={{
+        perspective:"300px", width:sz, height:sz,
+        cursor: active&&!rolling ? "pointer" : "default",
+        filter: active
+          ? "drop-shadow(0 5px 12px rgba(0,0,0,0.6)) drop-shadow(0 2px 4px rgba(0,0,0,0.4))"
+          : "drop-shadow(0 2px 6px rgba(0,0,0,0.4))",
+      }}
+    >
+      <motion.div
+        key={rollKey}
+        animate={rolling
+          ? {rotateX:[0,-180,-360,tr.rx+360], rotateY:[0,180,360,tr.ry+360]}
+          : {rotateX:tr.rx, rotateY:tr.ry}}
+        transition={rolling ? {duration:0.7,ease:"easeOut"} : {duration:0.12}}
+        style={{ width:sz, height:sz, transformStyle:"preserve-3d", position:"relative" }}
+      >
+        {faces.map(([v,t,bg])=>(
+          <div key={v} style={{
+            position:"absolute", inset:0,
+            background:`radial-gradient(circle at 32% 28%, #FFFFE8, ${bg})`,
+            borderRadius:rad,
+            border:"1px solid rgba(160,145,100,0.4)",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            backfaceVisibility:"hidden",
+            transform:t,
+            boxShadow:"inset 1.5px 1.5px 3px rgba(255,255,255,0.9), inset -1px -1px 3px rgba(0,0,0,0.14)",
+          }}>
+            <DiceFace value={v} sz={sz*0.78}/>
+          </div>
+        ))}
+      </motion.div>
+    </div>
+  );
+}
+
 // ─── Player Panel ─────────────────────────────────────────────────────────────
-function PlayerPanel({player,name,isActive,diceValue,rolling,onRoll,showArrow,finished}:{
-  player:Player; name:string; isActive:boolean; diceValue:number|null;
+function PlayerPanel({ player, name, isActive, diceValue, rolling, onRoll, showArrow, finished }: {
+  player: Player; name:string; isActive:boolean; diceValue:number|null;
   rolling:boolean; onRoll:()=>void; showArrow:boolean; finished:number;
 }) {
-  const {fill,dark,shine} = PAWN_COLORS[player];
+  const color: PawnColor = player === "blue" ? "blue" : "green";
+  const p = PAWN_PALETTE[color];
   return (
     <div style={{
       display:"flex", alignItems:"center", gap:10, padding:"8px 12px",
       background: isActive ? "rgba(255,255,255,0.09)" : "rgba(255,255,255,0.03)",
       borderRadius:16,
-      border: isActive ? `2px solid ${fill}55` : "2px solid transparent",
-      boxShadow: isActive ? `0 0 16px ${fill}22` : "none",
-      transition:"all 0.35s",
+      border: isActive ? `2px solid ${p.m}55` : "2px solid transparent",
+      boxShadow: isActive ? `0 0 18px ${p.m}22` : "none",
+      transition:"all 0.3s",
     }}>
       {/* Avatar */}
       <div style={{
-        width:40, height:40, borderRadius:12,
-        background:`linear-gradient(135deg, ${shine}44, ${dark}88)`,
-        border:`2px solid ${fill}66`,
+        width:42, height:42, borderRadius:13,
+        background:`linear-gradient(135deg,${p.s}40,${p.d}80)`,
+        border:`2px solid ${p.m}66`,
         display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0,
-        boxShadow:`0 2px 8px ${dark}55`,
+        boxShadow:`0 2px 8px ${p.d}55`,
       }}>
-        <Pawn player={player} size={22}/>
+        <Pawn color={color} size={24}/>
       </div>
-      {/* Name */}
+      {/* Name + progress */}
       <div style={{flex:1,minWidth:0}}>
-        <p style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,
-          color:isActive?"#fff":"rgba(255,255,255,0.4)",lineHeight:1}}>{name}</p>
-        <div style={{display:"flex",gap:3,marginTop:4}}>
+        <p style={{
+          fontFamily:"'Syne',sans-serif", fontWeight:700, fontSize:13,
+          color: isActive ? "#fff" : "rgba(255,255,255,0.4)", lineHeight:1,
+        }}>{name}</p>
+        <div style={{display:"flex", gap:4, marginTop:5}}>
           {Array.from({length:4}).map((_,i)=>(
             <div key={i} style={{
-              width:8,height:8,borderRadius:"50%",
-              background:i<finished ? fill : "rgba(255,255,255,0.12)",
-              border:`1px solid ${i<finished ? dark : "rgba(255,255,255,0.08)"}`,
-              boxShadow:i<finished ? `0 0 4px ${fill}` : "none",
+              width:9, height:9, borderRadius:"50%",
+              background: i<finished ? p.m : "rgba(255,255,255,0.12)",
+              border:`1.5px solid ${i<finished ? p.d : "rgba(255,255,255,0.08)"}`,
+              boxShadow: i<finished ? `0 0 5px ${p.m}` : "none",
               transition:"all 0.3s",
             }}/>
           ))}
         </div>
       </div>
       {/* Dice */}
-      <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <div style={{display:"flex", alignItems:"center", gap:8}}>
         <AnimatePresence>
-          {showArrow&&(
+          {showArrow && (
             <motion.div
-              initial={{opacity:0,x:player==="blue"?8:-8}}
-              animate={{opacity:1,x:0}} exit={{opacity:0}}
-              style={{fontSize:16,lineHeight:1}}
+              initial={{opacity:0, x: player==="blue" ? 8 : -8}}
+              animate={{opacity:1, x:0}} exit={{opacity:0}}
+              style={{fontSize:16, lineHeight:1}}
             >
-              {player==="blue"?"👉":"👈"}
+              {player==="blue" ? "👉" : "👈"}
             </motion.div>
           )}
         </AnimatePresence>
         <div style={{
-          background:"rgba(0,0,0,0.25)",
-          borderRadius:12,padding:6,
-          border:isActive ? `1.5px solid ${fill}44` : "1.5px solid rgba(255,255,255,0.06)",
-          boxShadow:isActive ? `0 0 12px ${fill}33` : "none",
+          background:"rgba(0,0,0,0.28)", borderRadius:12, padding:6,
+          border: isActive ? `1.5px solid ${p.m}44` : "1.5px solid rgba(255,255,255,0.07)",
+          boxShadow: isActive ? `0 0 14px ${p.m}33` : "none",
         }}>
-          <Dice3D value={diceValue} rolling={rolling} onClick={onRoll} active={isActive} sz={52}/>
+          <Dice3D value={diceValue} rolling={rolling} onClick={onRoll} active={isActive} sz={54}/>
         </div>
       </div>
     </div>
@@ -458,17 +569,17 @@ export default function LudoGame() {
     {id:"G0",player:"green",pos:-1},{id:"G1",player:"green",pos:-1},
     {id:"G2",player:"green",pos:-1},{id:"G3",player:"green",pos:-1},
   ]);
-  const [turn,setTurn]           = useState<Player>("blue");
-  const [phase,setPhase]         = useState<Phase>("roll");
-  const [diceBlue,setDiceBlue]   = useState<number|null>(null);
-  const [diceGreen,setDiceGreen] = useState<number|null>(null);
-  const [rollingBlue,setRollingBlue]   = useState(false);
-  const [rollingGreen,setRollingGreen] = useState(false);
-  const [movable,setMovable]     = useState<PieceId[]>([]);
-  const [winner,setWinner]       = useState<Player|null>(null);
-  const [msg,setMsg]             = useState("Jogador Azul – clica nos dados para começar!");
-  const scriptIdx = useRef(0);
-  const piecesRef = useRef(pieces);
+  const [turn,setTurn]                     = useState<Player>("blue");
+  const [phase,setPhase]                   = useState<Phase>("roll");
+  const [diceBlue,setDiceBlue]             = useState<number|null>(null);
+  const [diceGreen,setDiceGreen]           = useState<number|null>(null);
+  const [rollingBlue,setRollingBlue]       = useState(false);
+  const [rollingGreen,setRollingGreen]     = useState(false);
+  const [movable,setMovable]               = useState<PieceId[]>([]);
+  const [winner,setWinner]                 = useState<Player|null>(null);
+  const [msg,setMsg]                       = useState("Jogador Azul – clica nos dados para começar!");
+  const scriptIdx                          = useRef(0);
+  const piecesRef                          = useRef(pieces);
   useEffect(()=>{ piecesRef.current=pieces; },[pieces]);
 
   const other = (p:Player):Player => p==="blue"?"green":"blue";
@@ -622,7 +733,7 @@ export default function LudoGame() {
     }}>
       <div style={{
         width:"100%", maxWidth:430, display:"flex", flexDirection:"column",
-        minHeight:"100vh", padding:"0 0 12px 0",
+        minHeight:"100vh", paddingBottom:12,
       }}>
 
         {/* Header */}
@@ -666,16 +777,16 @@ export default function LudoGame() {
             key={msg}
             initial={{opacity:0,y:-4}} animate={{opacity:1,y:0}}
             style={{
-              background:"rgba(255,255,255,0.05)",
-              borderRadius:10,padding:"7px 14px",textAlign:"center",
-              border:"1px solid rgba(255,255,255,0.06)",
+              background:"rgba(255,255,255,0.05)", borderRadius:10,
+              padding:"7px 14px", textAlign:"center",
+              border:"1px solid rgba(255,255,255,0.07)",
             }}>
-            <p style={{fontSize:12,color:"rgba(255,255,255,0.7)",fontWeight:600,letterSpacing:0.3}}>{msg}</p>
+            <p style={{fontSize:12,color:"rgba(255,255,255,0.75)",fontWeight:600,letterSpacing:0.3}}>{msg}</p>
           </motion.div>
         </div>
 
         {/* Board */}
-        <div style={{padding:"0 10px",flex:1}}>
+        <div style={{padding:"0 10px", flex:1}}>
           <Board pieces={pieces} movable={movable} onSelectPiece={handleSelectPiece}/>
         </div>
 
@@ -695,13 +806,14 @@ export default function LudoGame() {
 
       {/* Win overlay */}
       <AnimatePresence>
-        {winner&&(
+        {winner && (
           <motion.div
             initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-            style={{position:"fixed",inset:0,
-              background:"rgba(0,0,0,0.8)",
+            style={{
+              position:"fixed", inset:0, background:"rgba(0,0,0,0.82)",
               backdropFilter:"blur(8px)",
-              display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}}>
+              display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
+            }}>
             <motion.div
               initial={{scale:0.6,opacity:0,y:40}}
               animate={{scale:1,opacity:1,y:0}}
@@ -710,10 +822,10 @@ export default function LudoGame() {
                 background: winner==="blue"
                   ? "linear-gradient(135deg,#1e3a8a,#1d4ed8)"
                   : "linear-gradient(135deg,#14532d,#16a34a)",
-                borderRadius:24,padding:"40px 36px",textAlign:"center",
+                borderRadius:24, padding:"40px 36px", textAlign:"center",
                 border:`2px solid ${winner==="blue"?"#60a5fa":"#4ade80"}`,
                 boxShadow:`0 20px 60px ${winner==="blue"?"#1d4ed855":"#16a34a55"}`,
-                maxWidth:300,width:"88%",
+                maxWidth:300, width:"88%",
               }}>
               <div style={{marginBottom:16}}>
                 <Trophy style={{width:60,height:60,color:"#fbbf24",margin:"0 auto",
@@ -730,10 +842,9 @@ export default function LudoGame() {
                 style={{
                   background:"rgba(255,255,255,0.15)",
                   border:"1.5px solid rgba(255,255,255,0.3)",
-                  color:"#fff",borderRadius:12,padding:"13px 0",
-                  fontFamily:"'Syne',sans-serif",fontWeight:700,
-                  fontSize:15,cursor:"pointer",width:"100%",
-                  transition:"background 0.2s",
+                  color:"#fff", borderRadius:12, padding:"13px 0",
+                  fontFamily:"'Syne',sans-serif", fontWeight:700,
+                  fontSize:15, cursor:"pointer", width:"100%",
                 }}>
                 Sair ao Menu
               </button>

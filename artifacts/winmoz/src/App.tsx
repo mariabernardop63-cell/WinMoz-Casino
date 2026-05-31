@@ -96,7 +96,6 @@ function Router() {
       <Route path="/ludo-jogo">
         <ProtectedRoute><LudoGame /></ProtectedRoute>
       </Route>
-
       <Route component={NotFound} />
     </Switch>
   );
