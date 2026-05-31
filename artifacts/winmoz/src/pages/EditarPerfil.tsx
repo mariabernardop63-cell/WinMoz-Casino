@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, Camera, User, Check, Loader2 } from "lucide-react";
-import { authApi } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 function formatPhone(digits: string) {
@@ -66,21 +66,38 @@ export default function EditarPerfil() {
       let avatarUrl: string | null = profile?.avatar_url ?? null;
 
       if (avatarFile) {
-        const reader = new FileReader();
-        const dataUrl = await new Promise<string>((resolve) => {
-          reader.onload = ev => resolve(ev.target?.result as string);
-          reader.readAsDataURL(avatarFile);
-        });
-        avatarUrl = dataUrl;
+        const ext = avatarFile.name.split(".").pop() || "jpg";
+        const path = `${user.id}/avatar.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("avatars")
+          .upload(path, avatarFile, { upsert: true, contentType: avatarFile.type });
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
+          avatarUrl = urlData.publicUrl + `?t=${Date.now()}`;
+        } else {
+          const reader = new FileReader();
+          const dataUrl = await new Promise<string>((resolve) => {
+            reader.onload = ev => resolve(ev.target?.result as string);
+            reader.readAsDataURL(avatarFile);
+          });
+          avatarUrl = dataUrl;
+        }
       } else if (!avatar && profile?.avatar_url) {
         avatarUrl = null;
       }
 
-      await authApi.updateProfile({
-        full_name: name.trim(),
-        phone: phone.replace(/\D/g, ""),
-        avatar_url: avatarUrl,
-      });
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({
+          full_name: name.trim(),
+          phone: phone.replace(/\D/g, ""),
+          avatar_url: avatarUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
 
       await refreshProfile();
       setSaving(false);
@@ -195,12 +212,6 @@ export default function EditarPerfil() {
             </div>
 
             <div className="border-t border-slate-100 mb-6" />
-
-            <div className="p-4 mb-6" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-              <p style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>
-                As alterações ao perfil são guardadas na nuvem e aplicadas imediatamente.
-              </p>
-            </div>
 
             <motion.button onClick={handleSave} disabled={saving || saved}
               whileTap={!saving && !saved ? { scale: 0.98 } : {}}

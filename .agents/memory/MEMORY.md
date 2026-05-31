@@ -1,1 +1,2 @@
-- [Auth system](auth-system.md) — custom Express+session auth (NOT Supabase); real user accounts live in local PostgreSQL; balance comes as string from Drizzle numeric type
+- [Auth system](auth-system.md) — NOW Supabase auth (NOT Express session); OTP flow for signup+recovery; balance is numeric in Supabase profiles table
+- [Supabase Node.js quirk](supabase-node-quirk.md) — Node.js 20 needs `ws` package passed as realtime transport in createClient; also remove express-session when switching to JWT

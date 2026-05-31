@@ -1,26 +1,18 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { authApi, setToken, type UserProfile } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
-export const DEMO_EMAIL = "12345678@gmail.com";
-export const DEMO_STORAGE_KEY = "winmoz_demo_mode";
-
-const DEMO_PROFILE: UserProfile = {
-  id: "demo-user-id",
-  full_name: "Demo User",
-  email: DEMO_EMAIL,
-  phone: null,
-  avatar_url: null,
-  invite_code_used: null,
-  my_invite_code: "DEMO01",
-  balance: 5000,
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-};
-
-const DEMO_USER = {
-  id: "demo-user-id",
-  email: DEMO_EMAIL,
-};
+export interface UserProfile {
+  id: string;
+  full_name: string | null;
+  email?: string;
+  phone: string | null;
+  avatar_url: string | null;
+  invite_code_used: string | null;
+  my_invite_code: string | null;
+  balance: string | number;
+  created_at?: string;
+  updated_at?: string;
+}
 
 interface AuthContextType {
   user: { id: string; email: string } | null;
@@ -38,76 +30,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchProfile = async (userId: string, email: string) => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    if (data) {
+      setProfile({ ...data, email });
+    }
+    setUser({ id: userId, email });
+  };
+
   const refreshProfile = async () => {
-    if (localStorage.getItem(DEMO_STORAGE_KEY) === "true") return;
-    try {
-      const result = await authApi.me();
-      if (result) {
-        setUser(result.user);
-        setProfile(result.profile);
-      } else {
-        setUser(null);
-        setProfile(null);
-      }
-    } catch {
-      // backend unavailable — keep current state
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.user) {
+      await fetchProfile(session.user.id, session.user.email ?? "");
     }
   };
 
-  const forceRefresh = async () => {
-    if (localStorage.getItem(DEMO_STORAGE_KEY) === "true") {
-      setUser(DEMO_USER);
-      setProfile(DEMO_PROFILE);
-      setLoading(false);
-      return;
-    }
-    try {
-      const result = await authApi.me();
-      if (result) {
-        setUser(result.user);
-        setProfile(result.profile);
-      } else {
-        setUser(null);
-        setProfile(null);
-      }
-    } catch {
-      setUser(null);
-      setProfile(null);
-    }
-    setLoading(false);
-  };
+  const forceRefresh = refreshProfile;
 
   const signOut = async () => {
-    if (localStorage.getItem(DEMO_STORAGE_KEY) === "true") {
-      localStorage.removeItem(DEMO_STORAGE_KEY);
-      setUser(null);
-      setProfile(null);
-      return;
-    }
-    await authApi.logout();
-    setToken(null);
+    await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
   };
 
   useEffect(() => {
-    if (localStorage.getItem(DEMO_STORAGE_KEY) === "true") {
-      setUser(DEMO_USER);
-      setProfile(DEMO_PROFILE);
-      setLoading(false);
-      return;
-    }
-
-    authApi.me().then((result) => {
-      if (result) {
-        setUser(result.user);
-        setProfile(result.profile);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        fetchProfile(session.user.id, session.user.email ?? "").finally(() =>
+          setLoading(false)
+        );
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
-    }).catch(() => {
-      // backend unavailable — just finish loading so the UI unblocks
-      setLoading(false);
     });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
+          await fetchProfile(session.user.id, session.user.email ?? "");
+          setLoading(false);
+        } else if (event === "SIGNED_OUT") {
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+        } else if (event === "TOKEN_REFRESHED" && session?.user) {
+          setUser({ id: session.user.id, email: session.user.email ?? "" });
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
   return (

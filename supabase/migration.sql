@@ -1,82 +1,102 @@
 -- ============================================================
--- WinMoz - Migração Supabase
--- Corre este SQL no Supabase Dashboard > SQL Editor
+-- WinMoz — Supabase Migration
+-- Run this in the Supabase SQL Editor for your project
 -- ============================================================
 
--- 1. Tabela de perfis
-CREATE TABLE IF NOT EXISTS public.profiles (
-  id            uuid          REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+-- 1. PROFILES TABLE (auto-created by trigger on new user)
+create table if not exists public.profiles (
+  id            uuid primary key references auth.users(id) on delete cascade,
   full_name     text,
   phone         text,
   avatar_url    text,
-  invite_code_used text,
-  my_invite_code   text UNIQUE,
-  balance       decimal(12,2) DEFAULT 0,
-  created_at    timestamptz   DEFAULT now(),
-  updated_at    timestamptz   DEFAULT now()
+  invite_code_used  text,
+  my_invite_code    text unique,
+  balance       numeric(18,2) not null default 0,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
 );
 
--- 2. Row Level Security
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+alter table public.profiles enable row level security;
 
-DROP POLICY IF EXISTS "sel_own_profile" ON public.profiles;
-DROP POLICY IF EXISTS "upd_own_profile" ON public.profiles;
-DROP POLICY IF EXISTS "ins_own_profile" ON public.profiles;
+create policy "Users can view own profile"   on public.profiles for select using (auth.uid() = id);
+create policy "Users can update own profile" on public.profiles for update using (auth.uid() = id);
+create policy "Service role full access"     on public.profiles for all using (true);
 
-CREATE POLICY "sel_own_profile" ON public.profiles
-  FOR SELECT USING (auth.uid() = id);
-
-CREATE POLICY "upd_own_profile" ON public.profiles
-  FOR UPDATE USING (auth.uid() = id);
-
-CREATE POLICY "ins_own_profile" ON public.profiles
-  FOR INSERT WITH CHECK (auth.uid() = id);
-
--- 3. Função para criar perfil automaticamente ao registar
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER AS $$
-BEGIN
-  INSERT INTO public.profiles (id, full_name, phone, my_invite_code)
-  VALUES (
-    NEW.id,
-    NEW.raw_user_meta_data->>'full_name',
-    NEW.raw_user_meta_data->>'phone',
-    upper(substring(md5(random()::text || NEW.id::text), 1, 6))
+-- Trigger to auto-create profile on sign-up
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer as $$
+begin
+  insert into public.profiles (id, full_name, my_invite_code)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'full_name', ''),
+    upper(substring(md5(random()::text) for 6))
   )
-  ON CONFLICT (id) DO NOTHING;
-  RETURN NEW;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
 
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
 
--- 4. Storage bucket para avatares
-INSERT INTO storage.buckets (id, name, public)
-  VALUES ('avatars', 'avatars', true)
-  ON CONFLICT (id) DO NOTHING;
+-- 2. TRANSACTIONS TABLE
+create table if not exists public.transactions (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  type        text not null check (type in ('deposit','withdrawal','bet','win','recharge','referral_bonus')),
+  amount      numeric(18,2) not null,
+  description text,
+  status      text not null default 'approved' check (status in ('pending','approved','rejected')),
+  created_at  timestamptz not null default now()
+);
 
-DROP POLICY IF EXISTS "avatars_public_read" ON storage.objects;
-DROP POLICY IF EXISTS "avatars_auth_insert" ON storage.objects;
-DROP POLICY IF EXISTS "avatars_own_update" ON storage.objects;
-DROP POLICY IF EXISTS "avatars_own_delete" ON storage.objects;
+alter table public.transactions enable row level security;
 
-CREATE POLICY "avatars_public_read" ON storage.objects
-  FOR SELECT USING (bucket_id = 'avatars');
+create policy "Users see own transactions"   on public.transactions for select using (auth.uid() = user_id);
+create policy "Service role full access"     on public.transactions for all using (true);
 
-CREATE POLICY "avatars_auth_insert" ON storage.objects
-  FOR INSERT WITH CHECK (
-    bucket_id = 'avatars' AND auth.role() = 'authenticated'
-  );
+-- 3. WITHDRAWAL REQUESTS TABLE
+create table if not exists public.withdrawal_requests (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  amount      numeric(18,2) not null,
+  phone       text,
+  status      text not null default 'pending' check (status in ('pending','approved','rejected')),
+  notes       text,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
 
-CREATE POLICY "avatars_own_update" ON storage.objects
-  FOR UPDATE USING (
-    bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]
-  );
+alter table public.withdrawal_requests enable row level security;
 
-CREATE POLICY "avatars_own_delete" ON storage.objects
-  FOR DELETE USING (
-    bucket_id = 'avatars' AND auth.uid()::text = (storage.foldername(name))[1]
-  );
+create policy "Users see own withdrawals"   on public.withdrawal_requests for select using (auth.uid() = user_id);
+create policy "Users can insert withdrawals" on public.withdrawal_requests for insert with check (auth.uid() = user_id);
+create policy "Service role full access"     on public.withdrawal_requests for all using (true);
+
+-- 4. REFERRALS TABLE
+create table if not exists public.referrals (
+  id           uuid primary key default gen_random_uuid(),
+  referrer_id  uuid not null references public.profiles(id) on delete cascade,
+  referred_id  uuid not null references public.profiles(id) on delete cascade,
+  bonus_paid   boolean not null default false,
+  created_at   timestamptz not null default now(),
+  unique(referred_id)
+);
+
+alter table public.referrals enable row level security;
+
+create policy "Users see own referrals"  on public.referrals for select using (auth.uid() = referrer_id);
+create policy "Service role full access" on public.referrals for all using (true);
+
+-- 5. STORAGE BUCKET for avatars
+insert into storage.buckets (id, name, public)
+values ('avatars', 'avatars', true)
+on conflict (id) do nothing;
+
+create policy "Public avatar read"    on storage.objects for select using (bucket_id = 'avatars');
+create policy "Auth users can upload" on storage.objects for insert with check (bucket_id = 'avatars' and auth.uid() is not null);
+create policy "Users update own"      on storage.objects for update using (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);
+create policy "Users delete own"      on storage.objects for delete using (bucket_id = 'avatars' and auth.uid()::text = (storage.foldername(name))[1]);

@@ -5,6 +5,8 @@ import {
   ArrowLeft, ArrowDownLeft, ArrowUpRight, RefreshCw, Gamepad2, CreditCard,
   ChevronRight, Search, SlidersHorizontal,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CYAN = "#00D4B4";
 
@@ -13,7 +15,6 @@ type TxType = "Todos" | "Depósitos" | "Levamentos" | "Apostas" | "Recargas";
 interface Tx {
   id: string;
   type: string;
-  subtype?: string;
   name: string;
   date: string;
   rawDate: Date;
@@ -21,6 +22,24 @@ interface Tx {
   sign: "+" | "-";
   state: "Aprovado" | "Pendente" | "Recusado";
   method?: string;
+}
+
+function mapType(dbType: string): string {
+  const m: Record<string, string> = {
+    deposit: "Depósito", withdrawal: "Levamento", bet: "Aposta",
+    win: "Aposta", recharge: "Recarga", referral_bonus: "Bónus",
+  };
+  return m[dbType] || "Transação";
+}
+
+function mapSign(dbType: string): "+" | "-" {
+  return ["withdrawal", "bet"].includes(dbType) ? "-" : "+";
+}
+
+function mapStatus(s: string): Tx["state"] {
+  if (s === "approved") return "Aprovado";
+  if (s === "pending") return "Pendente";
+  return "Recusado";
 }
 
 function getIcon(type: string) {
@@ -42,47 +61,48 @@ function fmtMZN(val: number) {
 }
 
 const FILTERS: TxType[] = ["Todos", "Depósitos", "Levamentos", "Apostas", "Recargas"];
-
 const filterMap: Record<TxType, string | null> = {
-  "Todos": null,
-  "Depósitos": "Depósito",
-  "Levamentos": "Levamento",
-  "Apostas": "Aposta",
-  "Recargas": "Recarga",
+  "Todos": null, "Depósitos": "Depósito", "Levamentos": "Levamento",
+  "Apostas": "Aposta", "Recargas": "Recarga",
 };
 
 export default function Extratos() {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const [activeFilter, setActiveFilter] = useState<TxType>("Todos");
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [transactions, setTransactions] = useState<Tx[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem("winmoz_transactions") || "[]");
-      if (!Array.isArray(stored) || stored.length === 0) {
-        setTransactions([]);
-        return;
-      }
-      const mapped: Tx[] = stored.map((t: any, i: number) => ({
-        id: t.id || `TX${String(i + 1).padStart(3, "0")}`,
-        type: t.type || "Depósito",
-        name: t.name || `${t.type || "Depósito"}${t.method ? ` (${t.method})` : ""}`.trim(),
-        date: t.date || new Date().toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" }),
-        rawDate: new Date(t.rawDate || t.date || Date.now()),
-        amount: Math.abs(t.amount || 0),
-        sign: (t.type === "Levamento" || t.type === "Aposta") ? "-" : "+",
-        state: t.state || "Aprovado",
-        method: t.method,
-      }));
-      mapped.sort((a, b) => b.rawDate.getTime() - a.rawDate.getTime());
-      setTransactions(mapped);
-    } catch {
-      setTransactions([]);
-    }
-  }, []);
+    if (!user) { setLoading(false); return; }
+    supabase
+      .from("transactions")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error || !data) { setLoading(false); return; }
+        const mapped: Tx[] = data.map((t: any) => {
+          const displayType = mapType(t.type);
+          const rawDate = new Date(t.created_at);
+          return {
+            id: t.id.slice(0, 8).toUpperCase(),
+            type: displayType,
+            name: t.description || displayType,
+            date: rawDate.toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" }),
+            rawDate,
+            amount: Math.abs(parseFloat(t.amount)),
+            sign: mapSign(t.type),
+            state: mapStatus(t.status),
+          };
+        });
+        setTransactions(mapped);
+        setLoading(false);
+      });
+  }, [user]);
 
   const filtered = transactions.filter(tx => {
     const typeMatch = !filterMap[activeFilter] || tx.type === filterMap[activeFilter];
@@ -104,7 +124,6 @@ export default function Extratos() {
     <div className="min-h-screen w-full flex justify-center" style={{ background: "#0f0f0f" }}>
       <div className="w-full max-w-[430px] flex flex-col min-h-screen">
 
-        {/* Header */}
         <div className="px-5 pt-12 pb-4">
           <div className="flex items-center justify-between mb-5">
             <button onClick={() => setLocation("/perfil")}
@@ -122,7 +141,6 @@ export default function Extratos() {
             </button>
           </div>
 
-          {/* Search bar */}
           <AnimatePresence>
             {searchOpen && (
               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
@@ -136,11 +154,10 @@ export default function Extratos() {
             )}
           </AnimatePresence>
 
-          {/* Summary cards */}
           <div className="grid grid-cols-2 gap-3 mb-4">
             {[
-              { label: "Total entradas",  val: fmtMZN(totalIn),  color: "#22c55e", sign: "+" },
-              { label: "Total saídas",    val: fmtMZN(totalOut), color: "#ef4444", sign: "-" },
+              { label: "Total entradas", val: fmtMZN(totalIn),  color: "#22c55e", sign: "+" },
+              { label: "Total saídas",   val: fmtMZN(totalOut), color: "#ef4444", sign: "-" },
             ].map(({ label, val, color, sign }) => (
               <div key={label} className="p-3.5 rounded-2xl" style={{ background: "#1c1c1c" }}>
                 <p className="text-white/40 text-[10px] uppercase tracking-wide mb-1">{label}</p>
@@ -151,7 +168,6 @@ export default function Extratos() {
             ))}
           </div>
 
-          {/* Filter tabs */}
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
             {FILTERS.map(f => (
               <button key={f} onClick={() => setActiveFilter(f)}
@@ -167,17 +183,18 @@ export default function Extratos() {
           </div>
         </div>
 
-        {/* Transactions list */}
         <div className="flex-1 px-5 pb-10 overflow-y-auto">
-          {Object.keys(grouped).length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+            </div>
+          ) : Object.keys(grouped).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <div style={{ width: 60, height: 60, borderRadius: "50%", background: "#1c1c1c", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <SlidersHorizontal style={{ width: 24, height: 24, color: "#3a3a3a" }} />
               </div>
-              <p className="text-white/30 text-sm font-semibold" style={{ fontFamily: "'Syne', sans-serif" }}>
-                {activeFilter !== "Todos" || search
-                  ? "Nenhuma transação encontrada"
-                  : "Sem movimentos ainda"}
+              <p className="text-white/30 text-sm font-semibold font-syne">
+                {activeFilter !== "Todos" || search ? "Nenhuma transação encontrada" : "Sem movimentos ainda"}
               </p>
               <p className="text-white/20 text-xs text-center" style={{ maxWidth: 220 }}>
                 {activeFilter !== "Todos" || search
@@ -230,16 +247,15 @@ export default function Extratos() {
                               <div className="mx-1 mb-1 p-3.5 rounded-b-2xl"
                                 style={{ background: "#161616", border: `1px solid ${color}20`, borderTop: "none" }}>
                                 {[
-                                  { label: "ID",       val: tx.id },
-                                  { label: "Tipo",     val: tx.type },
-                                  { label: "Data",     val: tx.date },
-                                  tx.method ? { label: "Método", val: tx.method } : null,
-                                  { label: "Montante", val: `${tx.sign}${fmtMZN(tx.amount)}` },
-                                  { label: "Estado",   val: tx.state },
-                                ].filter(Boolean).map(row => (
-                                  <div key={row!.label} className="flex items-center justify-between py-1.5">
-                                    <span className="text-xs" style={{ color: "#636366" }}>{row!.label}</span>
-                                    <span className="text-xs font-medium text-white">{row!.val}</span>
+                                  { label: "ID",        val: tx.id },
+                                  { label: "Tipo",      val: tx.type },
+                                  { label: "Data",      val: tx.date },
+                                  { label: "Montante",  val: `${tx.sign}${fmtMZN(tx.amount)}` },
+                                  { label: "Estado",    val: tx.state },
+                                ].map(row => (
+                                  <div key={row.label} className="flex items-center justify-between py-1.5">
+                                    <span className="text-xs" style={{ color: "#636366" }}>{row.label}</span>
+                                    <span className="text-xs font-medium text-white">{row.val}</span>
                                   </div>
                                 ))}
                               </div>
@@ -254,7 +270,6 @@ export default function Extratos() {
             ))
           )}
         </div>
-
       </div>
     </div>
   );

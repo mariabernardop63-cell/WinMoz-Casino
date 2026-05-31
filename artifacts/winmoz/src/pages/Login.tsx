@@ -2,17 +2,15 @@ import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react";
-import { authApi } from "@/lib/api";
-import { useAuth, DEMO_EMAIL, DEMO_STORAGE_KEY } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 function PokerLogo() {
   return (
     <svg viewBox="0 0 230 46" height="38" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M1 2 L11 2 L7 44 L0 44 Z" fill="#0D0D0D" />
       <path d="M13 2 L20 2 L16 44 L10 44 Z" fill="#0D0D0D" opacity="0.18" />
-      <text x="24" y="40" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="40" letterSpacing="-1.5" fill="#0D0D0D">Poker</text>
-      <circle cx="218" cy="11" r="7" stroke="#0D0D0D" strokeWidth="1.8" fill="none" />
-      <text x="214.5" y="15.5" fontFamily="'Syne', sans-serif" fontWeight="700" fontSize="9" fill="#0D0D0D">R</text>
+      <text x="24" y="40" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="40" letterSpacing="-1.5" fill="#0D0D0D">WinMoz</text>
     </svg>
   );
 }
@@ -41,30 +39,29 @@ export default function Login() {
     setLoading(true);
     setErrors({});
 
-    const isDemoEmail = email.trim().toLowerCase() === DEMO_EMAIL;
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    });
 
-    if (isDemoEmail) {
-      localStorage.setItem(DEMO_STORAGE_KEY, "true");
-      await forceRefresh();
+    if (error) {
       setLoading(false);
-      setLocation("/");
+      if (
+        error.message.includes("Invalid login credentials") ||
+        error.message.includes("invalid_credentials")
+      ) {
+        setErrors({ general: "Email ou palavra-passe incorretos." });
+      } else if (error.message.includes("Email not confirmed")) {
+        setErrors({ general: "Email não verificado. Verifique a sua caixa de entrada." });
+      } else {
+        setErrors({ general: error.message || "Erro ao iniciar sessão." });
+      }
       return;
     }
 
-    try {
-      await authApi.login(email.trim().toLowerCase(), password);
-      await forceRefresh();
-      setLoading(false);
-      setLocation("/");
-    } catch (err: any) {
-      setLoading(false);
-      const msg = err?.message ?? "";
-      if (msg.includes("incorretos") || msg.includes("credentials")) {
-        setErrors({ general: "Email ou palavra-passe incorretos." });
-      } else {
-        setErrors({ general: msg || "Erro ao iniciar sessão." });
-      }
-    }
+    await forceRefresh();
+    setLoading(false);
+    setLocation("/");
   };
 
   const inputStyle = (field: "email" | "password"): React.CSSProperties => ({

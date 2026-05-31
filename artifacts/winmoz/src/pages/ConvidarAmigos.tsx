@@ -2,20 +2,8 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, Copy, Check, Share2, MessageSquare, Mail, Users, Gift, TrendingUp } from "lucide-react";
-
-function generateCode(name: string): string {
-  const stored = localStorage.getItem("winmoz_referral_code");
-  if (stored) return stored;
-  const initials = name.replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase();
-  const rnd = Math.random().toString(36).slice(2, 6).toUpperCase();
-  const code = initials + rnd;
-  localStorage.setItem("winmoz_referral_code", code);
-  return code;
-}
-
-function getReferralCount(): number {
-  return parseInt(localStorage.getItem("winmoz_referral_count") || "0");
-}
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 function fmtMZN(val: number) {
   return `${Number(val.toFixed(2)).toLocaleString("pt-PT")} MT`;
@@ -23,21 +11,38 @@ function fmtMZN(val: number) {
 
 export default function ConvidarAmigos() {
   const [, setLocation] = useLocation();
+  const { profile } = useAuth();
   const [code, setCode] = useState("");
   const [copied, setCopied] = useState(false);
-  const [referralCount] = useState(getReferralCount());
-  const earned = referralCount * 5;
+  const [referralCount, setReferralCount] = useState(0);
 
   useEffect(() => {
-    const name = localStorage.getItem("winmoz_user_name") || "USER";
-    setCode(generateCode(name));
-  }, []);
+    if (profile?.my_invite_code) {
+      setCode(profile.my_invite_code);
+    }
+    if (profile?.id) {
+      supabase
+        .from("referrals")
+        .select("id", { count: "exact", head: true })
+        .eq("referrer_id", profile.id)
+        .then(({ count }) => {
+          if (count !== null) setReferralCount(count);
+        });
+    }
+  }, [profile]);
+
+  const earned = referralCount * 5;
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(code);
     } catch {
-      /* fallback */
+      const ta = document.createElement("textarea");
+      ta.value = code;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -47,27 +52,25 @@ export default function ConvidarAmigos() {
 
   const handleShare = async () => {
     if (navigator.share) {
-      await navigator.share({ title: "WinMoz — Convite", text: shareText });
+      try { await navigator.share({ title: "WinMoz — Convite", text: shareText }); } catch {}
     } else {
       handleCopy();
     }
   };
 
   const STEPS = [
-    { icon: Share2,    label: "Convida um amigo",       desc: "Partilha o teu código único" },
-    { icon: Users,     label: "O amigo regista-se",     desc: "Com o teu código de convite" },
-    { icon: TrendingUp,label: "Ele faz uma aposta",     desc: "Qualquer valor, qualquer jogo" },
-    { icon: Gift,      label: "Tu ganhas 5 MT",         desc: "Creditado automaticamente" },
+    { icon: Share2,     label: "Convida um amigo",   desc: "Partilha o teu código único" },
+    { icon: Users,      label: "O amigo regista-se", desc: "Com o teu código de convite" },
+    { icon: TrendingUp, label: "Ele faz uma aposta", desc: "Qualquer valor, qualquer jogo" },
+    { icon: Gift,       label: "Tu ganhas 5 MT",     desc: "Creditado automaticamente" },
   ];
 
   return (
     <div className="min-h-screen w-full flex justify-center" style={{ background: "#0f0f0f" }}>
       <div className="w-full max-w-[430px] flex flex-col min-h-screen relative overflow-x-hidden">
 
-        {/* Hero gradient header */}
         <div className="relative px-5 pt-12 pb-8 overflow-hidden"
           style={{ background: "linear-gradient(145deg, #c0392b 0%, #e74c3c 40%, #922b21 100%)" }}>
-          {/* Decorative circles */}
           <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full opacity-10" style={{ background: "#fff" }} />
           <div className="absolute top-16 -left-6 w-24 h-24 rounded-full opacity-10" style={{ background: "#fff" }} />
 
@@ -90,7 +93,6 @@ export default function ConvidarAmigos() {
           </motion.div>
         </div>
 
-        {/* Stats bar */}
         <div className="flex" style={{ background: "#1a1a1a" }}>
           {[
             { label: "Amigos convidados", val: referralCount.toString() },
@@ -106,7 +108,6 @@ export default function ConvidarAmigos() {
 
         <div className="flex-1 px-5 py-5 pb-10 overflow-y-auto">
 
-          {/* How it works */}
           <div className="mb-6">
             <p className="text-white font-syne font-bold mb-3" style={{ fontSize: 15 }}>Como funciona</p>
             <div className="flex flex-col gap-2.5">
@@ -133,61 +134,61 @@ export default function ConvidarAmigos() {
             </div>
           </div>
 
-          {/* Referral code box */}
           <motion.div className="mb-5"
             initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3, duration: 0.35 }}>
             <p className="text-white font-syne font-bold mb-3" style={{ fontSize: 15 }}>O teu código único</p>
-            <div className="rounded-2xl overflow-hidden" style={{ border: "2px dashed #e74c3c", background: "#1c1c1c" }}>
-              <div className="flex items-center justify-between px-5 py-4">
-                <div>
-                  <p className="text-white/40 text-xs mb-1 uppercase tracking-widest">Código de Convite</p>
-                  <p className="font-syne font-bold text-white" style={{ fontSize: "1.8rem", letterSpacing: "0.12em" }}>
-                    {code}
-                  </p>
+            {code ? (
+              <div className="rounded-2xl overflow-hidden" style={{ border: "2px dashed #e74c3c", background: "#1c1c1c" }}>
+                <div className="flex items-center justify-between px-5 py-4">
+                  <div>
+                    <p className="text-white/40 text-xs mb-1 uppercase tracking-widest">Código de Convite</p>
+                    <p className="font-syne font-bold text-white" style={{ fontSize: "1.8rem", letterSpacing: "0.12em" }}>
+                      {code}
+                    </p>
+                  </div>
+                  <motion.button onClick={handleCopy} whileTap={{ scale: 0.92 }}
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all"
+                    style={{
+                      background: copied ? "rgba(34,197,94,0.15)" : "rgba(231,76,60,0.15)",
+                      border: copied ? "1px solid rgba(34,197,94,0.4)" : "1px solid rgba(231,76,60,0.4)",
+                      color: copied ? "#22c55e" : "#e74c3c",
+                    }}>
+                    {copied
+                      ? <><Check style={{ width: 14, height: 14 }} /> Copiado</>
+                      : <><Copy style={{ width: 14, height: 14 }} /> Copiar</>
+                    }
+                  </motion.button>
                 </div>
-                <motion.button onClick={handleCopy}
-                  whileTap={{ scale: 0.92 }}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all"
-                  style={{
-                    background: copied ? "rgba(34,197,94,0.15)" : "rgba(231,76,60,0.15)",
-                    border: copied ? "1px solid rgba(34,197,94,0.4)" : "1px solid rgba(231,76,60,0.4)",
-                    color: copied ? "#22c55e" : "#e74c3c",
-                  }}>
-                  {copied
-                    ? <><Check style={{ width: 14, height: 14 }} /> Copiado</>
-                    : <><Copy style={{ width: 14, height: 14 }} /> Copiar</>
-                  }
-                </motion.button>
+                <div className="px-5 pb-3">
+                  <p className="text-white/30 text-xs">Partilha este código com os teus amigos para ganhar 5 MT por cada aposta que eles fizerem</p>
+                </div>
               </div>
-              <div className="px-5 pb-3">
-                <p className="text-white/30 text-xs">Partilha este código com os teus amigos para ganhar 5 MT por cada aposta que eles fizerem</p>
+            ) : (
+              <div className="rounded-2xl p-5 flex items-center justify-center" style={{ background: "#1c1c1c", border: "1px solid #2a2a2a" }}>
+                <p className="text-white/30 text-sm">Inicia sessão para ver o teu código</p>
               </div>
-            </div>
+            )}
           </motion.div>
 
-          {/* Bonus info */}
           <div className="p-4 rounded-2xl mb-5 flex items-start gap-3"
             style={{ background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.2)" }}>
             <Gift style={{ width: 16, height: 16, color: "#e74c3c", flexShrink: 0, marginTop: 2 }} />
             <div>
               <p className="text-white font-semibold text-sm mb-1">Como ganhas 5 MT</p>
               <p className="text-white/50 text-xs leading-relaxed">
-                O teu amigo regista-se com o teu código e faz pelo menos uma aposta (qualquer valor). Os 5 MT são creditados automaticamente na tua carteira.
+                O teu amigo regista-se com o teu código e faz pelo menos uma aposta. Os 5 MT são creditados automaticamente na tua carteira.
               </p>
             </div>
           </div>
 
-          {/* Share options */}
           <p className="text-white font-syne font-bold mb-3" style={{ fontSize: 15 }}>Partilhar com amigos</p>
           <div className="flex flex-col gap-2.5 mb-6">
             {[
-              { icon: MessageSquare, label: "SMS",   desc: "Envia por mensagem de texto",   color: "#22c55e" },
-              { icon: Mail,          label: "Email",  desc: "Partilha por correio eletrónico", color: "#3b82f6" },
+              { icon: MessageSquare, label: "SMS",   desc: "Envia por mensagem de texto",     color: "#22c55e" },
+              { icon: Mail,          label: "Email",  desc: "Partilha por correio eletrónico",  color: "#3b82f6" },
             ].map(({ icon: Icon, label, desc, color }) => (
-              <motion.button key={label}
-                whileTap={{ scale: 0.97 }}
-                onClick={handleShare}
+              <motion.button key={label} whileTap={{ scale: 0.97 }} onClick={handleShare}
                 className="flex items-center gap-4 p-4 rounded-2xl text-left w-full transition-all hover:opacity-80"
                 style={{ background: "#1c1c1c", border: "1px solid #2a2a2a" }}>
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -203,17 +204,14 @@ export default function ConvidarAmigos() {
             ))}
           </div>
 
-          {/* Social icons row */}
           <div className="flex items-center gap-3">
             {[
+              { label: "WhatsApp", color: "#25D366", letter: "W" },
               { label: "Facebook", color: "#1877F2", letter: "f" },
               { label: "X",        color: "#000",    letter: "𝕏" },
-              { label: "WhatsApp", color: "#25D366", letter: "W" },
               { label: "Mais",     color: "#6b7280", letter: "…" },
             ].map(({ label, color, letter }) => (
-              <motion.button key={label}
-                whileTap={{ scale: 0.92 }}
-                onClick={handleShare}
+              <motion.button key={label} whileTap={{ scale: 0.92 }} onClick={handleShare}
                 className="flex-1 flex flex-col items-center gap-1.5">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-white"
                   style={{ background: color, fontSize: label === "Mais" ? 18 : 16 }}>
@@ -223,7 +221,6 @@ export default function ConvidarAmigos() {
               </motion.button>
             ))}
           </div>
-
         </div>
       </div>
     </div>
