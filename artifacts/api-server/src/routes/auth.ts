@@ -1,26 +1,15 @@
 import { Router } from "express";
-import bcrypt from "bcryptjs";
-import { db, profilesTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { supabase } from "../lib/supabase";
 
 const router = Router();
 
-function generateInviteCode(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-}
-
-function saveSession(req: any): Promise<void> {
-  return new Promise((resolve, reject) => {
-    req.session.save((err: Error | null) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
+async function getAuthedUser(req: any) {
+  const authHeader = req.headers["authorization"] ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return null;
+  return data.user;
 }
 
 router.post("/register", async (req, res) => {
@@ -29,58 +18,52 @@ router.post("/register", async (req, res) => {
   if (!full_name || !email || !password) {
     return res.status(400).json({ error: "Campos obrigatórios em falta." });
   }
-
   if (password.length < 8) {
     return res.status(400).json({ error: "A senha deve ter pelo menos 8 caracteres." });
   }
 
-  const normEmail = email.trim().toLowerCase();
+  const { data, error } = await supabase.auth.admin.createUser({
+    email: email.trim().toLowerCase(),
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: full_name.trim(), phone: phone ?? null },
+  });
 
-  const existing = await db
-    .select({ id: profilesTable.id })
-    .from(profilesTable)
-    .where(eq(profilesTable.email, normEmail))
-    .limit(1);
-
-  if (existing.length > 0) {
-    return res.status(409).json({ error: "Este email já está registado. Por favor, inicie sessão." });
+  if (error) {
+    if (error.message.includes("already registered") || error.message.includes("already been registered")) {
+      return res.status(409).json({ error: "Este email já está registado. Por favor, inicie sessão." });
+    }
+    return res.status(400).json({ error: error.message });
   }
 
-  const password_hash = await bcrypt.hash(password, 12);
+  const userId = data.user.id;
 
-  let my_invite_code = generateInviteCode();
-  let attempts = 0;
-  while (attempts < 5) {
-    const codeConflict = await db
-      .select({ id: profilesTable.id })
-      .from(profilesTable)
-      .where(eq(profilesTable.my_invite_code, my_invite_code))
-      .limit(1);
-    if (codeConflict.length === 0) break;
-    my_invite_code = generateInviteCode();
-    attempts++;
+  if (invite_code_used) {
+    await supabase
+      .from("profiles")
+      .update({ invite_code_used })
+      .eq("id", userId);
   }
 
-  const [profile] = await db
-    .insert(profilesTable)
-    .values({
-      full_name: full_name.trim(),
-      email: normEmail,
-      phone: phone ?? null,
-      password_hash,
-      invite_code_used: invite_code_used ?? null,
-      my_invite_code,
-    })
-    .returning();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
 
-  req.session.regenerate((err) => {
-    if (err) return res.status(500).json({ error: "Erro ao criar sessão." });
-    (req.session as any).userId = profile.id;
-    req.session.save((saveErr) => {
-      if (saveErr) return res.status(500).json({ error: "Erro ao guardar sessão." });
-      const { password_hash: _ph, ...safeProfile } = profile;
-      return res.status(201).json({ user: { id: profile.id, email: profile.email }, profile: safeProfile });
-    });
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
+
+  if (signInError) {
+    return res.status(500).json({ error: "Conta criada mas erro ao iniciar sessão. Tente fazer login." });
+  }
+
+  return res.status(201).json({
+    token: signInData.session?.access_token,
+    user: { id: userId, email: data.user.email },
+    profile: profile ?? { id: userId, full_name: full_name.trim(), email: data.user.email, balance: "0" },
   });
 });
 
@@ -91,111 +74,96 @@ router.post("/login", async (req, res) => {
     return res.status(400).json({ error: "Email e senha são obrigatórios." });
   }
 
-  const normEmail = email.trim().toLowerCase();
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email.trim().toLowerCase(),
+    password,
+  });
 
-  const [profile] = await db
-    .select()
-    .from(profilesTable)
-    .where(eq(profilesTable.email, normEmail))
-    .limit(1);
-
-  if (!profile) {
+  if (error || !data.session) {
     return res.status(401).json({ error: "Email ou palavra-passe incorretos." });
   }
 
-  const valid = await bcrypt.compare(password, profile.password_hash);
-  if (!valid) {
-    return res.status(401).json({ error: "Email ou palavra-passe incorretos." });
-  }
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", data.user.id)
+    .single();
 
-  req.session.regenerate((err) => {
-    if (err) return res.status(500).json({ error: "Erro ao criar sessão." });
-    (req.session as any).userId = profile.id;
-    req.session.save((saveErr) => {
-      if (saveErr) return res.status(500).json({ error: "Erro ao guardar sessão." });
-      const { password_hash: _ph, ...safeProfile } = profile;
-      return res.json({ user: { id: profile.id, email: profile.email }, profile: safeProfile });
-    });
+  return res.json({
+    token: data.session.access_token,
+    user: { id: data.user.id, email: data.user.email },
+    profile: profile ?? { id: data.user.id, email: data.user.email, balance: "0" },
   });
 });
 
-router.post("/logout", (req, res) => {
-  req.session.destroy((err) => {
-    if (err) return res.status(500).json({ error: "Erro ao terminar sessão." });
-    res.clearCookie("winmoz.sid");
-    return res.json({ ok: true });
-  });
+router.post("/logout", async (req, res) => {
+  const user = await getAuthedUser(req);
+  if (user) {
+    const authHeader = req.headers["authorization"] ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (token) await supabase.auth.admin.signOut(token);
+  }
+  return res.json({ ok: true });
 });
 
 router.get("/me", async (req, res) => {
-  const sess = req.session as any;
-  if (!sess.userId) {
-    return res.status(401).json({ error: "Não autenticado." });
-  }
+  const user = await getAuthedUser(req);
+  if (!user) return res.status(401).json({ error: "Não autenticado." });
 
-  const [profile] = await db
-    .select()
-    .from(profilesTable)
-    .where(eq(profilesTable.id, sess.userId))
-    .limit(1);
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user.id)
+    .single();
 
-  if (!profile) {
-    req.session.destroy(() => {});
-    return res.status(401).json({ error: "Utilizador não encontrado." });
-  }
-
-  const { password_hash: _ph, ...safeProfile } = profile;
-  return res.json({ user: { id: profile.id, email: profile.email }, profile: safeProfile });
+  return res.json({
+    user: { id: user.id, email: user.email },
+    profile: profile ?? { id: user.id, email: user.email, balance: "0" },
+  });
 });
 
 router.put("/profile", async (req, res) => {
-  const sess = req.session as any;
-  if (!sess.userId) {
-    return res.status(401).json({ error: "Não autenticado." });
-  }
+  const user = await getAuthedUser(req);
+  if (!user) return res.status(401).json({ error: "Não autenticado." });
 
   const { full_name, phone, avatar_url } = req.body;
 
-  const [updated] = await db
-    .update(profilesTable)
-    .set({
-      full_name: full_name ?? undefined,
-      phone: phone ?? undefined,
-      avatar_url: avatar_url !== undefined ? avatar_url : undefined,
-      updated_at: new Date(),
-    })
-    .where(eq(profilesTable.id, sess.userId))
-    .returning();
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (full_name !== undefined) updates.full_name = full_name;
+  if (phone !== undefined) updates.phone = phone;
+  if (avatar_url !== undefined) updates.avatar_url = avatar_url;
 
-  if (!updated) {
-    return res.status(404).json({ error: "Perfil não encontrado." });
-  }
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("id", user.id)
+    .select()
+    .single();
 
-  const { password_hash: _ph, ...safeProfile } = updated;
-  return res.json({ profile: safeProfile });
+  if (error) return res.status(500).json({ error: error.message });
+
+  return res.json({ profile });
 });
 
 router.post("/forgot-password", async (req, res) => {
+  const { email } = req.body;
+  if (email) {
+    await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase());
+  }
   return res.json({ ok: true, message: "Se o email existir, receberá instruções em breve." });
 });
 
 router.post("/reset-password", async (req, res) => {
-  const sess = req.session as any;
-  if (!sess.userId) {
-    return res.status(401).json({ error: "Não autenticado." });
-  }
+  const user = await getAuthedUser(req);
+  if (!user) return res.status(401).json({ error: "Não autenticado." });
 
   const { password } = req.body;
   if (!password || password.length < 8) {
     return res.status(400).json({ error: "A senha deve ter pelo menos 8 caracteres." });
   }
 
-  const password_hash = await bcrypt.hash(password, 12);
-
-  await db
-    .update(profilesTable)
-    .set({ password_hash, updated_at: new Date() })
-    .where(eq(profilesTable.id, sess.userId));
+  const { error } = await supabase.auth.admin.updateUserById(user.id, { password });
+  if (error) return res.status(500).json({ error: error.message });
 
   return res.json({ ok: true });
 });

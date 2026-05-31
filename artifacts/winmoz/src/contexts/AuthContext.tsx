@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { authApi, type UserProfile } from "@/lib/api";
+import { authApi, setToken, type UserProfile } from "@/lib/api";
 
 export const DEMO_EMAIL = "12345678@gmail.com";
 export const DEMO_STORAGE_KEY = "winmoz_demo_mode";
@@ -76,6 +76,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     await authApi.logout();
+    setToken(null);
     setUser(null);
     setProfile(null);
   };
