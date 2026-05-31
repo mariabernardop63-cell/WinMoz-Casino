@@ -55,89 +55,61 @@ const STRETCH = {
   yellow: "#FACC15",
 };
 
-// ─── 3D Pawn SVG ──────────────────────────────────────────────────────────────
+// ─── Location-Pin Pawn (Ludo King style) ─────────────────────────────────────
 type PawnColor = "red"|"green"|"blue"|"yellow";
 const PAWN_PALETTE: Record<PawnColor,{s:string;m:string;d:string;sh:string}> = {
-  red:    { s:"#FCA5A5", m:"#EF4444", d:"#B91C1C", sh:"#7F1D1D" },
-  green:  { s:"#86EFAC", m:"#22C55E", d:"#15803D", sh:"#14532D" },
-  blue:   { s:"#93C5FD", m:"#3B82F6", d:"#1D4ED8", sh:"#1E3A8A" },
-  yellow: { s:"#FDE68A", m:"#EAB308", d:"#A16207", sh:"#713F12" },
+  red:    { s:"#FF9494", m:"#EF4444", d:"#B91C1C", sh:"#7F1D1D" },
+  green:  { s:"#72F094", m:"#22C55E", d:"#15803D", sh:"#14532D" },
+  blue:   { s:"#82C4FF", m:"#3B82F6", d:"#1D4ED8", sh:"#1E3A8A" },
+  yellow: { s:"#FFE570", m:"#EAB308", d:"#A16207", sh:"#713F12" },
 };
 
-function Pawn({ color, size=28, vibrate=false, glow=false }: {
+function Pawn({ color, size=28, glow=false }: {
   color: PawnColor; size?: number; vibrate?: boolean; glow?: boolean;
 }) {
   const p = PAWN_PALETTE[color];
-  const id = `pw_${color}_${size}`;
+  const id = `pw_${color}`;
   return (
-    <motion.div
-      animate={vibrate ? { y:[0,-3,0,-3,0] } : { y:0 }}
-      transition={vibrate ? { duration:0.55, repeat:Infinity, ease:"easeInOut" } : {}}
+    <div
       style={{
         filter: glow
-          ? `drop-shadow(0 0 8px ${p.m}) drop-shadow(0 3px 5px rgba(0,0,0,0.55))`
-          : "drop-shadow(0 3px 5px rgba(0,0,0,0.5))",
+          ? `drop-shadow(0 0 7px ${p.m}) drop-shadow(0 2px 5px rgba(0,0,0,0.55))`
+          : "drop-shadow(0 2px 5px rgba(0,0,0,0.48))",
         display:"flex", flexShrink:0,
       }}
     >
-      <svg viewBox="0 0 100 130" width={size} height={Math.round(size*130/100)}>
+      <svg viewBox="0 0 56 80" width={size} height={Math.round(size*80/56)}>
         <defs>
-          <radialGradient id={`hd_${id}`} cx="34%" cy="30%" r="66%">
-            <stop offset="0%"   stopColor={p.s}/>
-            <stop offset="40%"  stopColor={p.m}/>
+          <radialGradient id={`${id}_g`} cx="32%" cy="26%" r="70%">
+            <stop offset="0%"  stopColor={p.s}/>
+            <stop offset="45%" stopColor={p.m}/>
             <stop offset="100%" stopColor={p.d}/>
           </radialGradient>
-          <radialGradient id={`bd_${id}`} cx="38%" cy="28%" r="72%">
-            <stop offset="0%"   stopColor={p.m}/>
-            <stop offset="100%" stopColor={p.d}/>
-          </radialGradient>
-          <radialGradient id={`bs_${id}`} cx="38%" cy="38%" r="65%">
-            <stop offset="0%"   stopColor={p.m}/>
-            <stop offset="100%" stopColor={p.sh}/>
+          <radialGradient id={`${id}_inner`} cx="40%" cy="35%" r="62%">
+            <stop offset="0%"  stopColor="white"/>
+            <stop offset="100%" stopColor={p.s}/>
           </radialGradient>
         </defs>
-
-        {/* Drop shadow */}
-        <ellipse cx="50" cy="127" rx="28" ry="5.5" fill="rgba(0,0,0,0.22)"/>
-
-        {/* Base disc bottom */}
-        <ellipse cx="50" cy="120" rx="29" ry="9"   fill={p.sh} opacity="0.7"/>
-        {/* Base disc top */}
-        <ellipse cx="50" cy="116" rx="29" ry="9"   fill={`url(#bs_${id})`}/>
-        {/* Base rim highlight */}
-        <ellipse cx="50" cy="113" rx="26" ry="5"   fill={p.m}  opacity="0.25"/>
-
-        {/* Bell / skirt */}
+        {/* Ground shadow */}
+        <ellipse cx="28" cy="77" rx="15" ry="4" fill="rgba(0,0,0,0.22)"/>
+        {/* Pin body — teardrop */}
         <path
-          d="M21 109 Q23 90 31 85 Q39 80 50 80 Q61 80 69 85 Q77 90 79 109 Q65 117 50 117 Q35 117 21 109Z"
-          fill={`url(#bd_${id})`}
+          d="M28 74 C28 74 7 46 7 28 C7 14.7 16.5 4 28 4 C39.5 4 49 14.7 49 28 C49 46 28 74 28 74Z"
+          fill={`url(#${id}_g)`}
         />
-        {/* Skirt inner highlight */}
+        {/* Outline */}
         <path
-          d="M26 107 Q28 93 35 89 Q42 85 50 85 Q58 85 65 89 Q72 93 74 107"
-          fill="none" stroke={p.s} strokeWidth="1.5" opacity="0.25"
+          d="M28 74 C28 74 7 46 7 28 C7 14.7 16.5 4 28 4 C39.5 4 49 14.7 49 28 C49 46 28 74 28 74Z"
+          fill="none" stroke={p.d} strokeWidth="1" opacity="0.4"
         />
-
-        {/* Neck */}
-        <rect x="40" y="66" width="20" height="17" rx="8" fill={`url(#bd_${id})`}/>
-
-        {/* Collar ring */}
-        <ellipse cx="50" cy="68" rx="18" ry="6.5" fill={p.d}/>
-        <ellipse cx="50" cy="67" rx="16" ry="4.5" fill={p.m} opacity="0.55"/>
-
-        {/* Head shadow ring */}
-        <circle cx="50" cy="44"  r="35" fill={p.sh} opacity="0.22"/>
-        {/* Head sphere */}
-        <circle cx="50" cy="41"  r="33" fill={`url(#hd_${id})`}/>
-        {/* Head outline */}
-        <circle cx="50" cy="41"  r="33" fill="none" stroke={p.d} strokeWidth="0.6" opacity="0.4"/>
-
-        {/* Specular highlight – large */}
-        <ellipse cx="37" cy="27" rx="13" ry="10"  fill="white" opacity="0.38"/>
-        {/* Specular highlight – sharp */}
-        <ellipse cx="34" cy="24" rx="7"  ry="5.5" fill="white" opacity="0.58"/>
+        {/* White inner circle */}
+        <circle cx="28" cy="27" r="13.5" fill={`url(#${id}_inner)`} opacity="0.96"/>
+        {/* Inner tint */}
+        <circle cx="28" cy="27" r="9" fill={p.m} opacity="0.28"/>
+        {/* Specular top-left */}
+        <ellipse cx="19" cy="17" rx="7.5" ry="5.5" fill="white" opacity="0.7"/>
       </svg>
-    </motion.div>
+    </div>
   );
 }
 
@@ -180,8 +152,23 @@ function cellColor(r:number, c:number): string {
   return "#FFFFFF";
 }
 
+// Home slot positions (grid [r,c] → SVG px, py)
+const HOME_SLOT_SVG: Record<"red"|"green"|"blue"|"yellow",[number,number][]> = {
+  red:    [[1,1],[1,3],[3,1],[3,3]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]) as [number,number][],
+  green:  [[2,10],[2,12],[4,10],[4,12]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]) as [number,number][],
+  blue:   [[10,1],[10,3],[12,1],[12,3]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]) as [number,number][],
+  yellow: [[10,10],[10,12],[12,10],[12,12]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]) as [number,number][],
+};
+
+// Directional arrows on border path cells
+const ARROWS: { r:number; c:number; sym:string }[] = [
+  { r:7,  c:0,  sym:"→" },
+  { r:7,  c:14, sym:"←" },
+  { r:0,  c:7,  sym:"↓" },
+  { r:14, c:7,  sym:"↑" },
+];
+
 function BoardSVG() {
-  // Path cells: everything NOT in 6x6 corner quadrants
   const pathCells: [number,number][] = [];
   for (let r=0;r<15;r++) {
     for (let c=0;c<15;c++) {
@@ -189,17 +176,8 @@ function BoardSVG() {
       if (!inQ) pathCells.push([r,c]);
     }
   }
-
-  // Safe squares that are NOT starting squares (show gray outline star)
-  const grayStarCoords = new Set(
-    SAFE_IDX.map(i => `${TRACK[i][0]},${TRACK[i][1]}`)
-  );
-  // Remove the colored starting squares (they get white star below)
   const coloredStarts = new Set(["13,6","1,8","6,1","8,13"]);
-
-  // Decorative pawn centers inside home areas (SVG coords, center of each slot)
-  const bluePawnCenters:  [number,number][] = [[10,1],[10,3],[12,1],[12,3]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]);
-  const greenPawnCenters: [number,number][] = [[2,10],[2,12],[4,10],[4,12]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]);
+  const arrowCells = new Set(ARROWS.map(a=>`${a.r},${a.c}`));
 
   return (
     <svg
@@ -208,8 +186,8 @@ function BoardSVG() {
       style={{ display:"block", position:"absolute", inset:0 }}
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Outer navy background */}
-      <rect x={0} y={0} width={SZ} height={SZ} fill="#0E1B4A" rx={6}/>
+      {/* Outer background */}
+      <rect x={0} y={0} width={SZ} height={SZ} fill="#0E1B4A" rx={4}/>
 
       {/* ── Quadrant fills ── */}
       <rect x={0}   y={0}   width={240} height={240} fill={Q.red.main}/>
@@ -217,119 +195,193 @@ function BoardSVG() {
       <rect x={0}   y={360} width={240} height={240} fill={Q.blue.main}/>
       <rect x={360} y={360} width={240} height={240} fill={Q.yellow.main}/>
 
-      {/* ── Path cells (white + colored stretches) ── */}
+      {/* ── Path cells ── */}
       {pathCells.map(([r,c])=>{
         const x=c*CS, y=r*CS;
         const isCenter = r>=6&&r<=8&&c>=6&&c<=8;
-        if (isCenter) return null; // center handled separately
+        if (isCenter) return null;
         const fill = cellColor(r,c);
         return (
           <rect key={`${r},${c}`} x={x} y={y} width={CS} height={CS}
-            fill={fill} stroke="#CCCCCC" strokeWidth="0.8"/>
+            fill={fill} stroke="#BBBBBB" strokeWidth="0.7"/>
         );
       })}
 
-      {/* ── Center 3×3 with colored triangles ── */}
-      {/* Background */}
-      <rect x={240} y={240} width={120} height={120} fill="#FFFFFF" stroke="#BBBBBB" strokeWidth="0.6"/>
-      {/* Green (from top) */}
+      {/* ── Center 3×3 colored triangles ── */}
+      <rect x={240} y={240} width={120} height={120} fill="#FFFFFF"/>
       <polygon points={`240,240 360,240 300,300`} fill={Q.green.main}/>
-      {/* Yellow (from right) */}
       <polygon points={`360,240 360,360 300,300`} fill={Q.yellow.main}/>
-      {/* Blue (from bottom) */}
       <polygon points={`360,360 240,360 300,300`} fill={Q.blue.main}/>
-      {/* Red (from left) */}
       <polygon points={`240,360 240,240 300,300`} fill={Q.red.main}/>
-      {/* Center dividers */}
-      <line x1={240} y1={240} x2={300} y2={300} stroke="white" strokeWidth="1.2" opacity="0.7"/>
-      <line x1={360} y1={240} x2={300} y2={300} stroke="white" strokeWidth="1.2" opacity="0.7"/>
-      <line x1={360} y1={360} x2={300} y2={300} stroke="white" strokeWidth="1.2" opacity="0.7"/>
-      <line x1={240} y1={360} x2={300} y2={300} stroke="white" strokeWidth="1.2" opacity="0.7"/>
-      {/* Center border */}
-      <rect x={240} y={240} width={120} height={120} fill="none" stroke="#BBBBBB" strokeWidth="0.6"/>
+      <line x1={240} y1={240} x2={300} y2={300} stroke="white" strokeWidth="1.5" opacity="0.8"/>
+      <line x1={360} y1={240} x2={300} y2={300} stroke="white" strokeWidth="1.5" opacity="0.8"/>
+      <line x1={360} y1={360} x2={300} y2={300} stroke="white" strokeWidth="1.5" opacity="0.8"/>
+      <line x1={240} y1={360} x2={300} y2={300} stroke="white" strokeWidth="1.5" opacity="0.8"/>
+      <rect x={240} y={240} width={120} height={120} fill="none" stroke="#BBBBBB" strokeWidth="0.7"/>
 
-      {/* ── Safe square stars (gray outline on white cells) ── */}
+      {/* ── Safe square stars (gray outline) ── */}
       {SAFE_IDX.map(i=>{
         const [r,c] = TRACK[i];
         const key = `${r},${c}`;
-        if (coloredStarts.has(key)) return null; // skip colored starts
-        const cx = (c+0.5)*CS, cy = (r+0.5)*CS;
+        if (coloredStarts.has(key)) return null;
         return (
-          <StarShape key={key} cx={cx} cy={cy} r={CS*0.36}
-            fill="none" stroke="#AAAAAA" strokeWidth={1.8} opacity={0.9}/>
+          <StarShape key={key} cx={(c+0.5)*CS} cy={(r+0.5)*CS} r={CS*0.33}
+            fill="none" stroke="#AAAAAA" strokeWidth={1.6} opacity={0.85}/>
         );
       })}
 
-      {/* ── Starting square stars (white filled on colored cells) ── */}
-      {[["13,6"],["1,8"],["6,1"],["8,13"]].map(([key])=>{
+      {/* ── Start square stars (white filled) ── */}
+      {["13,6","1,8","6,1","8,13"].map(key=>{
         const [r,c] = key.split(",").map(Number);
         return (
-          <StarShape key={key} cx={(c+0.5)*CS} cy={(r+0.5)*CS} r={CS*0.36}
-            fill="white" opacity={0.9}/>
+          <StarShape key={key} cx={(c+0.5)*CS} cy={(r+0.5)*CS} r={CS*0.33}
+            fill="white" opacity={0.92}/>
         );
       })}
 
-      {/* ── Home area white rounded rectangles ── */}
-      {/* Red home */}
-      <rect x={44} y={44} width={152} height={152} rx={18} fill="white"/>
-      <rect x={44} y={44} width={152} height={152} rx={18} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={1}/>
-      {/* Green home */}
-      <rect x={404} y={44} width={152} height={152} rx={18} fill="white"/>
-      <rect x={404} y={44} width={152} height={152} rx={18} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={1}/>
-      {/* Blue home */}
-      <rect x={44} y={404} width={152} height={152} rx={18} fill="white"/>
-      <rect x={44} y={404} width={152} height={152} rx={18} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={1}/>
-      {/* Yellow home */}
-      <rect x={404} y={404} width={152} height={152} rx={18} fill="white"/>
-      <rect x={404} y={404} width={152} height={152} rx={18} fill="none" stroke="rgba(0,0,0,0.06)" strokeWidth={1}/>
+      {/* ── Directional arrows ── */}
+      {ARROWS.map(({r,c,sym})=>(
+        <text key={sym}
+          x={(c+0.5)*CS} y={(r+0.5)*CS+6}
+          textAnchor="middle" dominantBaseline="middle"
+          fill="#888" fontSize={16} fontWeight="bold" opacity={0.75}
+          fontFamily="Arial, sans-serif"
+        >{sym}</text>
+      ))}
 
-      {/* ── Decorative Blue pawns in blue home ── */}
-      {bluePawnCenters.map(([px,py],i)=>(
+      {/* ── Home white inner rectangles (straight borders) ── */}
+      <rect x={36} y={36} width={168} height={168} rx={8} fill="white"/>
+      <rect x={396} y={36} width={168} height={168} rx={8} fill="white"/>
+      <rect x={36} y={396} width={168} height={168} rx={8} fill="white"/>
+      <rect x={396} y={396} width={168} height={168} rx={8} fill="white"/>
+
+      {/* ── Red home: 4 solid red circles ── */}
+      {HOME_SLOT_SVG.red.map(([px,py],i)=>(
+        <DecoSVGPawn key={i} cx={px} cy={py} color="red"/>
+      ))}
+
+      {/* ── Yellow home: 4 solid yellow circles ── */}
+      {HOME_SLOT_SVG.yellow.map(([px,py],i)=>(
+        <DecoSVGPawn key={i} cx={px} cy={py} color="yellow"/>
+      ))}
+
+      {/* ── Blue home: 4 location-pin pawns ── */}
+      {HOME_SLOT_SVG.blue.map(([px,py],i)=>(
         <DecoSVGPawn key={i} cx={px} cy={py} color="blue"/>
       ))}
 
-      {/* ── Decorative Green pawns in green home ── */}
-      {greenPawnCenters.map(([px,py],i)=>(
+      {/* ── Green home: 4 location-pin pawns ── */}
+      {HOME_SLOT_SVG.green.map(([px,py],i)=>(
         <DecoSVGPawn key={i} cx={px} cy={py} color="green"/>
       ))}
 
-      {/* ── Overall board border ── */}
-      <rect x={0} y={0} width={SZ} height={SZ} fill="none" stroke="#0A1440" strokeWidth={4} rx={6}/>
+      {/* ── Board border ── */}
+      <rect x={0} y={0} width={SZ} height={SZ} fill="none" stroke="#0A1440" strokeWidth={3} rx={4}/>
     </svg>
   );
 }
 
-// Inline SVG pawn for decorative use inside the board SVG
+// ─── Home slot: circle + optional location-pin pawn ───────────────────────────
 function DecoSVGPawn({ cx, cy, color }: { cx:number; cy:number; color:"red"|"yellow"|"blue"|"green" }) {
   const p = PAWN_PALETTE[color];
-  const r = 14; // pawn "radius" in SVG units
-  const id = `deco_${color}_${cx}_${cy}`;
+  const slotR = 23;
+  const isPin = color === "blue" || color === "green";
+  const id = `hs_${color}_${Math.round(cx)}_${Math.round(cy)}`;
+
+  if (!isPin) {
+    // Red / Yellow — big solid colored disc
+    return (
+      <g>
+        {/* Shadow */}
+        <ellipse cx={cx+1} cy={cy+2} rx={slotR} ry={slotR*0.55} fill="rgba(0,0,0,0.18)"/>
+        {/* Disc */}
+        <circle cx={cx} cy={cy} r={slotR} fill={p.m}/>
+        <circle cx={cx} cy={cy} r={slotR} fill="none" stroke={p.d} strokeWidth={2}/>
+        {/* Shine */}
+        <ellipse cx={cx-slotR*0.3} cy={cy-slotR*0.32} rx={slotR*0.38} ry={slotR*0.28} fill="white" opacity={0.32}/>
+      </g>
+    );
+  }
+
+  // Blue / Green — slot circle with location-pin pawn inside
+  // Pin is drawn in a 56×80 viewBox then scaled/translated to fit
+  const sc = 0.60;
+  const pinW = 56*sc, pinH = 80*sc;
+  const tx = cx - pinW/2;
+  const ty = cy - pinH*0.66; // shift up so pin bottom aligns near cy+6
+
   return (
-    <g transform={`translate(${cx},${cy-r*0.6})`}>
+    <g>
+      {/* Slot circle background */}
+      <circle cx={cx} cy={cy} r={slotR} fill="rgba(255,255,255,0.78)"/>
+      <circle cx={cx} cy={cy} r={slotR} fill="none" stroke={p.m} strokeWidth={1.8} opacity={0.55}/>
+      {/* Location-pin pawn */}
       <defs>
-        <radialGradient id={`dhd_${id}`} cx="34%" cy="30%" r="66%">
-          <stop offset="0%"   stopColor={p.s}/>
-          <stop offset="45%"  stopColor={p.m}/>
+        <radialGradient id={`${id}_g`} cx="32%" cy="26%" r="70%">
+          <stop offset="0%"  stopColor={p.s}/>
+          <stop offset="45%" stopColor={p.m}/>
           <stop offset="100%" stopColor={p.d}/>
         </radialGradient>
+        <radialGradient id={`${id}_in`} cx="40%" cy="35%" r="62%">
+          <stop offset="0%"  stopColor="white"/>
+          <stop offset="100%" stopColor={p.s}/>
+        </radialGradient>
       </defs>
-      {/* Shadow */}
-      <ellipse cx={0} cy={r*2.05} rx={r*0.9} ry={r*0.22} fill="rgba(0,0,0,0.18)"/>
-      {/* Base */}
-      <ellipse cx={0} cy={r*1.8}  rx={r*0.9} ry={r*0.3}  fill={p.d}/>
-      <ellipse cx={0} cy={r*1.68} rx={r*0.9} ry={r*0.3}  fill={p.m}/>
-      {/* Skirt */}
-      <path
-        d={`M${-r*0.65} ${r*1.5} Q${-r*0.7} ${r*1.0} ${-r*0.35} ${r*0.82} Q0 ${r*0.7} 0 ${r*0.7} Q0 ${r*0.7} ${r*0.35} ${r*0.82} Q${r*0.7} ${r*1.0} ${r*0.65} ${r*1.5} Z`}
-        fill={p.m}
-      />
-      {/* Neck */}
-      <rect x={-r*0.22} y={r*0.28} width={r*0.44} height={r*0.44} rx={r*0.15} fill={p.m}/>
-      {/* Head */}
-      <circle cx={0} cy={0} r={r*0.7} fill={`url(#dhd_${id})`}/>
-      {/* Highlight */}
-      <ellipse cx={-r*0.2} cy={-r*0.2} rx={r*0.25} ry={r*0.2} fill="white" opacity={0.45}/>
+      <g transform={`translate(${tx},${ty}) scale(${sc})`}>
+        {/* Shadow at base */}
+        <ellipse cx="28" cy="77" rx="14" ry="3.5" fill="rgba(0,0,0,0.18)"/>
+        {/* Pin body */}
+        <path
+          d="M28 74 C28 74 7 46 7 28 C7 14.7 16.5 4 28 4 C39.5 4 49 14.7 49 28 C49 46 28 74 28 74Z"
+          fill={`url(#${id}_g)`}
+        />
+        {/* Outline */}
+        <path
+          d="M28 74 C28 74 7 46 7 28 C7 14.7 16.5 4 28 4 C39.5 4 49 14.7 49 28 C49 46 28 74 28 74Z"
+          fill="none" stroke={p.d} strokeWidth="1.2" opacity="0.4"
+        />
+        {/* White inner circle */}
+        <circle cx="28" cy="27" r="13.5" fill={`url(#${id}_in)`} opacity="0.96"/>
+        <circle cx="28" cy="27" r="9"    fill={p.m} opacity="0.25"/>
+        {/* Specular */}
+        <ellipse cx="19" cy="17" rx="7.5" ry="5.5" fill="white" opacity="0.7"/>
+      </g>
     </g>
+  );
+}
+
+// ─── Selection ring: rotating dots around a selectable pawn ───────────────────
+function SelectionRing({ size }: { size: number }) {
+  const N = 10;
+  const R = size * 0.72;
+  const dotR = size * 0.09;
+  return (
+    <motion.div
+      animate={{ rotate: 360 }}
+      transition={{ duration: 2.2, repeat: Infinity, ease: "linear" }}
+      style={{
+        position:"absolute",
+        width: size*2, height: size*2,
+        left: -size*0.5, top: -size*0.5,
+        pointerEvents:"none",
+        zIndex:30,
+      }}
+    >
+      {Array.from({length:N},(_,i)=>{
+        const angle = (i*360/N)*Math.PI/180;
+        return (
+          <div key={i} style={{
+            position:"absolute",
+            width: dotR*2, height: dotR*2,
+            borderRadius:"50%",
+            background: i%2===0 ? "white" : "rgba(255,255,255,0.55)",
+            left: size + R*Math.cos(angle) - dotR,
+            top:  size + R*Math.sin(angle) - dotR,
+            boxShadow:"0 1px 3px rgba(0,0,0,0.45)",
+          }}/>
+        );
+      })}
+    </motion.div>
   );
 }
 
@@ -349,7 +401,7 @@ function Board({ pieces, movable, onSelectPiece }: {
       position:"relative",
       width:"100%",
       aspectRatio:"1",
-      borderRadius:8,
+      borderRadius:6,
       overflow:"hidden",
       boxShadow:"0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.4)",
     }}>
@@ -363,14 +415,13 @@ function Board({ pieces, movable, onSelectPiece }: {
         const selectable = movable.includes(p.id);
         const color: PawnColor = p.player === "blue" ? "blue" : "green";
 
-        // Offset if multiple pieces on same cell
-        let offX = 0, offY = 0;
-        if (here.length > 1) {
-          offX = idx === 0 ? -4 : 4;
-          offY = idx === 0 ? -3 : 3;
-        }
+        // Stack offset for multiple pieces on same cell
+        const OFFSETS = [[0,0],[-5,-4],[5,-4],[-5,4],[5,4]];
+        const [offX, offY] = here.length > 1
+          ? (OFFSETS[idx] ?? [0,0])
+          : [0,0];
 
-        const pawnSize = 22;
+        const pawnSize = 26;
         return (
           <div
             key={p.id}
@@ -380,11 +431,13 @@ function Board({ pieces, movable, onSelectPiece }: {
               left:`${(c + 0.5) / 15 * 100}%`,
               top:`${(r + 0.5) / 15 * 100}%`,
               transform:`translate(calc(-50% + ${offX}px), calc(-50% + ${offY}px))`,
-              zIndex: selectable ? 20 : 10,
+              zIndex: selectable ? 25 : 10,
               cursor: selectable ? "pointer" : "default",
+              display:"flex", alignItems:"center", justifyContent:"center",
             }}
           >
-            <Pawn color={color} size={pawnSize} vibrate={selectable} glow={selectable}/>
+            {selectable && <SelectionRing size={pawnSize}/>}
+            <Pawn color={color} size={pawnSize} glow={selectable}/>
           </div>
         );
       })}
