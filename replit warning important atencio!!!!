@@ -1,0 +1,1 @@
+Agent, reverta qualquer alteração recente que você fez no código para usar banco local e garanta que estamos apontando para o cliente do Supabase. simplesmente peço que nao destruas o meu banco de dados do supabase, e nao integres nada que tem have com o seu bancos
