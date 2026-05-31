@@ -152,12 +152,14 @@ function cellColor(r:number, c:number): string {
   return "#FFFFFF";
 }
 
-// Home slot positions (grid [r,c] → SVG px, py)
-const HOME_SLOT_SVG: Record<"red"|"green"|"blue"|"yellow",[number,number][]> = {
-  red:    [[1,1],[1,3],[3,1],[3,3]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]) as [number,number][],
-  green:  [[2,10],[2,12],[4,10],[4,12]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]) as [number,number][],
-  blue:   [[10,1],[10,3],[12,1],[12,3]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]) as [number,number][],
-  yellow: [[10,10],[10,12],[12,10],[12,12]].map(([r,c])=>[(c+0.5)*CS,(r+0.5)*CS]) as [number,number][],
+// Home slot display positions — centered inside each home's white inner rect
+// White inner rects: red/green=(36,36+168²) green=(396,36+168²) blue=(36,396+168²) yellow=(396,396+168²)
+// Offset ±40 from each rect center to place 4 slots symmetrically
+const ALL_SLOT_DISPLAY: Record<"red"|"green"|"blue"|"yellow",[number,number][]> = {
+  red:    [[80,80],[160,80],[80,160],[160,160]],     // center=(120,120)
+  green:  [[440,80],[520,80],[440,160],[520,160]],   // center=(480,120)
+  blue:   [[80,440],[160,440],[80,520],[160,520]],   // center=(120,480)
+  yellow: [[440,440],[520,440],[440,520],[520,520]], // center=(480,480)
 };
 
 // Directional arrows on border path cells
@@ -168,7 +170,13 @@ const ARROWS: { r:number; c:number; sym:string }[] = [
   { r:14, c:7,  sym:"↑" },
 ];
 
-function BoardSVG() {
+function BoardSVG({ pieces }: { pieces: GamePiece[] }) {
+  // Which slot indices are still in home (pos===-1) per player
+  const inHome: Record<"blue"|"green", Set<number>> = {
+    blue:  new Set(pieces.filter(p=>p.player==="blue"  && p.pos===-1).map(p=>+p.id[1])),
+    green: new Set(pieces.filter(p=>p.player==="green" && p.pos===-1).map(p=>+p.id[1])),
+  };
+
   const pathCells: [number,number][] = [];
   for (let r=0;r<15;r++) {
     for (let c=0;c<15;c++) {
@@ -177,7 +185,6 @@ function BoardSVG() {
     }
   }
   const coloredStarts = new Set(["13,6","1,8","6,1","8,13"]);
-  const arrowCells = new Set(ARROWS.map(a=>`${a.r},${a.c}`));
 
   return (
     <svg
@@ -249,30 +256,30 @@ function BoardSVG() {
         >{sym}</text>
       ))}
 
-      {/* ── Home white inner rectangles (straight borders) ── */}
-      <rect x={36} y={36} width={168} height={168} rx={8} fill="white"/>
-      <rect x={396} y={36} width={168} height={168} rx={8} fill="white"/>
-      <rect x={36} y={396} width={168} height={168} rx={8} fill="white"/>
-      <rect x={396} y={396} width={168} height={168} rx={8} fill="white"/>
+      {/* ── Home white inner rectangles ── */}
+      <rect x={36} y={36} width={168} height={168} rx={6} fill="white"/>
+      <rect x={396} y={36} width={168} height={168} rx={6} fill="white"/>
+      <rect x={36} y={396} width={168} height={168} rx={6} fill="white"/>
+      <rect x={396} y={396} width={168} height={168} rx={6} fill="white"/>
 
-      {/* ── Red home: 4 solid red circles ── */}
-      {HOME_SLOT_SVG.red.map(([px,py],i)=>(
-        <DecoSVGPawn key={i} cx={px} cy={py} color="red"/>
+      {/* ── Red home: 4 solid circles (always shown, no pieces) ── */}
+      {ALL_SLOT_DISPLAY.red.map(([px,py],i)=>(
+        <DecoSVGPawn key={i} cx={px} cy={py} color="red" showPin={false}/>
       ))}
 
-      {/* ── Yellow home: 4 solid yellow circles ── */}
-      {HOME_SLOT_SVG.yellow.map(([px,py],i)=>(
-        <DecoSVGPawn key={i} cx={px} cy={py} color="yellow"/>
+      {/* ── Yellow home: 4 solid circles (always shown, no pieces) ── */}
+      {ALL_SLOT_DISPLAY.yellow.map(([px,py],i)=>(
+        <DecoSVGPawn key={i} cx={px} cy={py} color="yellow" showPin={false}/>
       ))}
 
-      {/* ── Blue home: 4 location-pin pawns ── */}
-      {HOME_SLOT_SVG.blue.map(([px,py],i)=>(
-        <DecoSVGPawn key={i} cx={px} cy={py} color="blue"/>
+      {/* ── Blue home: circle always; pin only if piece still at home ── */}
+      {ALL_SLOT_DISPLAY.blue.map(([px,py],i)=>(
+        <DecoSVGPawn key={i} cx={px} cy={py} color="blue" showPin={inHome.blue.has(i)}/>
       ))}
 
-      {/* ── Green home: 4 location-pin pawns ── */}
-      {HOME_SLOT_SVG.green.map(([px,py],i)=>(
-        <DecoSVGPawn key={i} cx={px} cy={py} color="green"/>
+      {/* ── Green home: circle always; pin only if piece still at home ── */}
+      {ALL_SLOT_DISPLAY.green.map(([px,py],i)=>(
+        <DecoSVGPawn key={i} cx={px} cy={py} color="green" showPin={inHome.green.has(i)}/>
       ))}
 
       {/* ── Board border ── */}
@@ -281,41 +288,35 @@ function BoardSVG() {
   );
 }
 
-// ─── Home slot: circle + optional location-pin pawn ───────────────────────────
-function DecoSVGPawn({ cx, cy, color }: { cx:number; cy:number; color:"red"|"yellow"|"blue"|"green" }) {
+// ─── Home slot: solid colored circle + optional location-pin pawn on top ───────
+function DecoSVGPawn({ cx, cy, color, showPin }: {
+  cx:number; cy:number; color:"red"|"yellow"|"blue"|"green"; showPin:boolean;
+}) {
   const p = PAWN_PALETTE[color];
-  const slotR = 23;
-  const isPin = color === "blue" || color === "green";
+  const slotR = 26;
   const id = `hs_${color}_${Math.round(cx)}_${Math.round(cy)}`;
 
-  if (!isPin) {
-    // Red / Yellow — big solid colored disc
-    return (
-      <g>
-        {/* Shadow */}
-        <ellipse cx={cx+1} cy={cy+2} rx={slotR} ry={slotR*0.55} fill="rgba(0,0,0,0.18)"/>
-        {/* Disc */}
-        <circle cx={cx} cy={cy} r={slotR} fill={p.m}/>
-        <circle cx={cx} cy={cy} r={slotR} fill="none" stroke={p.d} strokeWidth={2}/>
-        {/* Shine */}
-        <ellipse cx={cx-slotR*0.3} cy={cy-slotR*0.32} rx={slotR*0.38} ry={slotR*0.28} fill="white" opacity={0.32}/>
-      </g>
-    );
+  // All colors: solid colored disc as the slot background
+  const slotCircle = (
+    <>
+      <circle cx={cx} cy={cy} r={slotR} fill={p.m}/>
+      <circle cx={cx} cy={cy} r={slotR} fill="none" stroke={p.d} strokeWidth={1.8}/>
+      <ellipse cx={cx-slotR*0.28} cy={cy-slotR*0.3} rx={slotR*0.38} ry={slotR*0.28} fill="white" opacity={0.25}/>
+    </>
+  );
+
+  if (!showPin) {
+    return <g>{slotCircle}</g>;
   }
 
-  // Blue / Green — slot circle with location-pin pawn inside
-  // Pin is drawn in a 56×80 viewBox then scaled/translated to fit
-  const sc = 0.60;
-  const pinW = 56*sc, pinH = 80*sc;
-  const tx = cx - pinW/2;
-  const ty = cy - pinH*0.66; // shift up so pin bottom aligns near cy+6
+  // Pin pawn on top of the colored disc — scaled to fit inside the slot
+  const sc = 0.62;
+  const tx = cx - 28*sc;
+  const ty = cy - 58*sc; // centers pin vertically over slot
 
   return (
     <g>
-      {/* Slot circle background */}
-      <circle cx={cx} cy={cy} r={slotR} fill="rgba(255,255,255,0.78)"/>
-      <circle cx={cx} cy={cy} r={slotR} fill="none" stroke={p.m} strokeWidth={1.8} opacity={0.55}/>
-      {/* Location-pin pawn */}
+      {slotCircle}
       <defs>
         <radialGradient id={`${id}_g`} cx="32%" cy="26%" r="70%">
           <stop offset="0%"  stopColor={p.s}/>
@@ -328,22 +329,18 @@ function DecoSVGPawn({ cx, cy, color }: { cx:number; cy:number; color:"red"|"yel
         </radialGradient>
       </defs>
       <g transform={`translate(${tx},${ty}) scale(${sc})`}>
-        {/* Shadow at base */}
-        <ellipse cx="28" cy="77" rx="14" ry="3.5" fill="rgba(0,0,0,0.18)"/>
         {/* Pin body */}
         <path
           d="M28 74 C28 74 7 46 7 28 C7 14.7 16.5 4 28 4 C39.5 4 49 14.7 49 28 C49 46 28 74 28 74Z"
           fill={`url(#${id}_g)`}
         />
-        {/* Outline */}
         <path
           d="M28 74 C28 74 7 46 7 28 C7 14.7 16.5 4 28 4 C39.5 4 49 14.7 49 28 C49 46 28 74 28 74Z"
-          fill="none" stroke={p.d} strokeWidth="1.2" opacity="0.4"
+          fill="none" stroke={p.d} strokeWidth="1.5" opacity="0.45"
         />
         {/* White inner circle */}
         <circle cx="28" cy="27" r="13.5" fill={`url(#${id}_in)`} opacity="0.96"/>
         <circle cx="28" cy="27" r="9"    fill={p.m} opacity="0.25"/>
-        {/* Specular */}
         <ellipse cx="19" cy="17" rx="7.5" ry="5.5" fill="white" opacity="0.7"/>
       </g>
     </g>
@@ -364,7 +361,6 @@ function SelectionRing({ size }: { size: number }) {
         width: size*2, height: size*2,
         left: -size*0.5, top: -size*0.5,
         pointerEvents:"none",
-        zIndex:30,
       }}
     >
       {Array.from({length:N},(_,i)=>{
@@ -389,8 +385,10 @@ function SelectionRing({ size }: { size: number }) {
 function Board({ pieces, movable, onSelectPiece }: {
   pieces: GamePiece[]; movable: PieceId[]; onSelectPiece: (id:PieceId)=>void;
 }) {
+  // For collision detection on path cells only
   const cellMap = new Map<string, GamePiece[]>();
   pieces.forEach(p => {
+    if (p.pos === -1) return; // home pieces handled separately
     const [r,c] = getPieceCoord(p);
     const k = `${r},${c}`;
     cellMap.set(k, [...(cellMap.get(k)||[]), p]);
@@ -405,23 +403,48 @@ function Board({ pieces, movable, onSelectPiece }: {
       overflow:"hidden",
       boxShadow:"0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.4)",
     }}>
-      <BoardSVG/>
+      <BoardSVG pieces={pieces}/>
 
       {/* Piece overlay */}
       {pieces.map(p => {
+        const selectable = movable.includes(p.id);
+        const color: PawnColor = p.player === "blue" ? "blue" : "green";
+        const pawnSize = 26;
+        const isHome = p.pos === -1;
+
+        // Home pieces: positioned at centered slot; SVG handles the visual,
+        // we just need an invisible clickable/ring layer here.
+        if (isHome) {
+          const slotIdx = +p.id[1];
+          const [svgX, svgY] = ALL_SLOT_DISPLAY[p.player][slotIdx];
+          const leftPct = svgX / SZ * 100;
+          const topPct  = svgY / SZ * 100;
+          return (
+            <div
+              key={p.id}
+              onClick={selectable ? () => onSelectPiece(p.id) : undefined}
+              style={{
+                position:"absolute",
+                left:`${leftPct}%`,
+                top:`${topPct}%`,
+                transform:"translate(-50%, -50%)",
+                zIndex: selectable ? 25 : 5,
+                cursor: selectable ? "pointer" : "default",
+                display:"flex", alignItems:"center", justifyContent:"center",
+              }}
+            >
+              {selectable && <SelectionRing size={pawnSize}/>}
+            </div>
+          );
+        }
+
+        // On-board pieces
         const [r,c] = getPieceCoord(p);
         const here = cellMap.get(`${r},${c}`) || [];
         const idx = here.findIndex(x => x.id === p.id);
-        const selectable = movable.includes(p.id);
-        const color: PawnColor = p.player === "blue" ? "blue" : "green";
-
-        // Stack offset for multiple pieces on same cell
         const OFFSETS = [[0,0],[-5,-4],[5,-4],[-5,4],[5,4]];
-        const [offX, offY] = here.length > 1
-          ? (OFFSETS[idx] ?? [0,0])
-          : [0,0];
+        const [offX, offY] = here.length > 1 ? (OFFSETS[idx] ?? [0,0]) : [0,0];
 
-        const pawnSize = 26;
         return (
           <div
             key={p.id}
@@ -437,7 +460,9 @@ function Board({ pieces, movable, onSelectPiece }: {
             }}
           >
             {selectable && <SelectionRing size={pawnSize}/>}
-            <Pawn color={color} size={pawnSize} glow={selectable}/>
+            <div style={{ position:"relative", zIndex:1 }}>
+              <Pawn color={color} size={pawnSize} glow={selectable}/>
+            </div>
           </div>
         );
       })}
