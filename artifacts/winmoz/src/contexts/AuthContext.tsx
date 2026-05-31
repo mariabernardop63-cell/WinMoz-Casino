@@ -71,6 +71,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
+          // Complete registration if pendingReg exists (magic link flow)
+          try {
+            const pendingRaw = sessionStorage.getItem("pendingReg");
+            if (pendingRaw) {
+              const pending = JSON.parse(pendingRaw);
+              if (pending.full_name || pending.phone || pending.invite_code_used) {
+                await fetch("/api/complete-registration", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    user_id: session.user.id,
+                    full_name: pending.full_name,
+                    phone: pending.phone,
+                    invite_code_used: pending.invite_code_used,
+                  }),
+                });
+                sessionStorage.removeItem("pendingReg");
+              }
+            }
+          } catch { /* non-critical */ }
           await fetchProfile(session.user.id, session.user.email ?? "");
           setLoading(false);
         } else if (event === "SIGNED_OUT") {

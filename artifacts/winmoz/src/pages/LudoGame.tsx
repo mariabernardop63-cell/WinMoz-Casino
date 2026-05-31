@@ -267,7 +267,7 @@ function BoardSVG({ pieces }:{ pieces:GamePiece[] }) {
 function Board({ pieces, movable, onSelectPiece }:{
   pieces:GamePiece[]; movable:PieceId[]; onSelectPiece:(id:PieceId)=>void;
 }) {
-  // Build cell map for stacking offsets
+  // Build cell map for stacking offsets (exclude home base and finished)
   const cellMap = new Map<string,GamePiece[]>();
   pieces.forEach(p=>{
     if(p.pos===-1||p.pos===57) return;
@@ -275,6 +275,33 @@ function Board({ pieces, movable, onSelectPiece }:{
     const k=`${r},${c}`;
     cellMap.set(k,[...(cellMap.get(k)||[]),p]);
   });
+
+  // Finished pieces rendered in center triangles
+  const blueFinished  = pieces.filter(p=>p.pos===57&&p.player==="blue");
+  const greenFinished = pieces.filter(p=>p.pos===57&&p.player==="green");
+
+  function renderFinished(arr:GamePiece[], cxSvg:number, cySvg:number) {
+    if(!arr.length) return null;
+    const count = arr.length;
+    const sz = Math.max(10, 20 - (count-1)*3);
+    const spacing = sz + 2;
+    const totalW = spacing*(count-1);
+    return arr.map((p,idx)=>{
+      const color:PawnColor = p.player==="blue"?"blue":"green";
+      const xOff = -totalW/2 + idx*spacing;
+      return (
+        <div key={p.id} style={{
+          position:"absolute",
+          left:`${cxSvg/SZ*100}%`,
+          top:`${cySvg/SZ*100}%`,
+          transform:`translate(calc(-50% + ${xOff}px),-50%)`,
+          zIndex:15, pointerEvents:"none",
+        }}>
+          <Pawn color={color} size={sz}/>
+        </div>
+      );
+    });
+  }
 
   return (
     <div style={{
@@ -287,9 +314,9 @@ function Board({ pieces, movable, onSelectPiece }:{
       {pieces.map(p=>{
         const selectable = movable.includes(p.id);
         const color: PawnColor = p.player==="blue" ? "blue" : "green";
-        const isDone = p.pos===57;
 
-        if(isDone) return null; // finished pieces enter the center triangle
+        // Finished pieces rendered separately below
+        if(p.pos===57) return null;
 
         // Home pieces: render at SVG slot coordinates
         if(p.pos===-1){
@@ -334,14 +361,11 @@ function Board({ pieces, movable, onSelectPiece }:{
               width:PIECE_BOX, height:PIECE_BOX,
               left:`${(c+0.5)/15*100}%`,
               top:`${(r+0.5)/15*100}%`,
-              // Sphere is square → simple -50%/-50% centering, no Y_SHIFT needed
               transform:`translate(calc(-50% + ${offX}px), calc(-50% + ${offY}px))`,
               zIndex:selectable?20:10,
               cursor:selectable?"pointer":"default",
             }}>
-            {/* Ring behind pawn (zIndex:0) */}
             {selectable && <SelectionRing color={color}/>}
-            {/* Pawn centered in PIECE_BOX (zIndex:2) */}
             <div style={{
               position:"absolute", inset:0,
               display:"flex", alignItems:"center", justifyContent:"center",
@@ -352,6 +376,10 @@ function Board({ pieces, movable, onSelectPiece }:{
           </div>
         );
       })}
+
+      {/* Finished pieces inside center triangles */}
+      {renderFinished(blueFinished,  300, 330)}
+      {renderFinished(greenFinished, 300, 270)}
     </div>
   );
 }
@@ -478,7 +506,6 @@ function TrophySVG({ size=72 }:{size?:number}) {
 }
 
 // ─── Premium Player Panel ──────────────────────────────────────────────────────
-// Inspired by the fitness app's clean card aesthetic
 function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRoll,
   finished, lives, timeLeft, isHuman }:{
   player:Player; name:string; balance:string; isActive:boolean; diceValue:number|null;
@@ -486,94 +513,98 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
 }) {
   const color:PawnColor = player==="blue"?"blue":"green";
   const p = PAWN_PAL[color];
-  const accentColor = player==="blue" ? "#3B82F6" : "#22C55E";
+  const accentColor = player==="blue" ? "#4F8EF7" : "#34D469";
+  const cardBg = player==="blue"
+    ? "linear-gradient(135deg,#0D1B3E 0%,#111F45 100%)"
+    : "linear-gradient(135deg,#0A2318 0%,#0F2E1E 100%)";
+  const borderColor = isActive ? accentColor+"88" : "rgba(255,255,255,0.09)";
 
   return (
     <div style={{
       display:"flex", alignItems:"center",
-      background:"rgba(255,255,255,0.04)",
-      borderRadius:18,
-      border:`1px solid ${isActive ? accentColor+"44" : "rgba(255,255,255,0.06)"}`,
+      background: cardBg,
+      borderRadius:14,
+      border:`1.5px solid ${borderColor}`,
       overflow:"hidden",
-      boxShadow: isActive ? `0 0 24px ${accentColor}18` : "none",
-      transition:"all 0.35s",
-      opacity: isActive ? 1 : 0.55,
+      boxShadow: isActive
+        ? `0 0 0 1px ${accentColor}33, 0 6px 24px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)`
+        : "0 2px 10px rgba(0,0,0,0.4)",
+      transition:"all 0.3s",
+      opacity: isActive ? 1 : 0.7,
+      gap:0,
     }}>
       {/* Left accent bar */}
       <div style={{
-        width:4, alignSelf:"stretch",
-        background: isActive ? accentColor : "transparent",
-        transition:"background 0.35s",
-        flexShrink:0,
+        width:3, alignSelf:"stretch", flexShrink:0,
+        background: isActive
+          ? `linear-gradient(180deg,${accentColor},${accentColor}88)`
+          : "rgba(255,255,255,0.08)",
+        transition:"background 0.3s",
       }}/>
 
       {/* Avatar */}
-      <div style={{
-        padding:"12px 10px",
-        display:"flex", alignItems:"center", justifyContent:"center",
-        flexShrink:0,
-      }}>
+      <div style={{ padding:"10px 8px", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
         <div style={{
-          width:44, height:44, borderRadius:12, flexShrink:0,
-          background:`linear-gradient(145deg, ${p.s}20, ${p.d}40)`,
-          border:`1.5px solid ${isActive ? p.m+"55" : "rgba(255,255,255,0.08)"}`,
+          width:40, height:40, borderRadius:11, flexShrink:0,
+          background:`linear-gradient(145deg,${p.m}1A,${p.d}33)`,
+          border:`1.5px solid ${isActive ? p.m+"66" : "rgba(255,255,255,0.1)"}`,
           display:"flex", alignItems:"center", justifyContent:"center",
-          boxShadow: isActive ? `0 0 14px ${p.m}30` : "none",
-          transition:"all 0.35s",
+          boxShadow: isActive ? `0 0 12px ${p.m}33` : "none",
+          transition:"all 0.3s",
         }}>
-          <Pawn color={color} size={24}/>
+          <Pawn color={color} size={22}/>
         </div>
       </div>
 
       {/* Info */}
-      <div style={{ flex:1, padding:"12px 0 12px", minWidth:0 }}>
-        {/* Name row */}
-        <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5 }}>
+      <div style={{ flex:1, padding:"9px 0", minWidth:0 }}>
+        {/* Name + badge */}
+        <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:4 }}>
           <span style={{
-            fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:13.5,
-            color: isActive ? "#fff" : "rgba(255,255,255,0.6)",
+            fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:13,
+            color: isActive ? "#F0F4FF" : "rgba(255,255,255,0.45)",
             lineHeight:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
-            maxWidth:90, transition:"color 0.35s",
+            maxWidth:88, transition:"color 0.3s", letterSpacing:0.2,
           }}>{name}</span>
           <span style={{
-            fontSize:8, fontWeight:800, letterSpacing:0.8, textTransform:"uppercase",
-            color: isHuman ? accentColor : "rgba(255,255,255,0.3)",
-            background: isHuman ? `${accentColor}1A` : "rgba(255,255,255,0.06)",
-            border: `1px solid ${isHuman ? accentColor+"44" : "rgba(255,255,255,0.1)"}`,
+            fontSize:7.5, fontWeight:800, letterSpacing:1, textTransform:"uppercase",
+            color: isHuman ? accentColor : "rgba(255,255,255,0.25)",
+            background: isHuman ? `${accentColor}18` : "rgba(255,255,255,0.05)",
+            border:`1px solid ${isHuman ? accentColor+"40" : "rgba(255,255,255,0.08)"}`,
             borderRadius:4, padding:"2px 5px", flexShrink:0,
           }}>{isHuman?"Tu":"IA"}</span>
         </div>
 
         {/* Balance */}
-        <div style={{ marginBottom:8 }}>
+        <div style={{ marginBottom:5 }}>
           <span style={{
-            fontSize:12, fontWeight:700, color: isActive ? accentColor : "rgba(255,255,255,0.3)",
-            transition:"color 0.35s",
+            fontSize:11.5, fontWeight:700,
+            color: isActive ? accentColor : "rgba(255,255,255,0.25)",
+            fontFamily:"'Syne',sans-serif",
+            transition:"color 0.3s",
           }}>{balance}</span>
         </div>
 
-        {/* Lives + pieces */}
-        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-          {/* Lives */}
-          <div style={{ display:"flex", gap:3 }}>
+        {/* Lives + pieces done */}
+        <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+          <div style={{ display:"flex", gap:2.5 }}>
             {Array.from({length:5}).map((_,i)=>(
               <div key={i} style={{
-                width:6, height:6, borderRadius:"50%",
-                background: i<lives ? "#ef4444" : "rgba(255,255,255,0.1)",
-                boxShadow: i<lives ? "0 0 5px #ef444466" : "none",
+                width:5.5, height:5.5, borderRadius:"50%",
+                background: i<lives ? "#F05555" : "rgba(255,255,255,0.1)",
+                boxShadow: i<lives ? "0 0 4px #F0555577" : "none",
                 transition:"all 0.3s",
               }}/>
             ))}
           </div>
-          <div style={{ width:1, height:10, background:"rgba(255,255,255,0.1)" }}/>
-          {/* Pieces done */}
-          <div style={{ display:"flex", gap:3 }}>
+          <div style={{ width:1, height:9, background:"rgba(255,255,255,0.1)" }}/>
+          <div style={{ display:"flex", gap:2.5 }}>
             {Array.from({length:4}).map((_,i)=>(
               <motion.div key={i}
-                animate={{ scale: i===finished-1 ? [1,1.4,1] : 1 }}
-                transition={{ duration:0.35 }}
+                animate={{ scale: i===finished-1 ? [1,1.5,1] : 1 }}
+                transition={{ duration:0.3 }}
                 style={{
-                  width:6, height:6, borderRadius:"50%",
+                  width:5.5, height:5.5, borderRadius:"50%",
                   background: i<finished ? accentColor : "rgba(255,255,255,0.1)",
                   boxShadow: i<finished ? `0 0 5px ${accentColor}88` : "none",
                   transition:"background 0.3s, box-shadow 0.3s",
@@ -583,22 +614,23 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
         </div>
       </div>
 
-      {/* Dice + timer */}
+      {/* Timer + Dice */}
       <div style={{
-        padding:"10px 12px",
-        display:"flex", flexDirection:"column", alignItems:"center", gap:5,
+        padding:"8px 10px",
+        display:"flex", flexDirection:"column", alignItems:"center", gap:4,
         flexShrink:0,
       }}>
         {isHuman && isActive
-          ? <TimerArc timeLeft={timeLeft} size={30}/>
-          : <div style={{ height:30 }}/>
+          ? <TimerArc timeLeft={timeLeft} size={26}/>
+          : <div style={{ height:26 }}/>
         }
         <div style={{
-          background:"rgba(0,0,0,0.4)",
-          borderRadius:12, padding:"5px",
-          border:`1.5px solid ${isActive ? accentColor+"33" : "rgba(255,255,255,0.06)"}`,
+          background:"rgba(0,0,0,0.45)",
+          borderRadius:10, padding:"4px",
+          border:`1.5px solid ${isActive ? accentColor+"40" : "rgba(255,255,255,0.07)"}`,
+          boxShadow: isActive ? `0 0 10px ${accentColor}20` : "none",
         }}>
-          <Dice3D value={diceValue} rolling={rolling} onClick={onRoll} active={isActive} sz={44}/>
+          <Dice3D value={diceValue} rolling={rolling} onClick={onRoll} active={isActive} sz={40}/>
         </div>
       </div>
     </div>
@@ -833,17 +865,20 @@ export default function LudoGame() {
     }
   }
 
-  function captureAtPos(mover:GamePiece){
+  function captureAtPos(mover:GamePiece): boolean {
     const [mr,mc]=getPieceCoord(mover);
     const ck=`${mr},${mc}`;
-    if(SAFE_COORDS.has(ck)||mover.pos<0||mover.pos>50) return;
+    if(SAFE_COORDS.has(ck)||mover.pos<0||mover.pos>50) return false;
     const opp=other(mover.player);
+    let captured = false;
     piecesRef.current
       .filter(p=>p.player===opp&&p.pos>=0&&p.pos<=50)
       .forEach(p=>{
         const [pr,pc]=getPieceCoord(p);
-        if(pr===mr&&pc===mc){
-          setMsg(`${mover.player==="blue"?playerName:opponentName} capturou uma peça!`);
+        // Only capture if defender is NOT on a safe/star square
+        if(pr===mr&&pc===mc && !SAFE_COORDS.has(`${pr},${pc}`)){
+          captured = true;
+          setMsg(`${mover.player==="blue"?playerName.split(" ")[0]:opponentName} capturou uma peça! +1 jogada`);
           let pos=p.pos;
           function stepBack(){
             setPieces(prev=>prev.map(x=>x.id!==p.id?x:{...x,pos:Math.max(-1,pos)}));
@@ -852,18 +887,23 @@ export default function LudoGame() {
           stepBack();
         }
       });
+    return captured;
   }
 
-  function handleMoveComplete(pieceId:PieceId,diceVal:number,currentTurn:Player){
+  function handleMoveComplete(pieceId:PieceId,diceVal:number,currentTurn:Player,prevPos:number){
     setPhase("moving");
     const ps=piecesRef.current;
     const mover=ps.find(p=>p.id===pieceId)!;
-    captureAtPos(mover);
+    const captured = captureAtPos(mover);
     if(finishedCount(piecesRef.current,currentTurn)===4){
       setWinner(currentTurn); setPhase("done"); return;
     }
-    if(diceVal===6){
-      setMsg(`${currentTurn==="blue"?playerName.split(" ")[0]:opponentName} tirou 6 — joga de novo!`);
+    // Extra turn: rolled 6, captured opponent, or entered home triangle
+    const enteredTriangle = mover.pos>=51 && prevPos<=50;
+    const extraTurn = diceVal===6 || captured || enteredTriangle;
+    if(extraTurn){
+      const reason = diceVal===6 ? "tirou 6" : captured ? "capturou uma peça" : "entrou no triângulo";
+      setMsg(`${currentTurn==="blue"?playerName.split(" ")[0]:opponentName} ${reason} — joga de novo!`);
       setMovable([]);
       setTimeout(()=>{setPhase("roll");if(currentTurn==="blue")setDiceBlue(null);else setDiceGreen(null);},400);
     } else {
@@ -881,12 +921,13 @@ export default function LudoGame() {
     setMovable([]); setPhase("moving");
     const piece=ps.find(p=>p.id===pid)!;
     const isExit=piece.pos===-1;
+    const prevPos=piece.pos;
     if(isExit){
       setMsg(`${pl==="blue"?playerName.split(" ")[0]:opponentName} coloca peça no tabuleiro!`);
-      movePieceSteps(pid,-1,1,true,()=>handleMoveComplete(pid,diceVal,pl));
+      movePieceSteps(pid,-1,1,true,()=>handleMoveComplete(pid,diceVal,pl,0));
     } else {
       setMsg(`${pl==="blue"?playerName.split(" ")[0]:opponentName} move ${diceVal} ${diceVal===1?"casa":"casas"}!`);
-      movePieceSteps(pid,piece.pos,diceVal,false,()=>handleMoveComplete(pid,diceVal,pl));
+      movePieceSteps(pid,piece.pos,diceVal,false,()=>handleMoveComplete(pid,diceVal,pl,prevPos));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[playerName,opponentName]);
@@ -991,65 +1032,66 @@ export default function LudoGame() {
 
   return (
     <div style={{
-      minHeight:"100vh", width:"100%",
+      height:"100vh", width:"100%", overflow:"hidden",
       backgroundImage:`url(${bgImg})`,
       backgroundSize:"320px auto",
       backgroundRepeat:"repeat",
       display:"flex", justifyContent:"center",
     }}>
-      {/* Dark overlay so content is readable over pattern */}
+      {/* Dark overlay */}
       <div style={{
         position:"fixed", inset:0,
-        background:"rgba(4,10,28,0.80)",
+        background:"rgba(4,10,28,0.82)",
         pointerEvents:"none", zIndex:0,
       }}/>
 
       <div style={{
         width:"100%", maxWidth:430,
+        height:"100vh", overflow:"hidden",
         display:"flex", flexDirection:"column",
-        minHeight:"100vh", paddingBottom:12,
         position:"relative", zIndex:1,
       }}>
 
         {/* ── Header */}
         <div style={{
           display:"flex", alignItems:"center", justifyContent:"space-between",
-          padding:"14px 16px 10px",
+          padding:"10px 14px 8px",
           borderBottom:"1px solid rgba(255,255,255,0.07)",
-          background:"rgba(0,0,0,0.4)",
+          background:"rgba(5,12,32,0.85)",
+          flexShrink:0,
         }}>
           <button onClick={()=>setLocation("/")} style={{
-            width:38, height:38, borderRadius:10,
-            background:"rgba(255,255,255,0.06)",
-            border:"1px solid rgba(255,255,255,0.1)",
+            width:34, height:34, borderRadius:9,
+            background:"rgba(255,255,255,0.07)",
+            border:"1px solid rgba(255,255,255,0.12)",
             display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer",
           }}>
-            <ArrowLeft style={{width:18,height:18,color:"#fff"}}/>
+            <ArrowLeft style={{width:16,height:16,color:"#9BB4E8"}}/>
           </button>
           <div style={{ textAlign:"center" }}>
             <p style={{
-              fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:18,
-              color:"#fff", lineHeight:1, letterSpacing:4,
-              textShadow:"0 0 28px rgba(99,179,255,0.5)",
+              fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:17,
+              color:"#E8F0FF", lineHeight:1, letterSpacing:5,
+              textShadow:"0 0 20px rgba(99,179,255,0.45)",
             }}>LUDO</p>
-            <p style={{ fontSize:10, color:"rgba(255,255,255,0.3)", marginTop:2, letterSpacing:2 }}>
+            <p style={{ fontSize:9, color:"rgba(255,255,255,0.28)", marginTop:1, letterSpacing:2.5, fontWeight:700 }}>
               1 VS 1
             </p>
           </div>
           <div style={{
-            padding:"5px 10px",
-            background:"rgba(255,255,255,0.05)",
-            border:"1px solid rgba(255,255,255,0.08)",
+            padding:"4px 10px",
+            background:"linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,215,0,0.06))",
+            border:"1px solid rgba(255,215,0,0.22)",
             borderRadius:8,
           }}>
-            <span style={{ fontSize:10, color:"rgba(255,255,255,0.3)", fontWeight:600 }}>
+            <span style={{ fontSize:10, color:"#FFD700", fontWeight:700, fontFamily:"'Syne',sans-serif" }}>
               {BET_AMOUNT} MT
             </span>
           </div>
         </div>
 
         {/* ── Green panel (AI — top) */}
-        <div style={{ padding:"10px 14px 5px" }}>
+        <div style={{ padding:"7px 12px 4px", flexShrink:0 }}>
           <PlayerPanel
             player="green" name={opponentName} balance={opponentBal}
             isActive={turn==="green"&&!winner}
@@ -1061,31 +1103,62 @@ export default function LudoGame() {
         </div>
 
         {/* ── Status message */}
-        <div style={{ padding:"4px 14px 5px" }}>
+        <div style={{ padding:"3px 12px 3px", flexShrink:0 }}>
           <AnimatePresence mode="wait">
             <motion.div key={msg}
-              initial={{opacity:0,y:-4}} animate={{opacity:1,y:0}} exit={{opacity:0,y:4}}
+              initial={{opacity:0,y:-3}} animate={{opacity:1,y:0}} exit={{opacity:0,y:3}}
               style={{
-                background:"rgba(0,0,0,0.35)",
-                border:"1px solid rgba(255,255,255,0.07)",
-                borderRadius:10, padding:"7px 14px",
+                background:"rgba(6,14,38,0.75)",
+                border:"1px solid rgba(255,255,255,0.08)",
+                borderRadius:9, padding:"5px 12px",
                 textAlign:"center",
               }}>
               <p style={{
-                fontSize:11.5, fontWeight:600,
-                color:"rgba(255,255,255,0.65)", letterSpacing:0.2,
+                fontSize:11, fontWeight:600,
+                color:"rgba(220,230,255,0.7)", letterSpacing:0.2,
               }}>{msg}</p>
             </motion.div>
           </AnimatePresence>
         </div>
 
-        {/* ── Board */}
-        <div style={{ padding:"0 12px", flex:1 }}>
-          <Board pieces={pieces} movable={movable} onSelectPiece={handleSelectPiece}/>
+        {/* ── Board — takes remaining space, stays square */}
+        <div style={{
+          flex:1, minHeight:0,
+          padding:"0 10px",
+          display:"flex", alignItems:"center", justifyContent:"center",
+        }}>
+          <div style={{ width:"100%", maxHeight:"100%", aspectRatio:"1" }}>
+            <Board pieces={pieces} movable={movable} onSelectPiece={handleSelectPiece}/>
+          </div>
+        </div>
+
+        {/* ── Turn indicator pill */}
+        <div style={{ padding:"3px 12px 2px", display:"flex", justifyContent:"center", flexShrink:0 }}>
+          <motion.div
+            animate={{ opacity:[0.65,1,0.65] }}
+            transition={{ duration:1.8, repeat:Infinity }}
+            style={{
+              display:"flex", alignItems:"center", gap:5,
+              background:"rgba(5,12,32,0.7)",
+              border:"1px solid rgba(255,255,255,0.09)",
+              borderRadius:20, padding:"4px 12px",
+            }}>
+            <div style={{
+              width:5, height:5, borderRadius:"50%",
+              background: turn==="blue" ? "#4F8EF7" : "#34D469",
+              boxShadow: turn==="blue" ? "0 0 5px #4F8EF7" : "0 0 5px #34D469",
+            }}/>
+            <span style={{
+              fontSize:9.5, fontWeight:700, letterSpacing:1, textTransform:"uppercase",
+              color: turn==="blue" ? "#4F8EF7" : "#34D469",
+            }}>
+              Vez de {turn==="blue" ? playerName.split(" ")[0] : opponentName}
+            </span>
+          </motion.div>
         </div>
 
         {/* ── Blue panel (human — bottom) */}
-        <div style={{ padding:"8px 14px 5px" }}>
+        <div style={{ padding:"2px 12px 8px", flexShrink:0 }}>
           <PlayerPanel
             player="blue" name={playerName} balance={playerBal}
             isActive={turn==="blue"&&!winner}
@@ -1094,31 +1167,6 @@ export default function LudoGame() {
             finished={blueFinished} lives={lives.blue}
             timeLeft={timeLeft} isHuman={true}
           />
-        </div>
-
-        {/* ── Turn indicator pill */}
-        <div style={{ padding:"4px 14px 0", display:"flex", justifyContent:"center" }}>
-          <motion.div
-            animate={{ opacity:[0.6,1,0.6] }}
-            transition={{ duration:1.8, repeat:Infinity }}
-            style={{
-              display:"flex", alignItems:"center", gap:6,
-              background:"rgba(0,0,0,0.3)",
-              border:"1px solid rgba(255,255,255,0.08)",
-              borderRadius:20, padding:"5px 14px",
-            }}>
-            <div style={{
-              width:6, height:6, borderRadius:"50%",
-              background: turn==="blue" ? "#3B82F6" : "#22C55E",
-              boxShadow: turn==="blue" ? "0 0 6px #3B82F6" : "0 0 6px #22C55E",
-            }}/>
-            <span style={{
-              fontSize:10, fontWeight:700, letterSpacing:0.8, textTransform:"uppercase",
-              color: turn==="blue" ? "#3B82F6" : "#22C55E",
-            }}>
-              Vez de {turn==="blue" ? playerName.split(" ")[0] : opponentName}
-            </span>
-          </motion.div>
         </div>
 
       </div>

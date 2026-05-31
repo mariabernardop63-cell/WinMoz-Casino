@@ -87,16 +87,21 @@ export default function Registar() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: email.trim().toLowerCase() }),
         });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.exists) {
-            setErrors({ email: "Este email já está registado. Por favor, inicie sessão." });
-            setLoading(false);
-            return;
-          }
+        if (!res.ok) {
+          setGeneralError("Não foi possível verificar o email. Tente novamente.");
+          setLoading(false);
+          return;
+        }
+        const data = await res.json();
+        if (data.exists) {
+          setErrors({ email: "Este email já está registado. Por favor, inicie sessão." });
+          setLoading(false);
+          return;
         }
       } catch {
-        // backend unavailable — allow proceeding
+        setGeneralError("Erro de ligação ao servidor. Verifique a sua ligação e tente novamente.");
+        setLoading(false);
+        return;
       }
       setLoading(false);
       setDir(1); setStep(2); setErrors({});
@@ -120,10 +125,13 @@ export default function Registar() {
         invite_code_used: invite || null,
       }));
 
-      const { error } = await supabase.auth.signUp({
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
-        options: { data: { full_name: nome.trim() } },
+        options: {
+          data: { full_name: nome.trim() },
+          emailRedirectTo: window.location.origin + "/splash",
+        },
       });
 
       setLoading(false);
@@ -138,6 +146,13 @@ export default function Registar() {
         } else {
           setGeneralError(error.message || "Erro ao criar conta.");
         }
+        return;
+      }
+
+      // Supabase silently accepts duplicate signups — detect via empty identities
+      if (signUpData?.user && (signUpData.user.identities?.length ?? 0) === 0) {
+        setGeneralError("Este email já está registado. Por favor, inicie sessão.");
+        setDir(-1); setStep(1);
         return;
       }
 
@@ -235,7 +250,7 @@ export default function Registar() {
                   <ShieldCheck style={{ width: 24, height: 24, color: "#111" }} />
                 </div>
                 <h1 className="font-syne font-bold text-[26px] text-[#0a0a0a] leading-tight mb-1">Defina a sua Senha</h1>
-                <p className="text-[13.5px] text-slate-500 mb-7">Após criar a conta, receberá um código de verificação no email.</p>
+                <p className="text-[13.5px] text-slate-500 mb-7">Após criar a conta, receberá um link de verificação no seu email.</p>
 
                 <div className="mb-4">
                   <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#374151", marginBottom: 7 }}>Palavra-passe</label>
