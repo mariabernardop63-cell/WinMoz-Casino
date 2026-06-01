@@ -248,6 +248,7 @@ export default function Roleta() {
   const [result, setResult] = useState<typeof SECTORS[0] | null>(null);
   const [showResult, setShowResult] = useState(false);
   const [spinsLeft, setSpinsLeft] = useState(3);
+  const [spinDuration, setSpinDuration] = useState(5000);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const tickIntervalRef = useRef<number | null>(null);
   const rotationRef = useRef(0);
@@ -288,7 +289,8 @@ export default function Roleta() {
     const totalRotation = rotationRef.current + totalSpins * 360 + targetDeg;
 
     // Schedule ticking sounds that slow down
-    const spinDuration = 4500 + Math.random() * 1500; // 4.5-6 seconds
+    const duration = 4500 + Math.random() * 1500; // 4.5-6 seconds
+    setSpinDuration(duration); // sync CSS transition with timeout
     const ticksTotal = N * (totalSpins + 1);
     let tickCount = 0;
 
@@ -309,14 +311,14 @@ export default function Roleta() {
     setRotation(totalRotation);
     rotationRef.current = totalRotation;
 
-    // After spin completes
+    // After spin completes — use same duration as CSS transition
     setTimeout(() => {
       stopTicking();
       setSpinning(false);
       setResult(SECTORS[targetIdx]);
       setShowResult(true);
       playWin(ctx);
-    }, spinDuration);
+    }, duration);
   }, [spinning, spinsLeft]);
 
   useEffect(() => () => stopTicking(), []);
@@ -385,7 +387,7 @@ export default function Roleta() {
                 {/* Wheel */}
                 <div style={{
                   width: "100%", height: "100%",
-                  transition: spinning ? `transform ${4.5 + 0.75}s cubic-bezier(0.17,0.67,0.12,1.0)` : "none",
+                  transition: spinning ? `transform ${spinDuration / 1000}s cubic-bezier(0.17,0.67,0.12,1.0)` : "none",
                   transform: `rotate(${rotation}deg)`,
                 }}>
                   <WheelSVG rotation={0} />

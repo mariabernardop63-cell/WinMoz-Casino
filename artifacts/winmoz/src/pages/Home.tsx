@@ -972,7 +972,10 @@ function HeroBanner() {
                 whileTap={{ scale: 0.96 }}
                 onClick={() => {
                   if (slide.cta === "Conversar") setLocation("/grupo-chat");
-                  else if (slide.cta === "Jogar Agora") setLocation(`/apostar/${slide.id}`);
+                  else if (slide.cta === "Jogar Agora") {
+                    if (slide.id === "roleta") setLocation("/roleta");
+                    else setLocation(`/apostar/${slide.id}`);
+                  }
                 }}
                 className="font-syne font-bold rounded-xl shadow-lg transition-all duration-200"
                 style={{
@@ -1244,7 +1247,11 @@ export default function Home() {
                   <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{game.players}</p>
                   <div className="mt-auto">
                     <button
-                      onClick={() => isLoggedIn ? setLocation(`/apostar/${game.id}`) : setLocation("/login")}
+                      onClick={() => {
+                        if (!isLoggedIn) { setLocation("/login"); return; }
+                        if (game.id === "roleta") { setLocation("/roleta"); return; }
+                        setLocation(`/apostar/${game.id}`);
+                      }}
                       className="w-full h-8 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-colors">
                       Jogar
                     </button>
@@ -1309,7 +1316,11 @@ export default function Home() {
                 </div>
 
                 <button
-                  onClick={() => isLoggedIn ? setLocation(`/apostar/${game.gameRoute}`) : setLocation("/login")}
+                  onClick={() => {
+                    if (!isLoggedIn) { setLocation("/login"); return; }
+                    if (game.gameRoute === "roleta") { setLocation("/roleta"); return; }
+                    setLocation(`/apostar/${game.gameRoute}`);
+                  }}
                   className="w-8 h-8 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center transition-colors shadow-md flex-shrink-0">
                   <Play className="w-3.5 h-3.5 ml-0.5"/>
                 </button>

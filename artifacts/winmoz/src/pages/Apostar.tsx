@@ -270,21 +270,25 @@ function MatchmakingScreen({
     const channel = supabase.channel(channelName, {
       config: {
         presence: { key: userId },
-        broadcast: { self: false },
+        broadcast: { self: false }, // leader won't receive their own broadcast — handled below
       },
     });
     channelRef.current = channel;
 
-    // ── When a "match_found" broadcast arrives both players navigate ──
+    // ── FOLLOWER path: receives "match_found" broadcast from the leader ──────
+    // With self:false, only the NON-leader (follower) receives this event.
     channel.on("broadcast", { event: "match_found" }, ({ payload }) => {
       if (matchedRef.current) return;
       matchedRef.current = true;
 
+      // Follower is always "green" (leader is always "blue" = lower sorted userId).
+      // But guard correctly in case ids are equal somehow.
       const myColor: string = payload.blue === userId ? "blue" : "green";
-      const oppId: string   = myColor === "blue" ? payload.green : payload.blue;
-      const state = channel.presenceState<{ displayName?: string }>();
-      const oppPresence = state[oppId]?.[0];
-      const oppName = (oppPresence as { displayName?: string })?.displayName ?? "Adversário";
+      // Names are included in the payload by the leader — no presence lookup needed
+      const oppName: string =
+        myColor === "green"
+          ? (payload.blueName as string) ?? "Adversário"
+          : (payload.greenName as string) ?? "Adversário";
 
       setFound(true);
       setTimeout(() => {
@@ -293,27 +297,48 @@ function MatchmakingScreen({
       }, 1500);
     });
 
-    // ── Helper: try to form a match if 2+ players are present ──
+    // ── LEADER path: detects 2 players and initiates the match ──────────────
     const tryMatch = () => {
       if (matchedRef.current) return;
       const state = channel.presenceState<{ displayName?: string }>();
       const presentIds = Object.keys(state).sort();
       if (presentIds.length < 2) return;
 
-      // Only the leader (lowest sorted userId) broadcasts the match
-      // This prevents both players from broadcasting simultaneously
+      // Only the lowest-sorted userId acts as leader (prevents both players racing)
       if (presentIds[0] !== userId) return;
 
-      const gameId = `${presentIds[0]}_${presentIds[1]}`;
+      // Claim the match immediately — before any async work — to prevent duplicates
+      matchedRef.current = true;
+
+      const gameId   = `${presentIds[0]}_${presentIds[1]}`;
+      const oppId    = presentIds[1];
+      const oppPresence = (state[oppId] as any)?.[0];
+      const oppName  = (oppPresence as { displayName?: string })?.displayName ?? "Adversário";
+
+      // Broadcast to follower, embedding both names so the follower
+      // never has to do a presence lookup (avoids race conditions).
       channel.send({
         type: "broadcast",
         event: "match_found",
-        payload: { gameId, blue: presentIds[0], green: presentIds[1] },
+        payload: {
+          gameId,
+          blue: presentIds[0],       // leader = blue
+          green: presentIds[1],      // follower = green
+          blueName: displayName,     // leader's name  → follower uses this as oppName
+          greenName: oppName,        // follower's name → leader uses this as oppName
+        },
       });
+
+      // Leader navigates HERE — they will NEVER receive the broadcast (self:false)
+      setFound(true);
+      setTimeout(() => {
+        onMatched(gameId, "blue", oppName);
+        supabase.removeChannel(channel);
+      }, 1500);
     };
 
     channel.on("presence", { event: "sync" }, tryMatch);
-    channel.on("presence", { event: "join" }, tryMatch);
+    channel.on("presence", { event: "join" },  tryMatch);
 
     channel.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {

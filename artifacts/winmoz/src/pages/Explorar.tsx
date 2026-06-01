@@ -53,6 +53,8 @@ function GameCard({ game }: { game: typeof jogosCards[0] }) {
   const betId = game.id.split("-")[0];
   const handlePlay = () => {
     if (!localStorage.getItem("winmoz_logged_in")) { setLocation("/login"); return; }
+    // Roulette goes directly to its own screen — no betting flow needed
+    if (game.id === "roleta") { setLocation("/roleta"); return; }
     setLocation(`/apostar/${betId}`);
   };
   return (
