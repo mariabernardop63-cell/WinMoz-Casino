@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 
 export interface UserProfile {
@@ -25,14 +25,27 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function withTimeout<T>(promise: Promise<T>, ms: number, label = "operation"): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
+
 async function fetchProfileFromSupabase(userId: string): Promise<UserProfile | null> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
-    .single();
-  if (error || !data) return null;
-  return data as UserProfile;
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from("profiles").select("*").eq("id", userId).single(),
+      10000,
+      "fetchProfile"
+    );
+    if (error || !data) return null;
+    return data as UserProfile;
+  } catch {
+    return null;
+  }
 }
 
 async function ensureProfileExists(
@@ -41,17 +54,21 @@ async function ensureProfileExists(
   extraData?: { full_name?: string; phone?: string; invite_code_used?: string | null }
 ) {
   try {
-    await fetch("/api/complete-registration", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: userId,
-        email,
-        full_name: extraData?.full_name ?? null,
-        phone: extraData?.phone ?? null,
-        invite_code_used: extraData?.invite_code_used ?? null,
+    await withTimeout(
+      fetch("/api/complete-registration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          email,
+          full_name: extraData?.full_name ?? null,
+          phone: extraData?.phone ?? null,
+          invite_code_used: extraData?.invite_code_used ?? null,
+        }),
       }),
-    });
+      10000,
+      "ensureProfile"
+    );
   } catch {
     /* não crítico */
   }
@@ -61,50 +78,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const loadingRef = useRef(false);
 
   const loadProfile = async (userId: string, email: string) => {
-    const data = await fetchProfileFromSupabase(userId);
-    if (data) {
-      setProfile({ ...data, email });
-    } else {
+    // Prevent concurrent loadProfile calls
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    try {
+      const data = await fetchProfileFromSupabase(userId);
+      setProfile(data ? { ...data, email } : null);
+      setUser({ id: userId, email });
+    } catch {
       setProfile(null);
+      setUser({ id: userId, email });
+    } finally {
+      loadingRef.current = false;
     }
-    setUser({ id: userId, email });
   };
 
   const refreshProfile = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      await loadProfile(session.user.id, session.user.email ?? "");
+    try {
+      const result = await withTimeout(supabase.auth.getSession(), 8000, "getSession");
+      const session = result.data.session;
+      if (session?.user) {
+        await loadProfile(session.user.id, session.user.email ?? "");
+      }
+    } catch {
+      /* silently fail — user stays logged in */
     }
   };
 
   const forceRefresh = refreshProfile;
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await withTimeout(supabase.auth.signOut(), 8000, "signOut");
+    } catch { /* ignore */ }
     setUser(null);
     setProfile(null);
   };
 
   useEffect(() => {
+    let cancelled = false;
+
+    // Safety net: always resolve loading after 12 seconds max
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 12000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return;
       if (session?.user) {
-        loadProfile(session.user.id, session.user.email ?? "").finally(() =>
-          setLoading(false)
-        );
+        loadProfile(session.user.id, session.user.email ?? "").finally(() => {
+          if (!cancelled) setLoading(false);
+        });
       } else {
         setLoading(false);
       }
+    }).catch(() => {
+      if (!cancelled) setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (cancelled) return;
+
         if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
           const userId = session.user.id;
           const email = session.user.email ?? "";
 
-          // Verificar se há dados de registo pendentes (telemóvel, código de convite)
           const pendingRaw = sessionStorage.getItem("pendingReg");
           if (pendingRaw) {
             try {
@@ -117,23 +159,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               sessionStorage.removeItem("pendingReg");
             } catch { /* não crítico */ }
           } else {
-            // Garante que o perfil existe mesmo sem dados pendentes
             await ensureProfileExists(userId, email);
           }
 
           await loadProfile(userId, email);
-          setLoading(false);
+          if (!cancelled) setLoading(false);
+
         } else if (event === "SIGNED_OUT") {
           setUser(null);
           setProfile(null);
-          setLoading(false);
+          if (!cancelled) setLoading(false);
+
         } else if (event === "TOKEN_REFRESHED" && session?.user) {
           setUser({ id: session.user.id, email: session.user.email ?? "" });
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (

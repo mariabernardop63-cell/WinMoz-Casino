@@ -37,29 +37,40 @@ export default function Login() {
     setLoading(true);
     setErrors({});
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), 15000)
+      );
 
-    setLoading(false);
+      const { error } = await Promise.race([
+        supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        }),
+        timeoutPromise,
+      ]) as Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>;
 
-    if (error) {
-      if (
-        error.message.includes("Invalid login credentials") ||
-        error.message.includes("invalid_credentials")
-      ) {
-        setErrors({ general: "Email ou palavra-passe incorretos." });
-      } else if (error.message.includes("Email not confirmed")) {
-        setErrors({ general: "Email não verificado. Verifique a sua caixa de entrada." });
-      } else {
-        setErrors({ general: error.message || "Erro ao iniciar sessão." });
+      setLoading(false);
+
+      if (error) {
+        if (
+          error.message.includes("Invalid login credentials") ||
+          error.message.includes("invalid_credentials")
+        ) {
+          setErrors({ general: "Email ou palavra-passe incorretos." });
+        } else if (error.message.includes("Email not confirmed")) {
+          setErrors({ general: "Email não verificado. Verifique a sua caixa de entrada." });
+        } else {
+          setErrors({ general: error.message || "Erro ao iniciar sessão." });
+        }
+        return;
       }
-      return;
-    }
 
-    // O onAuthStateChange no AuthContext carrega o perfil automaticamente
-    setLocation("/");
+      setLocation("/");
+    } catch {
+      setLoading(false);
+      setErrors({ general: "Ligação lenta ou sem resposta. Tenta novamente." });
+    }
   };
 
   const inputStyle = (field: "email" | "password"): React.CSSProperties => ({
