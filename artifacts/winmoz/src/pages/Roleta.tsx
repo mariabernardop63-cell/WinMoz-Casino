@@ -1,23 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { ChevronLeft, Gift, Star, Zap } from "lucide-react";
+import { ChevronLeft, Star, Zap } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 // ─── Sectors ────────────────────────────────────────────────────────────────────
 const SECTORS = [
-  { label: "100",   sub: "MT",  color: "#7C3AED", darkColor: "#5B21B6", prize: 100,  type: "mt"   },
-  { label: "x2",    sub: "",    color: "#EA580C", darkColor: "#C2410C", prize: 2,    type: "mult" },
-  { label: "50",    sub: "MT",  color: "#6D28D9", darkColor: "#4C1D95", prize: 50,   type: "mt"   },
-  { label: "x3",    sub: "",    color: "#D97706", darkColor: "#B45309", prize: 3,    type: "mult" },
-  { label: "5.000", sub: "MT",  color: "#7C3AED", darkColor: "#5B21B6", prize: 5000, type: "jackpot"},
-  { label: "x1.5",  sub: "",    color: "#2563EB", darkColor: "#1D4ED8", prize: 1.5,  type: "mult" },
-  { label: "200",   sub: "MT",  color: "#6D28D9", darkColor: "#4C1D95", prize: 200,  type: "mt"   },
-  { label: "Free",  sub: "Spin",color: "#059669", darkColor: "#047857", prize: 0,    type: "free" },
-  { label: "25",    sub: "MT",  color: "#7C3AED", darkColor: "#5B21B6", prize: 25,   type: "mt"   },
-  { label: "x5",    sub: "",    color: "#DC2626", darkColor: "#B91C1C", prize: 5,    type: "mult" },
-  { label: "500",   sub: "MT",  color: "#6D28D9", darkColor: "#4C1D95", prize: 500,  type: "mt"   },
-  { label: "10",    sub: "MT",  color: "#EA580C", darkColor: "#C2410C", prize: 10,   type: "mt"   },
+  { label: "100",   sub: "MT",  color: "#7C3AED", darkColor: "#5B21B6", prize: 100,  type: "mt"      },
+  { label: "200",   sub: "MT",  color: "#DC2626", darkColor: "#B91C1C", prize: 200,  type: "mt"      },
+  { label: "50",    sub: "MT",  color: "#6D28D9", darkColor: "#4C1D95", prize: 50,   type: "mt"      },
+  { label: "25",    sub: "MT",  color: "#EA580C", darkColor: "#C2410C", prize: 25,   type: "mt"      },
+  { label: "10",    sub: "MT",  color: "#7C3AED", darkColor: "#5B21B6", prize: 10,   type: "mt"      },
+  { label: "5",     sub: "MT",  color: "#2563EB", darkColor: "#1D4ED8", prize: 5,    type: "mt"      },
+  { label: "1",     sub: "MT",  color: "#6D28D9", darkColor: "#4C1D95", prize: 1,    type: "mt"      },
+  { label: "5.000", sub: "MT",  color: "#059669", darkColor: "#047857", prize: 5000, type: "jackpot" },
+  { label: "Boa",   sub: "Sorte",color:"#6B7280", darkColor: "#4B5563", prize: 0,    type: "luck"    },
 ];
 
 const N = SECTORS.length;
@@ -185,8 +183,8 @@ function Pointer() {
 // ─── Prize Result Card ───────────────────────────────────────────────────────────
 function PrizeCard({ sector, onClose }: { sector: typeof SECTORS[0]; onClose: () => void }) {
   const isJackpot = sector.type === "jackpot";
-  const isMult = sector.type === "mult";
-  const isFree = sector.type === "free";
+  const isLuck    = sector.type === "luck";
+  const isMT      = sector.type === "mt";
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -203,17 +201,17 @@ function PrizeCard({ sector, onClose }: { sector: typeof SECTORS[0]; onClose: ()
             <motion.div animate={{ rotate: [0, 10, -10, 0] }} transition={{ duration: 0.5, repeat: 3 }}
               style={{ fontSize: 52, marginBottom: 8 }}>🎰</motion.div>
           )}
-          {isMult && <div style={{ fontSize: 52, marginBottom: 8 }}>⚡</div>}
-          {isFree && <div style={{ fontSize: 52, marginBottom: 8 }}>🎁</div>}
-          {!isJackpot && !isMult && !isFree && <div style={{ fontSize: 52, marginBottom: 8 }}>💰</div>}
+          {isLuck && <div style={{ fontSize: 52, marginBottom: 8 }}>🍀</div>}
+          {isMT && <div style={{ fontSize: 52, marginBottom: 8 }}>💰</div>}
+          {!isJackpot && !isLuck && !isMT && <div style={{ fontSize: 52, marginBottom: 8 }}>⭐</div>}
 
           <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: 3, textTransform: "uppercase",
             color: "rgba(255,255,255,0.65)", marginBottom: 8 }}>
-            {isJackpot ? "JACKPOT!" : isMult ? "MULTIPLICADOR" : isFree ? "GIRO GRÁTIS" : "GANHO"}
+            {isJackpot ? "JACKPOT!" : isLuck ? "BOA SORTE" : "GANHO"}
           </p>
           <p style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900,
-            fontSize: isJackpot ? 36 : 32, color: "#FFD700", lineHeight: 1 }}>
-            {isFree ? "FREE SPIN" : isMult ? `x${sector.prize}` : `${sector.label} MT`}
+            fontSize: isJackpot ? 36 : isLuck ? 28 : 32, color: "#FFD700", lineHeight: 1 }}>
+            {isLuck ? "Boa Sorte!" : `${sector.label} ${sector.sub}`}
           </p>
         </div>
 
@@ -221,9 +219,9 @@ function PrizeCard({ sector, onClose }: { sector: typeof SECTORS[0]; onClose: ()
         <div style={{ background: "rgba(255,255,255,0.04)", borderTop: "1px solid rgba(255,255,255,0.08)",
           padding: "20px 24px" }}>
           <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", textAlign: "center", marginBottom: 16 }}>
-            {isFree ? "Um giro extra foi adicionado à tua conta!"
-              : isMult ? `O teu próximo ganho será multiplicado por ${sector.prize}x!`
-              : `${sector.label} MT foram adicionados ao teu saldo!`}
+            {isLuck ? "Desta vez não houve prémio. A sorte está ao virar da esquina!"
+              : isJackpot ? "Parabéns! O jackpot máximo foi adicionado ao teu saldo!"
+              : `${sector.label} ${sector.sub} foram adicionados ao teu saldo!`}
           </p>
           <button onClick={onClose} style={{
             width: "100%", padding: "14px", borderRadius: 14, border: "none",
@@ -231,7 +229,7 @@ function PrizeCard({ sector, onClose }: { sector: typeof SECTORS[0]; onClose: ()
             color: "#fff", fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 14,
             cursor: "pointer",
           }}>
-            {isFree ? "Usar Giro Grátis!" : "Fantástico! 🎉"}
+            {isLuck ? "Tentar de Novo" : "Fantástico! 🎉"}
           </button>
         </div>
       </motion.div>
@@ -240,6 +238,9 @@ function PrizeCard({ sector, onClose }: { sector: typeof SECTORS[0]; onClose: ()
 }
 
 // ─── Main Roulette Component ─────────────────────────────────────────────────────
+const PAID_SPIN_COST = 5;
+const FREE_SPINS_INITIAL = 3;
+
 export default function Roleta() {
   const [, setLocation] = useLocation();
   const { profile } = useAuth();
@@ -247,13 +248,17 @@ export default function Roleta() {
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<typeof SECTORS[0] | null>(null);
   const [showResult, setShowResult] = useState(false);
-  const [spinsLeft, setSpinsLeft] = useState(3);
+  const [freeSpinsLeft, setFreeSpinsLeft] = useState(FREE_SPINS_INITIAL);
   const [spinDuration, setSpinDuration] = useState(5000);
+  const [localBalance, setLocalBalance] = useState<number | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const tickIntervalRef = useRef<number | null>(null);
   const rotationRef = useRef(0);
 
-  const balance = parseFloat(String(profile?.balance ?? "0"));
+  const profileBalance = parseFloat(String(profile?.balance ?? "0"));
+  const balance = localBalance ?? profileBalance;
+
+  useEffect(() => { setLocalBalance(profileBalance); }, [profile?.balance]);
 
   function getAudioCtx(): AudioContext {
     if (!audioCtxRef.current) {
@@ -269,13 +274,25 @@ export default function Roleta() {
     }
   }
 
-  const startSpin = useCallback(() => {
-    if (spinning || spinsLeft <= 0) return;
+  const startSpin = useCallback(async (isPaid = false) => {
+    if (spinning) return;
+    if (freeSpinsLeft <= 0 && !isPaid) return;
 
     const ctx = getAudioCtx();
     if (ctx.state === "suspended") ctx.resume();
 
-    setSpinsLeft(s => s - 1);
+    if (freeSpinsLeft > 0) {
+      setFreeSpinsLeft(s => s - 1);
+    } else {
+      // Paid spin: deduct 5 MT
+      if (balance < PAID_SPIN_COST) return;
+      const newBal = balance - PAID_SPIN_COST;
+      setLocalBalance(newBal);
+      if (profile?.id) {
+        await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
+      }
+    }
+
     setSpinning(true);
     setResult(null);
     setShowResult(false);
@@ -319,7 +336,7 @@ export default function Roleta() {
       setShowResult(true);
       playWin(ctx);
     }, duration);
-  }, [spinning, spinsLeft]);
+  }, [spinning, freeSpinsLeft, balance, profile?.id]);
 
   useEffect(() => () => stopTicking(), []);
 
@@ -356,11 +373,14 @@ export default function Roleta() {
         {/* Spins left badge */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px",
-            background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.35)",
+            background: freeSpinsLeft > 0 ? "rgba(124,58,237,0.15)" : "rgba(255,215,0,0.12)",
+            border: `1px solid ${freeSpinsLeft > 0 ? "rgba(124,58,237,0.35)" : "rgba(255,215,0,0.3)"}`,
             borderRadius: 99 }}>
-            <Zap style={{ width: 13, height: 13, color: "#A78BFA" }} />
-            <span style={{ fontSize: 11, color: "#A78BFA", fontWeight: 700 }}>
-              {spinsLeft} giro{spinsLeft !== 1 ? "s" : ""} disponível{spinsLeft !== 1 ? "is" : ""}
+            <Zap style={{ width: 13, height: 13, color: freeSpinsLeft > 0 ? "#A78BFA" : "#FFD700" }} />
+            <span style={{ fontSize: 11, color: freeSpinsLeft > 0 ? "#A78BFA" : "#FFD700", fontWeight: 700 }}>
+              {freeSpinsLeft > 0
+                ? `${freeSpinsLeft} giro${freeSpinsLeft !== 1 ? "s" : ""} grátis`
+                : `Giros pagos · ${balance.toLocaleString("pt-MZ")} MT disponível`}
             </span>
           </div>
         </div>
@@ -414,46 +434,67 @@ export default function Roleta() {
 
         {/* Spin button */}
         <div style={{ padding: "8px 20px 36px", flexShrink: 0 }}>
-          <motion.button
-            whileTap={{ scale: 0.96 }}
-            onClick={startSpin}
-            disabled={spinning || spinsLeft <= 0}
-            style={{
-              width: "100%", height: 60, borderRadius: 99, border: "none",
-              background: spinning || spinsLeft <= 0
-                ? "rgba(255,255,255,0.08)"
-                : "linear-gradient(135deg,#7C3AED,#5B21B6)",
-              color: spinning || spinsLeft <= 0 ? "rgba(255,255,255,0.3)" : "#fff",
-              fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16,
-              cursor: spinning || spinsLeft <= 0 ? "not-allowed" : "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              boxShadow: spinning || spinsLeft <= 0 ? "none" : "0 4px 24px rgba(124,58,237,0.5)",
-              transition: "all 0.3s",
-            }}>
-            {spinning ? (
-              <>
-                <div style={{ width: 20, height: 20, borderRadius: "50%",
-                  border: "2.5px solid rgba(255,255,255,0.2)", borderTopColor: "#fff" }}
-                  className="animate-spin" />
-                A girar…
-              </>
-            ) : spinsLeft <= 0 ? (
-              "Sem giros disponíveis"
-            ) : (
-              <>
-                <Star style={{ width: 18, height: 18 }} />
-                Girar Agora x{spinsLeft}
-              </>
-            )}
-          </motion.button>
-
-          {spinsLeft <= 0 && (
-            <motion.button initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-              onClick={() => setSpinsLeft(3)}
-              style={{ width: "100%", marginTop: 10, height: 44, borderRadius: 99, border: "none",
-                background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.5)",
-                fontFamily: "'Syne',sans-serif", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-              Obter mais giros
+          {freeSpinsLeft > 0 ? (
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onClick={() => startSpin(false)}
+              disabled={spinning}
+              style={{
+                width: "100%", height: 60, borderRadius: 99, border: "none",
+                background: spinning ? "rgba(255,255,255,0.08)" : "linear-gradient(135deg,#7C3AED,#5B21B6)",
+                color: spinning ? "rgba(255,255,255,0.3)" : "#fff",
+                fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16,
+                cursor: spinning ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                boxShadow: spinning ? "none" : "0 4px 24px rgba(124,58,237,0.5)",
+                transition: "all 0.3s",
+              }}>
+              {spinning ? (
+                <>
+                  <div style={{ width: 20, height: 20, borderRadius: "50%",
+                    border: "2.5px solid rgba(255,255,255,0.2)", borderTopColor: "#fff" }}
+                    className="animate-spin" />
+                  A girar…
+                </>
+              ) : (
+                <>
+                  <Star style={{ width: 18, height: 18 }} />
+                  Girar Grátis ({freeSpinsLeft} restante{freeSpinsLeft !== 1 ? "s" : ""})
+                </>
+              )}
+            </motion.button>
+          ) : (
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onClick={() => startSpin(true)}
+              disabled={spinning || balance < PAID_SPIN_COST}
+              style={{
+                width: "100%", height: 60, borderRadius: 99, border: "none",
+                background: spinning || balance < PAID_SPIN_COST
+                  ? "rgba(255,255,255,0.08)"
+                  : "linear-gradient(135deg,#B8860B,#D4A35A)",
+                color: spinning || balance < PAID_SPIN_COST ? "rgba(255,255,255,0.3)" : "#fff",
+                fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16,
+                cursor: spinning || balance < PAID_SPIN_COST ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                boxShadow: spinning || balance < PAID_SPIN_COST ? "none" : "0 4px 24px rgba(212,163,90,0.45)",
+                transition: "all 0.3s",
+              }}>
+              {spinning ? (
+                <>
+                  <div style={{ width: 20, height: 20, borderRadius: "50%",
+                    border: "2.5px solid rgba(255,255,255,0.2)", borderTopColor: "#fff" }}
+                    className="animate-spin" />
+                  A girar…
+                </>
+              ) : balance < PAID_SPIN_COST ? (
+                "Saldo insuficiente (mínimo 5 MT)"
+              ) : (
+                <>
+                  <Star style={{ width: 18, height: 18 }} />
+                  Girar por {PAID_SPIN_COST} MT
+                </>
+              )}
             </motion.button>
           )}
         </div>

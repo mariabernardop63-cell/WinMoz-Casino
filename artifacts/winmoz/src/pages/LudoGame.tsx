@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
+import { ArrowLeft, RotateCcw, LogOut, Flag } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import bgImg from "@assets/Gemini_Generated_Image_grc2w7grc2w7grc2_1780220609974.png";
@@ -701,8 +701,8 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
 }
 
 // ─── Win Screen — premium, fitness-app inspired, shows MT won ─────────────────
-function WinScreen({ winner, winnerName, loserName, betAmount, onReplay, onQuit }:{
-  winner:Player; winnerName:string; loserName:string; betAmount:number;
+function WinScreen({ winner, winnerName, loserName, betAmount, isWinner, onReplay, onQuit }:{
+  winner:Player; winnerName:string; loserName:string; betAmount:number; isWinner:boolean;
   onReplay:()=>void; onQuit:()=>void;
 }) {
   const color:PawnColor = winner==="blue"?"blue":"green";
@@ -711,6 +711,63 @@ function WinScreen({ winner, winnerName, loserName, betAmount, onReplay, onQuit 
     ? "linear-gradient(145deg,#1D4ED8,#1E40AF)"
     : "linear-gradient(145deg,#16A34A,#15803D)";
   const accentLight = winner==="blue" ? "#60A5FA" : "#4ADE80";
+
+  if(!isWinner) return(
+    <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+      style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.88)",
+        backdropFilter:"blur(14px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <motion.div initial={{scale:0.55,opacity:0,y:40}} animate={{scale:1,opacity:1,y:0}}
+        transition={{type:"spring",stiffness:220,damping:22,delay:0.08}}
+        style={{borderRadius:26,maxWidth:310,width:"88%",overflow:"hidden",
+          boxShadow:"0 32px 80px rgba(0,0,0,0.75),0 0 60px rgba(239,68,68,0.15)",
+          border:"1px solid rgba(255,255,255,0.08)"}}>
+        <div style={{background:"linear-gradient(145deg,#1a0a0a,#2a0f0f)",padding:"28px 24px 22px",textAlign:"center"}}>
+          <motion.div animate={{y:[0,-5,0]}} transition={{duration:2,repeat:Infinity,ease:"easeInOut"}}
+            style={{display:"flex",justifyContent:"center",marginBottom:14}}>
+            <span style={{fontSize:72}}>💔</span>
+          </motion.div>
+          <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
+            color:"rgba(255,100,100,0.8)",marginBottom:6}}>DERROTA</p>
+          <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:17,
+            color:"rgba(255,255,255,0.6)",lineHeight:1.2,marginBottom:4}}>Perdeste para</p>
+          <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#fff",lineHeight:1.1}}>
+            {winnerName}
+          </p>
+        </div>
+        <div style={{background:"rgba(255,255,255,0.04)",borderTop:"1px solid rgba(255,255,255,0.08)",
+          padding:"20px 24px 22px"}}>
+          {betAmount>0&&(
+            <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",
+              borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"center",
+              justifyContent:"space-between",marginBottom:14}}>
+              <div>
+                <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",
+                  color:"rgba(255,255,255,0.4)",marginBottom:4}}>PERDIDO</p>
+                <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:20,color:"#EF4444",lineHeight:1}}>
+                  -{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
+                </p>
+              </div>
+              <span style={{fontSize:32}}>📉</span>
+            </div>
+          )}
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={onReplay} style={{flex:1,background:"rgba(239,68,68,0.15)",color:"#EF4444",
+              borderRadius:14,padding:"14px 0",border:"1px solid rgba(239,68,68,0.3)",
+              fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",
+              display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              <RotateCcw style={{width:14,height:14}}/>Revanche
+            </button>
+            <button onClick={onQuit} style={{flex:1,background:"rgba(255,255,255,0.06)",
+              border:"1px solid rgba(255,255,255,0.12)",color:"rgba(255,255,255,0.65)",
+              borderRadius:14,padding:"14px 0",fontFamily:"'Syne',sans-serif",fontWeight:700,
+              fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              <LogOut style={{width:14,height:14}}/>Sair
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
 
   return (
     <motion.div
@@ -793,7 +850,7 @@ function WinScreen({ winner, winnerName, loserName, betAmount, onReplay, onQuit 
                   fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:24,
                   color:"#FFD700", lineHeight:1,
                 }}>
-                  {betAmount.toLocaleString("pt-MZ")} <span style={{fontSize:13}}>MT</span>
+                  +{betAmount.toLocaleString("pt-MZ")} <span style={{fontSize:13}}>MT</span>
                 </p>
               </div>
               <div style={{
@@ -1168,6 +1225,13 @@ export default function LudoGame() {
       );
     });
 
+    channel.on("broadcast",{ event:"ludo_forfeit" },()=>{
+      if(winnerRef.current||phaseRef.current==="done") return;
+      setWinner(myColor);
+      setPhase("done");
+      setMsg(`${opponentName} desistiu! Tu venceste!`);
+    });
+
     channel.subscribe(async(status)=>{
       if(status==="SUBSCRIBED"&&profile?.id){
         await channel.track({ userId:profile.id, color:myColor });
@@ -1221,6 +1285,22 @@ export default function LudoGame() {
     setMsg(myColor==="blue"?myTurnMsg:oppTurnMsg);
   }
 
+  function handleForfeit(){
+    if(winner||phase==="done")return;
+    if(!window.confirm("Tens a certeza que queres desistir? Irás perder a partida."))return;
+    channelRef.current?.send({type:"broadcast",event:"ludo_forfeit",payload:{player:myColor}});
+    setWinner(opponentColor); setPhase("done");
+    setMsg("Desististe da partida.");
+  }
+
+  function handleBack(){
+    if(!winner&&phase!=="done"&&gameId!=="local"){
+      if(!window.confirm("Se saíres agora, perdes a partida. Confirmas?"))return;
+      channelRef.current?.send({type:"broadcast",event:"ludo_forfeit",payload:{player:myColor}});
+    }
+    setLocation("/");
+  }
+
   const blueFinished  = finishedCount(pieces,"blue");
   const greenFinished = finishedCount(pieces,"green");
 
@@ -1254,7 +1334,7 @@ export default function LudoGame() {
           background:"rgba(5,12,32,0.85)",
           flexShrink:0,
         }}>
-          <button onClick={()=>setLocation("/")} style={{
+          <button onClick={handleBack} style={{
             width:34, height:34, borderRadius:9,
             background:"rgba(255,255,255,0.07)",
             border:"1px solid rgba(255,255,255,0.12)",
@@ -1272,15 +1352,24 @@ export default function LudoGame() {
               1 VS 1
             </p>
           </div>
-          <div style={{
-            padding:"4px 10px",
-            background:"linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,215,0,0.06))",
-            border:"1px solid rgba(255,215,0,0.22)",
-            borderRadius:8,
-          }}>
-            <span style={{ fontSize:10, color:"#FFD700", fontWeight:700, fontFamily:"'Syne',sans-serif" }}>
-              {BET_AMOUNT>0?`${BET_AMOUNT} MT`:"Demo"}
-            </span>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            {!winner&&phase!=="done"&&gameId!=="local"&&(
+              <button onClick={handleForfeit} style={{width:34,height:34,borderRadius:9,
+                background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",
+                display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+                <Flag style={{width:15,height:15,color:"#EF4444"}}/>
+              </button>
+            )}
+            <div style={{
+              padding:"4px 10px",
+              background:"linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,215,0,0.06))",
+              border:"1px solid rgba(255,215,0,0.22)",
+              borderRadius:8,
+            }}>
+              <span style={{ fontSize:10, color:"#FFD700", fontWeight:700, fontFamily:"'Syne',sans-serif" }}>
+                {BET_AMOUNT>0?`${BET_AMOUNT} MT`:"Demo"}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -1376,6 +1465,7 @@ export default function LudoGame() {
             winnerName={winner===myColor?playerName:opponentName}
             loserName={winner===myColor?opponentName:playerName}
             betAmount={BET_AMOUNT}
+            isWinner={winner===myColor}
             onReplay={resetGame}
             onQuit={()=>setLocation("/")}
           />

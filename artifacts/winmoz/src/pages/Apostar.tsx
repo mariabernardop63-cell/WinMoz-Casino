@@ -631,6 +631,9 @@ export default function Apostar() {
             // map blue→white, green→black for chess
             const chessColor = color === "blue" ? "white" : "black";
             dest = `/xadrez-jogo?gameId=${gId}&color=${chessColor}&bet=${selectedBet ?? 0}&opp=${encodeURIComponent(oppName)}`;
+          } else if (gameId === "damas") {
+            const damasColor = color === "blue" ? "w" : "b";
+            dest = `/damas-jogo?gameId=${gId}&color=${damasColor}&bet=${selectedBet ?? 0}&opp=${encodeURIComponent(oppName)}`;
           }
           setTimeout(() => setLocation(dest), 2200);
         }}

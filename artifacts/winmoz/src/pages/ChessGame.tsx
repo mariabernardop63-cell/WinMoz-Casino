@@ -258,7 +258,7 @@ function ChessPiece({piece}:{piece:Piece}){
   return(
     <div style={{
       width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",
-      fontSize:"70%",lineHeight:1,userSelect:"none",
+      fontSize:"min(9vw,46px)",lineHeight:1,userSelect:"none",
       color:isWhite?"#FFFFFF":"#111111",
       textShadow:isWhite
         ?"0 1px 3px rgba(0,0,0,0.9),0 0 8px rgba(0,0,0,0.5)"
@@ -383,14 +383,75 @@ function PromotionModal({color,onChoose}:{color:PColor;onChoose:(t:PType)=>void}
   );
 }
 
-// ─── Win Screen (adapted from Ludo) ────────────────────────────────────────────
-function WinScreen({winner,winnerName,loserName,reason,betAmount,onReplay,onQuit}:{
+// ─── Win Screen ─────────────────────────────────────────────────────────────────
+function WinScreen({winner,winnerName,loserName,reason,betAmount,isWinner,onReplay,onQuit}:{
   winner:PColor;winnerName:string;loserName:string;reason:string;betAmount:number;
-  onReplay:()=>void;onQuit:()=>void;
+  isWinner:boolean;onReplay:()=>void;onQuit:()=>void;
 }){
   const isWhiteWinner=winner==="w";
-  const headerBg=isWhiteWinner?"linear-gradient(145deg,#B8960C,#9A7D0A)":"linear-gradient(145deg,#1A1A2E,#16213E)";
   const accent=isWhiteWinner?"#F5C842":"#6366F1";
+  const winnerBg=isWhiteWinner?"linear-gradient(145deg,#B8960C,#9A7D0A)":"linear-gradient(145deg,#1A1A2E,#16213E)";
+  const loserBg="linear-gradient(145deg,#1a0a0a,#2a0f0f)";
+
+  if(!isWinner){
+    return(
+      <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+        style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.88)",
+          backdropFilter:"blur(14px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+        <motion.div initial={{scale:0.6,opacity:0,y:40}} animate={{scale:1,opacity:1,y:0}}
+          transition={{type:"spring",stiffness:220,damping:22}}
+          style={{borderRadius:26,maxWidth:310,width:"88%",overflow:"hidden",
+            boxShadow:"0 32px 80px rgba(0,0,0,0.75),0 0 60px rgba(239,68,68,0.15)",
+            border:"1px solid rgba(255,255,255,0.08)"}}>
+          <div style={{background:loserBg,padding:"28px 24px 22px",textAlign:"center"}}>
+            <div style={{fontSize:64,marginBottom:8}}>💔</div>
+            <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
+              color:"rgba(255,100,100,0.8)",marginBottom:6}}>DERROTA</p>
+            <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:18,color:"rgba(255,255,255,0.7)",lineHeight:1.2,marginBottom:4}}>
+              Perdeste para
+            </p>
+            <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#fff",lineHeight:1.1}}>
+              {winnerName}
+            </p>
+            <p style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginTop:6}}>{reason}</p>
+          </div>
+          <div style={{background:"rgba(255,255,255,0.04)",borderTop:"1px solid rgba(255,255,255,0.08)",
+            padding:"20px 24px 22px"}}>
+            {betAmount>0&&(
+              <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",
+                borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"center",
+                justifyContent:"space-between",marginBottom:14}}>
+                <div>
+                  <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",
+                    color:"rgba(255,255,255,0.4)",marginBottom:4}}>PERDIDO</p>
+                  <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:20,color:"#EF4444",lineHeight:1}}>
+                    -{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
+                  </p>
+                </div>
+                <span style={{fontSize:32}}>📉</span>
+              </div>
+            )}
+            <div style={{display:"flex",gap:10}}>
+              <button onClick={onReplay} style={{flex:1,background:"rgba(239,68,68,0.15)",
+                color:"#EF4444",borderRadius:14,padding:"14px 0",
+                border:"1px solid rgba(239,68,68,0.3)",
+                fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",
+                display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <RotateCcw style={{width:13,height:13}}/>Revanche
+              </button>
+              <button onClick={onQuit} style={{flex:1,background:"rgba(255,255,255,0.06)",
+                border:"1px solid rgba(255,255,255,0.12)",color:"rgba(255,255,255,0.65)",
+                borderRadius:14,padding:"14px 0",fontFamily:"'Syne',sans-serif",fontWeight:700,
+                fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <LogOut style={{width:13,height:13}}/>Sair
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
   return(
     <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
       style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.88)",
@@ -400,7 +461,7 @@ function WinScreen({winner,winnerName,loserName,reason,betAmount,onReplay,onQuit
         style={{borderRadius:26,maxWidth:310,width:"88%",overflow:"hidden",
           boxShadow:`0 32px 80px rgba(0,0,0,0.75),0 0 60px ${accent}22`,
           border:"1px solid rgba(255,255,255,0.08)"}}>
-        <div style={{background:headerBg,padding:"28px 24px 22px",textAlign:"center"}}>
+        <div style={{background:winnerBg,padding:"28px 24px 22px",textAlign:"center"}}>
           <div style={{fontSize:72,marginBottom:8}}>{isWhiteWinner?"♔":"♚"}</div>
           <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
             color:"rgba(255,255,255,0.65)",marginBottom:6}}>VENCEDOR</p>
@@ -412,14 +473,14 @@ function WinScreen({winner,winnerName,loserName,reason,betAmount,onReplay,onQuit
         <div style={{background:"rgba(255,255,255,0.04)",borderTop:"1px solid rgba(255,255,255,0.08)",
           padding:"20px 24px 22px"}}>
           {betAmount>0&&(
-            <div style={{background:`linear-gradient(135deg,rgba(255,215,0,0.15),rgba(255,215,0,0.05))`,
+            <div style={{background:"linear-gradient(135deg,rgba(255,215,0,0.15),rgba(255,215,0,0.05))",
               border:"1px solid rgba(255,215,0,0.3)",borderRadius:14,padding:"14px 16px",
               display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
               <div>
                 <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",
                   color:"rgba(255,255,255,0.4)",marginBottom:4}}>GANHOS</p>
                 <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#FFD700",lineHeight:1}}>
-                  {betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
+                  +{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
               <span style={{fontSize:36}}>🏆</span>
@@ -722,6 +783,12 @@ export default function ChessGame(){
       applyMoveToState(boardRef.current,payload.from as Sq,payload.to as Sq,
         payload.prom as PType,epRef.current,turnRef.current);
     });
+    ch.on("broadcast",{event:"chess_forfeit"},()=>{
+      if(statusRef.current==="checkmate"||statusRef.current==="stalemate")return;
+      setWinner(myColor);
+      setWinReason(`${opponentName} desistiu da partida!`);
+      setStatus("checkmate");
+    });
     ch.subscribe();
     return()=>{supabase.removeChannel(ch);};
   },[gameId,applyMoveToState]);
@@ -732,6 +799,23 @@ export default function ChessGame(){
     setHistory([]);setCaptured({w:[],b:[]});setStatus("playing");
     setWinner(null);setWinReason("");setPromotionPending(null);
     setTimers({w:600,b:600});
+  }
+
+  function handleForfeit(){
+    if(status!=="playing"&&status!=="check")return;
+    if(!window.confirm("Tens a certeza que queres desistir? Irás perder a partida."))return;
+    channelRef.current?.send({type:"broadcast",event:"chess_forfeit",payload:{player:myColor}});
+    setWinner(opponentColor);
+    setWinReason("Desististe da partida");
+    setStatus("checkmate");
+  }
+
+  function handleBack(){
+    if((status==="playing"||status==="check")&&gameId!=="local"){
+      if(!window.confirm("Se saíres agora, perdes a partida. Confirmas?"))return;
+      channelRef.current?.send({type:"broadcast",event:"chess_forfeit",payload:{player:myColor}});
+    }
+    setLocation("/");
   }
 
   const oppTimer=timers[opponentColor];
@@ -751,7 +835,7 @@ export default function ChessGame(){
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
           padding:"10px 14px 8px",borderBottom:"1px solid rgba(255,255,255,0.07)",
           background:"rgba(5,12,32,0.9)",flexShrink:0}}>
-          <button onClick={()=>setLocation("/")} style={{width:34,height:34,borderRadius:9,
+          <button onClick={handleBack} style={{width:34,height:34,borderRadius:9,
             background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",
             display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
             <ArrowLeft style={{width:16,height:16,color:"#9BB4E8"}}/>
@@ -764,11 +848,20 @@ export default function ChessGame(){
               1 VS 1
             </p>
           </div>
-          <div style={{padding:"4px 10px",background:"linear-gradient(135deg,rgba(245,200,66,0.15),rgba(245,200,66,0.06))",
-            border:"1px solid rgba(245,200,66,0.25)",borderRadius:8}}>
-            <span style={{fontSize:10,color:"#F5C842",fontWeight:700,fontFamily:"'Syne',sans-serif"}}>
-              {BET>0?`${BET} MT`:"Demo"}
-            </span>
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            {(status==="playing"||status==="check")&&gameId!=="local"&&(
+              <button onClick={handleForfeit} style={{width:34,height:34,borderRadius:9,
+                background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",
+                display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
+                <Flag style={{width:15,height:15,color:"#EF4444"}}/>
+              </button>
+            )}
+            <div style={{padding:"4px 10px",background:"linear-gradient(135deg,rgba(245,200,66,0.15),rgba(245,200,66,0.06))",
+              border:"1px solid rgba(245,200,66,0.25)",borderRadius:8}}>
+              <span style={{fontSize:10,color:"#F5C842",fontWeight:700,fontFamily:"'Syne',sans-serif"}}>
+                {BET>0?`${BET} MT`:"Demo"}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -837,6 +930,7 @@ export default function ChessGame(){
             loserName={winner?(winner===myColor?opponentName:playerName):"—"}
             reason={winReason}
             betAmount={BET}
+            isWinner={!!(winner&&winner===myColor)}
             onReplay={resetGame}
             onQuit={()=>setLocation("/")}
           />

@@ -30,6 +30,7 @@ import ScannerQR from "@/pages/ScannerQR";
 import Apostar from "@/pages/Apostar";
 import LudoGame from "@/pages/LudoGame";
 import ChessGame from "@/pages/ChessGame";
+import DamasGame from "@/pages/DamasGame";
 import Roleta from "@/pages/Roleta";
 
 const queryClient = new QueryClient();
@@ -100,6 +101,9 @@ function Router() {
       </Route>
       <Route path="/xadrez-jogo">
         <ProtectedRoute><ChessGame /></ProtectedRoute>
+      </Route>
+      <Route path="/damas-jogo">
+        <ProtectedRoute><DamasGame /></ProtectedRoute>
       </Route>
       <Route path="/roleta">
         <ProtectedRoute><Roleta /></ProtectedRoute>
