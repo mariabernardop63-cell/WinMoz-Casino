@@ -14,7 +14,7 @@ function fmtMZN(val: number) {
 }
 
 const CODE_MAP: Record<string, number> = {
-  "1": 20,
+  "1": 200,
   "2": 50,
   "3": 100,
   "4": 200,
@@ -52,12 +52,7 @@ export default function Recarga() {
     if (!isComplete) return;
     const firstDigit = digits[0];
 
-    let resolved = 0;
-    if (digits === "1".repeat(15)) {
-      resolved = 500;
-    } else if (CODE_MAP[firstDigit]) {
-      resolved = CODE_MAP[firstDigit];
-    }
+    let resolved = CODE_MAP[firstDigit] ?? 0;
 
     if (!resolved) { setScreen("error"); return; }
     setScreen("processing");
@@ -164,7 +159,7 @@ export default function Recarga() {
                   >
                     {(() => {
                       const fd = digits[0];
-                      const amt = digits === "1".repeat(15) ? 500 : CODE_MAP[fd];
+                      const amt = CODE_MAP[fd];
                       return amt ? (
                         <>
                           <p className="text-xs mb-0.5" style={{ color: "#636366" }}>Valor detectado</p>

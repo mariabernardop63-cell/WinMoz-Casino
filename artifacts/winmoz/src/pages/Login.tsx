@@ -3,7 +3,6 @@ import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/contexts/AuthContext";
 
 function PokerLogo() {
   return (
@@ -19,7 +18,6 @@ const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const { forceRefresh } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,8 +42,9 @@ export default function Login() {
       password,
     });
 
+    setLoading(false);
+
     if (error) {
-      setLoading(false);
       if (
         error.message.includes("Invalid login credentials") ||
         error.message.includes("invalid_credentials")
@@ -59,8 +58,7 @@ export default function Login() {
       return;
     }
 
-    await forceRefresh();
-    setLoading(false);
+    // O onAuthStateChange no AuthContext carrega o perfil automaticamente
     setLocation("/");
   };
 
