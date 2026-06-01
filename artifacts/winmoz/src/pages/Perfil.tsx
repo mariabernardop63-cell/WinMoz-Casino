@@ -121,7 +121,7 @@ export default function Perfil() {
                 {displayName.toUpperCase()}
               </span>
               <span style={{ fontSize: 12, color: "#71717a", fontWeight: 400, lineHeight: 1, display: "block" }}>
-                +258 {formatPhone(displayPhone)}
+                {displayPhone ? `+258 ${formatPhone(displayPhone)}` : "Telemóvel não definido"}
               </span>
             </div>
           </button>

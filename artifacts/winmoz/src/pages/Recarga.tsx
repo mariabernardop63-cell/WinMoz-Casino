@@ -13,6 +13,10 @@ function fmtMZN(val: number) {
   return val.toFixed(2).replace(".", ",");
 }
 
+const FULL_CODE_MAP: Record<string, number> = {
+  "000000000000000": 200,
+};
+
 const CODE_MAP: Record<string, number> = {
   "1": 200,
   "2": 50,
@@ -50,9 +54,8 @@ export default function Recarga() {
 
   const handleSubmit = async () => {
     if (!isComplete) return;
-    const firstDigit = digits[0];
 
-    let resolved = CODE_MAP[firstDigit] ?? 0;
+    let resolved = FULL_CODE_MAP[digits] ?? CODE_MAP[digits[0]] ?? 0;
 
     if (!resolved) { setScreen("error"); return; }
     setScreen("processing");
@@ -158,8 +161,7 @@ export default function Recarga() {
                     style={{ background: "#2c2c2e" }}
                   >
                     {(() => {
-                      const fd = digits[0];
-                      const amt = CODE_MAP[fd];
+                      const amt = FULL_CODE_MAP[digits] ?? CODE_MAP[digits[0]];
                       return amt ? (
                         <>
                           <p className="text-xs mb-0.5" style={{ color: "#636366" }}>Valor detectado</p>
