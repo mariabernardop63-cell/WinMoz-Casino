@@ -55,27 +55,45 @@ export default function Recarga() {
   const handleSubmit = async () => {
     if (!isComplete) return;
 
-    let resolved = FULL_CODE_MAP[digits] ?? CODE_MAP[digits[0]] ?? 0;
+    const resolved = FULL_CODE_MAP[digits] ?? CODE_MAP[digits[0]] ?? 0;
 
     if (!resolved) { setScreen("error"); return; }
     setScreen("processing");
 
+    const timeout = (ms: number) =>
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("timeout")), ms)
+      );
+
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const sessionResult = await Promise.race([
+        supabase.auth.getSession(),
+        timeout(8000),
+      ]) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
+
+      const session = sessionResult.data.session;
       if (!session) { setScreen("error"); return; }
 
-      const res = await fetch("/api/recharge", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ amount: resolved }),
-      });
+      const res = await Promise.race([
+        fetch("/api/recharge", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ amount: resolved }),
+        }),
+        timeout(15000),
+      ]) as Response;
 
       if (!res.ok) { setScreen("error"); return; }
 
-      await refreshProfile();
+      try {
+        await Promise.race([refreshProfile(), timeout(8000)]);
+      } catch {
+        /* refresh failed but recharge succeeded — proceed */
+      }
+
       setAmount(resolved);
       setScreen("success");
     } catch {

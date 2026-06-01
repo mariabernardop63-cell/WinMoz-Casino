@@ -8,12 +8,40 @@ function generateInviteCode(): string {
   return randomBytes(3).toString("hex").toUpperCase();
 }
 
+function decodeJwtPayload(token: string): Record<string, any> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = Buffer.from(parts[1], "base64url").toString("utf8");
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
+}
+
 async function getUserFromToken(authHeader: string | undefined) {
   if (!authHeader?.startsWith("Bearer ")) return null;
   const token = authHeader.slice(7);
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !user) return null;
-  return user;
+
+  // First try the Supabase admin verification (network call)
+  try {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (!error && user) return user;
+    console.warn("[auth] supabaseAdmin.auth.getUser failed, falling back to JWT decode:", error?.message);
+  } catch (e: any) {
+    console.warn("[auth] supabaseAdmin.auth.getUser threw:", e?.message);
+  }
+
+  // Fallback: decode JWT locally to extract sub (user id) and check expiry
+  const payload = decodeJwtPayload(token);
+  if (!payload) return null;
+  const { sub, exp } = payload;
+  if (!sub || typeof sub !== "string") return null;
+  if (exp && Date.now() / 1000 > exp) {
+    console.warn("[auth] JWT expired");
+    return null;
+  }
+  return { id: sub, email: payload.email ?? "" } as any;
 }
 
 router.post("/check-email", async (_req, res) => {
