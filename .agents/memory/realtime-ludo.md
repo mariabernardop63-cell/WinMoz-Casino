@@ -32,6 +32,12 @@ description: How the realtime 2-player Ludo game and matchmaking work — Supaba
 - Dice `active={isActive && isMe}` — opponent dice visible but not clickable
 - Timer arc only shown for `isMe && isActive`
 
-## Balance flow
-- Recarga.tsx → POST `/api/recharge` with Bearer token + amount → updates `profiles.balance` in Supabase → calls `refreshProfile()`
+## Balance flow & DB architecture
+- Backend uses TWO separate DBs: Supabase (cloud, auth only) and local Replit Postgres (data, Drizzle)
+- All data ops (profiles, transactions, withdrawal_requests, referrals) use Drizzle → local Postgres
+- Supabase admin client is ONLY used for JWT verification: `supabaseAdmin.auth.getUser(token)`
+- Service role key not provisioned → falls back to anon key for JWT verification (works for getUser)
+- AuthContext.fetchProfile → calls `/api/profile` (backend) with Bearer token instead of `supabase.from("profiles")`
+- On 404 (profile not in local DB), AuthContext auto-calls `/api/complete-registration` to sync then retries
+- Recarga.tsx → POST `/api/recharge` with Bearer token + amount → updates local DB → calls `refreshProfile()`
 - Apostar.tsx handleStart uses `profile?.balance` from AuthContext (not localStorage)

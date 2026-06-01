@@ -1,40 +1,108 @@
 import { Router } from "express";
+import { eq, sql } from "drizzle-orm";
+import { db, profilesTable, transactionsTable, withdrawalRequestsTable, referralsTable } from "@workspace/db";
 import { supabaseAdmin } from "../lib/supabaseAdmin";
+import { randomBytes } from "crypto";
 
 const router = Router();
 
+function generateInviteCode(): string {
+  return randomBytes(3).toString("hex").toUpperCase();
+}
+
+async function getUserFromToken(authHeader: string | undefined) {
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = authHeader.slice(7);
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !user) return null;
+  return user;
+}
+
 router.post("/check-email", async (_req, res) => {
-  // Duplicate-email detection is handled downstream by Supabase signUp.
-  // Always return exists:false so the registration flow is never blocked here.
   return res.json({ exists: false });
 });
 
+router.get("/profile", async (req, res) => {
+  const user = await getUserFromToken(req.headers.authorization);
+  if (!user) return res.status(401).json({ error: "Não autenticado." });
+
+  try {
+    const [profile] = await db
+      .select()
+      .from(profilesTable)
+      .where(eq(profilesTable.id, user.id))
+      .limit(1);
+
+    if (!profile) return res.status(404).json({ error: "Perfil não encontrado." });
+
+    return res.json({
+      id: profile.id,
+      full_name: profile.full_name,
+      email: profile.email,
+      phone: profile.phone,
+      avatar_url: profile.avatar_url,
+      invite_code_used: profile.invite_code_used,
+      my_invite_code: profile.my_invite_code,
+      balance: profile.balance ?? "0",
+      created_at: profile.created_at,
+      updated_at: profile.updated_at,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err?.message ?? "Erro interno." });
+  }
+});
+
 router.post("/complete-registration", async (req, res) => {
-  const { user_id, full_name, phone, invite_code_used } = req.body;
+  const { user_id, full_name, phone, invite_code_used, email } = req.body;
   if (!user_id) return res.status(400).json({ error: "user_id obrigatório." });
 
   try {
-    const updates: Record<string, any> = { updated_at: new Date().toISOString() };
-    if (full_name) updates.full_name = full_name.trim();
-    if (phone) updates.phone = phone.replace(/\D/g, "");
-    if (invite_code_used) {
-      updates.invite_code_used = invite_code_used;
+    const existing = await db
+      .select({ id: profilesTable.id })
+      .from(profilesTable)
+      .where(eq(profilesTable.id, user_id))
+      .limit(1);
 
-      const { data: referrer } = await supabaseAdmin
-        .from("profiles")
-        .select("id, balance")
-        .eq("my_invite_code", invite_code_used)
-        .single();
+    const my_invite_code = generateInviteCode();
+    const normalizedEmail = (email ?? "").trim().toLowerCase();
+
+    if (existing.length === 0) {
+      await db.insert(profilesTable).values({
+        id: user_id,
+        email: normalizedEmail,
+        full_name: full_name?.trim() ?? null,
+        phone: phone?.replace(/\D/g, "") ?? null,
+        invite_code_used: invite_code_used ?? null,
+        my_invite_code,
+        balance: "0",
+      });
+    } else {
+      const updates: Record<string, any> = { updated_at: new Date() };
+      if (full_name) updates.full_name = full_name.trim();
+      if (phone) updates.phone = phone.replace(/\D/g, "");
+      if (invite_code_used) updates.invite_code_used = invite_code_used;
+
+      await db.update(profilesTable)
+        .set(updates)
+        .where(eq(profilesTable.id, user_id));
+    }
+
+    if (invite_code_used) {
+      const [referrer] = await db
+        .select({ id: profilesTable.id })
+        .from(profilesTable)
+        .where(eq(profilesTable.my_invite_code, invite_code_used))
+        .limit(1);
 
       if (referrer) {
-        const existing = await supabaseAdmin
-          .from("referrals")
-          .select("id")
-          .eq("referred_id", user_id)
-          .single();
+        const [existingRef] = await db
+          .select({ id: referralsTable.id })
+          .from(referralsTable)
+          .where(eq(referralsTable.referred_id, user_id))
+          .limit(1);
 
-        if (!existing.data) {
-          await supabaseAdmin.from("referrals").insert({
+        if (!existingRef) {
+          await db.insert(referralsTable).values({
             referrer_id: referrer.id,
             referred_id: user_id,
             bonus_paid: false,
@@ -43,8 +111,6 @@ router.post("/complete-registration", async (req, res) => {
       }
     }
 
-    await supabaseAdmin.from("profiles").update(updates).eq("id", user_id);
-
     return res.json({ ok: true });
   } catch (err: any) {
     return res.status(500).json({ error: err?.message ?? "Erro interno." });
@@ -52,14 +118,8 @@ router.post("/complete-registration", async (req, res) => {
 });
 
 router.post("/recharge", async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Não autenticado." });
-  }
-  const token = authHeader.slice(7);
-
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-  if (authError || !user) return res.status(401).json({ error: "Token inválido." });
+  const user = await getUserFromToken(req.headers.authorization);
+  if (!user) return res.status(401).json({ error: "Não autenticado." });
 
   const { amount } = req.body;
   if (!amount || typeof amount !== "number" || amount <= 0) {
@@ -67,24 +127,25 @@ router.post("/recharge", async (req, res) => {
   }
 
   try {
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("balance")
-      .eq("id", user.id)
-      .single();
+    const [profile] = await db
+      .select({ balance: profilesTable.balance })
+      .from(profilesTable)
+      .where(eq(profilesTable.id, user.id))
+      .limit(1);
 
-    const currentBalance = parseFloat(String(profile?.balance ?? "0"));
+    if (!profile) return res.status(404).json({ error: "Perfil não encontrado." });
+
+    const currentBalance = parseFloat(String(profile.balance ?? "0"));
     const newBalance = parseFloat((currentBalance + amount).toFixed(2));
 
-    await supabaseAdmin
-      .from("profiles")
-      .update({ balance: newBalance })
-      .eq("id", user.id);
+    await db.update(profilesTable)
+      .set({ balance: String(newBalance), updated_at: new Date() })
+      .where(eq(profilesTable.id, user.id));
 
-    await supabaseAdmin.from("transactions").insert({
+    await db.insert(transactionsTable).values({
       user_id: user.id,
       type: "recharge",
-      amount,
+      amount: String(amount),
       description: "Recarga de código",
       status: "completed",
     });
@@ -96,46 +157,43 @@ router.post("/recharge", async (req, res) => {
 });
 
 router.post("/withdraw", async (req, res) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Não autenticado." });
-  }
-  const token = authHeader.slice(7);
-
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-  if (authError || !user) return res.status(401).json({ error: "Token inválido." });
+  const user = await getUserFromToken(req.headers.authorization);
+  if (!user) return res.status(401).json({ error: "Não autenticado." });
 
   const { amount, phone } = req.body;
   if (!amount || amount <= 0) return res.status(400).json({ error: "Valor inválido." });
 
   try {
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("balance")
-      .eq("id", user.id)
-      .single();
+    const [profile] = await db
+      .select({ balance: profilesTable.balance })
+      .from(profilesTable)
+      .where(eq(profilesTable.id, user.id))
+      .limit(1);
 
-    const currentBalance = parseFloat(String(profile?.balance ?? "0"));
+    if (!profile) return res.status(404).json({ error: "Perfil não encontrado." });
+
+    const currentBalance = parseFloat(String(profile.balance ?? "0"));
     if (currentBalance < amount) {
       return res.status(400).json({ error: "Saldo insuficiente." });
     }
 
-    await supabaseAdmin.from("withdrawal_requests").insert({
+    const newBalance = parseFloat((currentBalance - amount).toFixed(2));
+
+    await db.update(profilesTable)
+      .set({ balance: String(newBalance), updated_at: new Date() })
+      .where(eq(profilesTable.id, user.id));
+
+    await db.insert(withdrawalRequestsTable).values({
       user_id: user.id,
-      amount,
+      amount: String(amount),
       phone: phone || null,
       status: "pending",
     });
 
-    await supabaseAdmin
-      .from("profiles")
-      .update({ balance: currentBalance - amount })
-      .eq("id", user.id);
-
-    await supabaseAdmin.from("transactions").insert({
+    await db.insert(transactionsTable).values({
       user_id: user.id,
       type: "withdrawal",
-      amount,
+      amount: String(amount),
       description: `Levantamento M-Pesa ${phone || ""}`.trim(),
       status: "pending",
     });
