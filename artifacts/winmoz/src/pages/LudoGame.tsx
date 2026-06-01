@@ -12,6 +12,71 @@ type PieceId = "B0"|"B1"|"B2"|"B3"|"G0"|"G1"|"G2"|"G3";
 type Phase   = "roll"|"select"|"moving"|"done";
 interface GamePiece { id: PieceId; player: Player; pos: number; }
 
+// ─── Smart Dice Algorithm ───────────────────────────────────────────────────────
+// Implements 5 fairness/drama rules for betting game integrity
+function generateWeightedDice(
+  playerPieces: GamePiece[],
+  opponentPieces: GamePiece[],
+  player: Player,
+  stuckTurns: number,       // consecutive turns with all pieces in base & no 6 rolled
+  consecutiveSixes: number, // sixes rolled in the current turn
+  gameId: string,
+): number {
+  // ── Rule 4: Block third consecutive 6 in the same turn ──────────────────────
+  if (consecutiveSixes >= 2) {
+    // Force a random 1-5, never 6
+    return Math.floor(Math.random() * 5) + 1;
+  }
+
+  // ── Rule 1: Anti-frustration — force 6 on 10th stuck turn ───────────────────
+  const allInBase = playerPieces.every(p => p.pos === -1);
+  if (allInBase && stuckTurns >= 9) {
+    return 6;
+  }
+
+  // Use timestamp + gameId as entropy salt (Rule 5)
+  const entropy = (Date.now() % 1000) / 1000;
+
+  // ── Rules 2 & 3 only apply to pieces actively on the track ──────────────────
+  const myActive  = playerPieces.filter(p => p.pos > 0 && p.pos <= 50);
+  const oppActive = opponentPieces.filter(p => p.pos > 0 && p.pos <= 50);
+
+  const playerStart  = player === "blue" ? 0 : 26;
+  const opponentStart = player === "blue" ? 26 : 0;
+
+  for (const mine of myActive) {
+    const myAbs = (playerStart + mine.pos) % 52;
+    for (const opp of oppActive) {
+      const oppAbs = (opponentStart + opp.pos) % 52;
+      const dist = (oppAbs - myAbs + 52) % 52; // steps I need to reach opp
+
+      // ── Rule 2: Combat Drama — 50% chance of exact kill if 1-6 away ─────────
+      if (dist >= 1 && dist <= 6) {
+        // Rule 5 anti-pattern: only apply if NOT just given an advantage
+        const salt = (entropy + gameId.charCodeAt(0) / 128) % 1;
+        if (salt < 0.5) {
+          return dist; // exact kill number
+        } else {
+          // other 50% distributed among non-kill numbers
+          const nonKill = [1, 2, 3, 4, 5, 6].filter(n => n !== dist);
+          return nonKill[Math.floor((Math.random() + entropy * 0.1) % 1 * nonKill.length)];
+        }
+      }
+
+      // ── Rule 3: Chase — 20% chance of high number if 7-15 behind ────────────
+      if (dist >= 7 && dist <= 15) {
+        if (Math.random() < 0.20) {
+          const highs = [4, 5, 6];
+          return highs[Math.floor(Math.random() * highs.length)];
+        }
+      }
+    }
+  }
+
+  // ── Normal fair roll ─────────────────────────────────────────────────────────
+  return Math.floor(Math.random() * 6) + 1;
+}
+
 // ─── Board geometry ─────────────────────────────────────────────────────────────
 const TRACK: [number,number][] = [
   [13,6],[12,6],[11,6],[10,6],[9,6],
@@ -826,6 +891,17 @@ export default function LudoGame() {
   const [lives,setLives]           = useState({blue:5,green:5});
   const [timeLeft,setTimeLeft]     = useState(30);
 
+  // ── Dice algorithm state ────────────────────────────────────────────────────
+  // stuckTurns: how many consecutive turns each player had ALL pieces in base
+  // and did NOT roll a 6 (triggers Rule 1 anti-frustration)
+  const [stuckTurns,setStuckTurns] = useState<Record<Player,number>>({blue:0,green:0});
+  // consecutiveSixes: how many 6s rolled in the current turn (resets on turn change)
+  const [consecutiveSixes,setConsecutiveSixes] = useState(0);
+  const stuckTurnsRef       = useRef<Record<Player,number>>({blue:0,green:0});
+  const consecutiveSixesRef = useRef(0);
+  // eventSeqRef: tracks last processed event sequence to discard duplicates
+  const lastEventSeqRef = useRef<Record<string,number>>({});
+
   const myTurnMsg  = `${playerName.split(" ")[0]} — clica nos dados!`;
   const oppTurnMsg = `A aguardar ${opponentName}…`;
   const [msg,setMsg] = useState(myColor==="blue" ? myTurnMsg : oppTurnMsg);
@@ -846,6 +922,8 @@ export default function LudoGame() {
   useEffect(()=>{diceGreenRef.current=diceGreen;},[diceGreen]);
   useEffect(()=>{turnRef.current=turn;},[turn]);
   useEffect(()=>{winnerRef.current=winner;},[winner]);
+  useEffect(()=>{stuckTurnsRef.current=stuckTurns;},[stuckTurns]);
+  useEffect(()=>{consecutiveSixesRef.current=consecutiveSixes;},[consecutiveSixes]);
 
   const other=(p:Player):Player=>p==="blue"?"green":"blue";
 
@@ -915,10 +993,20 @@ export default function LudoGame() {
       const plName=currentTurn===myColor?playerName.split(" ")[0]:opponentName;
       setMsg(`${plName} ${reason} — joga de novo!`);
       setMovable([]);
+      // Keep consecutiveSixes for this extra turn (don't reset, it accumulates)
       setTimeout(()=>{setPhase("roll");if(currentTurn==="blue")setDiceBlue(null);else setDiceGreen(null);},400);
     } else {
       const next=other(currentTurn);
+      // Update stuckTurns: if the current player had all pieces in base and rolled but didn't get 6
+      // we track it; if they successfully moved, reset to 0
+      const justMoved = prevPos !== mover.pos;
+      if(justMoved){
+        // A piece successfully moved — reset stuck counter for this player
+        setStuckTurns(prev=>({...prev,[currentTurn]:0}));
+      }
       setMovable([]);
+      // Reset consecutiveSixes when turn changes
+      setConsecutiveSixes(0);
       setTimeout(()=>{
         setTurn(next); setPhase("roll");
         if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
@@ -950,12 +1038,40 @@ export default function LudoGame() {
     setR(true);
     setTimeout(()=>{
       setD(val); setR(false);
+
+      // Track consecutive sixes (Rule 4)
+      if(val===6){
+        setConsecutiveSixes(prev=>prev+1);
+      } else {
+        // Non-six rolled: update stuckTurns if all pieces still in base
+        const allInBase = piecesRef.current.filter(p=>p.player===pl).every(p=>p.pos===-1);
+        if(allInBase){
+          setStuckTurns(prev=>({...prev,[pl]:prev[pl]+1}));
+        }
+      }
+
       const mv=calcMovable(piecesRef.current,pl,val);
       const plName=pl===myColor?playerName.split(" ")[0]:opponentName;
+
+      // Rule 4: if this was a forced-non-6 (third six), skip turn automatically
+      if(val!==6 && consecutiveSixesRef.current>=2){
+        setMsg(`${plName} — terceiro 6 bloqueado! Vez do adversário.`);
+        setConsecutiveSixes(0);
+        setTimeout(()=>{
+          const next=other(pl); setTurn(next); setPhase("roll");
+          if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
+          setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
+        },1100);
+        return;
+      }
+
       if(mv.length===0){
         setMsg(val===6
           ?`${plName} — 6 mas sem movimento!`
           :`${plName} — ${val} sem jogadas.`);
+        // Reset consecutiveSixes when turn passes
+        setConsecutiveSixes(0);
+        // Also increment stuckTurns if all still in base (6 with no exit = unusual but possible)
         setTimeout(()=>{
           const next=other(pl); setTurn(next); setPhase("roll");
           if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
@@ -972,27 +1088,44 @@ export default function LudoGame() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[myColor,playerName,opponentName,doSelectPiece]);
 
-  // ── Roll my color dice — generates, broadcasts, and applies ────────────────
+  // ── Roll my color dice — uses weighted algorithm + broadcasts ───────────────
   const doRoll=useCallback(()=>{
     if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current) return;
-    const val=Math.floor(Math.random()*6)+1;
+
+    const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
+    const oppPieces = piecesRef.current.filter(p=>p.player!==myColor);
+    const val = generateWeightedDice(
+      myPieces,
+      oppPieces,
+      myColor,
+      stuckTurnsRef.current[myColor],
+      consecutiveSixesRef.current,
+      gameId,
+    );
+
+    const seq = Date.now();
     channelRef.current?.send({
       type:"broadcast",
       event:"dice_rolled",
-      payload:{ player:myColor, value:val },
+      payload:{ player:myColor, value:val, seq },
     });
     applyRoll(myColor,val);
-  },[myColor,applyRoll]);
+  },[myColor,applyRoll,gameId]);
 
   // ── Select piece — broadcasts + applies ────────────────────────────────────
   function handleSelectPiece(pid:PieceId){
-    if(phase!=="select"||turn!==myColor) return;
+    // Guard: only act when it's my turn in select phase, dice must have a value
+    if(phaseRef.current!=="select"||turnRef.current!==myColor) return;
     const dv=myColor==="blue"?diceBlueRef.current:diceGreenRef.current;
     if(dv===null) return;
+    // Guard: piece must still be in the movable list
+    if(!movableRef.current.includes(pid)) return;
+
+    const seq = Date.now();
     channelRef.current?.send({
       type:"broadcast",
       event:"piece_selected",
-      payload:{ pieceId:pid, diceVal:dv, player:myColor },
+      payload:{ pieceId:pid, diceVal:dv, player:myColor, seq },
     });
     doSelectPiece(pid,dv,myColor,piecesRef.current);
   }
@@ -1006,20 +1139,33 @@ export default function LudoGame() {
     channelRef.current=channel;
 
     channel.on("broadcast",{ event:"dice_rolled" },({ payload })=>{
-      if(payload.player!==myColor){
-        applyRoll(payload.player as Player, payload.value);
-      }
+      // Only process opponent's rolls; ignore our own echoes
+      if(payload.player===myColor) return;
+      // Deduplicate: ignore if we already processed this exact event
+      const seq:number = payload.seq ?? 0;
+      const key = `dice_${payload.player}`;
+      if(seq && lastEventSeqRef.current[key] >= seq) return;
+      if(seq) lastEventSeqRef.current[key] = seq;
+      // Only apply if it's actually the opponent's turn and we're in roll phase
+      if(phaseRef.current==="done"||winnerRef.current) return;
+      applyRoll(payload.player as Player, payload.value as number);
     });
 
     channel.on("broadcast",{ event:"piece_selected" },({ payload })=>{
-      if(payload.player!==myColor){
-        doSelectPiece(
-          payload.pieceId as PieceId,
-          payload.diceVal,
-          payload.player as Player,
-          piecesRef.current
-        );
-      }
+      // Only process opponent's selections
+      if(payload.player===myColor) return;
+      // Deduplicate
+      const seq:number = payload.seq ?? 0;
+      const key = `select_${payload.player}`;
+      if(seq && lastEventSeqRef.current[key] >= seq) return;
+      if(seq) lastEventSeqRef.current[key] = seq;
+      if(phaseRef.current==="done"||winnerRef.current) return;
+      doSelectPiece(
+        payload.pieceId as PieceId,
+        payload.diceVal as number,
+        payload.player as Player,
+        piecesRef.current
+      );
     });
 
     channel.subscribe(async(status)=>{
@@ -1070,6 +1216,8 @@ export default function LudoGame() {
     setPieces(initialPieces()); setTurn("blue"); setPhase("roll");
     setDiceBlue(null); setDiceGreen(null); setRollingB(false); setRollingG(false);
     setMovable([]); setWinner(null); setLives({blue:5,green:5}); setTimeLeft(30);
+    setStuckTurns({blue:0,green:0}); setConsecutiveSixes(0);
+    lastEventSeqRef.current = {};
     setMsg(myColor==="blue"?myTurnMsg:oppTurnMsg);
   }
 

@@ -263,30 +263,57 @@ function MatchmakingScreen({
   const [remaining, setRemaining] = useState(TOTAL);
   const [found, setFound] = useState(false);
   const matchedRef = useRef(false);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     const channelName = `matchmaking_${gameType}_${betAmount}`;
     const channel = supabase.channel(channelName, {
-      config: { presence: { key: userId } },
+      config: {
+        presence: { key: userId },
+        broadcast: { self: false },
+      },
+    });
+    channelRef.current = channel;
+
+    // ── When a "match_found" broadcast arrives both players navigate ──
+    channel.on("broadcast", { event: "match_found" }, ({ payload }) => {
+      if (matchedRef.current) return;
+      matchedRef.current = true;
+
+      const myColor: string = payload.blue === userId ? "blue" : "green";
+      const oppId: string   = myColor === "blue" ? payload.green : payload.blue;
+      const state = channel.presenceState<{ displayName?: string }>();
+      const oppPresence = state[oppId]?.[0];
+      const oppName = (oppPresence as { displayName?: string })?.displayName ?? "Adversário";
+
+      setFound(true);
+      setTimeout(() => {
+        onMatched(payload.gameId as string, myColor, oppName);
+        supabase.removeChannel(channel);
+      }, 1500);
     });
 
-    channel.on("presence", { event: "sync" }, () => {
+    // ── Helper: try to form a match if 2+ players are present ──
+    const tryMatch = () => {
       if (matchedRef.current) return;
-      const state = channel.presenceState<{ userId: string; displayName: string }>();
+      const state = channel.presenceState<{ displayName?: string }>();
       const presentIds = Object.keys(state).sort();
-      if (presentIds.length >= 2) {
-        matchedRef.current = true;
-        const myIdx = presentIds.indexOf(userId);
-        const color = myIdx === 0 ? "blue" : "green";
-        const oppId = presentIds.find(id => id !== userId) ?? presentIds[myIdx === 0 ? 1 : 0];
-        const oppPresence = state[oppId]?.[0];
-        const oppName = (oppPresence as { displayName?: string })?.displayName ?? "Adversário";
-        const gameId = `${presentIds[0]}_${presentIds[1]}`;
-        setFound(true);
-        supabase.removeChannel(channel);
-        setTimeout(() => onMatched(gameId, color, oppName), 1500);
-      }
-    });
+      if (presentIds.length < 2) return;
+
+      // Only the leader (lowest sorted userId) broadcasts the match
+      // This prevents both players from broadcasting simultaneously
+      if (presentIds[0] !== userId) return;
+
+      const gameId = `${presentIds[0]}_${presentIds[1]}`;
+      channel.send({
+        type: "broadcast",
+        event: "match_found",
+        payload: { gameId, blue: presentIds[0], green: presentIds[1] },
+      });
+    };
+
+    channel.on("presence", { event: "sync" }, tryMatch);
+    channel.on("presence", { event: "join" }, tryMatch);
 
     channel.subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
@@ -294,7 +321,10 @@ function MatchmakingScreen({
       }
     });
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
