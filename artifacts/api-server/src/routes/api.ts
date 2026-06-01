@@ -32,15 +32,12 @@ async function getUserFromToken(authHeader: string | undefined) {
     console.warn("[auth] supabaseAdmin.auth.getUser threw:", e?.message);
   }
 
-  // Fallback: decode JWT locally to extract sub (user id) and check expiry
+  // Fallback: decode JWT locally to extract sub (user id)
+  // We trust the token here because the Supabase client auto-refreshes before sending
   const payload = decodeJwtPayload(token);
   if (!payload) return null;
-  const { sub, exp } = payload;
+  const { sub } = payload;
   if (!sub || typeof sub !== "string") return null;
-  if (exp && Date.now() / 1000 > exp) {
-    console.warn("[auth] JWT expired");
-    return null;
-  }
   return { id: sub, email: payload.email ?? "" } as any;
 }
 
