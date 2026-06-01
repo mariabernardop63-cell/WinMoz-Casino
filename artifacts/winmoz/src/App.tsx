@@ -29,6 +29,8 @@ import GrupoChat from "@/pages/GrupoChat";
 import ScannerQR from "@/pages/ScannerQR";
 import Apostar from "@/pages/Apostar";
 import LudoGame from "@/pages/LudoGame";
+import ChessGame from "@/pages/ChessGame";
+import Roleta from "@/pages/Roleta";
 
 const queryClient = new QueryClient();
 
@@ -95,6 +97,12 @@ function Router() {
       </Route>
       <Route path="/ludo-jogo">
         <ProtectedRoute><LudoGame /></ProtectedRoute>
+      </Route>
+      <Route path="/xadrez-jogo">
+        <ProtectedRoute><ChessGame /></ProtectedRoute>
+      </Route>
+      <Route path="/roleta">
+        <ProtectedRoute><Roleta /></ProtectedRoute>
       </Route>
       <Route component={NotFound} />
     </Switch>

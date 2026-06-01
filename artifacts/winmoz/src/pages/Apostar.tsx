@@ -519,7 +519,7 @@ function SegmentedToggle<T extends string>({
 export default function Apostar() {
   const [, params] = useRoute("/apostar/:gameId");
   const [, setLocation] = useLocation();
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
 
   const gameId = params?.gameId ?? "damas";
   const game = GAMES_DATA[gameId] ?? FALLBACK_GAME;
@@ -544,17 +544,34 @@ export default function Apostar() {
 
   const canStart = selectedBet !== null;
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!canStart) return;
     setScreen("processing");
-    setTimeout(() => {
-      const balance = parseFloat(String(profile?.balance ?? "0"));
-      if (balance >= (selectedBet ?? 0)) {
+    try {
+      // Always query Supabase for the freshest balance — avoids stale context data
+      let freshBalance = 0;
+      if (user?.id) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("balance")
+          .eq("id", user.id)
+          .single();
+        freshBalance = parseFloat(String(data?.balance ?? profile?.balance ?? "0"));
+      } else {
+        freshBalance = parseFloat(String(profile?.balance ?? "0"));
+      }
+      // Minimum UX delay so the processing animation plays
+      await new Promise(res => setTimeout(res, 2000));
+      if (freshBalance >= (selectedBet ?? 0)) {
         setScreen("matchmaking");
       } else {
         setScreen("rejected");
       }
-    }, 2400);
+    } catch {
+      await new Promise(res => setTimeout(res, 2000));
+      const fallback = parseFloat(String(profile?.balance ?? "0"));
+      setScreen(fallback >= (selectedBet ?? 0) ? "matchmaking" : "rejected");
+    }
   };
 
   const recommendedGames = ALL_GAMES.filter(g => g.id !== gameId);
@@ -582,9 +599,14 @@ export default function Apostar() {
         onCancel={() => setScreen("bet")}
         onMatched={(gId, color, oppName) => {
           setScreen("matched");
-          const dest = (gameId === "ludo" || gameId === "ludo-classic")
-            ? `/ludo-jogo?gameId=${gId}&color=${color}&bet=${selectedBet ?? 0}&opp=${encodeURIComponent(oppName)}`
-            : "/";
+          let dest = "/";
+          if (gameId === "ludo" || gameId === "ludo-classic") {
+            dest = `/ludo-jogo?gameId=${gId}&color=${color}&bet=${selectedBet ?? 0}&opp=${encodeURIComponent(oppName)}`;
+          } else if (gameId === "xadrez") {
+            // map blue→white, green→black for chess
+            const chessColor = color === "blue" ? "white" : "black";
+            dest = `/xadrez-jogo?gameId=${gId}&color=${chessColor}&bet=${selectedBet ?? 0}&opp=${encodeURIComponent(oppName)}`;
+          }
           setTimeout(() => setLocation(dest), 2200);
         }}
         userId={user?.id ?? ""}
