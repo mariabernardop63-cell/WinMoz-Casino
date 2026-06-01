@@ -25,16 +25,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-async function fetchProfileFromApi(token: string): Promise<UserProfile | null> {
-  try {
-    const res = await fetch("/api/profile", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
+async function fetchProfileFromSupabase(userId: string): Promise<UserProfile | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", userId)
+    .single();
+  if (error || !data) return null;
+  return data as UserProfile;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -42,19 +40,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (token: string, userId: string, email: string) => {
-    let data = await fetchProfileFromApi(token);
-    if (!data) {
-      // Profile doesn't exist in local DB yet — sync it first
-      try {
-        await fetch("/api/complete-registration", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: userId, email }),
-        });
-        data = await fetchProfileFromApi(token);
-      } catch { /* non-critical */ }
-    }
+  const loadProfile = async (userId: string, email: string) => {
+    const data = await fetchProfileFromSupabase(userId);
     if (data) {
       setProfile({ ...data, email });
     }
@@ -64,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      await fetchProfile(session.access_token, session.user.id, session.user.email ?? "");
+      await loadProfile(session.user.id, session.user.email ?? "");
     }
   };
 
@@ -79,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        fetchProfile(session.access_token, session.user.id, session.user.email ?? "").finally(() =>
+        loadProfile(session.user.id, session.user.email ?? "").finally(() =>
           setLoading(false)
         );
       } else {
@@ -90,34 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if ((event === "SIGNED_IN" || event === "USER_UPDATED") && session?.user) {
-          try {
-            const pendingRaw = sessionStorage.getItem("pendingReg");
-            if (pendingRaw) {
-              const pending = JSON.parse(pendingRaw);
-              await fetch("/api/complete-registration", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  user_id: session.user.id,
-                  email: session.user.email ?? "",
-                  full_name: pending.full_name,
-                  phone: pending.phone,
-                  invite_code_used: pending.invite_code_used,
-                }),
-              });
-              sessionStorage.removeItem("pendingReg");
-            } else {
-              await fetch("/api/complete-registration", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  user_id: session.user.id,
-                  email: session.user.email ?? "",
-                }),
-              });
-            }
-          } catch { /* non-critical */ }
-          await fetchProfile(session.access_token, session.user.id, session.user.email ?? "");
+          await loadProfile(session.user.id, session.user.email ?? "");
           setLoading(false);
         } else if (event === "SIGNED_OUT") {
           setUser(null);

@@ -6,19 +6,12 @@ let _client: SupabaseClient | null = null;
 export function getSupabaseAdmin(): SupabaseClient {
   if (_client) return _client;
 
-  const supabaseUrl =
-    process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"];
-
-  // Service role key preferred; fall back to anon key for JWT verification only
-  const supabaseKey =
-    process.env["SUPABASE_SERVICE_ROLE_KEY"] ??
-    process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"] ??
-    process.env["SUPABASE_ANON_KEY"] ??
-    process.env["VITE_SUPABASE_ANON_KEY"];
+  const supabaseUrl = process.env["SUPABASE_URL"];
+  const supabaseKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error(
-      "Missing Supabase credentials: set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY",
+      "Missing Supabase credentials: set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY"
     );
   }
 
