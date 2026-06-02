@@ -4,31 +4,52 @@ import { Link, useLocation } from "wouter";
 import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp, Bell, User } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
+import { getSyntheticUser, generateWithdrawalAmount, getWithdrawalInterval, shouldBootWithdrawal } from "@/lib/simulation";
 
 /* ─────────────────────────────────────────────
-   SAQUES 24 HORAS
+   SAQUES 24 HORAS — realistic, time-aware
 ───────────────────────────────────────────── */
-const SAQUES_POOL = [
-  { id: "s1", name: "Isabel Martins", initials: "IM", bg: "from-violet-500 to-purple-700", amount: "3.500 MT", time: "agora mesmo" },
-  { id: "s2", name: "Carlos Fonseca", initials: "CF", bg: "from-blue-500 to-indigo-700", amount: "12.000 MT", time: "há 1 min" },
-  { id: "s3", name: "Ana Rodrigues", initials: "AR", bg: "from-emerald-500 to-teal-700", amount: "850 MT", time: "há 2 min" },
-  { id: "s4", name: "Pedro Nhamposse", initials: "PN", bg: "from-orange-500 to-red-600", amount: "5.200 MT", time: "há 3 min" },
-  { id: "s5", name: "Beatriz Silva", initials: "BS", bg: "from-pink-500 to-rose-700", amount: "1.750 MT", time: "há 4 min" },
-  { id: "s6", name: "Miguel Chongo", initials: "MC", bg: "from-amber-500 to-yellow-600", amount: "22.000 MT", time: "há 5 min" },
-  { id: "s7", name: "Lúcia Tembe", initials: "LT", bg: "from-cyan-500 to-blue-600", amount: "4.400 MT", time: "há 7 min" },
-  { id: "s8", name: "Daniel Macuacua", initials: "DM", bg: "from-lime-500 to-green-700", amount: "9.800 MT", time: "há 8 min" },
-];
+
+// Generate a seed that changes each minute so entries aren't always the same
+function nowSeed() { return Math.floor(Date.now() / 60_000); }
+
+function makeSaque(extraSeed = 0) {
+  const seed = nowSeed() + extraSeed + Math.floor(Math.random() * 10_000);
+  const user = getSyntheticUser(seed);
+  // Simple deterministic-ish RNG for amount
+  let s = (seed * 1664525 + 1013904223) >>> 0;
+  const rng = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4_294_967_296; };
+  const mt = generateWithdrawalAmount(rng);
+  return {
+    id: `sq-${seed}`,
+    name: user.name,
+    initials: user.initials,
+    bg: user.bg,
+    amount: mt.toLocaleString("pt-PT") + " MT",
+    time: "agora mesmo",
+  };
+}
 
 function SaquesSection() {
-  const [visible, setVisible] = useState(SAQUES_POOL.slice(0, 4));
+  const [visible, setVisible] = useState(() => {
+    // Pre-populate with 4 entries offset by different seeds
+    return [makeSaque(0), makeSaque(111), makeSaque(222), makeSaque(333)];
+  });
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const next = SAQUES_POOL[Math.floor(Math.random() * SAQUES_POOL.length)];
-      const fresh = { ...next, id: next.id + Date.now(), time: "agora mesmo" };
-      setVisible(prev => [fresh, ...prev.slice(0, 3)]);
-    }, 3500);
-    return () => clearInterval(interval);
+    // First update: skip if it's quiet hours
+    if (!shouldBootWithdrawal()) return;
+
+    const schedule = () => {
+      const ms = getWithdrawalInterval();
+      return setTimeout(() => {
+        setVisible(prev => [makeSaque(Math.floor(Math.random() * 99_999)), ...prev.slice(0, 3)]);
+        timerRef.current = schedule();
+      }, ms);
+    };
+
+    const timerRef = { current: schedule() };
+    return () => clearTimeout(timerRef.current);
   }, []);
 
   return (
@@ -88,7 +109,7 @@ const POSTS = [
     imageBg: null as string | null,
     title: "Nova Temporada de Ludo Online",
     content: "Prémios até 50.000 $MT para os melhores jogadores. Inscreve-te já e garante o teu lugar!",
-    time: "2h",
+    time: "04/06/2026",
     likes: 142,
     comments: 29,
     shares: 38,
@@ -99,7 +120,7 @@ const POSTS = [
     imageBg: null as string | null,
     title: "Saques 24h Sem Complicações",
     content: "Levanta os teus ganhos a qualquer hora, sem esperas nem taxas escondidas. Rápido e seguro.",
-    time: "5h",
+    time: "02/06/2026",
     likes: 97,
     comments: 14,
     shares: 21,
@@ -110,7 +131,7 @@ const POSTS = [
     imageBg: null as string | null,
     title: "Torneio de Xadrez Semanal",
     content: "Compete por 20.000 $MT em prémios nos nossos torneios semanais. Regista-te agora.",
-    time: "1d",
+    time: "31/05/2026",
     likes: 213,
     comments: 47,
     shares: 64,

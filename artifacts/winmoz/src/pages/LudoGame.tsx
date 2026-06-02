@@ -1524,9 +1524,13 @@ export default function LudoGame() {
   }
 
   function handleBack(){
-    if(!winner&&phase!=="done"&&gameId!=="local"){
-      if(!window.confirm("Se saíres agora, perdes a partida. Confirmas?"))return;
-      channelRef.current?.send({type:"broadcast",event:"ludo_forfeit",payload:{player:myColor}});
+    if(!winner&&phase!=="done"&&gameId!=="local"&&BET_AMOUNT>0){
+      try {
+        localStorage.setItem("wm_active_game", JSON.stringify({
+          gameId, gameType:"ludo", betAmount:BET_AMOUNT,
+          opponentName, savedAt:Date.now(), ttlMs:30*60_000,
+        }));
+      } catch { /* ignore */ }
     }
     setLocation("/");
   }
@@ -1534,27 +1538,38 @@ export default function LudoGame() {
   async function handleReplay(){
     if(gameId==="local"||BET_AMOUNT===0){ resetGame(); return; }
     setRematchPhase("checking");
-    const { data } = await supabase.from("profiles").select("balance").eq("id", profile!.id).single();
-    if(!data || parseFloat(String(data.balance)) < BET_AMOUNT){
-      setRematchPhase("no_balance"); return;
+    try {
+      const timeout = new Promise<never>((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000));
+      const fetch   = supabase.from("profiles").select("balance").eq("id",profile!.id).single().then(r=>r.data);
+      const data    = await Promise.race([fetch,timeout]) as {balance:string|number}|null;
+      if(!data||parseFloat(String(data.balance))<BET_AMOUNT){ setRematchPhase("no_balance"); return; }
+      setRematchPhase("waiting");
+      channelRef.current?.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0] } });
+    } catch {
+      setRematchPhase("no_balance");
     }
-    setRematchPhase("waiting");
-    channelRef.current?.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0] } });
   }
 
   async function handleRematchAccept(){
     if(!profile?.id) return;
-    const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-    if(!data || parseFloat(String(data.balance)) < BET_AMOUNT){
+    try {
+      const timeout = new Promise<never>((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000));
+      const fetch   = supabase.from("profiles").select("balance").eq("id",profile.id).single().then(r=>r.data);
+      const data    = await Promise.race([fetch,timeout]) as {balance:string|number}|null;
+      if(!data||parseFloat(String(data.balance))<BET_AMOUNT){
+        channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } });
+        setRematchPhase("opp_no_balance"); return;
+      }
+      if(BET_AMOUNT>0){
+        await supabase.from("profiles").update({ balance: parseFloat(String(data.balance))-BET_AMOUNT }).eq("id",profile.id);
+      }
+      channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
+      setRematchPhase("idle");
+      resetGame();
+    } catch {
       channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } });
-      setRematchPhase("idle"); return;
+      setRematchPhase("no_balance");
     }
-    if(BET_AMOUNT > 0){
-      await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET_AMOUNT }).eq("id", profile.id);
-    }
-    channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
-    setRematchPhase("idle");
-    resetGame();
   }
 
   function handleRematchDecline(){

@@ -2,3 +2,5 @@
 - [Supabase Node.js quirk](supabase-node-quirk.md) — Node.js 20 needs `ws` package passed as realtime transport in createClient; also remove express-session when switching to JWT
 - [Realtime Ludo architecture](realtime-ludo.md) — Supabase Broadcast for game sync; Presence for matchmaking; myColor from URL params; no AI bot; each player only rolls/selects their own color
 - [DamasGame finalizeTurn contract](damas-finalizeTurn.md) — finalBoard passed to finalizeTurn must already have move applied; callers are responsible for calling applyBoardMove before passing
+- [Rematch bug pattern](rematch-bug.md) — unhandled async rejection in handleReplay/handleRematchAccept leaves UI stuck at "checking"; fix: always wrap Supabase calls in try-catch + Promise.race timeout
+- [Simulation engine](simulation-engine.md) — central lib at src/lib/simulation.ts; Mozambique time UTC+2; player counts/withdrawals/match pools all time-aware; active game stored as wm_active_game in localStorage TTL 30 min

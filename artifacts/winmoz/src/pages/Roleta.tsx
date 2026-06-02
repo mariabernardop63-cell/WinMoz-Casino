@@ -180,100 +180,97 @@ function Pointer() {
   );
 }
 
-// ─── Prize Result Card ───────────────────────────────────────────────────────────
+// ─── Prize Result Card — compact banner style ────────────────────────────────
 function PrizeCard({ sector, onClose }: { sector: typeof SECTORS[0]; onClose: () => void }) {
   const isJackpot = sector.type === "jackpot";
   const isLuck    = sector.type === "luck";
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", zIndex: 50,
-        display: "flex", alignItems: "center", justifyContent: "center", backdropFilter: "blur(14px)" }}>
-      <motion.div initial={{ scale: 0.55, y: 40 }} animate={{ scale: 1, y: 0 }}
-        transition={{ type: "spring", stiffness: 260, damping: 22 }}
-        style={{ width: "82%", maxWidth: 300, borderRadius: 28, overflow: "hidden",
-          border: "1px solid rgba(255,255,255,0.08)",
-          boxShadow: `0 32px 80px rgba(0,0,0,0.7), 0 0 50px ${sector.color}2A` }}>
+      style={{ position: "fixed", inset: 0, zIndex: 50,
+        display: "flex", alignItems: "flex-end", justifyContent: "center",
+        background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
+      onClick={onClose}>
+      <motion.div
+        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+        transition={{ type: "spring", stiffness: 300, damping: 28 }}
+        onClick={e => e.stopPropagation()}
+        style={{ width: "100%", maxWidth: 430, borderRadius: "20px 20px 0 0", overflow: "hidden",
+          border: "1px solid rgba(255,255,255,0.08)", borderBottom: "none",
+          boxShadow: `0 -12px 40px rgba(0,0,0,0.5), 0 0 40px ${sector.color}25` }}>
 
-        {/* Header */}
-        <div style={{ background: `linear-gradient(150deg,${sector.color} 0%,${sector.darkColor} 100%)`,
-          padding: "30px 24px 28px", textAlign: "center", position: "relative", overflow: "hidden" }}>
-          {/* Shine streak */}
-          <div style={{ position: "absolute", top: 0, left: "-30%", width: "60%", height: "100%",
-            background: "linear-gradient(105deg,transparent,rgba(255,255,255,0.12),transparent)",
+        {/* Coloured strip — prize identity */}
+        <div style={{ background: `linear-gradient(120deg,${sector.color} 0%,${sector.darkColor} 100%)`,
+          padding: "18px 22px 16px", display: "flex", alignItems: "center", gap: 14,
+          position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: 0, left: "-20%", width: "50%", height: "100%",
+            background: "linear-gradient(105deg,transparent,rgba(255,255,255,0.1),transparent)",
             transform: "skewX(-15deg)", pointerEvents: "none" }}/>
 
           {/* Icon */}
           <motion.div
-            animate={isJackpot
-              ? { rotate: [0, 8, -8, 4, -4, 0], scale: [1, 1.08, 1] }
-              : isLuck ? { opacity: [1, 0.6, 1] }
-              : { y: [0, -3, 0] }}
-            transition={{ duration: isJackpot ? 0.7 : 2, repeat: Infinity, ease: "easeInOut" }}
-            style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
-            <div style={{ width: 68, height: 68, borderRadius: 22,
-              background: "rgba(0,0,0,0.2)", border: "1.5px solid rgba(255,255,255,0.22)",
-              backdropFilter: "blur(4px)",
+            animate={isJackpot ? { rotate:[0,10,-10,5,-5,0], scale:[1,1.1,1] }
+              : isLuck ? { opacity:[1,0.55,1] }
+              : { y:[0,-2,0] }}
+            transition={{ duration: isJackpot ? 0.6 : 1.8, repeat: Infinity, ease: "easeInOut" }}
+            style={{ width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+              background: "rgba(0,0,0,0.22)", border: "1.5px solid rgba(255,255,255,0.2)",
               display: "flex", alignItems: "center", justifyContent: "center" }}>
-              {isJackpot && (
-                <svg width={36} height={36} viewBox="0 0 24 24" fill="none">
-                  <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"
-                    fill="rgba(255,215,0,0.35)" stroke="#FFD700" strokeWidth="1.4" strokeLinejoin="round"/>
-                </svg>
-              )}
-              {isLuck && (
-                <svg width={34} height={34} viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="9.5" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5"/>
-                  <path d="M12 7v5.5l3.5 2" stroke="rgba(255,255,255,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  <circle cx="12" cy="12" r="1" fill="rgba(255,255,255,0.5)"/>
-                </svg>
-              )}
-              {!isJackpot && !isLuck && (
-                <svg width={34} height={34} viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="9.5" fill="rgba(255,215,0,0.18)" stroke="#FFD700" strokeWidth="1.5"/>
-                  <path d="M12 7.5v9M8.5 12h7" stroke="#FFD700" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-              )}
-            </div>
+            {isJackpot && (
+              <svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"
+                  fill="rgba(255,215,0,0.4)" stroke="#FFD700" strokeWidth="1.4" strokeLinejoin="round"/>
+              </svg>
+            )}
+            {isLuck && (
+              <svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9.5" stroke="rgba(255,255,255,0.65)" strokeWidth="1.5"/>
+                <path d="M12 7v5.5l3.5 2" stroke="rgba(255,255,255,0.9)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            )}
+            {!isJackpot && !isLuck && (
+              <svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9.5" fill="rgba(255,215,0,0.18)" stroke="#FFD700" strokeWidth="1.5"/>
+                <path d="M12 7.5v9M8.5 12h7" stroke="#FFD700" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            )}
           </motion.div>
 
-          <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 3.5, textTransform: "uppercase",
-            color: "rgba(255,255,255,0.55)", marginBottom: 10 }}>
-            {isJackpot ? "JACKPOT" : isLuck ? "SEM PRÉMIO" : "GANHO"}
-          </p>
-          <p style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, lineHeight: 1,
-            fontSize: isJackpot ? 34 : isLuck ? 24 : 32,
-            color: "#fff", letterSpacing: isLuck ? 0 : -0.5 }}>
-            {isLuck ? "Desta Vez Não" : `${sector.label} ${sector.sub}`}
-          </p>
-          {isJackpot && (
-            <p style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 8, fontWeight: 500 }}>
-              Prémio máximo alcançado
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 3, textTransform: "uppercase",
+              color: "rgba(255,255,255,0.55)", marginBottom: 3 }}>
+              {isJackpot ? "JACKPOT" : isLuck ? "SEM PRÉMIO" : "GANHO"}
             </p>
-          )}
+            <p style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, lineHeight: 1,
+              fontSize: isJackpot ? 26 : isLuck ? 20 : 24, color: "#fff", letterSpacing: -0.3 }}>
+              {isLuck ? "Desta Vez Não" : `${sector.label} ${sector.sub}`}
+            </p>
+            {isJackpot && (
+              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>Prémio máximo alcançado</p>
+            )}
+          </div>
         </div>
 
-        {/* Body */}
-        <div style={{ background: "rgba(10,12,18,0.96)", borderTop: "1px solid rgba(255,255,255,0.07)",
-          padding: "22px 22px 24px" }}>
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", textAlign: "center",
-            marginBottom: 18, lineHeight: 1.6 }}>
+        {/* Action row */}
+        <div style={{ background: "rgba(8,10,18,0.97)", padding: "14px 18px 22px",
+          display: "flex", alignItems: "center", gap: 12 }}>
+          <p style={{ flex: 1, fontSize: 12, color: "rgba(255,255,255,0.42)", lineHeight: 1.5 }}>
             {isLuck
-              ? "Nenhum prémio desta vez. A sorte está ao virar da esquina!"
+              ? "Nenhum prémio desta vez. Tenta novamente!"
               : isJackpot
-              ? "Parabéns! O prémio máximo foi creditado no teu saldo."
-              : `${sector.label} ${sector.sub} foram adicionados ao teu saldo.`}
+              ? "Parabéns! O prémio máximo foi creditado."
+              : `+${sector.label} ${sector.sub} adicionados ao teu saldo.`}
           </p>
           <button onClick={onClose} style={{
-            width: "100%", padding: "14px", borderRadius: 16, border: "none",
+            height: 44, paddingLeft: 20, paddingRight: 20, borderRadius: 12, border: "none", flexShrink: 0,
             background: isLuck
-              ? "rgba(255,255,255,0.07)"
+              ? "rgba(255,255,255,0.08)"
               : `linear-gradient(135deg,${sector.color},${sector.darkColor})`,
-            color: "#fff", fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 14,
-            cursor: "pointer", letterSpacing: 0.2,
-            boxShadow: isLuck ? "none" : `0 4px 18px ${sector.color}40`,
+            color: "#fff", fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 13,
+            cursor: "pointer",
+            boxShadow: isLuck ? "none" : `0 4px 14px ${sector.color}50`,
           }}>
-            {isLuck ? "Tentar de Novo" : "Continuar"}
+            {isLuck ? "Fechar" : "Continuar"}
           </button>
         </div>
       </motion.div>

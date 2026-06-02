@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Search, X, LayoutGrid, Play, Gamepad2 } from "lucide-react";
+import { User, Search, X, LayoutGrid, Play, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import type { ActiveGameRecord } from "@/lib/simulation";
 
 function HomeIcon({ color }: { color: string }) {
   return (
@@ -37,7 +38,13 @@ function NavIcon({ iconKey, color }: { iconKey: string; color: string }) {
   return null;
 }
 
-function ResumeModal({ onClose }: { onClose: () => void }) {
+const GAME_META: Record<string, { name: string; image: string; imagePos: string }> = {
+  damas:  { name: "Damas Clássico", image: "/damas-card.jpg",   imagePos: "center" },
+  chess:  { name: "Xadrez Rápido",  image: "/xadrez-card.jpg",  imagePos: "center 30%" },
+  ludo:   { name: "Ludo Turbo",     image: "/ludo-card2.png",   imagePos: "center" },
+};
+
+function ResumeModal({ activeGame, onClose }: { activeGame: ActiveGameRecord | null; onClose: () => void }) {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
@@ -46,14 +53,95 @@ function ResumeModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const gameShortcuts = [
-    { id: "damas",  name: "Damas",  players: "2.4K", image: "/damas-card.jpg",  imagePos: "center" },
-    { id: "ludo",   name: "Ludo",   players: "4.1K", image: "/ludo-card2.png",  imagePos: "center" },
-    { id: "xadrez", name: "Xadrez", players: "1.2K", image: "/xadrez-card.jpg", imagePos: "center 30%" },
-  ];
-
   const go = (path: string) => { onClose(); setLocation(path); };
 
+  const gameShortcuts = [
+    { id: "damas",  name: "Damas",  image: "/damas-card.jpg",   imagePos: "center" },
+    { id: "ludo",   name: "Ludo",   image: "/ludo-card2.png",   imagePos: "center" },
+    { id: "xadrez", name: "Xadrez", image: "/xadrez-card.jpg",  imagePos: "center 30%" },
+  ];
+
+  // ── If there's an active game saved, show the resume screen ──────────────
+  if (activeGame) {
+    const meta  = GAME_META[activeGame.gameType] ?? GAME_META["damas"];
+    const minsAgo = Math.round((Date.now() - activeGame.savedAt) / 60_000);
+    const timeLabel = minsAgo <= 1 ? "Agora mesmo" : `Há ${minsAgo} min`;
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+        style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+        onClick={onClose}>
+        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }} />
+
+        <motion.div
+          initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
+          transition={{ type: "spring", damping: 32, stiffness: 350, mass: 0.55 }}
+          onClick={e => e.stopPropagation()}
+          style={{
+            position: "relative", width: "100%", maxWidth: 430,
+            background: "#0a0a0f", borderRadius: "24px 24px 0 0",
+            overflow: "hidden", zIndex: 1,
+            paddingBottom: "env(safe-area-inset-bottom, 20px)",
+          }}>
+          <div style={{ display: "flex", justifyContent: "center", paddingTop: 14, paddingBottom: 6 }}>
+            <div style={{ width: 32, height: 4, borderRadius: 99, background: "rgba(255,255,255,0.1)" }} />
+          </div>
+
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "6px 22px 18px" }}>
+            <div>
+              <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: "#fff", lineHeight: 1.15, marginBottom: 5 }}>Partida em Curso</p>
+              <p style={{ fontSize: 12.5, color: "#52525b", lineHeight: 1.5 }}>Tens um jogo activo. Volta para não perderes!</p>
+            </div>
+            <button onClick={onClose}
+              style={{ width: 32, height: 32, borderRadius: "50%", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, marginLeft: 14, marginTop: 2 }}>
+              <X style={{ width: 14, height: 14, color: "#71717a" }} />
+            </button>
+          </div>
+
+          <div style={{ height: 1, background: "rgba(255,255,255,0.05)", marginBottom: 20 }} />
+
+          {/* Active game card */}
+          <div style={{ padding: "0 22px", marginBottom: 16 }}>
+            <motion.button whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                try { localStorage.removeItem("wm_active_game"); } catch { /* ignore */ }
+                go(`/${activeGame.gameType === "chess" ? "xadrez" : activeGame.gameType}/${activeGame.gameId}`);
+              }}
+              style={{ width: "100%", background: "#141418", border: "1px solid rgba(124,58,237,0.35)", borderRadius: 18, overflow: "hidden", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "stretch" }}>
+              <div style={{ width: 90, flexShrink: 0, position: "relative", overflow: "hidden" }}>
+                <img src={meta.image} alt={meta.name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: meta.imagePos, minHeight: 88 }} />
+                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, rgba(0,0,0,0.05), rgba(0,0,0,0.5))" }} />
+              </div>
+              <div style={{ flex: 1, padding: "14px 16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#22c55e", display: "inline-block", flexShrink: 0, boxShadow: "0 0 6px #22c55e" }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e", letterSpacing: 1 }}>ACTIVO</span>
+                </div>
+                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 15, color: "#fff", marginBottom: 4 }}>{meta.name}</p>
+                <p style={{ fontSize: 11, color: "#71717a", marginBottom: 2 }}>vs {activeGame.opponentName}</p>
+                <p style={{ fontSize: 10, color: "#52525b" }}>{timeLabel} · {activeGame.betAmount > 0 ? `${activeGame.betAmount} MT apostados` : "Sem aposta"}</p>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", paddingRight: 14, flexShrink: 0 }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#6d28d9)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <RefreshCw style={{ width: 16, height: 16, color: "#fff" }} />
+                </div>
+              </div>
+            </motion.button>
+          </div>
+
+          <div style={{ padding: "0 22px 24px" }}>
+            <button onClick={() => go("/explorar")}
+              style={{ width: "100%", height: 48, background: "rgba(255,255,255,0.06)", color: "#a1a1aa", fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: 13, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              Ver Outros Jogos
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  }
+
+  // ── No active game — show generic game picker ─────────────────────────────
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
@@ -98,7 +186,6 @@ function ResumeModal({ onClose }: { onClose: () => void }) {
               </div>
               <div style={{ padding: "9px 10px 11px" }}>
                 <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12, color: "#fff", marginBottom: 2 }}>{g.name}</p>
-                <p style={{ fontSize: 10, color: "#52525b" }}>{g.players}K a jogar</p>
               </div>
             </motion.button>
           ))}
@@ -121,8 +208,29 @@ export default function BottomNav() {
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
   const [showResume, setShowResume] = useState(false);
+  const [activeGame, setActiveGame] = useState<ActiveGameRecord | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+
+  // Poll localStorage for active game every 5 seconds
+  useEffect(() => {
+    function checkActiveGame() {
+      try {
+        const raw = localStorage.getItem("wm_active_game");
+        if (!raw) { setActiveGame(null); return; }
+        const rec = JSON.parse(raw) as ActiveGameRecord;
+        if (Date.now() > rec.savedAt + rec.ttlMs) {
+          localStorage.removeItem("wm_active_game");
+          setActiveGame(null);
+        } else {
+          setActiveGame(rec);
+        }
+      } catch { setActiveGame(null); }
+    }
+    checkActiveGame();
+    const id = setInterval(checkActiveGame, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   const isActive = (href: string) =>
     href === "/" ? location === "/" : location.startsWith(href);
@@ -139,21 +247,17 @@ export default function BottomNav() {
 
   const handleResumeClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!user) {
-      setLocation("/login");
-      return;
-    }
+    if (!user) { setLocation("/login"); return; }
     setShowResume(true);
   };
 
   const handlePerfilClick = (e: React.MouseEvent) => {
     e.preventDefault();
-    if (!user) {
-      setLocation("/login");
-      return;
-    }
+    if (!user) { setLocation("/login"); return; }
     setLocation("/perfil");
   };
+
+  const hasActiveGame = !!activeGame;
 
   return (
     <>
@@ -188,9 +292,17 @@ export default function BottomNav() {
                 if (iconKey === "partidas") {
                   return (
                     <motion.div key={href} layout onClick={handleResumeClick}
-                      className="flex items-center gap-1.5 cursor-pointer select-none"
-                      style={{ background: "transparent", borderRadius: 99, paddingLeft: 10, paddingRight: 10, paddingTop: 8, paddingBottom: 8 }}>
-                      <NavIcon iconKey={iconKey} color="#71717a" />
+                      className="flex items-center gap-1.5 cursor-pointer select-none relative"
+                      style={{
+                        background: hasActiveGame ? "rgba(34,197,94,0.12)" : "transparent",
+                        borderRadius: 99, paddingLeft: 10, paddingRight: 10, paddingTop: 8, paddingBottom: 8,
+                        border: hasActiveGame ? "1px solid rgba(34,197,94,0.25)" : "1px solid transparent",
+                        transition: "all 0.25s ease",
+                      }}>
+                      <NavIcon iconKey={iconKey} color={hasActiveGame ? "#22c55e" : "#71717a"} />
+                      {hasActiveGame && (
+                        <span style={{ position: "absolute", top: 6, right: 6, width: 6, height: 6, borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 5px #22c55e" }} />
+                      )}
                     </motion.div>
                   );
                 }
@@ -258,7 +370,7 @@ export default function BottomNav() {
       </nav>
 
       <AnimatePresence>
-        {showResume && <ResumeModal onClose={() => setShowResume(false)} />}
+        {showResume && <ResumeModal activeGame={activeGame} onClose={() => setShowResume(false)} />}
       </AnimatePresence>
     </>
   );

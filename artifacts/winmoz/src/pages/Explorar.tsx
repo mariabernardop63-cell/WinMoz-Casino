@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, ChevronRight, Play, Users, Clock, Trophy, Zap, Plus, Hash, ArrowRight, Shield, SlidersHorizontal, X, CheckCircle2, Key, Send
+  Search, ChevronRight, Play, Users, Clock, Trophy, Zap, Plus, Hash, ArrowRight, Shield, SlidersHorizontal, X, CheckCircle2, Key, Send, Lock
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BottomNav from "@/components/BottomNav";
 import { AtualizacoesCards } from "./Home";
 import { useAuth } from "@/contexts/AuthContext";
+import { getLivePlayerCount, formatPlayerCount, generateMatchPool, type SimMatch } from "@/lib/simulation";
 
 const TABS = ["Jogos", "Assistir", "Sala", "Novidades", "Chat"] as const;
 type Tab = typeof TABS[number];
@@ -14,28 +15,14 @@ type Tab = typeof TABS[number];
 const GAME_FILTERS = ["Todos", "Damas", "Ludo", "Xadrez", "Padrão"] as const;
 type GameFilter = typeof GAME_FILTERS[number];
 
-const jogosCards = [
-  { id: "damas",       name: "Damas Clássico",  desc: "Jogo de Tabuleiro • 12 Modos", players: "2.4K jogadores", color: "from-blue-500 to-indigo-700",     initials: "DA", hot: true,  category: "Damas",  image: "/damas-card.jpg"   },
-  { id: "ludo",        name: "Ludo Turbo",       desc: "Jogo de Dados • 6 Modos",      players: "4.1K jogadores", color: "from-emerald-500 to-teal-700",    initials: "LU", hot: true,  category: "Ludo",   image: "/ludo-card2.png"   },
-  { id: "xadrez",      name: "Xadrez Rápido",    desc: "Estratégia Real • 8 Modos",    players: "1.2K jogadores", color: "from-violet-500 to-purple-800",   initials: "XA", hot: false, category: "Xadrez", image: "/xadrez-card.jpg"  },
-  { id: "ludo-classic",name: "Ludo Clássico",    desc: "Jogo de Dados • 3 Modos",      players: "760 jogadores",  color: "from-pink-500 to-rose-700",      initials: "LC", hot: false, category: "Ludo",   image: "/ludo-card2.png"   },
-  { id: "padrao",      name: "Jogo Padrão",      desc: "Clássico • 5 Modos",           players: "1.8K jogadores", color: "from-amber-500 to-yellow-600",   initials: "JP", hot: false, category: "Padrão", image: null                },
-  { id: "bilhar",      name: "Bilhar Apostado",  desc: "Jogo de Mesa • 5 Modos",       players: "890 jogadores",  color: "from-cyan-500 to-blue-700",      initials: "BI", hot: false, category: "Padrão", image: "/bilhar-card.webp" },
-  { id: "roleta",      name: "Roleta da Sorte",  desc: "Sorte • 3 Modos",              players: "1.5K jogadores", color: "from-pink-600 to-rose-800",      initials: "RS", hot: true,  category: "Padrão", image: "/roleta-card.jpg"  },
-];
-
-const partidasTempoReal = [
-  { id:"p1", game:"Damas Clássico",  players:"João M. vs Carlos F.",  viewers:"142", time:"8min",  bet:"500 MT",   status:"AO VIVO", color:"from-blue-500 to-indigo-700",   initials:"DA", image:"/damas-card.jpg"   },
-  { id:"p2", game:"Ludo Turbo",      players:"Maria S. vs Pedro A.",  viewers:"89",  time:"12min", bet:"200 MT",   status:"AO VIVO", color:"from-emerald-500 to-teal-700",  initials:"LU", image:"/ludo-card2.png"   },
-  { id:"p3", game:"Xadrez Rápido",   players:"Ana L. vs Bruno K.",    viewers:"310", time:"3min",  bet:"1.000 MT", status:"AO VIVO", color:"from-violet-500 to-purple-800", initials:"XA", image:"/xadrez-card.jpg"  },
-];
-
-const partidasAssistir = [
-  { id:"a2", game:"Damas Clássico",  players:"Tomás V. vs Nuno B.",     viewers:"201", time:"17min", bet:"750 MT",   status:"AO VIVO", color:"from-blue-500 to-indigo-700",   initials:"DA", image:"/damas-card.jpg"   },
-  { id:"a3", game:"Ludo Turbo",      players:"Celina R. vs Amina D.",   viewers:"134", time:"5min",  bet:"300 MT",   status:"AO VIVO", color:"from-emerald-500 to-teal-700",  initials:"LU", image:"/ludo-card2.png"   },
-  { id:"a4", game:"Xadrez Rápido",   players:"Hugo F. vs Paulo C.",     viewers:"440", time:"31min", bet:"3.000 MT", status:"AO VIVO", color:"from-violet-500 to-purple-800", initials:"XA", image:"/xadrez-card.jpg"  },
-  { id:"a5", game:"Damas Clássico",  players:"Lúcia M. vs Beatriz S.",  viewers:"97",  time:"9min",  bet:"400 MT",   status:"AO VIVO", color:"from-blue-500 to-indigo-700",   initials:"DA", image:"/damas-card.jpg"   },
-  { id:"a6", game:"Ludo Clássico",   players:"Marco T. vs Sandro P.",   viewers:"63",  time:"14min", bet:"150 MT",   status:"AO VIVO", color:"from-pink-500 to-rose-700",     initials:"LC", image:"/ludo-card2.png"   },
+const jogosCardsMeta = [
+  { id: "damas",        name: "Damas Clássico",  desc: "Jogo de Tabuleiro • 12 Modos", baseIdx: 0, color: "from-blue-500 to-indigo-700",     initials: "DA", hot: true,  category: "Damas",  image: "/damas-card.jpg"   },
+  { id: "ludo",         name: "Ludo Turbo",       desc: "Jogo de Dados • 6 Modos",      baseIdx: 1, color: "from-emerald-500 to-teal-700",    initials: "LU", hot: true,  category: "Ludo",   image: "/ludo-card2.png"   },
+  { id: "xadrez",       name: "Xadrez Rápido",    desc: "Estratégia Real • 8 Modos",    baseIdx: 2, color: "from-violet-500 to-purple-800",   initials: "XA", hot: false, category: "Xadrez", image: "/xadrez-card.jpg"  },
+  { id: "ludo-classic", name: "Ludo Clássico",    desc: "Jogo de Dados • 3 Modos",      baseIdx: 3, color: "from-pink-500 to-rose-700",       initials: "LC", hot: false, category: "Ludo",   image: "/ludo-card2.png"   },
+  { id: "padrao",       name: "Jogo Padrão",      desc: "Clássico • 5 Modos",           baseIdx: 4, color: "from-amber-500 to-yellow-600",    initials: "JP", hot: false, category: "Padrão", image: null                },
+  { id: "bilhar",       name: "Bilhar Apostado",  desc: "Jogo de Mesa • 5 Modos",       baseIdx: 5, color: "from-cyan-500 to-blue-700",        initials: "BI", hot: false, category: "Padrão", image: "/bilhar-card.webp" },
+  { id: "roleta",       name: "Roleta da Sorte",  desc: "Sorte • 3 Modos",              baseIdx: 6, color: "from-pink-600 to-rose-800",        initials: "RS", hot: true,  category: "Padrão", image: "/roleta-card.jpg"  },
 ];
 
 const fadeUp = {
@@ -47,10 +34,11 @@ const stagger = {
   show: { transition: { staggerChildren: 0.07 } },
 };
 
-function GameCard({ game }: { game: typeof jogosCards[0] }) {
+function GameCard({ game, tick }: { game: typeof jogosCardsMeta[0]; tick: number }) {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const betId = game.id.split("-")[0];
+  const count = getLivePlayerCount(game.baseIdx, tick);
   const handlePlay = () => {
     if (!user) { setLocation("/login"); return; }
     if (game.id === "roleta") { setLocation("/roleta"); return; }
@@ -83,7 +71,7 @@ function GameCard({ game }: { game: typeof jogosCards[0] }) {
         <div className="flex items-center gap-2 mt-0.5">
           <span className="text-[10px] text-slate-400">{game.desc}</span>
           <span className="text-[10px] text-violet-600 font-medium flex items-center gap-0.5">
-            <Users className="w-2.5 h-2.5" />{game.players}
+            <Users className="w-2.5 h-2.5" />{formatPlayerCount(count)} a jogar
           </span>
         </div>
       </div>
@@ -92,44 +80,103 @@ function GameCard({ game }: { game: typeof jogosCards[0] }) {
   );
 }
 
-function MatchCard({ match }: { match: typeof partidasTempoReal[0] }) {
+/** overlay shown when user tries to watch a private match */
+function PrivateMatchOverlay({ onClose }: { onClose: () => void }) {
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.75)",
+        backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center" }}
+      onClick={onClose}>
+      <motion.div initial={{ scale: 0.85, y: 20 }} animate={{ scale: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 280, damping: 22 }}
+        onClick={e => e.stopPropagation()}
+        style={{ width: "80%", maxWidth: 290, background: "#0f0f18",
+          border: "1px solid rgba(255,255,255,0.1)", borderRadius: 24,
+          padding: "28px 22px 22px", textAlign: "center",
+          boxShadow: "0 24px 60px rgba(0,0,0,0.6)" }}>
+        <div style={{ width: 56, height: 56, borderRadius: 18, background: "rgba(124,58,237,0.15)",
+          border: "1.5px solid rgba(124,58,237,0.35)", display: "flex", alignItems: "center",
+          justifyContent: "center", margin: "0 auto 16px" }}>
+          <Lock style={{ width: 24, height: 24, color: "#a78bfa" }} />
+        </div>
+        <p style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, fontSize: 18,
+          color: "#E8F0FF", marginBottom: 8 }}>Partida Privada</p>
+        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", marginBottom: 22, lineHeight: 1.6 }}>
+          Esta partida é privada e não pode ser assistida. Junta-te a uma partida pública no separador Jogos.
+        </p>
+        <button onClick={onClose}
+          style={{ width: "100%", padding: "13px 0", borderRadius: 14, border: "none",
+            background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)",
+            fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+          Fechar
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function MatchCard({ match, isAssistirTab }: { match: SimMatch; isAssistirTab?: boolean }) {
+  const [showPrivate, setShowPrivate] = useState(false);
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+
+  // ms remaining (always positive while match is alive)
+  const minsLeft = Math.max(0, Math.round((match.endsAt - Date.now()) / 60_000));
+  const timeLabel = minsLeft <= 1 ? "< 1 min" : `${minsLeft} min`;
+
   const handleWatch = () => {
     if (!user) { setLocation("/login"); return; }
+    if (isAssistirTab) { setShowPrivate(true); return; }
   };
+
   return (
-    <motion.div
-      variants={fadeUp}
-      className="flex items-center p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 group cursor-pointer"
-    >
-      <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 relative">
-        {match.image ? (
-          <img src={match.image} alt={match.game} className="w-full h-full object-cover" />
-        ) : (
-          <div className={`w-full h-full bg-gradient-to-br ${match.color} flex items-center justify-center text-white font-syne font-bold text-xs`}>
-            {match.initials}
-          </div>
-        )}
-        <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-white animate-pulse" />
-      </div>
-      <div className="ml-2.5 flex-1 min-w-0">
-        <p className="font-syne font-semibold text-slate-900 text-[12px] truncate">{match.players}</p>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          <span className="text-[8.5px] font-bold text-red-600 bg-red-50 px-1 py-0.5 rounded border border-red-200">{match.status}</span>
-          <span className="text-[10px] text-slate-400">{match.game}</span>
-          <span className="flex items-center gap-0.5 text-[10px] text-slate-400"><Users className="w-2.5 h-2.5" />{match.viewers}</span>
+    <>
+      <motion.div
+        variants={fadeUp}
+        onClick={handleWatch}
+        className="flex items-center p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 group cursor-pointer"
+      >
+        <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 relative">
+          {match.image ? (
+            <img src={match.image} alt={match.gameName} className="w-full h-full object-cover" />
+          ) : (
+            <div className={`w-full h-full bg-gradient-to-br ${match.color} flex items-center justify-center text-white font-syne font-bold text-xs`}>
+              {match.initials}
+            </div>
+          )}
+          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-white animate-pulse" />
         </div>
-      </div>
-      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-        <span className="text-[10px] font-bold text-violet-700">{match.bet}</span>
-        <button
-          onClick={(e) => { e.stopPropagation(); handleWatch(); }}
-          className="w-7 h-7 rounded-full bg-violet-700 hover:bg-violet-800 text-white flex items-center justify-center transition-colors">
-          <Play className="w-3 h-3 ml-0.5" />
-        </button>
-      </div>
-    </motion.div>
+        <div className="ml-2.5 flex-1 min-w-0">
+          <p className="font-syne font-semibold text-slate-900 text-[12px] truncate">{match.player1} vs {match.player2}</p>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <span className="text-[8.5px] font-bold text-red-600 bg-red-50 px-1 py-0.5 rounded border border-red-200">AO VIVO</span>
+            <span className="text-[10px] text-slate-400">{match.gameName}</span>
+            {!isAssistirTab && (
+              <span className="flex items-center gap-0.5 text-[10px] text-slate-400">
+                <Clock className="w-2.5 h-2.5" />{timeLabel}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+          <span className="text-[10px] font-bold text-violet-700">{match.bet}</span>
+          {isAssistirTab ? (
+            <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
+              <Lock className="w-3 h-3 text-slate-400" />
+            </div>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleWatch(); }}
+              className="w-7 h-7 rounded-full bg-violet-700 hover:bg-violet-800 text-white flex items-center justify-center transition-colors">
+              <Play className="w-3 h-3 ml-0.5" />
+            </button>
+          )}
+        </div>
+      </motion.div>
+      <AnimatePresence>
+        {showPrivate && <PrivateMatchOverlay onClose={() => setShowPrivate(false)} />}
+      </AnimatePresence>
+    </>
   );
 }
 
@@ -455,6 +502,49 @@ export default function Explorar() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
+  // Tick increments every 20 s to drive smooth player count drift
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 20_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Epoch changes every 10 min to rotate expired matches
+  const [epoch, setEpoch] = useState(() => Math.floor(Date.now() / (10 * 60_000)));
+  const [liveMatches, setLiveMatches] = useState<SimMatch[]>(() => generateMatchPool(5, Math.floor(Date.now() / (10 * 60_000))));
+  const [assistirMatches, setAssistirMatches] = useState<SimMatch[]>(() => generateMatchPool(12, Math.floor(Date.now() / (10 * 60_000)) + 9999));
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = Date.now();
+      const newEpoch = Math.floor(now / (10 * 60_000));
+      if (newEpoch !== epoch) {
+        setEpoch(newEpoch);
+        setLiveMatches(generateMatchPool(5, newEpoch));
+        setAssistirMatches(generateMatchPool(12, newEpoch + 9999));
+      }
+    }, 30_000);
+    return () => clearInterval(id);
+  }, [epoch]);
+
+  // Replace expired individual matches with fresh ones
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = Date.now();
+      setLiveMatches(prev => {
+        const anyExpired = prev.some(m => m.endsAt < now);
+        if (!anyExpired) return prev;
+        return generateMatchPool(5, Math.floor(now / 1000));
+      });
+      setAssistirMatches(prev => {
+        const anyExpired = prev.some(m => m.endsAt < now);
+        if (!anyExpired) return prev;
+        return generateMatchPool(12, Math.floor(now / 1000) + 7777);
+      });
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   const handleTabChange = (tab: Tab) => {
     const protectedTabs: Tab[] = ["Sala", "Chat"];
     if (protectedTabs.includes(tab) && !user) {
@@ -464,7 +554,7 @@ export default function Explorar() {
     setActiveTab(tab);
   };
 
-  const filteredJogos = jogosCards.filter(g => {
+  const filteredJogos = jogosCardsMeta.filter(g => {
     const matchSearch = !query || g.name.toLowerCase().includes(query.toLowerCase());
     const matchFilter = gameFilter === "Todos" || g.category === gameFilter;
     return matchSearch && matchFilter;
@@ -536,7 +626,7 @@ export default function Explorar() {
                 </div>
 
                 <motion.div variants={stagger} initial="hidden" animate="show" className="flex flex-col gap-2.5 mb-6">
-                  {filteredJogos.map(game => <GameCard key={game.id} game={game} />)}
+                  {filteredJogos.map(game => <GameCard key={game.id} game={game} tick={tick} />)}
                   {filteredJogos.length === 0 && (
                     <div className="text-center py-10 text-slate-400 text-sm">Nenhum jogo encontrado para "{gameFilter}"</div>
                   )}
@@ -550,7 +640,7 @@ export default function Explorar() {
                   <button className="text-violet-700 text-xs font-semibold hover:underline">Ver todas</button>
                 </div>
                 <motion.div variants={stagger} initial="hidden" animate="show" className="flex flex-col gap-2.5 mb-6">
-                  {partidasTempoReal.map(match => <MatchCard key={match.id} match={match} />)}
+                  {liveMatches.map(match => <MatchCard key={match.id} match={match} />)}
                 </motion.div>
               </motion.div>
             )}
@@ -560,10 +650,12 @@ export default function Explorar() {
                 <div className="flex items-center gap-2 mb-4">
                   <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                   <h2 className="font-syne font-bold text-sm text-slate-900">Partidas ao Vivo</h2>
-                  <span className="bg-red-50 text-red-600 text-[9px] font-bold px-2 py-0.5 rounded-full border border-red-200">{partidasAssistir.length} ativas</span>
+                  <span className="bg-red-50 text-red-600 text-[9px] font-bold px-2 py-0.5 rounded-full border border-red-200">{assistirMatches.length} ativas</span>
                 </div>
                 <motion.div variants={stagger} initial="hidden" animate="show" className="flex flex-col gap-2.5 mb-6">
-                  {partidasAssistir.filter(m => !query || m.game.toLowerCase().includes(query.toLowerCase()) || m.players.toLowerCase().includes(query.toLowerCase())).map(match => <MatchCard key={match.id} match={match} />)}
+                  {assistirMatches
+                    .filter(m => !query || m.gameName.toLowerCase().includes(query.toLowerCase()) || m.player1.toLowerCase().includes(query.toLowerCase()) || m.player2.toLowerCase().includes(query.toLowerCase()))
+                    .map(match => <MatchCard key={match.id} match={match} isAssistirTab />)}
                 </motion.div>
               </motion.div>
             )}
