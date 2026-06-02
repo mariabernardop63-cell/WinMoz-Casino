@@ -212,7 +212,7 @@ function saveRooms(rooms: RoomRecord[]) {
   try { localStorage.setItem("wm_rooms", JSON.stringify(rooms)); } catch { /* ignore */ }
 }
 
-type SalaView = "main" | "entrar" | "criar" | "criar-aposta" | "room-created" | "room-waiting" | "join-bet";
+type SalaView = "main" | "entrar" | "criar" | "criar-aposta" | "room-created" | "room-waiting" | "join-loading" | "join-confirm";
 
 function SalaTab() {
   const [view, setView] = useState<SalaView>("main");
@@ -315,7 +315,7 @@ function SalaTab() {
     channel.on("presence", { event: "sync" }, tryMatch);
     channel.on("presence", { event: "join" }, tryMatch);
     channel.subscribe(async status => {
-      if (status === "SUBSCRIBED") await channel.track({ userId: user.id, displayName: profile?.full_name ?? "Jogador" });
+      if (status === "SUBSCRIBED") await channel.track({ userId: user.id, displayName: profile?.full_name ?? "Jogador", gameId: activeGameId, betAmount: activeBet });
     });
     return () => { supabase.removeChannel(channel); channelRef.current = null; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -493,39 +493,109 @@ function SalaTab() {
     );
   }
 
-  // ── JOIN BET (joiner selects bet amount) ───────────────────────────────────
-  if (view === "join-bet") {
+  // ── JOIN LOADING — fetch creator's game/bet from channel presence ──────────
+  useEffect(() => {
+    if (view !== "join-loading" || !activeCode || !user?.id) return;
+    let done = false;
+    const ch = supabase.channel(`room_${activeCode}`, {
+      config: { presence: { key: user.id }, broadcast: { self: false } },
+    });
+
+    const tryRead = () => {
+      if (done) return;
+      const state = ch.presenceState<{ gameId?: string; betAmount?: number; displayName?: string }>();
+      const ids = Object.keys(state).filter(id => id !== user.id);
+      if (ids.length > 0) {
+        const creatorInfo = (state[ids[0]] as any)?.[0];
+        if (creatorInfo?.gameId && creatorInfo?.betAmount) {
+          done = true;
+          setActiveGameId(creatorInfo.gameId);
+          setActiveBet(creatorInfo.betAmount);
+          supabase.removeChannel(ch);
+          setView("join-confirm");
+          return;
+        }
+      }
+    };
+
+    ch.on("presence", { event: "sync" }, tryRead);
+    ch.on("presence", { event: "join" }, tryRead);
+    ch.subscribe(async status => {
+      if (status === "SUBSCRIBED") {
+        await ch.track({ userId: user.id, displayName: profile?.full_name ?? "Jogador" });
+        tryRead();
+      }
+    });
+
+    // Timeout after 4 s — room may not exist or creator may have left
+    const timer = setTimeout(() => {
+      if (!done) {
+        done = true;
+        supabase.removeChannel(ch);
+        setError("Sala não encontrada ou já encerrada. Verifica o código.");
+        setView("entrar");
+      }
+    }, 4000);
+
+    return () => {
+      done = true;
+      clearTimeout(timer);
+      supabase.removeChannel(ch);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, activeCode, user?.id]);
+
+  // ── JOIN LOADING UI ───────────────────────────────────────────────────────
+  if (view === "join-loading") {
     return (
-      <motion.div key="join-bet" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="pb-6">
+      <motion.div key="join-loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center py-16 gap-5">
+        <div style={{ width: 56, height: 56, borderRadius: "50%", border: "4px solid #7c3aed33", borderTopColor: "#7c3aed" }} className="animate-spin" />
+        <p className="font-syne font-bold text-slate-900 text-lg">A verificar sala…</p>
+        <p className="text-slate-400 text-sm text-center">Código: <span className="font-mono font-bold text-slate-700">{activeCode}</span></p>
+      </motion.div>
+    );
+  }
+
+  // ── JOIN CONFIRM — show creator's game/bet; joiner confirms ───────────────
+  if (view === "join-confirm") {
+    const gameInfo = SALA_GAMES.find(g => g.id === activeGameId);
+    return (
+      <motion.div key="join-confirm" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="pb-6">
         <button onClick={() => setView("entrar")} className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-6 hover:text-slate-800 transition-colors">
           <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center"><ChevronRight className="w-3.5 h-3.5 rotate-180 text-slate-600" /></div>
           Voltar
         </button>
-        <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Confirmar Aposta</h2>
-        <p className="text-slate-400 text-sm mb-1">Código: <span className="font-mono font-bold text-slate-700">{activeCode}</span></p>
-        <p className="text-slate-400 text-sm mb-6">Saldo: <span className="font-bold text-emerald-600">{parseFloat(String(profile?.balance ?? "0")).toLocaleString("pt-PT")} MT</span></p>
-        <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-3">Valor da Aposta</p>
-        <div className="grid grid-cols-3 gap-2 mb-5">
-          {SALA_BET_AMOUNTS.map(amt => (
-            <button key={amt} onClick={() => setSelectedBet(amt)}
-              className={`py-3 rounded-xl font-syne font-bold text-sm border-2 transition-all ${selectedBet === amt ? "border-violet-600 bg-violet-50 text-violet-700" : "border-slate-100 bg-white text-slate-700 hover:border-slate-300"}`}>
-              {amt >= 1000 ? `${(amt / 1000).toFixed(amt % 1000 === 0 ? 0 : 1)}K` : amt} MT
-            </button>
-          ))}
+        <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Confirmar Entrada</h2>
+        <p className="text-slate-400 text-sm mb-5">Detalhes da sala criada pelo adversário:</p>
+        <div className="bg-white border border-slate-100 rounded-2xl p-5 mb-5 shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            {gameInfo && (
+              <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
+                <img src={gameInfo.image} alt={gameInfo.name} className="w-full h-full object-cover" style={{ objectPosition: gameInfo.imagePos }} />
+              </div>
+            )}
+            <div>
+              <p className="font-syne font-bold text-slate-900 text-base">{gameInfo?.name ?? activeGameId}</p>
+              <p className="text-xs text-slate-400 mt-0.5">Sala: <span className="font-mono font-bold text-violet-700">{activeCode}</span></p>
+            </div>
+          </div>
+          <div className="flex items-center justify-between px-3 py-3 bg-violet-50 border border-violet-100 rounded-xl">
+            <span className="text-sm text-slate-600 font-medium">Valor a apostar:</span>
+            <span className="font-syne font-extrabold text-violet-700 text-lg">{activeBet} MT</span>
+          </div>
+          <p className="text-xs text-slate-400 mt-3 text-center">O teu saldo actual: <span className="font-bold text-emerald-600">{parseFloat(String(profile?.balance ?? "0")).toLocaleString("pt-PT")} MT</span></p>
         </div>
         {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl mb-4 text-red-700 text-sm"><AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}</div>}
-        <button disabled={selectedBet === null || loading}
+        <button disabled={loading}
           onClick={async () => {
-            if (!selectedBet) return;
             setError(""); setLoading(true);
-            const ok = await deductBalance(selectedBet, `Entrada em sala ${activeCode}`);
+            const ok = await deductBalance(activeBet, `Entrada em sala ${activeCode}`);
             if (!ok) { setError("Saldo insuficiente. Por favor recarregue a sua conta."); setLoading(false); return; }
-            setActiveBet(selectedBet); setActiveGameId("damas");
             setLoading(false); setWaitRemaining(300); setWaitFound(false); setRoomRole("joiner"); setView("room-waiting");
           }}
-          className={`w-full py-4 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 transition-all ${selectedBet === null ? "bg-slate-100 text-slate-300 cursor-not-allowed" : "text-white"}`}
-          style={selectedBet !== null ? { background: "linear-gradient(135deg,#7c3aed,#6d28d9)" } : {}}>
-          {loading ? <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <><ArrowRight className="w-4 h-4" /> Entrar na Sala</>}
+          className="w-full py-4 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 text-white"
+          style={{ background: loading ? "#7c3aed99" : "linear-gradient(135deg,#7c3aed,#6d28d9)", cursor: loading ? "not-allowed" : "pointer" }}>
+          {loading ? <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <><ArrowRight className="w-4 h-4" /> Confirmar e Entrar na Sala</>}
         </button>
       </motion.div>
     );
@@ -557,7 +627,7 @@ function SalaTab() {
               if (inputCode.length < 6) return;
               const matched = myRooms.find(r => r.code === inputCode && r.status === "matched");
               if (matched) { setError("Este código já foi utilizado. A sala expirou."); return; }
-              setActiveCode(inputCode); setRoomRole("joiner"); setSelectedBet(null); setError(""); setView("join-bet");
+              setActiveCode(inputCode); setRoomRole("joiner"); setSelectedBet(null); setError(""); setView("join-loading");
             }}
             className={`w-full h-12 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
               inputCode.length >= 6 ? "bg-slate-900 text-white hover:bg-slate-800" : "bg-slate-100 text-slate-300 cursor-not-allowed"
@@ -818,11 +888,12 @@ export default function Explorar() {
   }, []);
 
   const handleTabChange = (tab: Tab) => {
-    const protectedTabs: Tab[] = ["Sala", "Chat"];
-    if (protectedTabs.includes(tab) && !user) {
-      setLocation("/login");
+    if (tab === "Chat") {
+      if (!user) { setLocation("/login"); return; }
+      setLocation("/grupo-chat");
       return;
     }
+    if (tab === "Sala" && !user) { setLocation("/login"); return; }
     setActiveTab(tab);
   };
 
@@ -944,11 +1015,6 @@ export default function Explorar() {
               </motion.div>
             )}
 
-            {activeTab === "Chat" && (
-              <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-                <ChatTab />
-              </motion.div>
-            )}
 
           </AnimatePresence>
         </div>

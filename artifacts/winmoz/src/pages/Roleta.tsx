@@ -341,8 +341,11 @@ export default function Roleta() {
     // Pick random result sector
     const targetIdx = Math.floor(Math.random() * N);
     // Total rotation: multiple full turns + offset to land on target
-    // Target sector center offset from top (pointer at top)
-    const targetDeg = 360 - (targetIdx * SLICE + SLICE / 2);
+    // Must account for accumulated rotation to ensure the wheel visually
+    // stops at exactly targetIdx regardless of previous spins.
+    const currentAngleMod = ((rotationRef.current % 360) + 360) % 360;
+    const rawTarget = ((360 - (targetIdx * SLICE + SLICE / 2)) % 360 + 360) % 360;
+    const targetDeg = ((rawTarget - currentAngleMod) % 360 + 360) % 360;
     const totalSpins = 5 + Math.floor(Math.random() * 4); // 5-8 full rotations
     const totalRotation = rotationRef.current + totalSpins * 360 + targetDeg;
 

@@ -20,32 +20,6 @@ type Msg = {
   userId?: string;
 };
 
-const SEED_MSGS: Msg[] = [
-  {
-    id: "g1", user: "João Mondlane", initials: "JM",
-    avatarBg: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
-    text: "Alguém quer um desafio de Damas? Aposto 500 MZN! 🎯",
-    time: "10:30",
-  },
-  {
-    id: "g2", user: "Maria Santos", initials: "MS",
-    avatarBg: "linear-gradient(135deg, #ec4899, #9d174d)",
-    text: "Aceito o desafio! Mas tenho que avisar — não perco fácil 😏",
-    time: "10:31",
-  },
-  {
-    id: "g3", user: "Carlos Fonseca", initials: "CF",
-    avatarBg: "linear-gradient(135deg, #10b981, #065f46)",
-    text: "Eu também quero entrar! Ludo Turbo às 20h? 🚀",
-    time: "10:33",
-  },
-  {
-    id: "g4", user: "Ana Ribeiro", initials: "AR",
-    avatarBg: "linear-gradient(135deg, #f59e0b, #b45309)",
-    text: "Conta comigo! Já fiz a recarga. Só estou à espera da hora 🔥",
-    time: "10:38",
-  },
-];
 
 const MEMBERS = [
   { initials: "JM", bg: "linear-gradient(135deg, #3b82f6, #1d4ed8)", name: "João M." },
@@ -68,7 +42,7 @@ function getInitials(name: string): string {
 
 export default function GrupoChat() {
   const [, setLocation] = useLocation();
-  const [messages, setMessages] = useState<Msg[]>(SEED_MSGS);
+  const [messages, setMessages] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [showInfo, setShowInfo] = useState(false);
   const [onlineCount, setOnlineCount] = useState(39);
@@ -157,7 +131,7 @@ export default function GrupoChat() {
                 <span style={{ position: "absolute", bottom: -3, right: -3, width: 12, height: 12, borderRadius: 999, background: "#22c55e", border: "2px solid #18181b" }} />
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p style={{ color: "#f1f5f9", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14 }}>Grupo WinMoz</p>
+                <p style={{ color: "#f1f5f9", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14 }}>Grupo Poker Winner</p>
                 <p style={{ fontSize: 10.5, color: "#71717a", marginTop: 1 }}>125 participantes · {onlineCount} online</p>
               </div>
             </button>
@@ -188,6 +162,15 @@ export default function GrupoChat() {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto py-4 px-3 [&::-webkit-scrollbar]:hidden" style={{ background: "#0f0f12", display: "flex", flexDirection: "column", gap: 10 }}>
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center flex-1 py-16 gap-3 opacity-60">
+              <div style={{ width: 56, height: 56, borderRadius: 16, background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Users style={{ width: 26, height: 26, color: "#71717a" }} />
+              </div>
+              <p style={{ color: "#71717a", fontSize: 13.5, fontWeight: 600 }}>Sem mensagens ainda</p>
+              <p style={{ color: "#52525b", fontSize: 12, textAlign: "center", maxWidth: 220 }}>Sê o primeiro a cumprimentar o grupo!</p>
+            </div>
+          )}
           <AnimatePresence initial={false}>
             {messages.map((msg, i) => {
               const prev = messages[i - 1];

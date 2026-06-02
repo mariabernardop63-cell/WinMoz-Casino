@@ -24,6 +24,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const PROFILE_CACHE_KEY = "wm_profile_cache";
 
 async function fetchProfile(userId: string, attempt = 0): Promise<UserProfile | null> {
   try {
@@ -33,7 +34,6 @@ async function fetchProfile(userId: string, attempt = 0): Promise<UserProfile | 
       .eq("id", userId)
       .single();
     if (error || !data) {
-      // Retry up to 3 times with exponential back-off (500ms, 1000ms, 2000ms)
       if (attempt < 3) {
         await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
         return fetchProfile(userId, attempt + 1);
@@ -85,22 +85,46 @@ async function ensureProfileExists(
   }
 }
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+function loadCachedProfile(): (UserProfile & { email?: string }) | null {
+  try {
+    const raw = sessionStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
 
-  // Tracks the active user id — used to discard stale async results
-  const activeUidRef = useRef<string | null>(null);
-  // Prevents SIGNED_IN from re-running a full load if INITIAL_SESSION already did it
-  const initialSessionDoneRef = useRef(false);
+function saveCachedProfile(p: UserProfile) {
+  try { sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(p)); } catch { /* ignore */ }
+}
+
+function clearCachedProfile() {
+  try { sessionStorage.removeItem(PROFILE_CACHE_KEY); } catch { /* ignore */ }
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const cachedProfile = loadCachedProfile();
+
+  const [user, setUser] = useState<{ id: string; email: string } | null>(
+    cachedProfile ? { id: cachedProfile.id, email: cachedProfile.email ?? "" } : null
+  );
+  const [profile, setProfile] = useState<UserProfile | null>(cachedProfile ?? null);
+  // If we already have a cache hit, skip the loading spinner
+  const [loading, setLoading] = useState(!cachedProfile);
+
+  const activeUidRef = useRef<string | null>(cachedProfile?.id ?? null);
+  const signedInHandledRef = useRef(false);
+
+  const saveAndSet = (p: UserProfile) => {
+    setProfile(p);
+    saveCachedProfile(p);
+  };
 
   const refreshProfile = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) return;
       const data = await fetchProfile(session.user.id);
-      if (data) setProfile({ ...data, email: session.user.email ?? "" });
+      if (data) saveAndSet({ ...data, email: session.user.email ?? "" });
     } catch { /* silently fail */ }
   };
 
@@ -108,7 +132,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     activeUidRef.current = null;
-    initialSessionDoneRef.current = false;
+    signedInHandledRef.current = false;
+    clearCachedProfile();
     try { await supabase.auth.signOut(); } catch { /* ignore */ }
     setUser(null);
     setProfile(null);
@@ -117,47 +142,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    // Safety net: resolve loading after 6 seconds max
-    const safetyTimer = setTimeout(() => {
-      if (!cancelled) setLoading(false);
-    }, 6000);
+    // ── getSession() is the primary and most reliable source on page reload ──
+    // It reads the stored token directly; doesn't depend on event timing.
+    const initFromSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
 
-    const unlock = () => {
-      if (!cancelled) {
-        setLoading(false);
-        clearTimeout(safetyTimer);
+        if (!session?.user) {
+          // No valid session — wipe any stale cache
+          clearCachedProfile();
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
+
+        const { id, email = "" } = session.user;
+
+        // If the cache already seeded this exact user, just do a silent background refresh
+        if (cachedProfile?.id === id) {
+          activeUidRef.current = id;
+          signedInHandledRef.current = true;
+          setLoading(false);
+          // Refresh balance/profile silently in background
+          const fresh = await fetchProfile(id);
+          if (!cancelled && activeUidRef.current === id && fresh) {
+            saveAndSet({ ...fresh, email });
+          }
+          return;
+        }
+
+        // Different user or no cache — load fresh
+        activeUidRef.current = id;
+        if (!cancelled) setUser({ id, email });
+
+        const data = await fetchProfile(id);
+        if (!cancelled && activeUidRef.current === id) {
+          if (data) saveAndSet({ ...data, email });
+          signedInHandledRef.current = true;
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) setLoading(false);
       }
     };
 
+    initFromSession();
+
+    // Safety net — never leave the app stuck in loading state
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) setLoading(false);
+    }, 8000);
+
+    // ── onAuthStateChange handles live sign-in, sign-out, and token refresh ──
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (cancelled) return;
 
-        // ── INITIAL_SESSION: page load / session restore ──────────────────────
-        if (event === "INITIAL_SESSION") {
-          if (session?.user) {
-            const { id, email = "" } = session.user;
-            activeUidRef.current = id;
-            setUser({ id, email });
-            // Wait for profile before unlocking so pages never flash "UTILIZADOR"
-            const data = await fetchProfile(id);
-            if (cancelled || activeUidRef.current !== id) return;
-            if (data) setProfile({ ...data, email });
-            initialSessionDoneRef.current = true;
-          }
-          unlock();
-
-        // ── SIGNED_IN: actual user login (or OTP confirmation) ────────────────
-        } else if (event === "SIGNED_IN" && session?.user) {
+        if (event === "SIGNED_IN" && session?.user) {
           const { id, email = "" } = session.user;
-
-          // If INITIAL_SESSION already loaded this user, skip to avoid double-fetch
-          if (initialSessionDoneRef.current && activeUidRef.current === id) return;
+          // Avoid re-running if initFromSession already handled this user
+          if (signedInHandledRef.current && activeUidRef.current === id) return;
 
           activeUidRef.current = id;
-          setUser({ id, email });
+          if (!cancelled) setUser({ id, email });
 
-          // Handle new registration data
           const pendingRaw = sessionStorage.getItem("pendingReg");
           if (pendingRaw) {
             try {
@@ -172,33 +222,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           const data = await fetchProfile(id);
-          if (cancelled || activeUidRef.current !== id) return;
-          if (data) setProfile({ ...data, email });
-          initialSessionDoneRef.current = true;
-          unlock();
+          if (!cancelled && activeUidRef.current === id) {
+            if (data) saveAndSet({ ...data, email });
+            signedInHandledRef.current = true;
+            setLoading(false);
+          }
 
-        // ── SIGNED_OUT ────────────────────────────────────────────────────────
         } else if (event === "SIGNED_OUT") {
           activeUidRef.current = null;
-          initialSessionDoneRef.current = false;
-          setUser(null);
-          setProfile(null);
-          unlock();
+          signedInHandledRef.current = false;
+          clearCachedProfile();
+          if (!cancelled) {
+            setUser(null);
+            setProfile(null);
+            setLoading(false);
+          }
 
-        // ── TOKEN_REFRESHED: silent background refresh ────────────────────────
         } else if (event === "TOKEN_REFRESHED" && session?.user) {
           const { id, email = "" } = session.user;
-          // Only update user object if id actually changed (avoid pointless re-renders)
-          setUser(prev => (prev?.id === id ? prev : { id, email }));
+          if (!cancelled) setUser(prev => (prev?.id === id ? prev : { id, email }));
+          // Silent profile refresh after token is renewed
           const data = await fetchProfile(id);
-          if (!cancelled && activeUidRef.current === id && data)
-            setProfile({ ...data, email });
+          if (!cancelled && activeUidRef.current === id && data) {
+            saveAndSet({ ...data, email });
+          }
 
-        // ── USER_UPDATED ──────────────────────────────────────────────────────
         } else if (event === "USER_UPDATED" && session?.user) {
           const { id, email = "" } = session.user;
           const data = await fetchProfile(id);
-          if (!cancelled && data) setProfile({ ...data, email });
+          if (!cancelled && data) saveAndSet({ ...data, email });
         }
       }
     );

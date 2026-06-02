@@ -26,7 +26,7 @@ export default function SplashScreen() {
   const showText    = phase === "draw" || phase === "hold" || phase === "erase";
   const showSpinner = phase === "spinner";
 
-  const targetWidth = (phase === "draw" || phase === "hold") ? 157 : 0;
+  const targetWidth = (phase === "draw" || phase === "hold") ? 295 : 0;
   const widthTransition: Parameters<typeof motion.div>[0]["transition"] =
     phase === "draw"
       ? { duration: 1.38, ease: "linear" }
@@ -66,7 +66,7 @@ export default function SplashScreen() {
               <motion.div initial={{ width: 0 }} animate={{ width: targetWidth }} transition={widthTransition}
                 style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 40, letterSpacing: "-1.5px", color: "#0D0D0D", display: "inline-block", lineHeight: "46px", userSelect: "none" }}>
-                  Poker
+                  Poker Winner
                 </span>
                 <svg style={{ display: "inline-block", verticalAlign: "top", marginLeft: 3, marginTop: 5 }} width="14" height="14" viewBox="0 0 14 14">
                   <circle cx="7" cy="7" r="6" stroke="#0D0D0D" strokeWidth="1.4" fill="none" />

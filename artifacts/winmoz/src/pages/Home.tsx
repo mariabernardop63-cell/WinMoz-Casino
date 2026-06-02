@@ -198,12 +198,10 @@ function AtualizacoesSection() {
 function WinMozLogo() {
   return (
     <div className="flex items-center">
-      <svg viewBox="0 0 230 46" height="34" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg viewBox="0 0 345 46" height="34" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M1 2 L11 2 L7 44 L0 44 Z" fill="#0D0D0D"/>
         <path d="M13 2 L20 2 L16 44 L10 44 Z" fill="#0D0D0D" opacity="0.18"/>
-        <text x="24" y="40" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="40" letterSpacing="-1.5" fill="#0D0D0D">Poker</text>
-        <circle cx="218" cy="11" r="7" stroke="#0D0D0D" strokeWidth="1.8" fill="none"/>
-        <text x="214.5" y="15.5" fontFamily="'Syne', sans-serif" fontWeight="700" fontSize="9" fill="#0D0D0D">R</text>
+        <text x="24" y="40" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="40" letterSpacing="-1.5" fill="#0D0D0D">Poker Winner</text>
       </svg>
     </div>
   );
