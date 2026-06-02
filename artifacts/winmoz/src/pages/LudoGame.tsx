@@ -145,38 +145,32 @@ const PAWN_PAL: Record<PawnColor,{s:string;m:string;d:string}> = {
   yellow: { s:"#FDE68A", m:"#EAB308", d:"#713F12" },
 };
 
-// ─── Location-pin pawn (map marker style) ──────────────────────────────────────
+// ─── PNG pawn images ────────────────────────────────────────────────────────────
+const PAWN_IMGS: Record<"blue"|"green", string> = {
+  blue:  "/pawn-blue.png",
+  green: "/pawn-green.png",
+};
+
 function PinPawn({ color, size=PAWN_SIZE, glow=false }: {
   color:PawnColor; size?:number; glow?:boolean;
 }) {
   const pinColor = color === "blue" ? "#2563EB" : "#16A34A";
   const w = size;
   const h = Math.round(w * 1.5);
+  const src = PAWN_IMGS[color as "blue"|"green"] ?? PAWN_IMGS.blue;
   return (
     <div style={{
-      display:"flex", flexShrink:0,
+      display:"flex", flexShrink:0, width:w, height:h,
       filter: glow
         ? `drop-shadow(0 0 ${Math.round(w*0.3)}px ${pinColor}CC) drop-shadow(0 1px 3px rgba(0,0,0,0.6))`
         : "drop-shadow(0 1px 3px rgba(0,0,0,0.5))",
     }}>
-      <svg viewBox="0 0 48 72" width={w} height={h} style={{display:"block"}}>
-        {/* Drop shadow under base */}
-        <ellipse cx="24" cy="70" rx="9" ry="2.2" fill="rgba(0,0,0,0.22)"/>
-        {/* Base ring — player color */}
-        <ellipse cx="24" cy="62" rx="11" ry="4" fill={pinColor}/>
-        {/* Base ring center — white hole */}
-        <ellipse cx="24" cy="61" rx="7" ry="2.5" fill="white"/>
-        {/* Pin body — white teardrop with dark outline */}
-        <path
-          d="M24,5 C12,5 4,15 4,26 C4,40 24,62 24,62 C24,62 44,40 44,26 C44,15 36,5 24,5 Z"
-          fill="white" stroke="#1a1a1a" strokeWidth="2.5" strokeLinejoin="round"
-        />
-        {/* Colored circle inside pin head */}
-        <circle cx="24" cy="23" r="13" fill={pinColor}/>
-        {/* Shine on colored circle */}
-        <ellipse cx="18" cy="17" rx="5" ry="3.5"
-          fill="rgba(255,255,255,0.35)" transform="rotate(-15 18 17)"/>
-      </svg>
+      <img
+        src={src}
+        alt={color}
+        style={{ width:w, height:h, objectFit:"contain", display:"block" }}
+        draggable={false}
+      />
     </div>
   );
 }
