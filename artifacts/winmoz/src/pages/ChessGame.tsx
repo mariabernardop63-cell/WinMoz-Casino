@@ -383,6 +383,54 @@ function PromotionModal({color,onChoose}:{color:PColor;onChoose:(t:PType)=>void}
   );
 }
 
+// ─── Rematch types & overlay ──────────────────────────────────────────────────
+type RematchPhase = "idle"|"checking"|"no_balance"|"waiting"|"received"|"declined"|"opp_no_balance";
+
+function RematchOverlay({ phase, requesterName, onAccept, onDecline, onClose }: {
+  phase: RematchPhase; requesterName: string;
+  onAccept: () => void; onDecline: () => void; onClose: () => void;
+}) {
+  const msgs: Record<RematchPhase, { title: string; body: string; actions?: "accept_decline"|"close" }> = {
+    idle:          { title:"", body:"" },
+    checking:      { title:"A verificar saldo…", body:"Por favor aguarda.", actions:"close" },
+    no_balance:    { title:"Saldo insuficiente", body:"Não tens saldo suficiente para a revanche.", actions:"close" },
+    waiting:       { title:"Desafio enviado!", body:`Aguardando resposta de ${requesterName}…`, actions:"close" },
+    received:      { title:`${requesterName} quer revanche!`, body:"Aceitas o desafio?", actions:"accept_decline" },
+    declined:      { title:"Desafio recusado", body:`${requesterName} recusou a revanche.`, actions:"close" },
+    opp_no_balance:{ title:"Adversário sem saldo", body:`${requesterName} não tem saldo suficiente.`, actions:"close" },
+  };
+  const m = msgs[phase];
+  return (
+    <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.82)", zIndex:60,
+        display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(10px)" }}>
+      <motion.div initial={{ scale:0.85, y:20 }} animate={{ scale:1, y:0 }}
+        transition={{ type:"spring", stiffness:280, damping:22 }}
+        style={{ width:"82%", maxWidth:300, background:"rgba(10,15,30,0.98)",
+          border:"1px solid rgba(255,255,255,0.1)", borderRadius:24, padding:"28px 22px 22px",
+          boxShadow:"0 24px 60px rgba(0,0,0,0.6)", textAlign:"center" }}>
+        <p style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:18,
+          color:"#E8F0FF", marginBottom:8 }}>{m.title}</p>
+        <p style={{ fontSize:12, color:"rgba(255,255,255,0.5)", marginBottom:20, lineHeight:1.5 }}>{m.body}</p>
+        {m.actions === "accept_decline" ? (
+          <div style={{ display:"flex", gap:10 }}>
+            <button onClick={onDecline} style={{ flex:1, padding:"12px 0", borderRadius:12,
+              background:"rgba(239,68,68,0.12)", border:"1px solid rgba(239,68,68,0.3)",
+              color:"#EF4444", fontWeight:700, fontSize:13, cursor:"pointer" }}>Recusar</button>
+            <button onClick={onAccept} style={{ flex:1, padding:"12px 0", borderRadius:12,
+              background:"linear-gradient(135deg,#22C55E,#16A34A)", border:"none",
+              color:"#fff", fontWeight:700, fontSize:13, cursor:"pointer" }}>Aceitar</button>
+          </div>
+        ) : (
+          <button onClick={onClose} style={{ width:"100%", padding:"12px 0", borderRadius:12,
+            background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)",
+            color:"rgba(255,255,255,0.7)", fontWeight:700, fontSize:13, cursor:"pointer" }}>Fechar</button>
+        )}
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── Win Screen ─────────────────────────────────────────────────────────────────
 function WinScreen({winner,winnerName,loserName,reason,betAmount,isWinner,onReplay,onQuit}:{
   winner:PColor;winnerName:string;loserName:string;reason:string;betAmount:number;
@@ -696,6 +744,8 @@ export default function ChessGame(){
   const epRef=useRef(ep);const statusRef=useRef(status);
   const channelRef=useRef<ReturnType<typeof supabase.channel>|null>(null);
   const lastSeqRef=useRef<Record<string,number>>({});
+  const[rematchPhase,setRematchPhase]=useState<RematchPhase>("idle");
+  const[rematchRequester,setRematchRequester]=useState("");
 
   useEffect(()=>{boardRef.current=board;},[board]);
   useEffect(()=>{turnRef.current=turn;},[turn]);
@@ -823,6 +873,27 @@ export default function ChessGame(){
       setWinReason(`${opponentName} desistiu da partida!`);
       setStatus("checkmate");
     });
+
+    ch.on("broadcast",{event:"rematch_request"},({payload})=>{
+      setRematchRequester((payload.name as string)??opponentName);
+      setRematchPhase("received");
+    });
+
+    ch.on("broadcast",{event:"rematch_response"},async({payload})=>{
+      if(payload.accepted){
+        if(BET>0&&profile?.id){
+          const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
+          if(data)await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
+        }
+        setRematchPhase("idle");
+        resetGame();
+      }else if((payload.reason as string)==="no_balance"){
+        setRematchPhase("opp_no_balance");
+      }else{
+        setRematchPhase("declined");
+      }
+    });
+
     ch.subscribe();
     return()=>{supabase.removeChannel(ch);};
   },[gameId,applyMoveToState]);
@@ -850,6 +921,33 @@ export default function ChessGame(){
       channelRef.current?.send({type:"broadcast",event:"chess_forfeit",payload:{player:myColor}});
     }
     setLocation("/");
+  }
+
+  async function handleReplay(){
+    if(gameId==="local"||BET===0){resetGame();return;}
+    setRematchPhase("checking");
+    const{data}=await supabase.from("profiles").select("balance").eq("id",profile!.id).single();
+    if(!data||parseFloat(String(data.balance))<BET){setRematchPhase("no_balance");return;}
+    setRematchPhase("waiting");
+    channelRef.current?.send({type:"broadcast",event:"rematch_request",payload:{name:playerName.split(" ")[0]}});
+  }
+
+  async function handleRematchAccept(){
+    if(!profile?.id)return;
+    const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
+    if(!data||parseFloat(String(data.balance))<BET){
+      channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:false,reason:"no_balance"}});
+      setRematchPhase("idle");return;
+    }
+    if(BET>0)await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
+    channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:true}});
+    setRematchPhase("idle");
+    resetGame();
+  }
+
+  function handleRematchDecline(){
+    channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:false,reason:"declined"}});
+    setRematchPhase("idle");
   }
 
   const oppTimer=timers[opponentColor];
@@ -965,8 +1063,21 @@ export default function ChessGame(){
             reason={winReason}
             betAmount={BET}
             isWinner={!!(winner&&winner===myColor)}
-            onReplay={resetGame}
+            onReplay={handleReplay}
             onQuit={()=>setLocation("/")}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Rematch overlay */}
+      <AnimatePresence>
+        {rematchPhase!=="idle"&&(
+          <RematchOverlay
+            phase={rematchPhase}
+            requesterName={rematchRequester||opponentName}
+            onAccept={handleRematchAccept}
+            onDecline={handleRematchDecline}
+            onClose={()=>setRematchPhase("idle")}
           />
         )}
       </AnimatePresence>

@@ -1,3 +1,4 @@
 - [Auth system](auth-system.md) — NOW Supabase auth (NOT Express session); OTP flow for signup+recovery; balance is numeric in Supabase profiles table
 - [Supabase Node.js quirk](supabase-node-quirk.md) — Node.js 20 needs `ws` package passed as realtime transport in createClient; also remove express-session when switching to JWT
 - [Realtime Ludo architecture](realtime-ludo.md) — Supabase Broadcast for game sync; Presence for matchmaking; myColor from URL params; no AI bot; each player only rolls/selects their own color
+- [DamasGame finalizeTurn contract](damas-finalizeTurn.md) — finalBoard passed to finalizeTurn must already have move applied; callers are responsible for calling applyBoardMove before passing

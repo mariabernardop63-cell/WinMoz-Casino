@@ -133,10 +133,10 @@ function getSelectablePieces(b: Board, color: PColor): { sq: Sq; depth: number }
 }
 
 // ─── Timer Arc ────────────────────────────────────────────────────────────────
-function TimerArc({ val, total=60, size=28 }: { val: number; total?: number; size?: number }) {
+function TimerArc({ val, total=30, size=28 }: { val: number; total?: number; size?: number }) {
   const r = (size - 4) / 2, circ = 2 * Math.PI * r;
   const fill = val / total;
-  const col = val > 20 ? "#4ade80" : val > 10 ? "#fbbf24" : "#ef4444";
+  const col = val > 10 ? "#4ade80" : val > 5 ? "#fbbf24" : "#ef4444";
   return (
     <div style={{ position:"relative", width:size, height:size, flexShrink:0 }}>
       <svg width={size} height={size} style={{ transform:"rotate(-90deg)", display:"block" }}>
@@ -192,26 +192,63 @@ function PlayerCard({ color, name, balance, isMe, isActive, piecesLeft, damesLef
         </div>
         <div style={{ display:"flex", alignItems:"center", gap:5 }}>
           <span style={{ fontSize:10, color:"rgba(0,0,0,0.35)", fontWeight:600 }}>{balance}</span>
-          <span style={{ fontSize:9, color:"rgba(0,0,0,0.3)" }}>·</span>
-          <div style={{ display:"flex", gap:2 }}>
-            {Array.from({length:5}).map((_,i) => (
-              <div key={i} style={{
-                width:5, height:5, borderRadius:"50%",
-                background: i < lives ? "#22C55E" : "#EF4444",
-                transition:"background 0.25s",
-              }}/>
-            ))}
-          </div>
-          <span style={{ fontSize:9, color:"rgba(0,0,0,0.3)" }}>·</span>
           <span style={{ fontSize:10, color: isActive ? accentColor : "#94A3B8", fontWeight:700 }}>
             {piecesLeft} peças{damesLeft > 0 ? ` (${damesLeft} 👑)` : ""}
           </span>
         </div>
       </div>
       <div style={{ padding:"0 10px 0 4px", display:"flex", alignItems:"center", gap:6 }}>
-        {isMe && isActive ? <TimerArc val={timeLeft}/> : <div style={{ width:28 }}/>}
+        {isActive ? <TimerArc val={timeLeft}/> : <div style={{ width:28 }}/>}
       </div>
     </div>
+  );
+}
+
+// ─── Rematch types & overlay ──────────────────────────────────────────────────
+type RematchPhase = "idle"|"checking"|"no_balance"|"waiting"|"received"|"declined"|"opp_no_balance";
+
+function RematchOverlay({ phase, requesterName, onAccept, onDecline, onClose }: {
+  phase: RematchPhase; requesterName: string;
+  onAccept: () => void; onDecline: () => void; onClose: () => void;
+}) {
+  const msgs: Record<RematchPhase, { title: string; body: string; actions?: "accept_decline"|"close" }> = {
+    idle:          { title:"", body:"" },
+    checking:      { title:"A verificar saldo…", body:"Por favor aguarda.", actions:"close" },
+    no_balance:    { title:"Saldo insuficiente", body:`Precisas de pelo menos ${0} MT para rever o desafio.`, actions:"close" },
+    waiting:       { title:"Desafio enviado!", body:`Aguardando resposta de ${requesterName}…`, actions:"close" },
+    received:      { title:`${requesterName} quer revanche!`, body:"Aceitas o desafio?", actions:"accept_decline" },
+    declined:      { title:"Desafio recusado", body:`${requesterName} recusou a revanche.`, actions:"close" },
+    opp_no_balance:{ title:"Adversário sem saldo", body:`${requesterName} não tem saldo suficiente.`, actions:"close" },
+  };
+  const m = msgs[phase];
+  return (
+    <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.82)", zIndex:60,
+        display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(10px)" }}>
+      <motion.div initial={{ scale:0.85, y:20 }} animate={{ scale:1, y:0 }}
+        transition={{ type:"spring", stiffness:280, damping:22 }}
+        style={{ width:"82%", maxWidth:300, background:"rgba(18,28,18,0.98)",
+          border:"1px solid rgba(255,255,255,0.1)", borderRadius:24, padding:"28px 22px 22px",
+          boxShadow:"0 24px 60px rgba(0,0,0,0.6)", textAlign:"center" }}>
+        <p style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:18,
+          color:"#E8F0FF", marginBottom:8 }}>{m.title}</p>
+        <p style={{ fontSize:12, color:"rgba(255,255,255,0.5)", marginBottom:20, lineHeight:1.5 }}>{m.body}</p>
+        {m.actions === "accept_decline" ? (
+          <div style={{ display:"flex", gap:10 }}>
+            <button onClick={onDecline} style={{ flex:1, padding:"12px 0", borderRadius:12,
+              background:"rgba(239,68,68,0.12)", border:"1px solid rgba(239,68,68,0.3)",
+              color:"#EF4444", fontWeight:700, fontSize:13, cursor:"pointer" }}>Recusar</button>
+            <button onClick={onAccept} style={{ flex:1, padding:"12px 0", borderRadius:12,
+              background:"linear-gradient(135deg,#22C55E,#16A34A)", border:"none",
+              color:"#fff", fontWeight:700, fontSize:13, cursor:"pointer" }}>Aceitar</button>
+          </div>
+        ) : (
+          <button onClick={onClose} style={{ width:"100%", padding:"12px 0", borderRadius:12,
+            background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)",
+            color:"rgba(255,255,255,0.7)", fontWeight:700, fontSize:13, cursor:"pointer" }}>Fechar</button>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -383,7 +420,7 @@ export default function DamasGame() {
   const [allCaptured, setAllCaptured] = useState<Sq[]>([]);
   const [winner, setWinner]         = useState<PColor | null>(null);
   const [winReason, setWinReason]   = useState("");
-  const [timers, setTimers]         = useState<Record<PColor, number>>({ w:60, b:60 });
+  const [timers, setTimers]         = useState<Record<PColor, number>>({ w:30, b:30 });
   const [lastMove, setLastMove]     = useState<{ from:Sq; to:Sq } | null>(null);
   const [selectableKeys, setSelectableKeys] = useState<Set<string>>(new Set());
   const [lives, setLives]           = useState<Record<PColor, number>>({ w:5, b:5 });
@@ -393,6 +430,11 @@ export default function DamasGame() {
   const turnRef  = useRef(turn);
   const winnerRef = useRef(winner);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const [opponentBal, setOpponentBal] = useState("—");
+  const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
+  const [rematchRequester, setRematchRequester] = useState("");
+  const [wrongClickSq, setWrongClickSq] = useState<string | null>(null);
+  const wrongClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { boardRef.current = board; }, [board]);
   useEffect(() => { turnRef.current = turn; }, [turn]);
@@ -402,7 +444,7 @@ export default function DamasGame() {
   // Compute selectable pieces when board/turn changes
   useEffect(() => {
     if (winner) return;
-    const selectable = getSelectablePieces(boardRef.current, turn);
+    const selectable = getSelectablePieces(board, turn);
     const keys = new Set(selectable.map(x => sqKey(x.sq[0], x.sq[1])));
     setSelectableKeys(keys);
     if (selectable.length === 0 && !winner) {
@@ -411,30 +453,37 @@ export default function DamasGame() {
     }
   }, [board, turn, winner]);
 
+  // ── Timer expiry handler ref (always fresh, avoids stale closure) ────────────
+  const timerExpiryRef = useRef<() => void>(() => {});
+  timerExpiryRef.current = () => {
+    const remaining = livesRef.current[myColor] - 1;
+    if (remaining <= 0) {
+      setLives(prev => ({ ...prev, [myColor]: 0 }));
+      setWinner(oppColor);
+      setWinReason(`${playerName.split(" ")[0]} perdeu todas as vidas`);
+      setTimers(prev => ({ ...prev, [myColor]: 0 }));
+    } else {
+      setLives(prev => ({ ...prev, [myColor]: remaining }));
+      setTimers(prev => ({ ...prev, [myColor]: 30 }));
+    }
+  };
+
   // ── Timers ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (winner || turn !== myColor || chainPiece) return;
     const tick = setInterval(() => {
-      setTimers(t => {
-        const nv = t[myColor] - 1;
+      setTimers(prev => {
+        const nv = prev[myColor] - 1;
         if (nv <= 0) {
-          clearInterval(tick);
-          const remaining = livesRef.current[myColor] - 1;
-          if (remaining <= 0) {
-            setLives(prev => ({ ...prev, [myColor]: 0 }));
-            setWinner(oppColor);
-            setWinReason(`${playerName.split(" ")[0]} perdeu todas as vidas`);
-            return { ...t, [myColor]: 0 };
-          }
-          setLives(prev => ({ ...prev, [myColor]: remaining }));
-          return { ...t, [myColor]: 60 };
+          setTimeout(() => timerExpiryRef.current(), 0);
+          return { ...prev, [myColor]: 0 };
         }
-        return { ...t, [myColor]: nv };
+        return { ...prev, [myColor]: nv };
       });
     }, 1000);
     return () => clearInterval(tick);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turn, winner, chainPiece, lives]);
+  }, [turn, winner, chainPiece]);
 
   // ── Apply remote move ─────────────────────────────────────────────────────
   const applyRemoteMove = useCallback((from: Sq, to: Sq, captured: Sq[], nextTurn: PColor) => {
@@ -451,7 +500,7 @@ export default function DamasGame() {
     setSelected(null); setValidDests([]); setValidCapDests([]);
     setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
     setTurn(nextTurn);
-    setTimers(t => ({ ...t, [nextTurn]: 60 }));
+    setTimers(t => ({ ...t, [nextTurn]: 30 }));
   }, []);
 
   // ── Supabase Realtime ─────────────────────────────────────────────────────
@@ -474,9 +523,38 @@ export default function DamasGame() {
       setWinReason(`${opponentName} desistiu da partida!`);
     });
 
+    ch.on("broadcast", { event: "rematch_request" }, ({ payload }) => {
+      setRematchRequester((payload.name as string) ?? opponentName);
+      setRematchPhase("received");
+    });
+
+    ch.on("broadcast", { event: "rematch_response" }, async ({ payload }) => {
+      if (payload.accepted) {
+        if (BET > 0 && profile?.id) {
+          const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+          if (data) await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
+        }
+        setRematchPhase("idle");
+        resetGame();
+      } else if ((payload.reason as string) === "no_balance") {
+        setRematchPhase("opp_no_balance");
+      } else {
+        setRematchPhase("declined");
+      }
+    });
+
+    ch.on("presence", { event: "sync" }, () => {
+      const state = ch.presenceState<{ color: string; balance?: string }>();
+      for (const presences of Object.values(state)) {
+        for (const p of presences as Array<{ color: string; balance?: string }>) {
+          if (p.color !== myColor && p.balance) setOpponentBal(p.balance);
+        }
+      }
+    });
+
     ch.subscribe(async (status) => {
       if (status === "SUBSCRIBED" && profile?.id) {
-        await ch.track({ userId: profile.id, color: myColor });
+        await ch.track({ userId: profile.id, color: myColor, balance: playerBal });
       }
     });
 
@@ -493,10 +571,10 @@ export default function DamasGame() {
   }
 
   // ── Execute a complete move (end of chain or non-capture) ─────────────────
-  function finalizeTurn(from: Sq, to: Sq, captured: Sq[], currentBoard: Board) {
-    const nb = applyBoardMove(currentBoard, from, to, captured);
-    const cnt = countPieces(nb, turn);
-    setBoard(nb);
+  // finalBoard must already have the move applied (piece at `to`, captures removed)
+  function finalizeTurn(from: Sq, to: Sq, captured: Sq[], finalBoard: Board) {
+    const cnt = countPieces(finalBoard, turn);
+    setBoard(finalBoard); boardRef.current = finalBoard;
     setLastMove({ from, to });
     setSelected(null); setValidDests([]); setValidCapDests([]);
     setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
@@ -508,7 +586,7 @@ export default function DamasGame() {
     }
     const nextTurn = opp(turn);
     setTurn(nextTurn);
-    setTimers(t => ({ ...t, [nextTurn]: 60 }));
+    setTimers(t => ({ ...t, [nextTurn]: 30 }));
     broadcastMove(from, to, captured, nextTurn);
   }
 
@@ -566,7 +644,8 @@ export default function DamasGame() {
         return;
       }
       if (validDests.some(d => d[0] === r && d[1] === c)) {
-        finalizeTurn(selected, [r, c], [], boardRef.current);
+        const nb = applyBoardMove(boardRef.current, selected, [r, c], []);
+        finalizeTurn(selected, [r, c], [], nb);
         return;
       }
     }
@@ -580,6 +659,10 @@ export default function DamasGame() {
       } else {
         setValidCapDests([]); setValidDests(getNonCaptures(boardRef.current, r, c));
       }
+    } else if (clickedPiece?.color === myColor && !selectableKeys.has(sqKey(r, c))) {
+      if (wrongClickTimerRef.current) clearTimeout(wrongClickTimerRef.current);
+      setWrongClickSq(sqKey(r, c));
+      wrongClickTimerRef.current = setTimeout(() => setWrongClickSq(null), 600);
     }
   }
 
@@ -599,13 +682,40 @@ export default function DamasGame() {
     setLocation("/");
   }
 
+  async function handleReplay() {
+    if (gameId === "local" || BET === 0) { resetGame(); return; }
+    setRematchPhase("checking");
+    const { data } = await supabase.from("profiles").select("balance").eq("id", profile!.id).single();
+    if (!data || parseFloat(String(data.balance)) < BET) { setRematchPhase("no_balance"); return; }
+    setRematchPhase("waiting");
+    channelRef.current?.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0] } });
+  }
+
+  async function handleRematchAccept() {
+    if (!profile?.id) return;
+    const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+    if (!data || parseFloat(String(data.balance)) < BET) {
+      channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } });
+      setRematchPhase("idle"); return;
+    }
+    if (BET > 0) await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
+    channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
+    setRematchPhase("idle");
+    resetGame();
+  }
+
+  function handleRematchDecline() {
+    channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"declined" } });
+    setRematchPhase("idle");
+  }
+
   function resetGame() {
     const nb = makeInitialBoard();
     setBoard(nb); boardRef.current = nb;
     setTurn("w"); setSelected(null); setValidDests([]); setValidCapDests([]);
     setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
     setWinner(null); setWinReason(""); setLastMove(null);
-    setTimers({ w:60, b:60 });
+    setTimers({ w:30, b:30 });
     setLives({ w:5, b:5 });
   }
 
@@ -664,7 +774,7 @@ export default function DamasGame() {
         {/* Opponent panel */}
         <div style={{ padding:"6px 10px 4px", flexShrink:0 }}>
           <PlayerCard
-            color={oppColor} name={opponentName} balance="—" isMe={false}
+            color={oppColor} name={opponentName} balance={opponentBal} isMe={false}
             isActive={turn === oppColor && !winner}
             piecesLeft={oppPieces} damesLeft={oppDames}
             timeLeft={timers[oppColor]} lives={lives[oppColor]}
@@ -692,6 +802,7 @@ export default function DamasGame() {
                   const isLastFrom = lastMove?.from[0] === boardRow && lastMove?.from[1] === boardCol;
                   const isLastTo   = lastMove?.to[0]   === boardRow && lastMove?.to[1]   === boardCol;
                   const isSelectable = !selected && !chainPiece && selectableKeys.has(sqKey(boardRow, boardCol));
+                  const isWrongClick = wrongClickSq === sqKey(boardRow, boardCol);
                   const bg = light
                     ? (isLastFrom || isLastTo ? "#2A2A2A" : "#111111")
                     : (isLastFrom || isLastTo ? "#B8892A" : "#D4A017");
@@ -702,7 +813,8 @@ export default function DamasGame() {
                       style={{
                         background: bg,
                         position:"relative", cursor: light ? "pointer" : "default",
-                        boxShadow: (isSel || isChain) ? "inset 0 0 0 3px #FFD700" :
+                        boxShadow: isWrongClick ? "inset 0 0 0 3px #EF4444" :
+                          (isSel || isChain) ? "inset 0 0 0 3px #FFD700" :
                           isLastTo ? "inset 0 0 0 2px #D4A35A88" : "none",
                         transition:"box-shadow 0.15s",
                       }}>
@@ -788,8 +900,21 @@ export default function DamasGame() {
             winnerName={winner === myColor ? playerName : opponentName}
             loserName={winner === myColor ? opponentName : playerName}
             betAmount={BET}
-            onReplay={resetGame}
+            onReplay={handleReplay}
             onQuit={() => setLocation("/")}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Rematch overlay */}
+      <AnimatePresence>
+        {rematchPhase !== "idle" && (
+          <RematchOverlay
+            phase={rematchPhase}
+            requesterName={rematchRequester || opponentName}
+            onAccept={handleRematchAccept}
+            onDecline={handleRematchDecline}
+            onClose={() => setRematchPhase("idle")}
           />
         )}
       </AnimatePresence>

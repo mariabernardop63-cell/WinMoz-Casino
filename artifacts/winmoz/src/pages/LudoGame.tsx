@@ -673,17 +673,6 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
             transition:"color 0.3s",
           }}>{balance}</span>
           <div style={{ width:1, height:10, background:"#E2E8F0", flexShrink:0 }}/>
-          {/* Lives */}
-          <div style={{ display:"flex", alignItems:"center", gap:2.5 }}>
-            {Array.from({length:5}).map((_,i)=>(
-              <div key={i} style={{
-                width:5, height:5, borderRadius:"50%",
-                background: i<lives ? "#22C55E" : "#EF4444",
-                transition:"all 0.25s",
-              }}/>
-            ))}
-          </div>
-          <div style={{ width:1, height:10, background:"#E2E8F0", flexShrink:0 }}/>
           {/* Finished pieces */}
           <div style={{ display:"flex", alignItems:"center", gap:2.5 }}>
             {Array.from({length:4}).map((_,i)=>(
@@ -705,7 +694,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
         display:"flex", alignItems:"center", gap:6,
         padding:"0 10px 0 4px", flexShrink:0,
       }}>
-        {isMe && isActive
+        {isActive
           ? <TimerArc timeLeft={timeLeft} size={24}/>
           : <div style={{ width:24 }}/>
         }
@@ -724,6 +713,121 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
         </div>
       </div>
     </div>
+  );
+}
+
+// ─── Rematch Overlay ───────────────────────────────────────────────────────────
+type RematchPhase = "idle"|"checking"|"no_balance"|"waiting"|"received"|"declined"|"opp_no_balance";
+
+function RematchOverlay({ phase, requesterName, onAccept, onDecline, onClose }:{
+  phase: Exclude<RematchPhase,"idle">;
+  requesterName: string;
+  onAccept: ()=>void;
+  onDecline: ()=>void;
+  onClose: ()=>void;
+}) {
+  const loading = phase==="checking"||phase==="waiting";
+  return (
+    <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+      style={{position:"fixed",inset:0,zIndex:200,background:"rgba(0,0,0,0.93)",
+        backdropFilter:"blur(18px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <motion.div initial={{scale:0.7,opacity:0,y:30}} animate={{scale:1,opacity:1,y:0}}
+        transition={{type:"spring",stiffness:220,damping:22}}
+        style={{width:"88%",maxWidth:290,borderRadius:24,overflow:"hidden",
+          background:"linear-gradient(145deg,#0D1A2A,#0A1420)",
+          border:"1px solid rgba(255,255,255,0.1)",
+          boxShadow:"0 32px 80px rgba(0,0,0,0.75)"}}>
+        <div style={{padding:"28px 22px 24px",textAlign:"center"}}>
+          {loading&&(
+            <>
+              <motion.div animate={{rotate:360}} transition={{duration:1,repeat:Infinity,ease:"linear"}}
+                style={{width:40,height:40,borderRadius:"50%",border:"3px solid rgba(255,255,255,0.1)",
+                  borderTopColor:"#D4A35A",margin:"0 auto 16px"}}/>
+              <p style={{fontSize:14,fontWeight:700,color:"rgba(255,255,255,0.8)"}}>
+                {phase==="checking"?"A verificar saldo…":"A aguardar resposta…"}
+              </p>
+              {phase==="waiting"&&<p style={{fontSize:11,color:"rgba(255,255,255,0.35)",marginTop:6}}>
+                Pedido de revanche enviado.
+              </p>}
+            </>
+          )}
+          {phase==="no_balance"&&(
+            <>
+              <div style={{width:52,height:52,borderRadius:16,background:"rgba(239,68,68,0.12)",
+                border:"1px solid rgba(239,68,68,0.25)",display:"flex",alignItems:"center",
+                justifyContent:"center",margin:"0 auto 14px"}}>
+                <svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="#EF4444" strokeWidth="1.8"/>
+                  <path d="M12 8v4M12 16h.01" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <p style={{fontSize:16,fontWeight:800,color:"#EF4444",marginBottom:6}}>Saldo Insuficiente</p>
+              <p style={{fontSize:12,color:"rgba(255,255,255,0.45)",marginBottom:20}}>
+                Não tens saldo suficiente para a revanche.
+              </p>
+              <button onClick={onClose} style={{width:"100%",padding:"13px",borderRadius:14,
+                background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",
+                color:"rgba(255,255,255,0.65)",fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                Fechar
+              </button>
+            </>
+          )}
+          {phase==="received"&&(
+            <>
+              <div style={{width:52,height:52,borderRadius:16,background:"rgba(255,215,0,0.1)",
+                border:"1px solid rgba(255,215,0,0.22)",display:"flex",alignItems:"center",
+                justifyContent:"center",margin:"0 auto 14px"}}>
+                <svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+                  <path d="M1 4v6h6M23 20v-6h-6" stroke="#FFD700" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" stroke="#FFD700" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <p style={{fontSize:16,fontWeight:800,color:"#FFD700",marginBottom:6}}>Revanche!</p>
+              <p style={{fontSize:13,color:"rgba(255,255,255,0.55)",marginBottom:20}}>
+                <strong style={{color:"rgba(255,255,255,0.85)"}}>{requesterName}</strong> quer jogar novamente.
+              </p>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={onAccept} style={{flex:1,padding:"13px",borderRadius:14,
+                  background:"linear-gradient(135deg,#22C55E,#16A34A)",border:"none",
+                  color:"#fff",fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                  Aceitar
+                </button>
+                <button onClick={onDecline} style={{flex:1,padding:"13px",borderRadius:14,
+                  background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.28)",
+                  color:"#EF4444",fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                  Recusar
+                </button>
+              </div>
+            </>
+          )}
+          {(phase==="declined"||phase==="opp_no_balance")&&(
+            <>
+              <div style={{width:52,height:52,borderRadius:16,background:"rgba(239,68,68,0.1)",
+                border:"1px solid rgba(239,68,68,0.2)",display:"flex",alignItems:"center",
+                justifyContent:"center",margin:"0 auto 14px"}}>
+                <svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="#EF4444" strokeWidth="1.8"/>
+                  <path d="M15 9l-6 6M9 9l6 6" stroke="#EF4444" strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <p style={{fontSize:15,fontWeight:800,color:"rgba(255,255,255,0.8)",marginBottom:6}}>
+                {phase==="declined"?"Revanche Recusada":"Sem Saldo"}
+              </p>
+              <p style={{fontSize:12,color:"rgba(255,255,255,0.4)",marginBottom:20}}>
+                {phase==="declined"
+                  ?`${requesterName} recusou a revanche.`
+                  :`${requesterName} não tem saldo suficiente.`}
+              </p>
+              <button onClick={onClose} style={{width:"100%",padding:"13px",borderRadius:14,
+                background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",
+                color:"rgba(255,255,255,0.65)",fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                Fechar
+              </button>
+            </>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -962,6 +1066,8 @@ export default function LudoGame() {
     : "0 MT";
   const opponentName = oppFromUrl ? decodeURIComponent(oppFromUrl) : "Adversário";
   const [opponentBal, setOpponentBal] = useState("—");
+  const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
+  const [rematchRequester, setRematchRequester] = useState("");
 
   // ── State ──────────────────────────────────────────────────────────────────────
   const initialPieces=():GamePiece[]=>([
@@ -987,8 +1093,7 @@ export default function LudoGame() {
   // stuckTurns: how many consecutive turns each player had ALL pieces in base
   // and did NOT roll a 6 (triggers Rule 1 anti-frustration)
   const [stuckTurns,setStuckTurns] = useState<Record<Player,number>>({blue:0,green:0});
-  // consecutiveSixes: how many 6s rolled in the current turn (resets on turn change)
-  const [consecutiveSixes,setConsecutiveSixes] = useState(0);
+  // consecutiveSixes: tracked directly via ref (no state to avoid async timing bug)
   const stuckTurnsRef       = useRef<Record<Player,number>>({blue:0,green:0});
   const consecutiveSixesRef = useRef(0);
   // eventSeqRef: tracks last processed event sequence to discard duplicates
@@ -1006,6 +1111,7 @@ export default function LudoGame() {
   const turnRef      = useRef(turn);
   const winnerRef    = useRef(winner);
   const channelRef   = useRef<ReturnType<typeof supabase.channel>|null>(null);
+  const captureAnimRef = useRef(false);
 
   useEffect(()=>{piecesRef.current=pieces;},[pieces]);
   useEffect(()=>{phaseRef.current=phase;},[phase]);
@@ -1015,7 +1121,6 @@ export default function LudoGame() {
   useEffect(()=>{turnRef.current=turn;},[turn]);
   useEffect(()=>{winnerRef.current=winner;},[winner]);
   useEffect(()=>{stuckTurnsRef.current=stuckTurns;},[stuckTurns]);
-  useEffect(()=>{consecutiveSixesRef.current=consecutiveSixes;},[consecutiveSixes]);
 
   const other=(p:Player):Player=>p==="blue"?"green":"blue";
 
@@ -1057,12 +1162,14 @@ export default function LudoGame() {
         const [pr,pc]=getPieceCoord(p);
         if(pr===mr&&pc===mc && !SAFE_COORDS.has(`${pr},${pc}`)){
           captured = true;
+          captureAnimRef.current = true;
           const capturerName=mover.player===myColor?playerName.split(" ")[0]:opponentName;
           setMsg(`${capturerName} capturou uma peça! +1 jogada`);
           let pos=p.pos;
           function stepBack(){
             setPieces(prev=>prev.map(x=>x.id!==p.id?x:{...x,pos:Math.max(-1,pos)}));
             if(pos>-1){pos--;setTimeout(stepBack,70);}
+            else { captureAnimRef.current=false; }
           }
           stepBack();
         }
@@ -1098,7 +1205,7 @@ export default function LudoGame() {
       }
       setMovable([]);
       // Reset consecutiveSixes when turn changes
-      setConsecutiveSixes(0);
+      consecutiveSixesRef.current=0;
       setTimeout(()=>{
         setTurn(next); setPhase("roll");
         if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
@@ -1131,9 +1238,9 @@ export default function LudoGame() {
     setTimeout(()=>{
       setD(val); setR(false);
 
-      // Track consecutive sixes (Rule 4)
+      // Track consecutive sixes (Rule 4) — update ref synchronously to avoid timing bugs
       if(val===6){
-        setConsecutiveSixes(prev=>prev+1);
+        consecutiveSixesRef.current++;
       } else {
         // Non-six rolled: update stuckTurns if all pieces still in base
         const allInBase = piecesRef.current.filter(p=>p.player===pl).every(p=>p.pos===-1);
@@ -1148,7 +1255,7 @@ export default function LudoGame() {
       // Rule 4: if this was a forced-non-6 (third six), skip turn automatically
       if(val!==6 && consecutiveSixesRef.current>=2){
         setMsg(`${plName} — terceiro 6 bloqueado! Vez do adversário.`);
-        setConsecutiveSixes(0);
+        consecutiveSixesRef.current=0;
         setTimeout(()=>{
           const next=other(pl); setTurn(next); setPhase("roll");
           if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
@@ -1161,8 +1268,7 @@ export default function LudoGame() {
         setMsg(val===6
           ?`${plName} — 6 mas sem movimento!`
           :`${plName} — ${val} sem jogadas.`);
-        // Reset consecutiveSixes when turn passes
-        setConsecutiveSixes(0);
+        consecutiveSixesRef.current=0;
         // Also increment stuckTurns if all still in base (6 with no exit = unusual but possible)
         setTimeout(()=>{
           const next=other(pl); setTurn(next); setPhase("roll");
@@ -1182,7 +1288,7 @@ export default function LudoGame() {
 
   // ── Roll my color dice — uses weighted algorithm + broadcasts ───────────────
   const doRoll=useCallback(()=>{
-    if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current) return;
+    if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current||captureAnimRef.current) return;
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
     const oppPieces = piecesRef.current.filter(p=>p.player!==myColor);
@@ -1267,6 +1373,28 @@ export default function LudoGame() {
       setMsg(`${opponentName} desistiu! Tu venceste!`);
     });
 
+    channel.on("broadcast",{ event:"rematch_request" },({ payload })=>{
+      setRematchRequester((payload.name as string) ?? opponentName);
+      setRematchPhase("received");
+    });
+
+    channel.on("broadcast",{ event:"rematch_response" },async({ payload })=>{
+      if(payload.accepted){
+        if(BET_AMOUNT > 0 && profile?.id){
+          const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+          if(data){
+            await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET_AMOUNT }).eq("id", profile.id);
+          }
+        }
+        setRematchPhase("idle");
+        resetGame();
+      } else if((payload.reason as string)==="no_balance"){
+        setRematchPhase("opp_no_balance");
+      } else {
+        setRematchPhase("declined");
+      }
+    });
+
     channel.on("presence",{ event:"sync" },()=>{
       const state = channel.presenceState<{ color:string; balance?:string }>();
       for(const presences of Object.values(state)){
@@ -1326,7 +1454,7 @@ export default function LudoGame() {
     setPieces(initialPieces()); setTurn("blue"); setPhase("roll");
     setDiceBlue(null); setDiceGreen(null); setRollingB(false); setRollingG(false);
     setMovable([]); setWinner(null); setLives({blue:5,green:5}); setTimeLeft(30);
-    setStuckTurns({blue:0,green:0}); setConsecutiveSixes(0);
+    setStuckTurns({blue:0,green:0}); consecutiveSixesRef.current=0;
     lastEventSeqRef.current = {};
     setMsg(myColor==="blue"?myTurnMsg:oppTurnMsg);
   }
@@ -1345,6 +1473,37 @@ export default function LudoGame() {
       channelRef.current?.send({type:"broadcast",event:"ludo_forfeit",payload:{player:myColor}});
     }
     setLocation("/");
+  }
+
+  async function handleReplay(){
+    if(gameId==="local"||BET_AMOUNT===0){ resetGame(); return; }
+    setRematchPhase("checking");
+    const { data } = await supabase.from("profiles").select("balance").eq("id", profile!.id).single();
+    if(!data || parseFloat(String(data.balance)) < BET_AMOUNT){
+      setRematchPhase("no_balance"); return;
+    }
+    setRematchPhase("waiting");
+    channelRef.current?.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0] } });
+  }
+
+  async function handleRematchAccept(){
+    if(!profile?.id) return;
+    const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+    if(!data || parseFloat(String(data.balance)) < BET_AMOUNT){
+      channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } });
+      setRematchPhase("idle"); return;
+    }
+    if(BET_AMOUNT > 0){
+      await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET_AMOUNT }).eq("id", profile.id);
+    }
+    channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
+    setRematchPhase("idle");
+    resetGame();
+  }
+
+  function handleRematchDecline(){
+    channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"declined" } });
+    setRematchPhase("idle");
   }
 
   const blueFinished  = finishedCount(pieces,"blue");
@@ -1512,8 +1671,21 @@ export default function LudoGame() {
             loserName={winner===myColor?opponentName:playerName}
             betAmount={BET_AMOUNT}
             isWinner={winner===myColor}
-            onReplay={resetGame}
+            onReplay={handleReplay}
             onQuit={()=>setLocation("/")}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* ── Rematch overlay */}
+      <AnimatePresence>
+        {rematchPhase!=="idle"&&(
+          <RematchOverlay
+            phase={rematchPhase}
+            requesterName={rematchRequester||opponentName}
+            onAccept={handleRematchAccept}
+            onDecline={handleRematchDecline}
+            onClose={()=>setRematchPhase("idle")}
           />
         )}
       </AnimatePresence>
