@@ -116,9 +116,9 @@ const SAFE_COORDS = new Set<string>([
   "13,6", "1,8",
 ]);
 
-// ─── Sizing — sphere pawn fits exactly in cell ─────────────────────────────────
-const PIECE_BOX  = 28;  // px — matches ~27px cell
-const PAWN_SIZE  = 22;  // px — sphere width = height (square)
+// ─── Sizing — pawn size (increased for visibility) ─────────────────────────────
+const PIECE_BOX  = 42;  // px
+const PAWN_SIZE  = 34;  // px
 
 // ─── getPieceCoord: stretch entered after pos 50 (arrow cell) ──────────────────
 function getPieceCoord(p: GamePiece): [number,number] {
@@ -175,24 +175,54 @@ function PinPawn({ color, size=PAWN_SIZE, glow=false }: {
   );
 }
 
-// ─── Selection ring — STATIC pulsing circle, centered on the square ────────────
-// NOT spinning/rotating — just a breathing glow ring around the pawn
+// ─── Selection highlight — dramatic bounce + glow when player must choose ───────
 function SelectionRing({ color }: { color: PawnColor }) {
   const p = PAWN_PAL[color];
+  const glowColor = p.m;
   return (
-    <motion.div
-      animate={{ scale:[1,1.08,1], opacity:[0.55,1,0.55] }}
-      transition={{ duration:1.1, repeat:Infinity, ease:"easeInOut" }}
-      style={{
-        position:"absolute",
-        inset: -3,          // ring is 3px larger than PIECE_BOX on each side
-        borderRadius:"50%",
-        border:`2.5px solid ${p.m}`,
-        boxShadow:`0 0 10px ${p.m}66, 0 0 18px ${p.m}22, inset 0 0 6px ${p.m}11`,
-        pointerEvents:"none",
-        zIndex:0,
-      }}
-    />
+    <>
+      {/* Outer pulsing halo */}
+      <motion.div
+        animate={{ scale:[1, 1.55, 1], opacity:[0, 0.7, 0] }}
+        transition={{ duration:0.9, repeat:Infinity, ease:"easeOut" }}
+        style={{
+          position:"absolute",
+          inset:-10,
+          borderRadius:"50%",
+          background:`radial-gradient(circle, ${glowColor}44 0%, transparent 70%)`,
+          pointerEvents:"none",
+          zIndex:0,
+        }}
+      />
+      {/* Spinning dashed ring */}
+      <motion.div
+        animate={{ rotate:360 }}
+        transition={{ duration:1.6, repeat:Infinity, ease:"linear" }}
+        style={{
+          position:"absolute",
+          inset:-5,
+          borderRadius:"50%",
+          border:`2.5px dashed ${glowColor}`,
+          boxShadow:`0 0 12px ${glowColor}99, 0 0 24px ${glowColor}44`,
+          pointerEvents:"none",
+          zIndex:0,
+        }}
+      />
+      {/* Inner solid ring */}
+      <motion.div
+        animate={{ scale:[1, 1.12, 1], opacity:[0.8, 1, 0.8] }}
+        transition={{ duration:0.7, repeat:Infinity, ease:"easeInOut" }}
+        style={{
+          position:"absolute",
+          inset:-2,
+          borderRadius:"50%",
+          border:`2px solid ${glowColor}`,
+          boxShadow:`0 0 8px ${glowColor}CC`,
+          pointerEvents:"none",
+          zIndex:0,
+        }}
+      />
+    </>
   );
 }
 
@@ -319,6 +349,9 @@ function BoardSVG({ pieces }:{ pieces:GamePiece[] }) {
 function Board({ pieces, movable, onSelectPiece }:{
   pieces:GamePiece[]; movable:PieceId[]; onSelectPiece:(id:PieceId)=>void;
 }) {
+  // Show selection effect only when player has a real choice (2+ movable pieces)
+  const mustChoose = movable.length >= 2;
+
   // Build cell map for stacking offsets (exclude home base and finished)
   const cellMap = new Map<string,GamePiece[]>();
   pieces.forEach(p=>{
@@ -365,6 +398,8 @@ function Board({ pieces, movable, onSelectPiece }:{
 
       {pieces.map(p=>{
         const selectable = movable.includes(p.id);
+        // Only show the highlight effect when there's a real choice to make
+        const showEffect = selectable && mustChoose;
         const color: PawnColor = p.player==="blue" ? "blue" : "green";
 
         // Finished pieces rendered separately below
@@ -375,26 +410,29 @@ function Board({ pieces, movable, onSelectPiece }:{
           const slotIdx = +p.id[1];
           const [svgX,svgY] = HOME_SVG_PX[p.player][slotIdx];
           return (
-            <div key={p.id}
+            <motion.div key={p.id}
               onClick={selectable?()=>onSelectPiece(p.id):undefined}
+              animate={showEffect ? { y:[0,-5,0] } : { y:0 }}
+              transition={showEffect ? { duration:0.65, repeat:Infinity, ease:"easeInOut" } : {}}
               style={{
                 position:"absolute",
                 width:PIECE_BOX, height:PIECE_BOX,
                 left:`${svgX/SZ*100}%`,
                 top:`${svgY/SZ*100}%`,
-                transform:"translate(-50%,-50%)",
+                translateX:"-50%",
+                translateY:"-50%",
                 zIndex:selectable?20:5,
                 cursor:selectable?"pointer":"default",
               }}>
-              {selectable && <SelectionRing color={color}/>}
+              {showEffect && <SelectionRing color={color}/>}
               <div style={{
                 position:"absolute", inset:0,
                 display:"flex", alignItems:"center", justifyContent:"center",
                 zIndex:2,
               }}>
-                <PinPawn color={color} size={PAWN_SIZE} glow={selectable}/>
+                <PinPawn color={color} size={PAWN_SIZE} glow={showEffect}/>
               </div>
-            </div>
+            </motion.div>
           );
         }
 
@@ -406,26 +444,29 @@ function Board({ pieces, movable, onSelectPiece }:{
         const [offX,offY]=here.length>1?(OFFSETS[idx]??[0,0]):[0,0];
 
         return (
-          <div key={p.id}
+          <motion.div key={p.id}
             onClick={selectable?()=>onSelectPiece(p.id):undefined}
+            animate={showEffect ? { y:[0,-5,0] } : { y:0 }}
+            transition={showEffect ? { duration:0.65, repeat:Infinity, ease:"easeInOut" } : {}}
             style={{
               position:"absolute",
               width:PIECE_BOX, height:PIECE_BOX,
               left:`${(c+0.5)/15*100}%`,
               top:`${(r+0.5)/15*100}%`,
-              transform:`translate(calc(-50% + ${offX}px), calc(-50% + ${offY}px))`,
+              translateX:`calc(-50% + ${offX}px)`,
+              translateY:`calc(-50% + ${offY}px)`,
               zIndex:selectable?20:10,
               cursor:selectable?"pointer":"default",
             }}>
-            {selectable && <SelectionRing color={color}/>}
+            {showEffect && <SelectionRing color={color}/>}
             <div style={{
               position:"absolute", inset:0,
               display:"flex", alignItems:"center", justifyContent:"center",
               zIndex:2,
             }}>
-              <PinPawn color={color} size={PAWN_SIZE} glow={selectable}/>
+              <PinPawn color={color} size={PAWN_SIZE} glow={showEffect}/>
             </div>
-          </div>
+          </motion.div>
         );
       })}
 
