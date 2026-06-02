@@ -117,8 +117,8 @@ const SAFE_COORDS = new Set<string>([
 ]);
 
 // ─── Sizing — pawn size (increased for visibility) ─────────────────────────────
-const PIECE_BOX  = 52;  // px
-const PAWN_SIZE  = 44;  // px
+const PIECE_BOX  = 38;  // px
+const PAWN_SIZE  = 30;  // px
 
 // ─── getPieceCoord: stretch entered after pos 50 (arrow cell) ──────────────────
 function getPieceCoord(p: GamePiece): [number,number] {
