@@ -70,7 +70,33 @@ async function ensureProfileExists(
       "ensureProfile"
     );
   } catch {
-    /* não crítico */
+    // Fallback: try direct Supabase upsert if API call fails
+    try {
+      const upsertData: Record<string, any> = { id: userId };
+      if (extraData?.full_name) upsertData.full_name = extraData.full_name;
+      if (extraData?.phone) upsertData.phone = extraData.phone.replace(/\D/g, "");
+      if (extraData?.invite_code_used !== undefined) upsertData.invite_code_used = extraData.invite_code_used;
+
+      // Check if profile exists first
+      const { data: existing } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", userId)
+        .single();
+
+      if (existing) {
+        // Update only non-null fields
+        const updates: Record<string, any> = {};
+        if (extraData?.full_name) updates.full_name = extraData.full_name;
+        if (extraData?.phone) updates.phone = extraData.phone.replace(/\D/g, "");
+        if (extraData?.invite_code_used !== undefined) updates.invite_code_used = extraData.invite_code_used;
+        if (Object.keys(updates).length > 0) {
+          await supabase.from("profiles").update(updates).eq("id", userId);
+        }
+      }
+    } catch {
+      /* silently ignore */
+    }
   }
 }
 
@@ -78,19 +104,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  // loadingRef prevents concurrent loadProfile calls — returns false if skipped so caller knows
   const loadingRef = useRef(false);
 
-  const loadProfile = async (userId: string, email: string) => {
-    // Prevent concurrent loadProfile calls
-    if (loadingRef.current) return;
+  // loadProfile: returns true if it actually ran (vs. was skipped by guard)
+  const loadProfile = async (userId: string, email: string): Promise<boolean> => {
+    if (loadingRef.current) return false;
     loadingRef.current = true;
     try {
       const data = await fetchProfileFromSupabase(userId);
       setProfile(data ? { ...data, email } : null);
       setUser({ id: userId, email });
+      return true;
     } catch {
       setProfile(null);
       setUser({ id: userId, email });
+      return true;
     } finally {
       loadingRef.current = false;
     }
@@ -101,6 +130,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await withTimeout(supabase.auth.getSession(), 8000, "getSession");
       const session = result.data.session;
       if (session?.user) {
+        // Force reload even if guard would block — reset it first
+        loadingRef.current = false;
         await loadProfile(session.user.id, session.user.email ?? "");
       }
     } catch {
@@ -126,14 +157,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!cancelled) setLoading(false);
     }, 12000);
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Initial session check
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (cancelled) return;
       if (session?.user) {
-        loadProfile(session.user.id, session.user.email ?? "").finally(() => {
-          if (!cancelled) setLoading(false);
-        });
+        const ran = await loadProfile(session.user.id, session.user.email ?? "");
+        // Only set loading=false if loadProfile actually ran (wasn't blocked by guard)
+        // If it was blocked, the onAuthStateChange handler is the one that will set it
+        if (!cancelled && ran) setLoading(false);
       } else {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }).catch(() => {
       if (!cancelled) setLoading(false);
@@ -147,23 +180,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userId = session.user.id;
           const email = session.user.email ?? "";
 
+          // Read and consume pendingReg (set by Registar.tsx before sign-up)
           const pendingRaw = sessionStorage.getItem("pendingReg");
           if (pendingRaw) {
             try {
               const pending = JSON.parse(pendingRaw);
+              sessionStorage.removeItem("pendingReg");
               await ensureProfileExists(userId, email, {
                 full_name: pending.full_name,
                 phone: pending.phone,
                 invite_code_used: pending.invite_code_used,
               });
-              sessionStorage.removeItem("pendingReg");
             } catch { /* não crítico */ }
           } else {
             await ensureProfileExists(userId, email);
           }
 
-          await loadProfile(userId, email);
-          if (!cancelled) setLoading(false);
+          const ran = await loadProfile(userId, email);
+          if (!cancelled && ran) setLoading(false);
 
         } else if (event === "SIGNED_OUT") {
           setUser(null);
@@ -171,7 +205,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (!cancelled) setLoading(false);
 
         } else if (event === "TOKEN_REFRESHED" && session?.user) {
+          // Just keep user in sync — no need to reload full profile
           setUser({ id: session.user.id, email: session.user.email ?? "" });
+        } else if (event === "INITIAL_SESSION" && session?.user) {
+          // Some Supabase versions fire INITIAL_SESSION instead of SIGNED_IN on restore
+          const userId = session.user.id;
+          const email = session.user.email ?? "";
+          const ran = await loadProfile(userId, email);
+          if (!cancelled && ran) setLoading(false);
+        } else if (event === "INITIAL_SESSION" && !session) {
+          if (!cancelled) setLoading(false);
         }
       }
     );

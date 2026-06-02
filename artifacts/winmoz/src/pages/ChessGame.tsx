@@ -744,6 +744,8 @@ export default function ChessGame(){
   const epRef=useRef(ep);const statusRef=useRef(status);
   const channelRef=useRef<ReturnType<typeof supabase.channel>|null>(null);
   const lastSeqRef=useRef<Record<string,number>>({});
+  const betDeductedRef=useRef(false);
+  const winCreditedRef=useRef(false);
   const[rematchPhase,setRematchPhase]=useState<RematchPhase>("idle");
   const[rematchRequester,setRematchRequester]=useState("");
 
@@ -751,6 +753,24 @@ export default function ChessGame(){
   useEffect(()=>{turnRef.current=turn;},[turn]);
   useEffect(()=>{epRef.current=ep;},[ep]);
   useEffect(()=>{statusRef.current=status;},[status]);
+
+  // Credit winner 83% of total pot when game ends
+  useEffect(()=>{
+    if(!winner||!profile?.id||BET<=0||gameId==="local"||winCreditedRef.current)return;
+    if(winner!==myColor)return;
+    winCreditedRef.current=true;
+    const payout=Math.floor(BET*2*0.83);
+    (async()=>{
+      try{
+        const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
+        if(data){
+          await supabase.from("profiles").update({balance:parseFloat(String(data.balance))+payout}).eq("id",profile.id);
+          await supabase.from("transactions").insert({user_id:profile.id,type:"win",amount:payout,description:`Vitória de jogo (Xadrez) +${payout} MT`,status:"approved"});
+        }
+      }catch{winCreditedRef.current=false;}
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[winner]);
 
   // ── Timer countdown ───────────────────────────────────────────────────────────
   useEffect(()=>{
@@ -894,11 +914,26 @@ export default function ChessGame(){
       }
     });
 
-    ch.subscribe();
+    ch.subscribe(async(status)=>{
+      if(status==="SUBSCRIBED"&&profile?.id){
+        if(BET>0&&!betDeductedRef.current){
+          betDeductedRef.current=true;
+          try{
+            const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
+            if(data){
+              await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
+              await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de jogo (Xadrez)",status:"approved"});
+            }
+          }catch{betDeductedRef.current=false;}
+        }
+      }
+    });
     return()=>{supabase.removeChannel(ch);};
   },[gameId,applyMoveToState]);
 
   function resetGame(){
+    betDeductedRef.current=false;
+    winCreditedRef.current=false;
     setBoard(makeInitialBoard());setTurn("w");setEp(null);
     setSelected(null);setLegalDests([]);setLastMove(null);
     setHistory([]);setCaptured({w:[],b:[]});setStatus("playing");

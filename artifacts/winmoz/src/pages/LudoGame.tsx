@@ -984,12 +984,12 @@ function WinScreen({ winner, winnerName, loserName, betAmount, isWinner, onRepla
                 <p style={{
                   fontSize:10, fontWeight:700, letterSpacing:1.5, textTransform:"uppercase",
                   color:"rgba(255,255,255,0.4)", marginBottom:4,
-                }}>GANHOS</p>
+                }}>GANHOS (83%)</p>
                 <p style={{
                   fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:24,
                   color:"#FFD700", lineHeight:1,
                 }}>
-                  +{betAmount.toLocaleString("pt-MZ")} <span style={{fontSize:13}}>MT</span>
+                  +{Math.floor(betAmount * 2 * 0.83).toLocaleString("pt-MZ")} <span style={{fontSize:13}}>MT</span>
                 </p>
               </div>
               <div style={{
@@ -1112,6 +1112,8 @@ export default function LudoGame() {
   const winnerRef    = useRef(winner);
   const channelRef   = useRef<ReturnType<typeof supabase.channel>|null>(null);
   const captureAnimRef = useRef(false);
+  const betDeductedRef = useRef(false);
+  const winCreditedRef = useRef(false);
 
   useEffect(()=>{piecesRef.current=pieces;},[pieces]);
   useEffect(()=>{phaseRef.current=phase;},[phase]);
@@ -1121,6 +1123,30 @@ export default function LudoGame() {
   useEffect(()=>{turnRef.current=turn;},[turn]);
   useEffect(()=>{winnerRef.current=winner;},[winner]);
   useEffect(()=>{stuckTurnsRef.current=stuckTurns;},[stuckTurns]);
+
+  // Credit winner 83% of total pot when game ends
+  useEffect(()=>{
+    if(!winner||!profile?.id||BET_AMOUNT<=0||gameId==="local"||winCreditedRef.current) return;
+    if(winner!==myColor) return;
+    winCreditedRef.current = true;
+    const payout = Math.floor(BET_AMOUNT * 2 * 0.83);
+    (async()=>{
+      try {
+        const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+        if(data){
+          await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) + payout }).eq("id", profile.id);
+          await supabase.from("transactions").insert({
+            user_id: profile.id,
+            type: "win",
+            amount: payout,
+            description: `Vitória de jogo (Ludo) +${payout} MT`,
+            status: "approved",
+          });
+        }
+      } catch { winCreditedRef.current = false; }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[winner]);
 
   const other=(p:Player):Player=>p==="blue"?"green":"blue";
 
@@ -1409,6 +1435,24 @@ export default function LudoGame() {
     channel.subscribe(async(status)=>{
       if(status==="SUBSCRIBED"&&profile?.id){
         await channel.track({ userId:profile.id, color:myColor, balance:playerBal });
+        // Deduct bet from balance when game starts (once per game)
+        if(BET_AMOUNT > 0 && !betDeductedRef.current){
+          betDeductedRef.current = true;
+          try {
+            const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+            if(data){
+              const newBal = parseFloat(String(data.balance)) - BET_AMOUNT;
+              await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
+              await supabase.from("transactions").insert({
+                user_id: profile.id,
+                type: "bet",
+                amount: -BET_AMOUNT,
+                description: "Aposta de jogo (Ludo)",
+                status: "approved",
+              });
+            }
+          } catch { betDeductedRef.current = false; }
+        }
       }
     });
 
@@ -1451,6 +1495,8 @@ export default function LudoGame() {
   },[turn,phase,winner,myColor]);
 
   function resetGame(){
+    betDeductedRef.current=false;
+    winCreditedRef.current=false;
     setPieces(initialPieces()); setTurn("blue"); setPhase("roll");
     setDiceBlue(null); setDiceGreen(null); setRollingB(false); setRollingG(false);
     setMovable([]); setWinner(null); setLives({blue:5,green:5}); setTimeLeft(30);

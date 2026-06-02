@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import {
   User, Eye, EyeOff,
   ArrowDownToLine, Plus, RefreshCw, MoreHorizontal,
   ArrowUpRight, ArrowDownLeft,
   X, UserCog, UserPlus, FileText, Flag, Lock, HelpCircle, Settings, LogOut, ChevronRight, Shield, ScanLine,
-  Gamepad2,
+  Gamepad2, CreditCard,
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 function fmtMZN(val: string | number): string {
   const n = typeof val === "string" ? parseFloat(val) || 0 : (isFinite(val) ? val : 0);
@@ -24,14 +25,36 @@ function formatPhone(digits: string) {
 }
 
 type TxIcon = typeof ArrowUpRight;
-interface Tx { id: number; name: string; type: string; date: string; amount: string; icon: TxIcon; color: string }
+interface Tx {
+  id: string;
+  name: string;
+  type: string;
+  date: string;
+  amount: string;
+  icon: TxIcon;
+  color: string;
+}
 
-function getRecentTransactions(): Tx[] {
-  return [
-    { id: 1, name: "Para Sarah",   type: "Transferência", date: "27 Jan", amount: "+589 MZN", icon: ArrowUpRight,  color: "#22c55e" },
-    { id: 2, name: "De John Dack", type: "Transferência", date: "27 Jan", amount: "+150 MZN", icon: ArrowDownLeft, color: "#22c55e" },
-    { id: 3, name: "Torneio Ludo", type: "Aposta",        date: "23 Jan", amount: "+457 MZN", icon: Gamepad2,      color: "#a78bfa" },
-  ];
+function mapTxType(dbType: string): string {
+  const m: Record<string, string> = {
+    deposit: "Depósito", withdrawal: "Levamento", bet: "Aposta",
+    win: "Vitória", recharge: "Recarga", referral_bonus: "Bónus",
+  };
+  return m[dbType] || "Transação";
+}
+
+function mapTxSign(dbType: string): "+" | "-" {
+  return ["withdrawal", "bet"].includes(dbType) ? "-" : "+";
+}
+
+function mapTxIcon(dbType: string): { icon: TxIcon; color: string } {
+  if (dbType === "deposit") return { icon: ArrowDownLeft, color: "#22c55e" };
+  if (dbType === "withdrawal") return { icon: ArrowUpRight, color: "#ef4444" };
+  if (dbType === "recharge") return { icon: RefreshCw, color: "#00D4B4" };
+  if (dbType === "win") return { icon: Gamepad2, color: "#f59e0b" };
+  if (dbType === "bet") return { icon: Gamepad2, color: "#a78bfa" };
+  if (dbType === "referral_bonus") return { icon: ArrowDownLeft, color: "#22c55e" };
+  return { icon: CreditCard, color: "#94a3b8" };
 }
 
 const FERRAMENTAS = [
@@ -49,14 +72,52 @@ export default function Perfil() {
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [ferramentasOpen, setFerramentasOpen] = useState(false);
   const [, setLocation] = useLocation();
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, user } = useAuth();
+
+  const [transactions, setTransactions] = useState<Tx[]>([]);
+  const [txLoading, setTxLoading] = useState(true);
 
   const displayName = profile?.full_name ?? "Utilizador";
   const displayPhone = profile?.phone ?? "";
   const displayAvatar = profile?.avatar_url ?? "";
   const balance = profile?.balance ?? 0;
 
-  const transactions = getRecentTransactions();
+  // Fetch last 3 real transactions from Supabase
+  useEffect(() => {
+    if (!user) { setTxLoading(false); return; }
+    supabase
+      .from("transactions")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(3)
+      .then(({ data }) => {
+        if (data && data.length > 0) {
+          const mapped: Tx[] = data.map((t: any) => {
+            const { icon, color } = mapTxIcon(t.type);
+            const sign = mapTxSign(t.type);
+            const amt = Math.abs(parseFloat(String(t.amount)));
+            return {
+              id: t.id,
+              name: t.description || mapTxType(t.type),
+              type: mapTxType(t.type),
+              date: new Date(t.created_at).toLocaleDateString("pt-PT", { day: "2-digit", month: "short" }),
+              amount: `${sign}${amt.toLocaleString("pt-PT")} MZN`,
+              icon,
+              color,
+            };
+          });
+          setTransactions(mapped);
+        } else {
+          setTransactions([]);
+        }
+        setTxLoading(false);
+      })
+      .catch(() => {
+        setTransactions([]);
+        setTxLoading(false);
+      });
+  }, [user]);
 
   const handleAction = (label: string) => {
     if (label === "Levantar")  setLocation("/levantar");
@@ -169,25 +230,42 @@ export default function Perfil() {
                   Ver todas
                 </button>
               </div>
-              <div className="flex flex-col gap-2.5">
-                {transactions.map((tx) => (
-                  <div key={tx.id}
-                    className="flex items-center gap-3 rounded-2xl px-4 py-3.5 border border-slate-100"
-                    style={{ background: "#f7f8fa" }}>
-                    <div style={{
-                      width: 38, height: 38, borderRadius: 999, background: "#fff",
-                      border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                    }}>
-                      <tx.icon style={{ width: 15, height: 15, color: tx.color }} />
+
+              {txLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="w-5 h-5 rounded-full border-2 border-slate-200 border-t-slate-500 animate-spin" />
+                </div>
+              ) : transactions.length === 0 ? (
+                <div className="flex flex-col items-center py-8 gap-2">
+                  <p className="text-slate-400 text-sm font-semibold">Sem transações ainda</p>
+                  <p className="text-slate-300 text-xs text-center" style={{ maxWidth: 220 }}>
+                    As tuas transações aparecerão aqui após o primeiro movimento.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  {transactions.map((tx) => (
+                    <div key={tx.id}
+                      className="flex items-center gap-3 rounded-2xl px-4 py-3.5 border border-slate-100"
+                      style={{ background: "#f7f8fa" }}>
+                      <div style={{
+                        width: 38, height: 38, borderRadius: 999, background: "#fff",
+                        border: "1px solid #e2e8f0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                      }}>
+                        <tx.icon style={{ width: 15, height: 15, color: tx.color }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-900 truncate" style={{ fontSize: 13 }}>{tx.name}</p>
+                        <p style={{ fontSize: 11, color: "#94a3b8" }}>{tx.type} · {tx.date}</p>
+                      </div>
+                      <p className="font-bold flex-shrink-0"
+                        style={{ fontSize: 13, color: tx.amount.startsWith("+") ? "#22c55e" : "#ef4444" }}>
+                        {tx.amount}
+                      </p>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-900 truncate" style={{ fontSize: 13 }}>{tx.name}</p>
-                      <p style={{ fontSize: 11, color: "#94a3b8" }}>{tx.type} · {tx.date}</p>
-                    </div>
-                    <p className="font-bold flex-shrink-0" style={{ fontSize: 13, color: tx.color }}>{tx.amount}</p>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               <div className="mt-5">
                 <button onClick={() => setFerramentasOpen(true)}

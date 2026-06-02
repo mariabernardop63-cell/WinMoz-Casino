@@ -430,6 +430,8 @@ export default function DamasGame() {
   const turnRef  = useRef(turn);
   const winnerRef = useRef(winner);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const betDeductedRef = useRef(false);
+  const winCreditedRef = useRef(false);
   const [opponentBal, setOpponentBal] = useState("—");
   const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
   const [rematchRequester, setRematchRequester] = useState("");
@@ -440,6 +442,24 @@ export default function DamasGame() {
   useEffect(() => { turnRef.current = turn; }, [turn]);
   useEffect(() => { winnerRef.current = winner; }, [winner]);
   useEffect(() => { livesRef.current = lives; }, [lives]);
+
+  // Credit winner 83% of total pot when game ends
+  useEffect(() => {
+    if (!winner || !profile?.id || BET <= 0 || gameId === "local" || winCreditedRef.current) return;
+    if (winner !== myColor) return;
+    winCreditedRef.current = true;
+    const payout = Math.floor(BET * 2 * 0.83);
+    (async () => {
+      try {
+        const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+        if (data) {
+          await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) + payout }).eq("id", profile.id);
+          await supabase.from("transactions").insert({ user_id: profile.id, type: "win", amount: payout, description: `Vitória de jogo (Damas) +${payout} MT`, status: "approved" });
+        }
+      } catch { winCreditedRef.current = false; }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winner]);
 
   // Compute selectable pieces when board/turn changes
   useEffect(() => {
@@ -555,6 +575,16 @@ export default function DamasGame() {
     ch.subscribe(async (status) => {
       if (status === "SUBSCRIBED" && profile?.id) {
         await ch.track({ userId: profile.id, color: myColor, balance: playerBal });
+        if(BET > 0 && !betDeductedRef.current){
+          betDeductedRef.current = true;
+          try{
+            const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+            if(data){
+              await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
+              await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta de jogo (Damas)", status: "approved" });
+            }
+          }catch{ betDeductedRef.current = false; }
+        }
       }
     });
 
@@ -710,6 +740,8 @@ export default function DamasGame() {
   }
 
   function resetGame() {
+    betDeductedRef.current = false;
+    winCreditedRef.current = false;
     const nb = makeInitialBoard();
     setBoard(nb); boardRef.current = nb;
     setTurn("w"); setSelected(null); setValidDests([]); setValidCapDests([]);
