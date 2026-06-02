@@ -349,10 +349,11 @@ export default function Roleta() {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "48px 20px 16px", flexShrink: 0 }}>
-          <button onClick={() => setLocation("/")} style={{
+          <button onClick={() => setLocation(-1 as any)} style={{
             width: 40, height: 40, borderRadius: "50%",
             background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
             display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+            position: "relative", zIndex: 20,
           }}>
             <ChevronLeft style={{ width: 20, height: 20, color: "#fff" }} />
           </button>

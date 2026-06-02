@@ -547,6 +547,12 @@ export default function Apostar() {
   const { user, profile, refreshProfile } = useAuth();
 
   const gameId = params?.gameId ?? "damas";
+
+  // Roleta is a solo game — redirect straight to /roleta
+  useEffect(() => {
+    if (gameId === "roleta") setLocation("/roleta");
+  }, [gameId]);
+
   const game = GAMES_DATA[gameId] ?? FALLBACK_GAME;
 
   /* Bet State */
@@ -920,7 +926,7 @@ export default function Apostar() {
             </div>
             <div style={{ display: "flex", gap: 10, overflowX: "auto", scrollbarWidth: "none", paddingBottom: 4 }}>
               {recommendedGames.map(g => (
-                <Link key={g.id} href={`/apostar/${g.id}`}>
+                <Link key={g.id} href={g.id === "roleta" ? "/roleta" : `/apostar/${g.id}`}>
                   <motion.div
                     whileTap={{ scale: 0.96 }}
                     style={{ minWidth: 110, background: "#1c1c1e", borderRadius: 16, overflow: "hidden", border: "1px solid #2c2c2e", cursor: "pointer", flexShrink: 0 }}
