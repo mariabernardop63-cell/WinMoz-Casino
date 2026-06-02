@@ -1120,9 +1120,8 @@ const topGames = [
   { id: "dc", gameRoute: "damas", name: "Damas Clássico", players: "4.1K apostadores ativos", rank: 1, image: "/damas-card.jpg", imagePos: "center", from: "#1D4ED8", to: "#1E3A8A" },
   { id: "lt", gameRoute: "ludo",  name: "Ludo Turbo",     players: "3.8K apostadores ativos", rank: 2, image: "/ludo-card2.png", imagePos: "center 65%", from: "#059669", to: "#064E3B" },
   { id: "xr", gameRoute: "xadrez",name: "Xadrez Rápido",  players: "2.5K apostadores ativos", rank: 3, image: "/xadrez-card.jpg", imagePos: "center 30%", from: "#7C3AED", to: "#3B0764" },
-  { id: "dp", gameRoute: "damas", name: "Damas Pro",       players: "1.9K apostadores ativos", rank: 4, image: "/damas-card.jpg", imagePos: "center", from: "#EA580C", to: "#7C2D12" },
-  { id: "bi", gameRoute: "bilhar",name: "Bilhar Apostado", players: "890 apostadores ativos",  rank: 5, image: "/bilhar-card.webp", imagePos: "center", from: "#0891b2", to: "#164e63" },
-  { id: "ro", gameRoute: "roleta",name: "Roleta da Sorte", players: "1.5K apostadores ativos", rank: 6, image: "/roleta-card.jpg", imagePos: "center", from: "#be185d", to: "#831843" },
+  { id: "bi", gameRoute: "bilhar",name: "Bilhar Apostado", players: "890 apostadores ativos",  rank: 4, image: "/bilhar-card.webp", imagePos: "center", from: "#0891b2", to: "#164e63" },
+  { id: "ro", gameRoute: "roleta",name: "Roleta da Sorte", players: "1.5K apostadores ativos", rank: 5, image: "/roleta-card.jpg", imagePos: "center", from: "#be185d", to: "#831843" },
 ];
 
 /* ─────────────────────────────────────────────

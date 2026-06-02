@@ -404,7 +404,8 @@ export default function DamasGame() {
   const oppUrl   = sp.get("opp") ?? "";
 
   const oppColor: PColor = myColor === "w" ? "b" : "w";
-  const playerName   = profile?.full_name ?? (myColor === "w" ? "Brancas" : "Pretas");
+  const myNameUrl = sp.get("myname") ?? "";
+  const playerName = myNameUrl ? decodeURIComponent(myNameUrl) : (profile?.full_name ?? "Jogador");
   const playerBal    = profile?.balance ? `${Number(profile.balance).toLocaleString("pt-MZ")} MT` : "0 MT";
   const opponentName = oppUrl ? decodeURIComponent(oppUrl) : "Adversário";
 
@@ -491,13 +492,17 @@ export default function DamasGame() {
   // ── Timers ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (winner || turn !== myColor || chainPiece) return;
+    // Broadcast timer reset to opponent
+    channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:30 } });
     const tick = setInterval(() => {
       setTimers(prev => {
         const nv = prev[myColor] - 1;
         if (nv <= 0) {
           setTimeout(() => timerExpiryRef.current(), 0);
+          channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:0 } });
           return { ...prev, [myColor]: 0 };
         }
+        channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:nv } });
         return { ...prev, [myColor]: nv };
       });
     }, 1000);
@@ -535,6 +540,12 @@ export default function DamasGame() {
       if (seq && seqRef.current >= seq) return;
       if (seq) seqRef.current = seq;
       applyRemoteMove(payload.from as Sq, payload.to as Sq, payload.captured as Sq[], payload.nextTurn as PColor);
+    });
+
+    ch.on("broadcast", { event: "damas_timer" }, ({ payload }) => {
+      if ((payload.player as string) !== myColor) {
+        setTimers(prev => ({ ...prev, [payload.player as string]: payload.t as number }));
+      }
     });
 
     ch.on("broadcast", { event: "damas_forfeit" }, () => {

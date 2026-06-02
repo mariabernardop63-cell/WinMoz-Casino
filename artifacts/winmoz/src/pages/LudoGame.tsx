@@ -664,7 +664,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
             borderRadius:4, padding:"2px 6px", flexShrink:0,
           }}>{isMe?"Tu":"Rival"}</span>
         </div>
-        {/* Row 2: balance + lives + pieces */}
+        {/* Row 2: balance + lives dots */}
         <div style={{ display:"flex", alignItems:"center", gap:7 }}>
           <span style={{
             fontFamily:"system-ui,-apple-system,sans-serif",
@@ -673,16 +673,18 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
             transition:"color 0.3s",
           }}>{balance}</span>
           <div style={{ width:1, height:10, background:"#E2E8F0", flexShrink:0 }}/>
-          {/* Finished pieces */}
-          <div style={{ display:"flex", alignItems:"center", gap:2.5 }}>
-            {Array.from({length:4}).map((_,i)=>(
+          {/* Life dots: green = alive, red = lost */}
+          <div style={{ display:"flex", alignItems:"center", gap:3 }}>
+            {Array.from({length:5}).map((_,i)=>(
               <motion.div key={i}
-                animate={{ scale: i===finished-1 ? [1,1.4,1] : 1 }}
-                transition={{ duration:0.25 }}
+                animate={{ scale: i===lives-1&&lives>0 ? [1,1.35,1] : 1 }}
+                transition={{ duration:0.22 }}
                 style={{
-                  width:5, height:5, borderRadius:"50%",
-                  background: i<finished ? accentColor : "#E2E8F0",
-                  transition:"background 0.25s",
+                  width:6, height:6, borderRadius:"50%",
+                  background: i < lives ? "#4ade80" : "#ef4444",
+                  boxShadow: i < lives ? "0 0 4px #4ade8066" : "none",
+                  transition:"background 0.3s, box-shadow 0.3s",
+                  flexShrink:0,
                 }}/>
             ))}
           </div>
@@ -694,10 +696,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
         display:"flex", alignItems:"center", gap:6,
         padding:"0 10px 0 4px", flexShrink:0,
       }}>
-        {isActive
-          ? <TimerArc timeLeft={timeLeft} size={24}/>
-          : <div style={{ width:24 }}/>
-        }
+        <TimerArc timeLeft={timeLeft} size={24}/>
         <div style={{
           background: isActive ? "#F8FAFC" : "#F1F5F9",
           borderRadius:10, padding:"4px",
@@ -1060,12 +1059,14 @@ export default function LudoGame() {
   const oppFromUrl  = searchParams.get("opp") ?? "";
   const opponentColor: Player = myColor === "blue" ? "green" : "blue";
 
-  const playerName  = profile?.full_name ?? (myColor === "blue" ? "Azul" : "Verde");
+  const myNameUrl   = searchParams.get("myname") ?? "";
+  const playerName  = myNameUrl ? decodeURIComponent(myNameUrl) : (profile?.full_name ?? "Jogador");
   const playerBal   = profile?.balance
     ? `${Number(profile.balance).toLocaleString("pt-MZ")} MT`
     : "0 MT";
   const opponentName = oppFromUrl ? decodeURIComponent(oppFromUrl) : "Adversário";
   const [opponentBal, setOpponentBal] = useState("—");
+  const [opponentTimeLeft, setOpponentTimeLeft] = useState(30);
   const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
   const [rematchRequester, setRematchRequester] = useState("");
 
@@ -1392,6 +1393,10 @@ export default function LudoGame() {
       );
     });
 
+    channel.on("broadcast",{ event:"ludo_timer" },({ payload })=>{
+      if((payload.player as string)!==myColor) setOpponentTimeLeft(payload.t as number);
+    });
+
     channel.on("broadcast",{ event:"ludo_forfeit" },()=>{
       if(winnerRef.current||phaseRef.current==="done") return;
       setWinner(myColor);
@@ -1484,10 +1489,14 @@ export default function LudoGame() {
   useEffect(()=>{
     setTimeLeft(30);
     if(winner||(phase!=="roll"&&phase!=="select")||turn!==myColor) return;
+    // Broadcast timer reset to opponent
+    channelRef.current?.send({type:"broadcast",event:"ludo_timer",payload:{player:myColor,t:30}});
     const tick=setInterval(()=>{
       setTimeLeft(prev=>{
-        if(prev<=1){ clearInterval(tick); setTimeout(()=>autoPlayRef.current?.(),0); return 30; }
-        return prev-1;
+        const newT=prev<=1?30:prev-1;
+        if(prev<=1){ clearInterval(tick); setTimeout(()=>autoPlayRef.current?.(),0); }
+        channelRef.current?.send({type:"broadcast",event:"ludo_timer",payload:{player:myColor,t:newT}});
+        return newT;
       });
     },1000);
     return()=>clearInterval(tick);
@@ -1500,6 +1509,7 @@ export default function LudoGame() {
     setPieces(initialPieces()); setTurn("blue"); setPhase("roll");
     setDiceBlue(null); setDiceGreen(null); setRollingB(false); setRollingG(false);
     setMovable([]); setWinner(null); setLives({blue:5,green:5}); setTimeLeft(30);
+    setOpponentTimeLeft(30);
     setStuckTurns({blue:0,green:0}); consecutiveSixesRef.current=0;
     lastEventSeqRef.current = {};
     setMsg(myColor==="blue"?myTurnMsg:oppTurnMsg);
@@ -1634,7 +1644,7 @@ export default function LudoGame() {
             diceValue={diceGreen} rolling={rollingGreen}
             onRoll={doRoll}
             finished={greenFinished} lives={lives.green}
-            timeLeft={timeLeft} isMe={myColor==="green"}
+            timeLeft={myColor==="green" ? timeLeft : opponentTimeLeft} isMe={myColor==="green"}
           />
         </div>
 
@@ -1702,7 +1712,7 @@ export default function LudoGame() {
             diceValue={diceBlue} rolling={rollingBlue}
             onRoll={doRoll}
             finished={blueFinished} lives={lives.blue}
-            timeLeft={timeLeft} isMe={myColor==="blue"}
+            timeLeft={myColor==="blue" ? timeLeft : opponentTimeLeft} isMe={myColor==="blue"}
           />
         </div>
 

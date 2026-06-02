@@ -77,7 +77,7 @@ export default function Perfil() {
   const [transactions, setTransactions] = useState<Tx[]>([]);
   const [txLoading, setTxLoading] = useState(true);
 
-  const displayName = profile?.full_name ?? "Utilizador";
+  const displayName = profile?.full_name ?? profile?.email?.split("@")[0] ?? "Utilizador";
   const displayPhone = profile?.phone ?? "";
   const displayAvatar = profile?.avatar_url ?? "";
   const balance = profile?.balance ?? 0;

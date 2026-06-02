@@ -393,7 +393,7 @@ export default function Roleta() {
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
           padding: "48px 20px 16px", flexShrink: 0 }}>
-          <button onClick={() => setLocation(-1 as any)} style={{
+          <button onClick={() => window.history.back()} style={{
             width: 40, height: 40, borderRadius: "50%",
             background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
             display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",

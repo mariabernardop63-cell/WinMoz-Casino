@@ -630,16 +630,17 @@ export default function Apostar() {
         onCancel={() => setScreen("bet")}
         onMatched={(gId, color, oppName) => {
           setScreen("matched");
+          const myEnc = encodeURIComponent(profile?.full_name ?? "Jogador");
+          const oppEnc = encodeURIComponent(oppName);
           let dest = "/";
           if (gameId === "ludo" || gameId === "ludo-classic") {
-            dest = `/ludo-jogo?gameId=${gId}&color=${color}&bet=${selectedBet ?? 0}&opp=${encodeURIComponent(oppName)}`;
+            dest = `/ludo-jogo?gameId=${gId}&color=${color}&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}`;
           } else if (gameId === "xadrez") {
-            // map blue→white, green→black for chess
             const chessColor = color === "blue" ? "white" : "black";
-            dest = `/xadrez-jogo?gameId=${gId}&color=${chessColor}&bet=${selectedBet ?? 0}&opp=${encodeURIComponent(oppName)}`;
+            dest = `/xadrez-jogo?gameId=${gId}&color=${chessColor}&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}`;
           } else if (gameId === "damas") {
             const damasColor = color === "blue" ? "w" : "b";
-            dest = `/damas-jogo?gameId=${gId}&color=${damasColor}&bet=${selectedBet ?? 0}&opp=${encodeURIComponent(oppName)}`;
+            dest = `/damas-jogo?gameId=${gId}&color=${damasColor}&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}`;
           }
           setTimeout(() => setLocation(dest), 2200);
         }}
@@ -709,7 +710,7 @@ export default function Apostar() {
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-12 pb-4 flex-shrink-0">
-          <button onClick={() => setLocation(-1 as any)} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#1c1c1e" }}>
+          <button onClick={() => window.history.back()} className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#1c1c1e" }}>
             <ChevronLeft style={{ width: 20, height: 20, color: "#fff" }} />
           </button>
           <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>Fazer Aposta</p>

@@ -721,7 +721,8 @@ export default function ChessGame(){
   const oppFromUrl=sp.get("opp")??"";
 
   const opponentColor:PColor=myColor==="w"?"b":"w";
-  const playerName=profile?.full_name??(myColor==="w"?"Brancas":"Pretas");
+  const myNameUrl=sp.get("myname")??"";
+  const playerName=myNameUrl?decodeURIComponent(myNameUrl):(profile?.full_name??"Jogador");
   const opponentName=oppFromUrl?decodeURIComponent(oppFromUrl):"Adversário";
 
   // ── Game state ────────────────────────────────────────────────────────────────
