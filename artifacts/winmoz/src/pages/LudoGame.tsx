@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { ArrowLeft, RotateCcw, LogOut, Flag } from "lucide-react";
+import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import bgImg from "@assets/Gemini_Generated_Image_grc2w7grc2w7grc2_1780220609974.png";
@@ -145,37 +145,37 @@ const PAWN_PAL: Record<PawnColor,{s:string;m:string;d:string}> = {
   yellow: { s:"#FDE68A", m:"#EAB308", d:"#713F12" },
 };
 
-// ─── Classic Ludo sphere pawn ──────────────────────────────────────────────────
-function Pawn({ color, size=PAWN_SIZE, glow=false }: {
+// ─── Location-pin pawn (map marker style) ──────────────────────────────────────
+function PinPawn({ color, size=PAWN_SIZE, glow=false }: {
   color:PawnColor; size?:number; glow?:boolean;
 }) {
-  const p = PAWN_PAL[color];
-  const id = `sp_${color}`;
+  const pinColor = color === "blue" ? "#2563EB" : "#16A34A";
+  const w = size;
+  const h = Math.round(w * 1.5);
   return (
     <div style={{
       display:"flex", flexShrink:0,
       filter: glow
-        ? `drop-shadow(0 0 ${Math.round(size*0.3)}px ${p.m}CC) drop-shadow(0 1px 3px rgba(0,0,0,0.6))`
+        ? `drop-shadow(0 0 ${Math.round(w*0.3)}px ${pinColor}CC) drop-shadow(0 1px 3px rgba(0,0,0,0.6))`
         : "drop-shadow(0 1px 3px rgba(0,0,0,0.5))",
     }}>
-      <svg viewBox="0 0 36 36" width={size} height={size} style={{display:"block"}}>
-        <defs>
-          <radialGradient id={`${id}_g`} cx="35%" cy="28%" r="72%">
-            <stop offset="0%"   stopColor={p.s}/>
-            <stop offset="50%"  stopColor={p.m}/>
-            <stop offset="100%" stopColor={p.d}/>
-          </radialGradient>
-        </defs>
-        {/* Shadow */}
-        <ellipse cx="18" cy="34" rx="10" ry="2.5" fill="rgba(0,0,0,0.2)"/>
-        {/* Sphere body */}
-        <circle cx="18" cy="17" r="15" fill={`url(#${id}_g)`}/>
-        <circle cx="18" cy="17" r="15" fill="none" stroke={p.d} strokeWidth="0.7" opacity="0.55"/>
-        {/* Inner ring detail — classic Ludo */}
-        <circle cx="18" cy="17" r="8"  fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5"/>
-        {/* Shine */}
-        <ellipse cx="11" cy="9" rx="5" ry="3.8" fill="white" opacity="0.52" transform="rotate(-18 11 9)"/>
-        <ellipse cx="11" cy="9" rx="2.2" ry="1.6" fill="white" opacity="0.8" transform="rotate(-18 11 9)"/>
+      <svg viewBox="0 0 48 72" width={w} height={h} style={{display:"block"}}>
+        {/* Drop shadow under base */}
+        <ellipse cx="24" cy="70" rx="9" ry="2.2" fill="rgba(0,0,0,0.22)"/>
+        {/* Base ring — player color */}
+        <ellipse cx="24" cy="62" rx="11" ry="4" fill={pinColor}/>
+        {/* Base ring center — white hole */}
+        <ellipse cx="24" cy="61" rx="7" ry="2.5" fill="white"/>
+        {/* Pin body — white teardrop with dark outline */}
+        <path
+          d="M24,5 C12,5 4,15 4,26 C4,40 24,62 24,62 C24,62 44,40 44,26 C44,15 36,5 24,5 Z"
+          fill="white" stroke="#1a1a1a" strokeWidth="2.5" strokeLinejoin="round"
+        />
+        {/* Colored circle inside pin head */}
+        <circle cx="24" cy="23" r="13" fill={pinColor}/>
+        {/* Shine on colored circle */}
+        <ellipse cx="18" cy="17" rx="5" ry="3.5"
+          fill="rgba(255,255,255,0.35)" transform="rotate(-15 18 17)"/>
       </svg>
     </div>
   );
@@ -284,23 +284,15 @@ function BoardSVG({ pieces }:{ pieces:GamePiece[] }) {
           );
         })}
       </defs>
-      {/* Home slot circles + resting pawns */}
+      {/* Home slot circles + resting pawns (pin rendered by HTML overlay) */}
       {HOME_DECO.map(({ color, slots })=>
         slots.map(([px,py],i)=>{
           const p=PAWN_PAL[color];
           const isActive=(color==="blue"&&inHome.blue.has(i))||(color==="green"&&inHome.green.has(i));
           return (
             <g key={`${color}_${i}`}>
-              <circle cx={px} cy={py} r={26} fill={p.d} opacity={0.28}/>
-              <circle cx={px} cy={py} r={26} fill="none" stroke={p.m} strokeWidth={2.2} opacity={0.7}/>
-              {isActive && (
-                <>
-                  <circle cx={px} cy={py} r={16} fill={`url(#hs_${color})`}/>
-                  <circle cx={px} cy={py} r={16} fill="none" stroke={p.d} strokeWidth="0.8" opacity="0.5"/>
-                  <circle cx={px} cy={py} r={9}  fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5"/>
-                  <ellipse cx={px-5} cy={py-7} rx="4.5" ry="3" fill="white" opacity="0.48" transform={`rotate(-18 ${px-5} ${py-7})`}/>
-                </>
-              )}
+              <circle cx={px} cy={py} r={26} fill={p.d} opacity={isActive ? 0.38 : 0.22}/>
+              <circle cx={px} cy={py} r={26} fill="none" stroke={p.m} strokeWidth={isActive ? 2.8 : 2.0} opacity={isActive ? 0.85 : 0.65}/>
             </g>
           );
         })
@@ -363,7 +355,7 @@ function Board({ pieces, movable, onSelectPiece }:{
           transform:`translate(calc(-50% + ${xOff}px),-50%)`,
           zIndex:15, pointerEvents:"none",
         }}>
-          <Pawn color={color} size={sz}/>
+          <PinPawn color={color} size={sz}/>
         </div>
       );
     });
@@ -406,7 +398,7 @@ function Board({ pieces, movable, onSelectPiece }:{
                 display:"flex", alignItems:"center", justifyContent:"center",
                 zIndex:2,
               }}>
-                <Pawn color={color} size={PAWN_SIZE} glow={selectable}/>
+                <PinPawn color={color} size={PAWN_SIZE} glow={selectable}/>
               </div>
             </div>
           );
@@ -437,7 +429,7 @@ function Board({ pieces, movable, onSelectPiece }:{
               display:"flex", alignItems:"center", justifyContent:"center",
               zIndex:2,
             }}>
-              <Pawn color={color} size={PAWN_SIZE} glow={selectable}/>
+              <PinPawn color={color} size={PAWN_SIZE} glow={selectable}/>
             </div>
           </div>
         );
@@ -614,7 +606,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
         display:"flex", alignItems:"center", justifyContent:"center",
         transition:"border-color 0.3s",
       }}>
-        <Pawn color={color} size={22}/>
+        <PinPawn color={color} size={22}/>
       </div>
 
       {/* Name + stats */}
@@ -651,7 +643,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
             {Array.from({length:5}).map((_,i)=>(
               <div key={i} style={{
                 width:5, height:5, borderRadius:"50%",
-                background: i<lives ? "#EF4444" : "#E2E8F0",
+                background: i<lives ? "#22C55E" : "#EF4444",
                 transition:"all 0.25s",
               }}/>
             ))}
@@ -722,10 +714,12 @@ function WinScreen({ winner, winnerName, loserName, betAmount, isWinner, onRepla
           boxShadow:"0 32px 80px rgba(0,0,0,0.75),0 0 60px rgba(239,68,68,0.15)",
           border:"1px solid rgba(255,255,255,0.08)"}}>
         <div style={{background:"linear-gradient(145deg,#1a0a0a,#2a0f0f)",padding:"28px 24px 22px",textAlign:"center"}}>
-          <motion.div animate={{y:[0,-5,0]}} transition={{duration:2,repeat:Infinity,ease:"easeInOut"}}
-            style={{display:"flex",justifyContent:"center",marginBottom:14}}>
-            <span style={{fontSize:72}}>💔</span>
-          </motion.div>
+          <div style={{display:"flex",justifyContent:"center",marginBottom:14}}>
+            <svg width={72} height={72} viewBox="0 0 72 72" fill="none">
+              <circle cx="36" cy="36" r="34" fill="rgba(239,68,68,0.1)" stroke="rgba(239,68,68,0.3)" strokeWidth="1.5"/>
+              <path d="M22 22 L50 50 M50 22 L22 50" stroke="#EF4444" strokeWidth="5" strokeLinecap="round"/>
+            </svg>
+          </div>
           <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
             color:"rgba(255,100,100,0.8)",marginBottom:6}}>DERROTA</p>
           <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:17,
@@ -747,7 +741,13 @@ function WinScreen({ winner, winnerName, loserName, betAmount, isWinner, onRepla
                   -{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
-              <span style={{fontSize:32}}>📉</span>
+              <div style={{width:40,height:40,borderRadius:10,background:"rgba(239,68,68,0.12)",
+                border:"1px solid rgba(239,68,68,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <path d="M3 17 L9 11 L13 15 L21 7" stroke="#EF4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M17 7 L21 7 L21 11" stroke="#EF4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
             </div>
           )}
           <div style={{display:"flex",gap:10}}>
@@ -926,7 +926,7 @@ export default function LudoGame() {
     ? `${Number(profile.balance).toLocaleString("pt-MZ")} MT`
     : "0 MT";
   const opponentName = oppFromUrl ? decodeURIComponent(oppFromUrl) : "Adversário";
-  const opponentBal  = "—";
+  const [opponentBal, setOpponentBal] = useState("—");
 
   // ── State ──────────────────────────────────────────────────────────────────────
   const initialPieces=():GamePiece[]=>([
@@ -1232,9 +1232,20 @@ export default function LudoGame() {
       setMsg(`${opponentName} desistiu! Tu venceste!`);
     });
 
+    channel.on("presence",{ event:"sync" },()=>{
+      const state = channel.presenceState<{ color:string; balance?:string }>();
+      for(const presences of Object.values(state)){
+        for(const p of presences as Array<{ color:string; balance?:string }>){
+          if(p.color !== myColor && p.balance){
+            setOpponentBal(p.balance);
+          }
+        }
+      }
+    });
+
     channel.subscribe(async(status)=>{
       if(status==="SUBSCRIBED"&&profile?.id){
-        await channel.track({ userId:profile.id, color:myColor });
+        await channel.track({ userId:profile.id, color:myColor, balance:playerBal });
       }
     });
 
@@ -1357,7 +1368,7 @@ export default function LudoGame() {
               <button onClick={handleForfeit} style={{width:34,height:34,borderRadius:9,
                 background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",
                 display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-                <Flag style={{width:15,height:15,color:"#EF4444"}}/>
+                <LogOut style={{width:15,height:15,color:"#EF4444"}}/>
               </button>
             )}
             <div style={{

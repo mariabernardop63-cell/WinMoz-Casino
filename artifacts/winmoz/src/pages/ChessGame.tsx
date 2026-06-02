@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { ArrowLeft, RotateCcw, LogOut, Flag } from "lucide-react";
+import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
@@ -404,7 +404,12 @@ function WinScreen({winner,winnerName,loserName,reason,betAmount,isWinner,onRepl
             boxShadow:"0 32px 80px rgba(0,0,0,0.75),0 0 60px rgba(239,68,68,0.15)",
             border:"1px solid rgba(255,255,255,0.08)"}}>
           <div style={{background:loserBg,padding:"28px 24px 22px",textAlign:"center"}}>
-            <div style={{fontSize:64,marginBottom:8}}>💔</div>
+            <div style={{display:"flex",justifyContent:"center",marginBottom:14}}>
+              <svg width={68} height={68} viewBox="0 0 72 72" fill="none">
+                <circle cx="36" cy="36" r="34" fill="rgba(239,68,68,0.1)" stroke="rgba(239,68,68,0.3)" strokeWidth="1.5"/>
+                <path d="M22 22 L50 50 M50 22 L22 50" stroke="#EF4444" strokeWidth="5" strokeLinecap="round"/>
+              </svg>
+            </div>
             <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
               color:"rgba(255,100,100,0.8)",marginBottom:6}}>DERROTA</p>
             <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:18,color:"rgba(255,255,255,0.7)",lineHeight:1.2,marginBottom:4}}>
@@ -428,7 +433,13 @@ function WinScreen({winner,winnerName,loserName,reason,betAmount,isWinner,onRepl
                     -{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                   </p>
                 </div>
-                <span style={{fontSize:32}}>📉</span>
+                <div style={{width:40,height:40,borderRadius:10,background:"rgba(239,68,68,0.12)",
+                  border:"1px solid rgba(239,68,68,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                  <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                    <path d="M3 17 L9 11 L13 15 L21 7" stroke="#EF4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M17 7 L21 7 L21 11" stroke="#EF4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
               </div>
             )}
             <div style={{display:"flex",gap:10}}>
@@ -462,7 +473,24 @@ function WinScreen({winner,winnerName,loserName,reason,betAmount,isWinner,onRepl
           boxShadow:`0 32px 80px rgba(0,0,0,0.75),0 0 60px ${accent}22`,
           border:"1px solid rgba(255,255,255,0.08)"}}>
         <div style={{background:winnerBg,padding:"28px 24px 22px",textAlign:"center"}}>
-          <div style={{fontSize:72,marginBottom:8}}>{isWhiteWinner?"♔":"♚"}</div>
+          <motion.div animate={{y:[0,-5,0]}} transition={{duration:2,repeat:Infinity,ease:"easeInOut"}}
+            style={{display:"flex",justifyContent:"center",marginBottom:14}}>
+            <svg width={72} height={72} viewBox="0 0 100 100" fill="none">
+              <defs>
+                <linearGradient id="cwtg" x1="25%" y1="0%" x2="75%" y2="100%">
+                  <stop offset="0%" stopColor="#FFE566"/>
+                  <stop offset="50%" stopColor="#FFD700"/>
+                  <stop offset="100%" stopColor="#B8860B"/>
+                </linearGradient>
+              </defs>
+              <path d="M28 12 L72 12 L68 52 Q65 64 50 68 Q35 64 32 52 Z" fill="url(#cwtg)"/>
+              <path d="M28 16 Q14 16 14 32 Q14 44 28 44" stroke="#FFD700" strokeWidth="4.5" fill="none" strokeLinecap="round"/>
+              <path d="M72 16 Q86 16 86 32 Q86 44 72 44" stroke="#FFD700" strokeWidth="4.5" fill="none" strokeLinecap="round"/>
+              <rect x="44" y="68" width="12" height="12" fill="url(#cwtg)" rx="2"/>
+              <rect x="30" y="80" width="40" height="7" fill="url(#cwtg)" rx="3.5"/>
+              <ellipse cx="38" cy="30" rx="7" ry="12" fill="rgba(255,255,255,0.2)" transform="rotate(-18 38 30)"/>
+            </svg>
+          </motion.div>
           <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
             color:"rgba(255,255,255,0.65)",marginBottom:6}}>VENCEDOR</p>
           <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#fff",lineHeight:1.1}}>
@@ -483,7 +511,13 @@ function WinScreen({winner,winnerName,loserName,reason,betAmount,isWinner,onRepl
                   +{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
-              <span style={{fontSize:36}}>🏆</span>
+              <div style={{width:44,height:44,borderRadius:12,background:"rgba(255,215,0,0.12)",
+                border:"1px solid rgba(255,215,0,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="#FFD700" strokeWidth="1.5"/>
+                  <path d="M12 6v6l4 2" stroke="#FFD700" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+              </div>
             </div>
           )}
           <p style={{fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center",marginBottom:16}}>
@@ -853,7 +887,7 @@ export default function ChessGame(){
               <button onClick={handleForfeit} style={{width:34,height:34,borderRadius:9,
                 background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",
                 display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-                <Flag style={{width:15,height:15,color:"#EF4444"}}/>
+                <LogOut style={{width:15,height:15,color:"#EF4444"}}/>
               </button>
             )}
             <div style={{padding:"4px 10px",background:"linear-gradient(135deg,rgba(245,200,66,0.15),rgba(245,200,66,0.06))",

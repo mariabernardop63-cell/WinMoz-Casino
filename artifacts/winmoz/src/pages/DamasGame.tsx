@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { ArrowLeft, RotateCcw, LogOut, Flag } from "lucide-react";
+import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
@@ -153,9 +153,9 @@ function TimerArc({ val, total=60, size=28 }: { val: number; total?: number; siz
 }
 
 // ─── Player Card ──────────────────────────────────────────────────────────────
-function PlayerCard({ color, name, balance, isMe, isActive, piecesLeft, damesLeft, timeLeft }: {
+function PlayerCard({ color, name, balance, isMe, isActive, piecesLeft, damesLeft, timeLeft, lives }: {
   color: PColor; name: string; balance: string; isMe: boolean;
-  isActive: boolean; piecesLeft: number; damesLeft: number; timeLeft: number;
+  isActive: boolean; piecesLeft: number; damesLeft: number; timeLeft: number; lives: number;
 }) {
   const isWhite = color === "w";
   const accentColor = isWhite ? "#D4A35A" : "#5C7A2E";
@@ -193,6 +193,16 @@ function PlayerCard({ color, name, balance, isMe, isActive, piecesLeft, damesLef
         <div style={{ display:"flex", alignItems:"center", gap:5 }}>
           <span style={{ fontSize:10, color:"rgba(0,0,0,0.35)", fontWeight:600 }}>{balance}</span>
           <span style={{ fontSize:9, color:"rgba(0,0,0,0.3)" }}>·</span>
+          <div style={{ display:"flex", gap:2 }}>
+            {Array.from({length:5}).map((_,i) => (
+              <div key={i} style={{
+                width:5, height:5, borderRadius:"50%",
+                background: i < lives ? "#22C55E" : "#EF4444",
+                transition:"background 0.25s",
+              }}/>
+            ))}
+          </div>
+          <span style={{ fontSize:9, color:"rgba(0,0,0,0.3)" }}>·</span>
           <span style={{ fontSize:10, color: isActive ? accentColor : "#94A3B8", fontWeight:700 }}>
             {piecesLeft} peças{damesLeft > 0 ? ` (${damesLeft} 👑)` : ""}
           </span>
@@ -220,7 +230,12 @@ function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQui
           boxShadow:"0 32px 80px rgba(0,0,0,0.75),0 0 60px rgba(239,68,68,0.15)",
           border:"1px solid rgba(255,255,255,0.08)"}}>
         <div style={{background:"linear-gradient(145deg,#1a0a0a,#2a0f0f)",padding:"28px 24px 22px",textAlign:"center"}}>
-          <div style={{fontSize:72,marginBottom:8}}>💔</div>
+          <div style={{display:"flex",justifyContent:"center",marginBottom:14}}>
+            <svg width={72} height={72} viewBox="0 0 72 72" fill="none">
+              <circle cx="36" cy="36" r="34" fill="rgba(239,68,68,0.1)" stroke="rgba(239,68,68,0.3)" strokeWidth="1.5"/>
+              <path d="M22 22 L50 50 M50 22 L22 50" stroke="#EF4444" strokeWidth="5" strokeLinecap="round"/>
+            </svg>
+          </div>
           <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
             color:"rgba(255,100,100,0.8)",marginBottom:6}}>DERROTA</p>
           <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:18,
@@ -237,7 +252,13 @@ function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQui
                   -{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
-              <span style={{fontSize:32}}>📉</span>
+              <div style={{width:40,height:40,borderRadius:10,background:"rgba(239,68,68,0.12)",
+                border:"1px solid rgba(239,68,68,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                  <path d="M3 17 L9 11 L13 15 L21 7" stroke="#EF4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M17 7 L21 7 L21 11" stroke="#EF4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
             </div>
           )}
           <div style={{display:"flex",gap:10}}>
@@ -268,10 +289,24 @@ function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQui
         style={{borderRadius:26,maxWidth:310,width:"88%",overflow:"hidden",
           boxShadow:"0 32px 80px rgba(0,0,0,0.75),0 0 60px rgba(212,163,90,0.2)",
           border:"1px solid rgba(255,255,255,0.08)"}}>
-        <div style={{background:"linear-gradient(145deg,#6B4A1A,#4A3010)",padding:"28px 24px 22px",textAlign:"center"}}>
+        <div style={{background:"linear-gradient(145deg,#5A3A10,#3A2008)",padding:"28px 24px 22px",textAlign:"center"}}>
           <motion.div animate={{y:[0,-5,0]}} transition={{duration:2,repeat:Infinity,ease:"easeInOut"}}
             style={{display:"flex",justifyContent:"center",marginBottom:14}}>
-            <span style={{fontSize:72}}>🏆</span>
+            <svg width={72} height={72} viewBox="0 0 100 100" fill="none">
+              <defs>
+                <linearGradient id="dwtg" x1="25%" y1="0%" x2="75%" y2="100%">
+                  <stop offset="0%" stopColor="#FFE566"/>
+                  <stop offset="50%" stopColor="#FFD700"/>
+                  <stop offset="100%" stopColor="#B8860B"/>
+                </linearGradient>
+              </defs>
+              <path d="M28 12 L72 12 L68 52 Q65 64 50 68 Q35 64 32 52 Z" fill="url(#dwtg)"/>
+              <path d="M28 16 Q14 16 14 32 Q14 44 28 44" stroke="#FFD700" strokeWidth="4.5" fill="none" strokeLinecap="round"/>
+              <path d="M72 16 Q86 16 86 32 Q86 44 72 44" stroke="#FFD700" strokeWidth="4.5" fill="none" strokeLinecap="round"/>
+              <rect x="44" y="68" width="12" height="12" fill="url(#dwtg)" rx="2"/>
+              <rect x="30" y="80" width="40" height="7" fill="url(#dwtg)" rx="3.5"/>
+              <ellipse cx="38" cy="30" rx="7" ry="12" fill="rgba(255,255,255,0.2)" transform="rotate(-18 38 30)"/>
+            </svg>
           </motion.div>
           <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
             color:"rgba(255,215,0,0.7)",marginBottom:6}}>VENCEDOR</p>
@@ -288,7 +323,13 @@ function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQui
                   +{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
-              <span style={{fontSize:36}}>♟️</span>
+              <div style={{width:44,height:44,borderRadius:12,background:"rgba(255,215,0,0.12)",
+                border:"1px solid rgba(255,215,0,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="#FFD700" strokeWidth="1.5"/>
+                  <path d="M12 6v6l4 2" stroke="#FFD700" strokeWidth="1.8" strokeLinecap="round"/>
+                </svg>
+              </div>
             </div>
           )}
           <p style={{fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center",marginBottom:16}}>
@@ -345,7 +386,9 @@ export default function DamasGame() {
   const [timers, setTimers]         = useState<Record<PColor, number>>({ w:60, b:60 });
   const [lastMove, setLastMove]     = useState<{ from:Sq; to:Sq } | null>(null);
   const [selectableKeys, setSelectableKeys] = useState<Set<string>>(new Set());
+  const [lives, setLives]           = useState<Record<PColor, number>>({ w:5, b:5 });
   const seqRef  = useRef(0);
+  const livesRef = useRef<Record<PColor, number>>({ w:5, b:5 });
   const boardRef = useRef(board);
   const turnRef  = useRef(turn);
   const winnerRef = useRef(winner);
@@ -354,6 +397,7 @@ export default function DamasGame() {
   useEffect(() => { boardRef.current = board; }, [board]);
   useEffect(() => { turnRef.current = turn; }, [turn]);
   useEffect(() => { winnerRef.current = winner; }, [winner]);
+  useEffect(() => { livesRef.current = lives; }, [lives]);
 
   // Compute selectable pieces when board/turn changes
   useEffect(() => {
@@ -375,15 +419,22 @@ export default function DamasGame() {
         const nv = t[myColor] - 1;
         if (nv <= 0) {
           clearInterval(tick);
-          setWinner(oppColor);
-          setWinReason(`${playerName.split(" ")[0]} esgotou o tempo`);
-          return { ...t, [myColor]: 0 };
+          const remaining = livesRef.current[myColor] - 1;
+          if (remaining <= 0) {
+            setLives(prev => ({ ...prev, [myColor]: 0 }));
+            setWinner(oppColor);
+            setWinReason(`${playerName.split(" ")[0]} perdeu todas as vidas`);
+            return { ...t, [myColor]: 0 };
+          }
+          setLives(prev => ({ ...prev, [myColor]: remaining }));
+          return { ...t, [myColor]: 60 };
         }
         return { ...t, [myColor]: nv };
       });
     }, 1000);
     return () => clearInterval(tick);
-  }, [turn, winner, chainPiece]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turn, winner, chainPiece, lives]);
 
   // ── Apply remote move ─────────────────────────────────────────────────────
   const applyRemoteMove = useCallback((from: Sq, to: Sq, captured: Sq[], nextTurn: PColor) => {
@@ -555,6 +606,7 @@ export default function DamasGame() {
     setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
     setWinner(null); setWinReason(""); setLastMove(null);
     setTimers({ w:60, b:60 });
+    setLives({ w:5, b:5 });
   }
 
   // ── Board display helpers ─────────────────────────────────────────────────
@@ -596,7 +648,7 @@ export default function DamasGame() {
               <button onClick={handleForfeit} style={{ width:34, height:34, borderRadius:9,
                 background:"rgba(239,68,68,0.12)", border:"1px solid rgba(239,68,68,0.25)",
                 display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
-                <Flag style={{ width:15, height:15, color:"#EF4444" }}/>
+                <LogOut style={{ width:15, height:15, color:"#EF4444" }}/>
               </button>
             )}
             <div style={{ padding:"4px 10px",
@@ -615,7 +667,7 @@ export default function DamasGame() {
             color={oppColor} name={opponentName} balance="—" isMe={false}
             isActive={turn === oppColor && !winner}
             piecesLeft={oppPieces} damesLeft={oppDames}
-            timeLeft={timers[oppColor]}
+            timeLeft={timers[oppColor]} lives={lives[oppColor]}
           />
         </div>
 
@@ -641,8 +693,8 @@ export default function DamasGame() {
                   const isLastTo   = lastMove?.to[0]   === boardRow && lastMove?.to[1]   === boardCol;
                   const isSelectable = !selected && !chainPiece && selectableKeys.has(sqKey(boardRow, boardCol));
                   const bg = light
-                    ? (isLastFrom || isLastTo ? "#B8892A" : "#C8902F")
-                    : "#2A1A0A";
+                    ? (isLastFrom || isLastTo ? "#2A2A2A" : "#111111")
+                    : (isLastFrom || isLastTo ? "#B8892A" : "#D4A017");
 
                   return (
                     <div key={`${boardRow},${boardCol}`}
@@ -722,7 +774,7 @@ export default function DamasGame() {
             color={myColor} name={playerName} balance={playerBal} isMe={true}
             isActive={myTurn && !winner}
             piecesLeft={myPieces} damesLeft={myDames}
-            timeLeft={timers[myColor]}
+            timeLeft={timers[myColor]} lives={lives[myColor]}
           />
         </div>
 
