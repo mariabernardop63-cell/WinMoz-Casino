@@ -66,7 +66,6 @@ async function ensureProfileExists(
         .select("id")
         .eq("id", userId)
         .single();
-
       if (existing) {
         const updates: Record<string, any> = {};
         if (extraData.full_name) updates.full_name = extraData.full_name;
@@ -76,9 +75,7 @@ async function ensureProfileExists(
           await supabase.from("profiles").update(updates).eq("id", userId);
         }
       }
-    } catch {
-      /* silently ignore */
-    }
+    } catch { /* silently ignore */ }
   }
 }
 
@@ -87,17 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Track the latest active userId to discard stale fetch results
   const currentUserIdRef = useRef<string | null>(null);
+  const cancelledRef = useRef(false);
 
-  const applyProfile = (userId: string, email: string, data: UserProfile | null) => {
-    // Only apply if this is still the current user
-    if (currentUserIdRef.current !== userId) return;
-    if (data) {
-      setProfile({ ...data, email });
-    }
-    // If fetch failed (data is null), do NOT clear profile — keep existing data
-    // This prevents data disappearing due to transient network errors or RLS timing
+  const loadProfileInBackground = async (userId: string, email: string) => {
+    const data = await fetchProfileFromSupabase(userId);
+    if (cancelledRef.current || currentUserIdRef.current !== userId) return;
+    if (data) setProfile({ ...data, email });
   };
 
   const refreshProfile = async () => {
@@ -105,51 +98,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const data = await fetchProfileFromSupabase(session.user.id);
-        if (data) {
-          setProfile({ ...data, email: session.user.email ?? "" });
-        }
+        if (data) setProfile({ ...data, email: session.user.email ?? "" });
       }
-    } catch {
-      /* silently fail — user stays logged in with existing data */
-    }
+    } catch { /* silently fail */ }
   };
 
   const forceRefresh = refreshProfile;
 
   const signOut = async () => {
     currentUserIdRef.current = null;
-    try {
-      await supabase.auth.signOut();
-    } catch { /* ignore */ }
+    try { await supabase.auth.signOut(); } catch { /* ignore */ }
     setUser(null);
     setProfile(null);
   };
 
   useEffect(() => {
-    let cancelled = false;
+    cancelledRef.current = false;
 
-    // Safety net: always resolve loading after 12 seconds max
+    // Safety net: resolve loading after 6 seconds max (reduced from 12)
     const safetyTimer = setTimeout(() => {
-      if (!cancelled) setLoading(false);
-    }, 12000);
+      if (!cancelledRef.current) setLoading(false);
+    }, 6000);
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (cancelled) return;
+        if (cancelledRef.current) return;
 
         if (event === "INITIAL_SESSION") {
-          // Page load — restore session if it exists
           if (session?.user) {
             const { id, email = "" } = session.user;
             currentUserIdRef.current = id;
+            // ── Unlock the UI immediately ──
             setUser({ id, email });
-            const data = await fetchProfileFromSupabase(id);
-            if (!cancelled) {
-              applyProfile(id, email, data);
-              setLoading(false);
-            }
+            setLoading(false);
+            clearTimeout(safetyTimer);
+            // ── Load full profile in background (non-blocking) ──
+            loadProfileInBackground(id, email);
           } else {
-            if (!cancelled) setLoading(false);
+            setLoading(false);
+            clearTimeout(safetyTimer);
           }
 
         } else if (event === "SIGNED_IN" && session?.user) {
@@ -171,43 +158,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch { /* não crítico */ }
           }
 
-          if (!cancelled) {
-            const data = await fetchProfileFromSupabase(id);
-            if (!cancelled) {
-              applyProfile(id, email, data);
-              setLoading(false);
-            }
+          // Load profile then unlock UI
+          const data = await fetchProfileFromSupabase(id);
+          if (!cancelledRef.current && currentUserIdRef.current === id) {
+            if (data) setProfile({ ...data, email });
+            setLoading(false);
+            clearTimeout(safetyTimer);
           }
 
         } else if (event === "SIGNED_OUT") {
           currentUserIdRef.current = null;
-          if (!cancelled) {
-            setUser(null);
-            setProfile(null);
-            setLoading(false);
-          }
+          setUser(null);
+          setProfile(null);
+          setLoading(false);
+          clearTimeout(safetyTimer);
 
         } else if (event === "TOKEN_REFRESHED" && session?.user) {
-          // Token refreshed silently — update user and reload profile
           const { id, email = "" } = session.user;
           setUser({ id, email });
+          // Silently refresh profile in background
           const data = await fetchProfileFromSupabase(id);
-          if (!cancelled && data) {
-            setProfile({ ...data, email });
-          }
+          if (!cancelledRef.current && data) setProfile({ ...data, email });
 
         } else if (event === "USER_UPDATED" && session?.user) {
           const { id, email = "" } = session.user;
           const data = await fetchProfileFromSupabase(id);
-          if (!cancelled && data) {
-            setProfile({ ...data, email });
-          }
+          if (!cancelledRef.current && data) setProfile({ ...data, email });
         }
       }
     );
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
       clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };
