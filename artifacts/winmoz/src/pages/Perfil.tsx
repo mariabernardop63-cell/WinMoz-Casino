@@ -82,16 +82,29 @@ export default function Perfil() {
   const displayAvatar = profile?.avatar_url ?? "";
   const balance = profile?.balance ?? 0;
 
-  // Fetch last 3 real transactions from Supabase
+  // Use user.id (primitive) as dependency — avoids re-running when user object reference
+  // changes but the id stays the same (which happened on every auth state event)
+  const userId = user?.id ?? null;
+
   useEffect(() => {
-    if (!user) { setTxLoading(false); return; }
+    if (!userId) { setTxLoading(false); return; }
+
+    let cancelled = false;
+
+    // 8-second hard timeout so the spinner never hangs forever
+    const timer = setTimeout(() => {
+      if (!cancelled) { setTransactions([]); setTxLoading(false); }
+    }, 8000);
+
     supabase
       .from("transactions")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(3)
       .then(({ data }) => {
+        if (cancelled) return;
+        clearTimeout(timer);
         if (data && data.length > 0) {
           const mapped: Tx[] = data.map((t: any) => {
             const { icon, color } = mapTxIcon(t.type);
@@ -114,10 +127,11 @@ export default function Perfil() {
         setTxLoading(false);
       })
       .catch(() => {
-        setTransactions([]);
-        setTxLoading(false);
+        if (!cancelled) { clearTimeout(timer); setTransactions([]); setTxLoading(false); }
       });
-  }, [user]);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [userId]);
 
   const handleAction = (label: string) => {
     if (label === "Levantar")  setLocation("/levantar");

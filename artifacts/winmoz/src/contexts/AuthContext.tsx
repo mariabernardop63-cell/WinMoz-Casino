@@ -25,7 +25,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-async function fetchProfileFromSupabase(userId: string): Promise<UserProfile | null> {
+async function fetchProfile(userId: string): Promise<UserProfile | null> {
   try {
     const { data, error } = await supabase
       .from("profiles")
@@ -45,7 +45,7 @@ async function ensureProfileExists(
   extraData: { full_name?: string; phone?: string; invite_code_used?: string | null }
 ) {
   try {
-    const response = await fetch("/api/complete-registration", {
+    const res = await fetch("/api/complete-registration", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -56,26 +56,21 @@ async function ensureProfileExists(
         invite_code_used: extraData.invite_code_used ?? null,
       }),
     });
-    if (!response.ok) throw new Error("API error");
+    if (!res.ok) throw new Error("API error");
   } catch {
-    // Fallback: only update if we actually have data to write
     if (!extraData.full_name && !extraData.phone) return;
     try {
       const { data: existing } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("id", userId)
-        .single();
+        .from("profiles").select("id").eq("id", userId).single();
       if (existing) {
         const updates: Record<string, any> = {};
         if (extraData.full_name) updates.full_name = extraData.full_name;
         if (extraData.phone) updates.phone = extraData.phone.replace(/\D/g, "");
         if (extraData.invite_code_used !== undefined) updates.invite_code_used = extraData.invite_code_used;
-        if (Object.keys(updates).length > 0) {
+        if (Object.keys(updates).length > 0)
           await supabase.from("profiles").update(updates).eq("id", userId);
-        }
       }
-    } catch { /* silently ignore */ }
+    } catch { /* ignore */ }
   }
 }
 
@@ -84,67 +79,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const currentUserIdRef = useRef<string | null>(null);
-  const cancelledRef = useRef(false);
-
-  const loadProfileInBackground = async (userId: string, email: string) => {
-    const data = await fetchProfileFromSupabase(userId);
-    if (cancelledRef.current || currentUserIdRef.current !== userId) return;
-    if (data) setProfile({ ...data, email });
-  };
+  // Tracks the active user id — used to discard stale async results
+  const activeUidRef = useRef<string | null>(null);
+  // Prevents SIGNED_IN from re-running a full load if INITIAL_SESSION already did it
+  const initialSessionDoneRef = useRef(false);
 
   const refreshProfile = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        const data = await fetchProfileFromSupabase(session.user.id);
-        if (data) setProfile({ ...data, email: session.user.email ?? "" });
-      }
+      if (!session?.user) return;
+      const data = await fetchProfile(session.user.id);
+      if (data) setProfile({ ...data, email: session.user.email ?? "" });
     } catch { /* silently fail */ }
   };
 
   const forceRefresh = refreshProfile;
 
   const signOut = async () => {
-    currentUserIdRef.current = null;
+    activeUidRef.current = null;
+    initialSessionDoneRef.current = false;
     try { await supabase.auth.signOut(); } catch { /* ignore */ }
     setUser(null);
     setProfile(null);
   };
 
   useEffect(() => {
-    cancelledRef.current = false;
+    let cancelled = false;
 
-    // Safety net: resolve loading after 6 seconds max (reduced from 12)
+    // Safety net: resolve loading after 6 seconds max
     const safetyTimer = setTimeout(() => {
-      if (!cancelledRef.current) setLoading(false);
+      if (!cancelled) setLoading(false);
     }, 6000);
+
+    const unlock = () => {
+      if (!cancelled) {
+        setLoading(false);
+        clearTimeout(safetyTimer);
+      }
+    };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (cancelledRef.current) return;
+        if (cancelled) return;
 
+        // ── INITIAL_SESSION: page load / session restore ──────────────────────
         if (event === "INITIAL_SESSION") {
           if (session?.user) {
             const { id, email = "" } = session.user;
-            currentUserIdRef.current = id;
-            // ── Unlock the UI immediately ──
+            activeUidRef.current = id;
             setUser({ id, email });
-            setLoading(false);
-            clearTimeout(safetyTimer);
-            // ── Load full profile in background (non-blocking) ──
-            loadProfileInBackground(id, email);
-          } else {
-            setLoading(false);
-            clearTimeout(safetyTimer);
+            // Wait for profile before unlocking so pages never flash "UTILIZADOR"
+            const data = await fetchProfile(id);
+            if (cancelled || activeUidRef.current !== id) return;
+            if (data) setProfile({ ...data, email });
+            initialSessionDoneRef.current = true;
           }
+          unlock();
 
+        // ── SIGNED_IN: actual user login (or OTP confirmation) ────────────────
         } else if (event === "SIGNED_IN" && session?.user) {
           const { id, email = "" } = session.user;
-          currentUserIdRef.current = id;
+
+          // If INITIAL_SESSION already loaded this user, skip to avoid double-fetch
+          if (initialSessionDoneRef.current && activeUidRef.current === id) return;
+
+          activeUidRef.current = id;
           setUser({ id, email });
 
-          // Only call ensureProfileExists for brand-new registrations
+          // Handle new registration data
           const pendingRaw = sessionStorage.getItem("pendingReg");
           if (pendingRaw) {
             try {
@@ -158,38 +160,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch { /* não crítico */ }
           }
 
-          // Load profile then unlock UI
-          const data = await fetchProfileFromSupabase(id);
-          if (!cancelledRef.current && currentUserIdRef.current === id) {
-            if (data) setProfile({ ...data, email });
-            setLoading(false);
-            clearTimeout(safetyTimer);
-          }
+          const data = await fetchProfile(id);
+          if (cancelled || activeUidRef.current !== id) return;
+          if (data) setProfile({ ...data, email });
+          initialSessionDoneRef.current = true;
+          unlock();
 
+        // ── SIGNED_OUT ────────────────────────────────────────────────────────
         } else if (event === "SIGNED_OUT") {
-          currentUserIdRef.current = null;
+          activeUidRef.current = null;
+          initialSessionDoneRef.current = false;
           setUser(null);
           setProfile(null);
-          setLoading(false);
-          clearTimeout(safetyTimer);
+          unlock();
 
+        // ── TOKEN_REFRESHED: silent background refresh ────────────────────────
         } else if (event === "TOKEN_REFRESHED" && session?.user) {
           const { id, email = "" } = session.user;
-          setUser({ id, email });
-          // Silently refresh profile in background
-          const data = await fetchProfileFromSupabase(id);
-          if (!cancelledRef.current && data) setProfile({ ...data, email });
+          // Only update user object if id actually changed (avoid pointless re-renders)
+          setUser(prev => (prev?.id === id ? prev : { id, email }));
+          const data = await fetchProfile(id);
+          if (!cancelled && activeUidRef.current === id && data)
+            setProfile({ ...data, email });
 
+        // ── USER_UPDATED ──────────────────────────────────────────────────────
         } else if (event === "USER_UPDATED" && session?.user) {
           const { id, email = "" } = session.user;
-          const data = await fetchProfileFromSupabase(id);
-          if (!cancelledRef.current && data) setProfile({ ...data, email });
+          const data = await fetchProfile(id);
+          if (!cancelled && data) setProfile({ ...data, email });
         }
       }
     );
 
     return () => {
-      cancelledRef.current = true;
+      cancelled = true;
       clearTimeout(safetyTimer);
       subscription.unsubscribe();
     };

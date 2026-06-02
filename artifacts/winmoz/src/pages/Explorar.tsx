@@ -6,6 +6,7 @@ import {
 import { Link, useLocation } from "wouter";
 import BottomNav from "@/components/BottomNav";
 import { AtualizacoesCards } from "./Home";
+import { useAuth } from "@/contexts/AuthContext";
 
 const TABS = ["Jogos", "Assistir", "Sala", "Novidades", "Chat"] as const;
 type Tab = typeof TABS[number];
@@ -48,10 +49,10 @@ const stagger = {
 
 function GameCard({ game }: { game: typeof jogosCards[0] }) {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const betId = game.id.split("-")[0];
   const handlePlay = () => {
-    if (!localStorage.getItem("winmoz_logged_in")) { setLocation("/login"); return; }
-    // Roulette goes directly to its own screen — no betting flow needed
+    if (!user) { setLocation("/login"); return; }
     if (game.id === "roleta") { setLocation("/roleta"); return; }
     setLocation(`/apostar/${betId}`);
   };
@@ -93,8 +94,9 @@ function GameCard({ game }: { game: typeof jogosCards[0] }) {
 
 function MatchCard({ match }: { match: typeof partidasTempoReal[0] }) {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
   const handleWatch = () => {
-    if (!localStorage.getItem("winmoz_logged_in")) { setLocation("/login"); return; }
+    if (!user) { setLocation("/login"); return; }
   };
   return (
     <motion.div
@@ -451,10 +453,11 @@ export default function Explorar() {
   const [gameFilter, setGameFilter] = useState<GameFilter>("Todos");
   const [filterOpen, setFilterOpen] = useState(false);
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
 
   const handleTabChange = (tab: Tab) => {
     const protectedTabs: Tab[] = ["Sala", "Chat"];
-    if (protectedTabs.includes(tab) && !localStorage.getItem("winmoz_logged_in")) {
+    if (protectedTabs.includes(tab) && !user) {
       setLocation("/login");
       return;
     }
