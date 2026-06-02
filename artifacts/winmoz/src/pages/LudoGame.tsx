@@ -117,8 +117,8 @@ const SAFE_COORDS = new Set<string>([
 ]);
 
 // ─── Sizing — pawn size (increased for visibility) ─────────────────────────────
-const PIECE_BOX  = 42;  // px
-const PAWN_SIZE  = 34;  // px
+const PIECE_BOX  = 52;  // px
+const PAWN_SIZE  = 44;  // px
 
 // ─── getPieceCoord: stretch entered after pos 50 (arrow cell) ──────────────────
 function getPieceCoord(p: GamePiece): [number,number] {
@@ -183,11 +183,11 @@ function SelectionRing({ color }: { color: PawnColor }) {
     <>
       {/* Outer pulsing halo */}
       <motion.div
-        animate={{ scale:[1, 1.55, 1], opacity:[0, 0.7, 0] }}
+        animate={{ scale:[1, 1.25, 1], opacity:[0, 0.55, 0] }}
         transition={{ duration:0.9, repeat:Infinity, ease:"easeOut" }}
         style={{
           position:"absolute",
-          inset:-10,
+          inset:-5,
           borderRadius:"50%",
           background:`radial-gradient(circle, ${glowColor}44 0%, transparent 70%)`,
           pointerEvents:"none",
@@ -200,24 +200,24 @@ function SelectionRing({ color }: { color: PawnColor }) {
         transition={{ duration:1.6, repeat:Infinity, ease:"linear" }}
         style={{
           position:"absolute",
-          inset:-5,
+          inset:-3,
           borderRadius:"50%",
-          border:`2.5px dashed ${glowColor}`,
-          boxShadow:`0 0 12px ${glowColor}99, 0 0 24px ${glowColor}44`,
+          border:`2px dashed ${glowColor}`,
+          boxShadow:`0 0 7px ${glowColor}88, 0 0 14px ${glowColor}33`,
           pointerEvents:"none",
           zIndex:0,
         }}
       />
       {/* Inner solid ring */}
       <motion.div
-        animate={{ scale:[1, 1.12, 1], opacity:[0.8, 1, 0.8] }}
+        animate={{ scale:[1, 1.07, 1], opacity:[0.8, 1, 0.8] }}
         transition={{ duration:0.7, repeat:Infinity, ease:"easeInOut" }}
         style={{
           position:"absolute",
-          inset:-2,
+          inset:-1,
           borderRadius:"50%",
           border:`2px solid ${glowColor}`,
-          boxShadow:`0 0 8px ${glowColor}CC`,
+          boxShadow:`0 0 6px ${glowColor}BB`,
           pointerEvents:"none",
           zIndex:0,
         }}
