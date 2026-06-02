@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { ArrowLeft, RotateCcw, LogOut, Flag } from "lucide-react";
+import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import bgImg from "@assets/Gemini_Generated_Image_grc2w7grc2w7grc2_1780220609974.png";
@@ -145,60 +145,76 @@ const PAWN_PAL: Record<PawnColor,{s:string;m:string;d:string}> = {
   yellow: { s:"#FDE68A", m:"#EAB308", d:"#713F12" },
 };
 
-// ─── Classic Ludo sphere pawn ──────────────────────────────────────────────────
-function Pawn({ color, size=PAWN_SIZE, glow=false }: {
-  color:PawnColor; size?:number; glow?:boolean;
+// ─── Pin / Location-marker pawn ────────────────────────────────────────────────
+// Normal state  : clean circle head + pointed tail (dice not yet rolled)
+// Selectable    : same shape + radiating sun-ray teeth (dice rolled, pick a piece)
+function PinPawn({ color, size=PAWN_SIZE, selectable=false }: {
+  color:PawnColor; size?:number; selectable?:boolean;
 }) {
   const p = PAWN_PAL[color];
-  const id = `sp_${color}`;
+  const w  = Math.round(size * 0.72);  // pin is narrower than tall
+  const CX = 18; const CY = 16;
+  const OR = 14;   // outer white ring radius
+  const IR = 11;   // inner colour circle radius
+  const TEETH = 12;
+  const T1 = OR + 1.5;   // tooth inner
+  const T2 = OR + 6;     // tooth outer
+  const gradId = `pp_${color}`;
   return (
     <div style={{
       display:"flex", flexShrink:0,
-      filter: glow
-        ? `drop-shadow(0 0 ${Math.round(size*0.3)}px ${p.m}CC) drop-shadow(0 1px 3px rgba(0,0,0,0.6))`
-        : "drop-shadow(0 1px 3px rgba(0,0,0,0.5))",
+      filter: selectable
+        ? `drop-shadow(0 0 ${Math.round(size*0.3)}px ${p.m}EE) drop-shadow(0 2px 4px rgba(0,0,0,0.55))`
+        : "drop-shadow(0 2px 4px rgba(0,0,0,0.48))",
     }}>
-      <svg viewBox="0 0 36 36" width={size} height={size} style={{display:"block"}}>
+      <svg viewBox="0 0 36 52" width={w} height={size} style={{display:"block"}}>
         <defs>
-          <radialGradient id={`${id}_g`} cx="35%" cy="28%" r="72%">
+          <radialGradient id={gradId} cx="35%" cy="28%" r="72%">
             <stop offset="0%"   stopColor={p.s}/>
-            <stop offset="50%"  stopColor={p.m}/>
+            <stop offset="55%"  stopColor={p.m}/>
             <stop offset="100%" stopColor={p.d}/>
           </radialGradient>
         </defs>
-        {/* Shadow */}
-        <ellipse cx="18" cy="34" rx="10" ry="2.5" fill="rgba(0,0,0,0.2)"/>
-        {/* Sphere body */}
-        <circle cx="18" cy="17" r="15" fill={`url(#${id}_g)`}/>
-        <circle cx="18" cy="17" r="15" fill="none" stroke={p.d} strokeWidth="0.7" opacity="0.55"/>
-        {/* Inner ring detail — classic Ludo */}
-        <circle cx="18" cy="17" r="8"  fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5"/>
-        {/* Shine */}
-        <ellipse cx="11" cy="9" rx="5" ry="3.8" fill="white" opacity="0.52" transform="rotate(-18 11 9)"/>
-        <ellipse cx="11" cy="9" rx="2.2" ry="1.6" fill="white" opacity="0.8" transform="rotate(-18 11 9)"/>
+
+        {/* Drop shadow at tip */}
+        <ellipse cx={CX} cy={50} rx={4.5} ry={1.8} fill="rgba(0,0,0,0.22)"/>
+
+        {/* Sun-ray teeth — only when selectable (dice rolled, waiting for pick) */}
+        {selectable && Array.from({length:TEETH}).map((_,i) => {
+          const a = (i * (360/TEETH)) * Math.PI / 180;
+          return (
+            <line key={i}
+              x1={CX + Math.cos(a)*T1} y1={CY + Math.sin(a)*T1}
+              x2={CX + Math.cos(a)*T2} y2={CY + Math.sin(a)*T2}
+              stroke={p.m} strokeWidth={2.8} strokeLinecap="round" opacity={0.92}
+            />
+          );
+        })}
+
+        {/* Pin tail (teardrop) */}
+        <path
+          d={`M${CX-6.5},${CY+OR-1} Q${CX-3},44 ${CX},49 Q${CX+3},44 ${CX+6.5},${CY+OR-1} Z`}
+          fill="white" opacity={0.9}
+        />
+        <path
+          d={`M${CX-5},${CY+OR} Q${CX-2.5},43.5 ${CX},48.5 Q${CX+2.5},43.5 ${CX+5},${CY+OR} Z`}
+          fill={`url(#${gradId})`}
+        />
+
+        {/* White outer ring */}
+        <circle cx={CX} cy={CY} r={OR+0.5} fill="white" opacity={0.92}/>
+
+        {/* Colour fill */}
+        <circle cx={CX} cy={CY} r={IR} fill={`url(#${gradId})`}/>
+
+        {/* Shine highlight */}
+        <ellipse
+          cx={CX-3.5} cy={CY-4.5} rx={3.8} ry={2.6}
+          fill="white" opacity={0.46}
+          transform={`rotate(-20 ${CX-3.5} ${CY-4.5})`}
+        />
       </svg>
     </div>
-  );
-}
-
-// ─── Selection ring — STATIC pulsing circle, centered on the square ────────────
-// NOT spinning/rotating — just a breathing glow ring around the pawn
-function SelectionRing({ color }: { color: PawnColor }) {
-  const p = PAWN_PAL[color];
-  return (
-    <motion.div
-      animate={{ scale:[1,1.08,1], opacity:[0.55,1,0.55] }}
-      transition={{ duration:1.1, repeat:Infinity, ease:"easeInOut" }}
-      style={{
-        position:"absolute",
-        inset: -3,          // ring is 3px larger than PIECE_BOX on each side
-        borderRadius:"50%",
-        border:`2.5px solid ${p.m}`,
-        boxShadow:`0 0 10px ${p.m}66, 0 0 18px ${p.m}22, inset 0 0 6px ${p.m}11`,
-        pointerEvents:"none",
-        zIndex:0,
-      }}
-    />
   );
 }
 
@@ -271,34 +287,48 @@ function BoardSVG({ pieces }:{ pieces:GamePiece[] }) {
       <polygon points="240,360 240,240 300,300" fill={Q.red.main}/>
       {/* Center border */}
       <rect x={240} y={240} width={120} height={120} fill="none" stroke="#AAAAAA" strokeWidth="0.6"/>
-      {/* SVG sphere gradients (shared) */}
+      {/* Gradients for home pin heads */}
       <defs>
         {(["blue","green","red","yellow"] as PawnColor[]).map(color=>{
           const p=PAWN_PAL[color];
           return (
             <radialGradient key={color} id={`hs_${color}`} cx="35%" cy="28%" r="72%">
               <stop offset="0%"   stopColor={p.s}/>
-              <stop offset="50%"  stopColor={p.m}/>
+              <stop offset="55%"  stopColor={p.m}/>
               <stop offset="100%" stopColor={p.d}/>
             </radialGradient>
           );
         })}
       </defs>
-      {/* Home slot circles + resting pawns */}
+      {/* Home slot circles + resting pin-pawns */}
       {HOME_DECO.map(({ color, slots })=>
         slots.map(([px,py],i)=>{
           const p=PAWN_PAL[color];
           const isActive=(color==="blue"&&inHome.blue.has(i))||(color==="green"&&inHome.green.has(i));
           return (
             <g key={`${color}_${i}`}>
+              {/* Slot ring */}
               <circle cx={px} cy={py} r={26} fill={p.d} opacity={0.28}/>
               <circle cx={px} cy={py} r={26} fill="none" stroke={p.m} strokeWidth={2.2} opacity={0.7}/>
               {isActive && (
                 <>
-                  <circle cx={px} cy={py} r={16} fill={`url(#hs_${color})`}/>
-                  <circle cx={px} cy={py} r={16} fill="none" stroke={p.d} strokeWidth="0.8" opacity="0.5"/>
-                  <circle cx={px} cy={py} r={9}  fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1.5"/>
-                  <ellipse cx={px-5} cy={py-7} rx="4.5" ry="3" fill="white" opacity="0.48" transform={`rotate(-18 ${px-5} ${py-7})`}/>
+                  {/* Pin tail */}
+                  <path
+                    d={`M${px-6},${py+11} Q${px-2.5},${py+24} ${px},${py+27} Q${px+2.5},${py+24} ${px+6},${py+11} Z`}
+                    fill="white" opacity={0.9}
+                  />
+                  <path
+                    d={`M${px-4.5},${py+12} Q${px-2},${py+23} ${px},${py+26} Q${px+2},${py+23} ${px+4.5},${py+12} Z`}
+                    fill={`url(#hs_${color})`}
+                  />
+                  {/* White outer ring */}
+                  <circle cx={px} cy={py} r={14.5} fill="white" opacity={0.9}/>
+                  {/* Colour fill */}
+                  <circle cx={px} cy={py} r={11} fill={`url(#hs_${color})`}/>
+                  {/* Shine */}
+                  <ellipse cx={px-3.5} cy={py-4.5} rx={3.8} ry={2.6}
+                    fill="white" opacity={0.46}
+                    transform={`rotate(-20 ${px-3.5} ${py-4.5})`}/>
                 </>
               )}
             </g>
@@ -363,7 +393,7 @@ function Board({ pieces, movable, onSelectPiece }:{
           transform:`translate(calc(-50% + ${xOff}px),-50%)`,
           zIndex:15, pointerEvents:"none",
         }}>
-          <Pawn color={color} size={sz}/>
+          <PinPawn color={color} size={sz}/>
         </div>
       );
     });
@@ -399,15 +429,9 @@ function Board({ pieces, movable, onSelectPiece }:{
                 transform:"translate(-50%,-50%)",
                 zIndex:selectable?20:5,
                 cursor:selectable?"pointer":"default",
-              }}>
-              {selectable && <SelectionRing color={color}/>}
-              <div style={{
-                position:"absolute", inset:0,
                 display:"flex", alignItems:"center", justifyContent:"center",
-                zIndex:2,
               }}>
-                <Pawn color={color} size={PAWN_SIZE} glow={selectable}/>
-              </div>
+              <PinPawn color={color} size={PAWN_SIZE} selectable={selectable}/>
             </div>
           );
         }
@@ -430,15 +454,9 @@ function Board({ pieces, movable, onSelectPiece }:{
               transform:`translate(calc(-50% + ${offX}px), calc(-50% + ${offY}px))`,
               zIndex:selectable?20:10,
               cursor:selectable?"pointer":"default",
-            }}>
-            {selectable && <SelectionRing color={color}/>}
-            <div style={{
-              position:"absolute", inset:0,
               display:"flex", alignItems:"center", justifyContent:"center",
-              zIndex:2,
             }}>
-              <Pawn color={color} size={PAWN_SIZE} glow={selectable}/>
-            </div>
+            <PinPawn color={color} size={PAWN_SIZE} selectable={selectable}/>
           </div>
         );
       })}
@@ -614,7 +632,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
         display:"flex", alignItems:"center", justifyContent:"center",
         transition:"border-color 0.3s",
       }}>
-        <Pawn color={color} size={22}/>
+        <PinPawn color={color} size={26}/>
       </div>
 
       {/* Name + stats */}
@@ -637,7 +655,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
             borderRadius:4, padding:"2px 6px", flexShrink:0,
           }}>{isMe?"Tu":"Rival"}</span>
         </div>
-        {/* Row 2: balance + lives + pieces */}
+        {/* Row 2: balance + finished pieces */}
         <div style={{ display:"flex", alignItems:"center", gap:7 }}>
           <span style={{
             fontFamily:"system-ui,-apple-system,sans-serif",
@@ -645,17 +663,6 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
             color: isActive ? accentColor : "#CBD5E1",
             transition:"color 0.3s",
           }}>{balance}</span>
-          <div style={{ width:1, height:10, background:"#E2E8F0", flexShrink:0 }}/>
-          {/* Lives */}
-          <div style={{ display:"flex", alignItems:"center", gap:2.5 }}>
-            {Array.from({length:5}).map((_,i)=>(
-              <div key={i} style={{
-                width:5, height:5, borderRadius:"50%",
-                background: i<lives ? "#EF4444" : "#E2E8F0",
-                transition:"all 0.25s",
-              }}/>
-            ))}
-          </div>
           <div style={{ width:1, height:10, background:"#E2E8F0", flexShrink:0 }}/>
           {/* Finished pieces */}
           <div style={{ display:"flex", alignItems:"center", gap:2.5 }}>
@@ -1294,10 +1301,7 @@ export default function LudoGame() {
   }
 
   function handleBack(){
-    if(!winner&&phase!=="done"&&gameId!=="local"){
-      if(!window.confirm("Se saíres agora, perdes a partida. Confirmas?"))return;
-      channelRef.current?.send({type:"broadcast",event:"ludo_forfeit",payload:{player:myColor}});
-    }
+    // Navigate away without forfeiting — the game continues for the other player
     setLocation("/");
   }
 
@@ -1353,23 +1357,21 @@ export default function LudoGame() {
             </p>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6}}>
+            {/* Bet amount label */}
+            <span style={{
+              fontSize:11, fontWeight:700, color:"#FFD700",
+              fontFamily:"'Syne',sans-serif", letterSpacing:0.2,
+            }}>
+              {BET_AMOUNT>0 ? `Valor da aposta: ${BET_AMOUNT} MT` : "Demo"}
+            </span>
+            {/* Quit game icon — forfeit */}
             {!winner&&phase!=="done"&&gameId!=="local"&&(
               <button onClick={handleForfeit} style={{width:34,height:34,borderRadius:9,
                 background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",
                 display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-                <Flag style={{width:15,height:15,color:"#EF4444"}}/>
+                <LogOut style={{width:15,height:15,color:"#EF4444"}}/>
               </button>
             )}
-            <div style={{
-              padding:"4px 10px",
-              background:"linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,215,0,0.06))",
-              border:"1px solid rgba(255,215,0,0.22)",
-              borderRadius:8,
-            }}>
-              <span style={{ fontSize:10, color:"#FFD700", fontWeight:700, fontFamily:"'Syne',sans-serif" }}>
-                {BET_AMOUNT>0?`${BET_AMOUNT} MT`:"Demo"}
-              </span>
-            </div>
           </div>
         </div>
 
