@@ -4,7 +4,7 @@ import { Link, useLocation } from "wouter";
 import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp, Bell, User } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
-import { getSyntheticUser, generateWithdrawalAmount, getWithdrawalInterval, shouldBootWithdrawal } from "@/lib/simulation";
+import { getSyntheticUser, generateWithdrawalAmount, getWithdrawalInterval, shouldBootWithdrawal, getLivePlayerCount, formatPlayerCount } from "@/lib/simulation";
 
 /* ─────────────────────────────────────────────
    SAQUES 24 HORAS — realistic, time-aware
@@ -1072,7 +1072,7 @@ const games = [
     sub: "Jogo de Tabuleiro",
     bet: "50–5.000 MT",
     rating: "4.8",
-    players: "2.4K jogando",
+    baseIdx: 0,
     image: "/damas-card.jpg",
     imageFit: "cover" as const,
     imagePos: "center",
@@ -1083,7 +1083,7 @@ const games = [
     sub: "Jogo de Dados",
     bet: "20–2.000 MT",
     rating: "4.9",
-    players: "4.1K jogando",
+    baseIdx: 1,
     image: "/ludo-card2.png",
     imageFit: "cover" as const,
     imagePos: "center 40%",
@@ -1095,7 +1095,7 @@ const games = [
     sub: "Estratégia Real",
     bet: "100–10.000 MT",
     rating: "4.7",
-    players: "1.2K jogando",
+    baseIdx: 2,
     image: "/xadrez-card.jpg",
     imageFit: "cover" as const,
     imagePos: "center 30%",
@@ -1106,7 +1106,7 @@ const games = [
     sub: "Jogo de Mesa",
     bet: "50–3.000 MT",
     rating: "4.6",
-    players: "890 jogando",
+    baseIdx: 5,
     image: "/bilhar-card.webp",
     imageFit: "cover" as const,
     imagePos: "center",
@@ -1117,7 +1117,7 @@ const games = [
     sub: "Roleta da Sorte",
     bet: "20–1.000 MT",
     rating: "4.5",
-    players: "1.5K jogando",
+    baseIdx: 6,
     image: "/roleta-card.jpg",
     imageFit: "cover" as const,
     imagePos: "center",
@@ -1138,11 +1138,11 @@ const fadeUp = {
    TOP GAMES
 ───────────────────────────────────────────── */
 const topGames = [
-  { id: "dc", gameRoute: "damas", name: "Damas Clássico", players: "4.1K apostadores ativos", rank: 1, image: "/damas-card.jpg", imagePos: "center", from: "#1D4ED8", to: "#1E3A8A" },
-  { id: "lt", gameRoute: "ludo",  name: "Ludo Turbo",     players: "3.8K apostadores ativos", rank: 2, image: "/ludo-card2.png", imagePos: "center 65%", from: "#059669", to: "#064E3B" },
-  { id: "xr", gameRoute: "xadrez",name: "Xadrez Rápido",  players: "2.5K apostadores ativos", rank: 3, image: "/xadrez-card.jpg", imagePos: "center 30%", from: "#7C3AED", to: "#3B0764" },
-  { id: "bi", gameRoute: "bilhar",name: "Bilhar Apostado", players: "890 apostadores ativos",  rank: 4, image: "/bilhar-card.webp", imagePos: "center", from: "#0891b2", to: "#164e63" },
-  { id: "ro", gameRoute: "roleta",name: "Roleta da Sorte", players: "1.5K apostadores ativos", rank: 5, image: "/roleta-card.jpg", imagePos: "center", from: "#be185d", to: "#831843" },
+  { id: "dc", gameRoute: "damas", name: "Damas Clássico", baseIdx: 0, rank: 1, image: "/damas-card.jpg", imagePos: "center", from: "#1D4ED8", to: "#1E3A8A" },
+  { id: "lt", gameRoute: "ludo",  name: "Ludo Turbo",     baseIdx: 1, rank: 2, image: "/ludo-card2.png", imagePos: "center 65%", from: "#059669", to: "#064E3B" },
+  { id: "xr", gameRoute: "xadrez",name: "Xadrez Rápido",  baseIdx: 2, rank: 3, image: "/xadrez-card.jpg", imagePos: "center 30%", from: "#7C3AED", to: "#3B0764" },
+  { id: "bi", gameRoute: "bilhar",name: "Bilhar Apostado", baseIdx: 5, rank: 4, image: "/bilhar-card.webp", imagePos: "center", from: "#0891b2", to: "#164e63" },
+  { id: "ro", gameRoute: "roleta",name: "Roleta da Sorte", baseIdx: 6, rank: 5, image: "/roleta-card.jpg", imagePos: "center", from: "#be185d", to: "#831843" },
 ];
 
 /* ─────────────────────────────────────────────
@@ -1150,6 +1150,7 @@ const topGames = [
 ───────────────────────────────────────────── */
 export default function Home() {
   const [gamesReady, setGamesReady] = useState(false);
+  const [tick, setTick] = useState(0);
   const [, setLocation] = useLocation();
   const { user, profile } = useAuth();
   const isLoggedIn = !!user;
@@ -1157,6 +1158,11 @@ export default function Home() {
   useEffect(() => {
     const t = setTimeout(() => setGamesReady(true), 350);
     return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 20_000);
+    return () => clearInterval(id);
   }, []);
 
   return (
@@ -1264,7 +1270,7 @@ export default function Home() {
                 <div className="p-3 flex flex-col flex-1">
                   <h3 className="font-syne font-bold text-slate-900 text-sm tracking-wide">{game.name}</h3>
                   <p className="text-[10px] font-semibold text-blue-700 mt-0.5 uppercase tracking-wider">{game.bet}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{game.players}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} jogando</p>
                   <div className="mt-auto">
                     <button
                       onClick={() => {
@@ -1332,7 +1338,7 @@ export default function Home() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{game.players}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} apostadores ativos</p>
                 </div>
 
                 <button

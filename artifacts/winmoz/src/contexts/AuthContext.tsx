@@ -25,16 +25,27 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-async function fetchProfile(userId: string): Promise<UserProfile | null> {
+async function fetchProfile(userId: string, attempt = 0): Promise<UserProfile | null> {
   try {
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .single();
-    if (error || !data) return null;
+    if (error || !data) {
+      // Retry up to 3 times with exponential back-off (500ms, 1000ms, 2000ms)
+      if (attempt < 3) {
+        await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+        return fetchProfile(userId, attempt + 1);
+      }
+      return null;
+    }
     return data as UserProfile;
   } catch {
+    if (attempt < 3) {
+      await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
+      return fetchProfile(userId, attempt + 1);
+    }
     return null;
   }
 }

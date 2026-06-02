@@ -1,28 +1,28 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Search, ChevronRight, Play, Users, Clock, Trophy, Zap, Plus, Hash, ArrowRight, Shield, SlidersHorizontal, X, CheckCircle2, Key, Send, Lock
+  Search, ChevronRight, Play, Users, Clock, Trophy, Zap, Plus, Hash, ArrowRight, Shield, SlidersHorizontal, X, CheckCircle2, Key, Send, Lock, Copy, Check, AlertCircle
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BottomNav from "@/components/BottomNav";
 import { AtualizacoesCards } from "./Home";
 import { useAuth } from "@/contexts/AuthContext";
-import { getLivePlayerCount, formatPlayerCount, generateMatchPool, type SimMatch } from "@/lib/simulation";
+import { supabase } from "@/lib/supabase";
+import { getLivePlayerCount, formatPlayerCount, generateMatchPool, getSalaOnlineCount, formatOnlineCount, type SimMatch } from "@/lib/simulation";
 
 const TABS = ["Jogos", "Assistir", "Sala", "Novidades", "Chat"] as const;
 type Tab = typeof TABS[number];
 
-const GAME_FILTERS = ["Todos", "Damas", "Ludo", "Xadrez", "Padrão"] as const;
+const GAME_FILTERS = ["Todos", "Damas", "Ludo", "Xadrez"] as const;
 type GameFilter = typeof GAME_FILTERS[number];
 
 const jogosCardsMeta = [
   { id: "damas",        name: "Damas Clássico",  desc: "Jogo de Tabuleiro • 12 Modos", baseIdx: 0, color: "from-blue-500 to-indigo-700",     initials: "DA", hot: true,  category: "Damas",  image: "/damas-card.jpg"   },
-  { id: "ludo",         name: "Ludo Turbo",       desc: "Jogo de Dados • 6 Modos",      baseIdx: 1, color: "from-emerald-500 to-teal-700",    initials: "LU", hot: true,  category: "Ludo",   image: "/ludo-card2.png"   },
+  { id: "ludo",         name: "Ludo Turbo",       desc: "Jogo de Dados • 4 Modos",      baseIdx: 1, color: "from-emerald-500 to-teal-700",    initials: "LU", hot: true,  category: "Ludo",   image: "/ludo-card2.png"   },
   { id: "xadrez",       name: "Xadrez Rápido",    desc: "Estratégia Real • 8 Modos",    baseIdx: 2, color: "from-violet-500 to-purple-800",   initials: "XA", hot: false, category: "Xadrez", image: "/xadrez-card.jpg"  },
   { id: "ludo-classic", name: "Ludo Clássico",    desc: "Jogo de Dados • 3 Modos",      baseIdx: 3, color: "from-pink-500 to-rose-700",       initials: "LC", hot: false, category: "Ludo",   image: "/ludo-card2.png"   },
-  { id: "padrao",       name: "Jogo Padrão",      desc: "Clássico • 5 Modos",           baseIdx: 4, color: "from-amber-500 to-yellow-600",    initials: "JP", hot: false, category: "Padrão", image: null                },
-  { id: "bilhar",       name: "Bilhar Apostado",  desc: "Jogo de Mesa • 5 Modos",       baseIdx: 5, color: "from-cyan-500 to-blue-700",        initials: "BI", hot: false, category: "Padrão", image: "/bilhar-card.webp" },
-  { id: "roleta",       name: "Roleta da Sorte",  desc: "Sorte • 3 Modos",              baseIdx: 6, color: "from-pink-600 to-rose-800",        initials: "RS", hot: true,  category: "Padrão", image: "/roleta-card.jpg"  },
+  { id: "bilhar",       name: "Bilhar Apostado",  desc: "Jogo de Mesa • 5 Modos",       baseIdx: 5, color: "from-cyan-500 to-blue-700",        initials: "BI", hot: false, category: "Xadrez", image: "/bilhar-card.webp" },
+  { id: "roleta",       name: "Roleta da Sorte",  desc: "Sorte • 3 Modos",              baseIdx: 6, color: "from-pink-600 to-rose-800",        initials: "RS", hot: true,  category: "Damas",  image: "/roleta-card.jpg"  },
 ];
 
 const fadeUp = {
@@ -180,227 +180,499 @@ function MatchCard({ match, isAssistirTab }: { match: SimMatch; isAssistirTab?: 
   );
 }
 
-const RECENT_ROOMS = [
-  { id: "WM-4821", game: "Damas Clássico", players: "2/2", bet: "500 MT",   color: "from-blue-500 to-indigo-700",   initials: "DA" },
-  { id: "WM-3307", game: "Ludo Turbo",     players: "3/4", bet: "200 MT",   color: "from-emerald-500 to-teal-700",  initials: "LU" },
-  { id: "WM-9154", game: "Xadrez Rápido",  players: "1/2", bet: "1.000 MT", color: "from-violet-500 to-purple-800", initials: "XA" },
+// ── Room types & helpers ─────────────────────────────────────────────────────
+
+interface RoomRecord {
+  code: string;
+  gameId: string;
+  gameName: string;
+  betAmount: number;
+  createdAt: number;
+  status: "waiting" | "matched" | "expired";
+}
+
+const SALA_GAMES = [
+  { id: "damas",  name: "Damas Clássico", desc: "12 modos de jogo", image: "/damas-card.jpg",   imagePos: "center" },
+  { id: "ludo",   name: "Ludo Turbo",     desc: "4 modos de jogo",  image: "/ludo-card2.png",   imagePos: "center 65%" },
+  { id: "xadrez", name: "Xadrez Rápido",  desc: "8 modos de jogo",  image: "/xadrez-card.jpg",  imagePos: "center 30%" },
 ];
 
+const SALA_BET_AMOUNTS = [10, 20, 50, 100, 500, 1000, 5000];
+
+function genRoomCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  return "WM-" + Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
+function loadRooms(): RoomRecord[] {
+  try { return JSON.parse(localStorage.getItem("wm_rooms") || "[]"); } catch { return []; }
+}
+
+function saveRooms(rooms: RoomRecord[]) {
+  try { localStorage.setItem("wm_rooms", JSON.stringify(rooms)); } catch { /* ignore */ }
+}
+
+type SalaView = "main" | "entrar" | "criar" | "criar-aposta" | "room-created" | "room-waiting" | "join-bet";
+
 function SalaTab() {
-  const [roomId, setRoomId] = useState("");
-  const [view, setView] = useState<"main" | "entrar" | "criar">("main");
+  const [view, setView] = useState<SalaView>("main");
+  const [inputCode, setInputCode] = useState("");
+  const [selectedGame, setSelectedGame] = useState<typeof SALA_GAMES[0] | null>(null);
+  const [selectedBet, setSelectedBet] = useState<number | null>(null);
+  const [activeCode, setActiveCode] = useState("");
+  const [roomRole, setRoomRole] = useState<"creator" | "joiner">("creator");
+  const [activeGameId, setActiveGameId] = useState("damas");
+  const [activeBet, setActiveBet] = useState(0);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [myRooms, setMyRooms] = useState<RoomRecord[]>(() => loadRooms());
+  const [tick, setTick] = useState(0);
+  const [waitFound, setWaitFound] = useState(false);
+  const [waitRemaining, setWaitRemaining] = useState(300);
+  const matchedRef = useRef(false);
+  const channelRef = useRef<any>(null);
+  const { user, profile, refreshProfile } = useAuth();
+  const [, setLocation] = useLocation();
 
-  /* ── ENTRAR EM SALA ── */
-  if (view === "entrar") {
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 15_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const onlineCount = getSalaOnlineCount(tick);
+  const activeRoomCount = 358 + Math.min(myRooms.filter(r => r.status === "waiting").length, 50);
+
+  async function deductBalance(amount: number, desc: string): Promise<boolean> {
+    if (!user?.id) return false;
+    try {
+      const { data } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
+      const bal = parseFloat(String(data?.balance ?? "0"));
+      if (bal < amount) return false;
+      await supabase.from("profiles").update({ balance: bal - amount }).eq("id", user.id);
+      await supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" });
+      refreshProfile();
+      return true;
+    } catch { return false; }
+  }
+
+  async function refundBalance(amount: number, code: string) {
+    if (!user?.id || amount <= 0) return;
+    try {
+      const { data } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
+      const bal = parseFloat(String(data?.balance ?? "0"));
+      await supabase.from("profiles").update({ balance: bal + amount }).eq("id", user.id);
+      await supabase.from("transactions").insert({ user_id: user.id, type: "win", amount, description: `Reembolso sala ${code}`, status: "approved" });
+      refreshProfile();
+    } catch { /* ignore */ }
+  }
+
+  function navigateToGame(gameId: string, color: string, oppName: string, bet: number, gameRoom: string) {
+    const myEnc = encodeURIComponent(profile?.full_name ?? "Jogador");
+    const oppEnc = encodeURIComponent(oppName);
+    let dest = "/explorar";
+    if (gameId === "ludo") dest = `/ludo-jogo?gameId=${gameRoom}&color=${color}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+    else if (gameId === "xadrez") dest = `/xadrez-jogo?gameId=${gameRoom}&color=${color === "blue" ? "white" : "black"}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+    else dest = `/damas-jogo?gameId=${gameRoom}&color=${color === "blue" ? "w" : "b"}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+    setLocation(dest);
+  }
+
+  // Setup Supabase channel when in room-waiting
+  useEffect(() => {
+    if (view !== "room-waiting" || !activeCode || !user?.id) return;
+    matchedRef.current = false;
+    const channel = supabase.channel(`room_${activeCode}`, {
+      config: { presence: { key: user.id }, broadcast: { self: false } },
+    });
+    channelRef.current = channel;
+
+    channel.on("broadcast", { event: "room_match" }, ({ payload }) => {
+      if (matchedRef.current) return;
+      matchedRef.current = true;
+      const myColor = payload.blue === user.id ? "blue" : "green";
+      const oppName = myColor === "green" ? (payload.blueName ?? "Adversário") : (payload.greenName ?? "Adversário");
+      const updated = loadRooms().map(r => r.code === activeCode ? { ...r, status: "matched" as const } : r);
+      saveRooms(updated); setMyRooms(updated);
+      setWaitFound(true);
+      setTimeout(() => { navigateToGame(activeGameId, myColor, oppName, activeBet, `${payload.blue}_${payload.green}`); supabase.removeChannel(channel); }, 1500);
+    });
+
+    const tryMatch = () => {
+      if (matchedRef.current) return;
+      const state = channel.presenceState<{ displayName?: string }>();
+      const ids = Object.keys(state).sort();
+      if (ids.length < 2 || ids[0] !== user.id) return;
+      matchedRef.current = true;
+      const oppId = ids[1];
+      const oppName = ((state[oppId] as any)?.[0] as any)?.displayName ?? "Adversário";
+      channel.send({ type: "broadcast", event: "room_match", payload: { blue: user.id, green: oppId, blueName: profile?.full_name ?? "Jogador", greenName: oppName } });
+      const updated = loadRooms().map(r => r.code === activeCode ? { ...r, status: "matched" as const } : r);
+      saveRooms(updated); setMyRooms(updated);
+      setWaitFound(true);
+      setTimeout(() => { navigateToGame(activeGameId, "blue", oppName, activeBet, `${user.id}_${oppId}`); supabase.removeChannel(channel); }, 1500);
+    };
+
+    channel.on("presence", { event: "sync" }, tryMatch);
+    channel.on("presence", { event: "join" }, tryMatch);
+    channel.subscribe(async status => {
+      if (status === "SUBSCRIBED") await channel.track({ userId: user.id, displayName: profile?.full_name ?? "Jogador" });
+    });
+    return () => { supabase.removeChannel(channel); channelRef.current = null; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, activeCode, user?.id]);
+
+  // Countdown when waiting
+  useEffect(() => {
+    if (view !== "room-waiting" || waitFound) return;
+    if (waitRemaining <= 0) { refundBalance(activeBet, activeCode); setView("main"); return; }
+    const t = setInterval(() => setWaitRemaining(r => r - 1), 1000);
+    return () => clearInterval(t);
+  }, [view, waitRemaining, waitFound]);
+
+  // ── ROOM WAITING ──────────────────────────────────────────────────────────
+  if (view === "room-waiting") {
+    const mins = String(Math.floor(waitRemaining / 60)).padStart(2, "0");
+    const secs = String(waitRemaining % 60).padStart(2, "0");
+    if (waitFound) return (
+      <div className="flex flex-col items-center justify-center py-16 gap-5">
+        <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-xl" style={{ background: "linear-gradient(135deg,#22c55e,#16a34a)" }}>
+          <CheckCircle2 className="w-10 h-10 text-white" strokeWidth={2.5} />
+        </div>
+        <p className="font-syne font-bold text-slate-900 text-xl">Adversário Encontrado!</p>
+        <p className="text-slate-400 text-sm">A iniciar o jogo…</p>
+        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "3px solid #22c55e33", borderTopColor: "#22c55e" }} className="animate-spin" />
+      </div>
+    );
     return (
-      <motion.div key="entrar" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="pb-6">
-        {/* Back */}
-        <button onClick={() => setView("main")} className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-6 hover:text-slate-800 transition-colors">
-          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
-            <ChevronRight className="w-3.5 h-3.5 rotate-180 text-slate-600" />
+      <motion.div key="room-waiting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="pb-6">
+        <div className="flex flex-col items-center pt-4 pb-6 gap-4">
+          <div className="relative" style={{ width: 84, height: 84 }}>
+            <svg width="84" height="84" style={{ position: "absolute", inset: 0 }}>
+              <circle cx="42" cy="42" r="36" fill="none" stroke="#f1f5f9" strokeWidth="5" />
+              <circle cx="42" cy="42" r="36" fill="none" stroke="#7c3aed" strokeWidth="5"
+                strokeLinecap="round"
+                strokeDasharray={String(2 * Math.PI * 36)}
+                strokeDashoffset={String(2 * Math.PI * 36 * (1 - (300 - waitRemaining) / 300))}
+                transform="rotate(-90 42 42)"
+                style={{ transition: "stroke-dashoffset 1s linear" }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="font-syne font-bold text-slate-900 text-base">{mins}:{secs}</span>
+            </div>
           </div>
-          Voltar
+          <p className="font-syne font-bold text-slate-900 text-lg">Sala {activeCode}</p>
+          <p className="text-slate-400 text-sm text-center px-4">
+            {roomRole === "creator" ? "Partilha o código com o teu adversário para ele entrar na sala." : "A aguardar que o adversário aceite a partida…"}
+          </p>
+          <div className="flex items-center gap-2 px-4 py-2 bg-violet-50 border border-violet-200 rounded-full">
+            <div className="w-2 h-2 rounded-full bg-violet-600 animate-pulse" />
+            <span className="text-xs font-semibold text-violet-700">A aguardar adversário em tempo real…</span>
+          </div>
+          {roomRole === "creator" && (
+            <button onClick={() => { navigator.clipboard.writeText(activeCode); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-syne font-bold text-sm transition-all"
+              style={{ background: copied ? "#22c55e" : "#7c3aed", color: "#fff" }}>
+              {copied ? <><Check className="w-4 h-4" /> Copiado!</> : <><Copy className="w-4 h-4" /> Copiar Código: {activeCode}</>}
+            </button>
+          )}
+        </div>
+        <button onClick={async () => { await refundBalance(activeBet, activeCode); setView("main"); }}
+          className="w-full h-12 rounded-xl font-syne font-medium text-sm flex items-center justify-center gap-2 bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
+          <X className="w-4 h-4" /> Cancelar e Receber Reembolso
         </button>
-
-        <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Entrar em Sala</h2>
-        <p className="text-slate-400 text-sm mb-6">Introduz o código da sala para participar numa partida privada.</p>
-
-        {/* Input */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4 shadow-sm">
-          <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Código da Sala</label>
-          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus-within:border-violet-500 transition-colors">
-            <Hash className="w-4 h-4 text-slate-400 flex-shrink-0" />
-            <input
-              type="text" placeholder="Ex: WM-4821" value={roomId}
-              onChange={e => setRoomId(e.target.value.toUpperCase())}
-              maxLength={10}
-              className="flex-1 bg-transparent text-slate-900 font-syne font-bold text-base outline-none placeholder-slate-300 tracking-widest"
-            />
-            {roomId.length > 0 && (
-              <button onClick={() => setRoomId("")} className="text-slate-300 hover:text-slate-500">
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
-          <button
-            disabled={roomId.length < 3}
-            className={`w-full mt-3.5 h-12 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
-              roomId.length >= 3
-                ? "bg-slate-900 text-white hover:bg-slate-800"
-                : "bg-slate-100 text-slate-300 cursor-not-allowed"
-            }`}
-          >
-            {roomId.length >= 3 ? <>Entrar na Sala <ArrowRight className="w-4 h-4" /></> : "Introduz o código"}
-          </button>
-        </div>
-
-        {/* Recent rooms */}
-        <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Salas Recentes</p>
-        <div className="flex flex-col gap-2">
-          {RECENT_ROOMS.map((room, idx) => (
-            <motion.button key={room.id}
-              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.06 }}
-              onClick={() => setRoomId(room.id)}
-              className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-100 hover:border-slate-300 hover:shadow-sm transition-all duration-200 text-left w-full group"
-            >
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${room.color} flex items-center justify-center text-white font-syne font-bold text-sm flex-shrink-0`}>
-                {room.initials}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-syne font-bold text-slate-900 text-sm">{room.game}</p>
-                <p className="text-[10.5px] text-slate-400 font-mono mt-0.5">{room.id} · {room.players} jogadores</p>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-[11px] font-bold text-slate-700">{room.bet}</p>
-                <ChevronRight className="w-3.5 h-3.5 text-slate-300 mt-0.5 ml-auto group-hover:text-slate-600 transition-colors" />
-              </div>
-            </motion.button>
-          ))}
-        </div>
       </motion.div>
     );
   }
 
-  /* ── CRIAR SALA ── */
+  // ── ROOM CREATED ──────────────────────────────────────────────────────────
+  if (view === "room-created") {
+    return (
+      <motion.div key="room-created" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="pb-6">
+        <div className="text-center py-6">
+          <div className="w-16 h-16 rounded-2xl bg-violet-50 border border-violet-200 flex items-center justify-center mx-auto mb-4">
+            <Key className="w-8 h-8 text-violet-700" />
+          </div>
+          <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Sala Criada!</h2>
+          <p className="text-slate-400 text-sm">Partilha este código com o teu adversário</p>
+        </div>
+        <div className="bg-violet-50 border-2 border-violet-300 rounded-2xl p-6 mb-4 text-center">
+          <p className="text-[11px] font-bold text-violet-500 uppercase tracking-widest mb-2">Código da Sala</p>
+          <p className="font-syne font-extrabold text-4xl text-violet-800 tracking-widest mb-4">{activeCode}</p>
+          <button onClick={() => { navigator.clipboard.writeText(activeCode); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+            className="flex items-center gap-2 mx-auto px-5 py-2.5 rounded-xl font-syne font-bold text-sm transition-all"
+            style={{ background: copied ? "#22c55e" : "#7c3aed", color: "#fff" }}>
+            {copied ? <><Check className="w-4 h-4" /> Copiado!</> : <><Copy className="w-4 h-4" /> Copiar Código</>}
+          </button>
+        </div>
+        <div className="bg-white border border-slate-100 rounded-xl p-4 mb-5 flex items-center justify-between">
+          <div><p className="text-xs text-slate-400 font-medium mb-0.5">Jogo</p><p className="font-syne font-bold text-slate-900 text-sm">{selectedGame?.name}</p></div>
+          <div className="text-right"><p className="text-xs text-slate-400 font-medium mb-0.5">Aposta</p><p className="font-syne font-bold text-violet-700 text-sm">{activeBet} MT</p></div>
+        </div>
+        <button onClick={() => { setWaitRemaining(300); setWaitFound(false); setView("room-waiting"); }}
+          className="w-full py-4 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 text-white mb-3"
+          style={{ background: "linear-gradient(135deg,#7c3aed,#6d28d9)" }}>
+          <ArrowRight className="w-4 h-4" /> Entrar na Sala
+        </button>
+        <button onClick={() => setView("main")} className="w-full h-11 rounded-xl font-syne font-medium text-sm text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors">
+          Voltar ao Menu
+        </button>
+      </motion.div>
+    );
+  }
+
+  // ── CRIAR APOSTA ──────────────────────────────────────────────────────────
+  if (view === "criar-aposta") {
+    return (
+      <motion.div key="criar-aposta" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="pb-6">
+        <button onClick={() => setView("criar")} className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-6 hover:text-slate-800 transition-colors">
+          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center"><ChevronRight className="w-3.5 h-3.5 rotate-180 text-slate-600" /></div>
+          Voltar
+        </button>
+        <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Valor da Aposta</h2>
+        <p className="text-slate-400 text-sm mb-1">Jogo: <span className="font-semibold text-slate-700">{selectedGame?.name}</span></p>
+        <p className="text-slate-400 text-sm mb-6">Saldo: <span className="font-bold text-emerald-600">{parseFloat(String(profile?.balance ?? "0")).toLocaleString("pt-PT")} MT</span></p>
+        <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-3">Selecciona o Valor</p>
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          {SALA_BET_AMOUNTS.map(amt => (
+            <button key={amt} onClick={() => setSelectedBet(amt)}
+              className={`py-3 rounded-xl font-syne font-bold text-sm border-2 transition-all ${selectedBet === amt ? "border-violet-600 bg-violet-50 text-violet-700" : "border-slate-100 bg-white text-slate-700 hover:border-slate-300"}`}>
+              {amt >= 1000 ? `${(amt / 1000).toFixed(amt % 1000 === 0 ? 0 : 1)}K` : amt} MT
+            </button>
+          ))}
+        </div>
+        {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl mb-4 text-red-700 text-sm"><AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}</div>}
+        <button disabled={selectedBet === null || loading}
+          onClick={async () => {
+            if (!selectedBet || !selectedGame) return;
+            setError(""); setLoading(true);
+            const ok = await deductBalance(selectedBet, `Criação de sala – ${selectedGame.name}`);
+            if (!ok) { setError("Saldo insuficiente. Por favor recarregue a sua conta."); setLoading(false); return; }
+            const code = genRoomCode();
+            const rec: RoomRecord = { code, gameId: selectedGame.id, gameName: selectedGame.name, betAmount: selectedBet, createdAt: Date.now(), status: "waiting" };
+            const updated = [rec, ...loadRooms()];
+            saveRooms(updated); setMyRooms(updated);
+            setActiveCode(code); setActiveGameId(selectedGame.id); setActiveBet(selectedBet);
+            setLoading(false); setView("room-created");
+          }}
+          className={`w-full py-4 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 transition-all ${selectedBet === null ? "bg-slate-100 text-slate-300 cursor-not-allowed" : "text-white"}`}
+          style={selectedBet !== null ? { background: "linear-gradient(135deg,#7c3aed,#6d28d9)" } : {}}>
+          {loading ? <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <><Key className="w-4 h-4" /> CRIAR SALA</>}
+        </button>
+      </motion.div>
+    );
+  }
+
+  // ── CRIAR (select game) ────────────────────────────────────────────────────
   if (view === "criar") {
-    const games = [
-      { name: "Damas Clássico", desc: "12 modos de jogo", color: "from-blue-500 to-indigo-700",  initials: "DA" },
-      { name: "Ludo Turbo",     desc: "6 modos de jogo",  color: "from-emerald-500 to-teal-700", initials: "LU" },
-      { name: "Xadrez Rápido",  desc: "8 modos de jogo",  color: "from-violet-500 to-purple-800",initials: "XA" },
-    ];
     return (
       <motion.div key="criar" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="pb-6">
         <button onClick={() => setView("main")} className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-6 hover:text-slate-800 transition-colors">
-          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
-            <ChevronRight className="w-3.5 h-3.5 rotate-180 text-slate-600" />
-          </div>
+          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center"><ChevronRight className="w-3.5 h-3.5 rotate-180 text-slate-600" /></div>
           Voltar
         </button>
-
         <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Criar Nova Sala</h2>
-        <p className="text-slate-400 text-sm mb-6">Escolhe o jogo e convida os teus amigos para uma partida privada.</p>
-
-        <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Selecciona o Jogo</p>
-        <div className="flex flex-col gap-2 mb-5">
-          {games.map(g => (
-            <button key={g.name} className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-100 hover:border-slate-300 hover:shadow-sm transition-all duration-200 text-left group">
-              <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${g.color} flex items-center justify-center text-white font-syne font-bold text-sm flex-shrink-0`}>
-                {g.initials}
+        <p className="text-slate-400 text-sm mb-6">Selecciona o jogo para a tua sala privada.</p>
+        <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-3">Selecciona o Jogo</p>
+        <div className="flex flex-col gap-3">
+          {SALA_GAMES.map(g => (
+            <button key={g.id} onClick={() => { setSelectedGame(g); setSelectedBet(null); setError(""); setView("criar-aposta"); }}
+              className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-100 hover:border-violet-300 hover:shadow-sm transition-all duration-200 text-left group">
+              <div className="w-12 h-12 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
+                <img src={g.image} alt={g.name} className="w-full h-full object-cover" style={{ objectPosition: g.imagePos }} />
               </div>
               <div className="flex-1">
                 <p className="font-syne font-bold text-slate-900 text-sm">{g.name}</p>
                 <p className="text-[10.5px] text-slate-400 mt-0.5">{g.desc}</p>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-slate-600 transition-colors" />
+              <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-violet-600 transition-colors" />
             </button>
           ))}
         </div>
+      </motion.div>
+    );
+  }
 
-        <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-xl border border-amber-100 mb-5">
-          <span className="text-amber-500 flex-shrink-0 mt-0.5">⚡</span>
-          <p className="text-sm text-amber-700 leading-relaxed font-medium">
-            Criação de salas estará disponível em breve. Estamos a finalizar os últimos detalhes!
-          </p>
+  // ── JOIN BET (joiner selects bet amount) ───────────────────────────────────
+  if (view === "join-bet") {
+    return (
+      <motion.div key="join-bet" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="pb-6">
+        <button onClick={() => setView("entrar")} className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-6 hover:text-slate-800 transition-colors">
+          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center"><ChevronRight className="w-3.5 h-3.5 rotate-180 text-slate-600" /></div>
+          Voltar
+        </button>
+        <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Confirmar Aposta</h2>
+        <p className="text-slate-400 text-sm mb-1">Código: <span className="font-mono font-bold text-slate-700">{activeCode}</span></p>
+        <p className="text-slate-400 text-sm mb-6">Saldo: <span className="font-bold text-emerald-600">{parseFloat(String(profile?.balance ?? "0")).toLocaleString("pt-PT")} MT</span></p>
+        <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-3">Valor da Aposta</p>
+        <div className="grid grid-cols-3 gap-2 mb-5">
+          {SALA_BET_AMOUNTS.map(amt => (
+            <button key={amt} onClick={() => setSelectedBet(amt)}
+              className={`py-3 rounded-xl font-syne font-bold text-sm border-2 transition-all ${selectedBet === amt ? "border-violet-600 bg-violet-50 text-violet-700" : "border-slate-100 bg-white text-slate-700 hover:border-slate-300"}`}>
+              {amt >= 1000 ? `${(amt / 1000).toFixed(amt % 1000 === 0 ? 0 : 1)}K` : amt} MT
+            </button>
+          ))}
         </div>
-
-        <button disabled className="w-full h-12 rounded-xl font-syne font-bold text-sm bg-slate-100 text-slate-300 cursor-not-allowed flex items-center justify-center gap-2">
-          <Plus className="w-4 h-4" /> Criar Sala — Em Breve
+        {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl mb-4 text-red-700 text-sm"><AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}</div>}
+        <button disabled={selectedBet === null || loading}
+          onClick={async () => {
+            if (!selectedBet) return;
+            setError(""); setLoading(true);
+            const ok = await deductBalance(selectedBet, `Entrada em sala ${activeCode}`);
+            if (!ok) { setError("Saldo insuficiente. Por favor recarregue a sua conta."); setLoading(false); return; }
+            setActiveBet(selectedBet); setActiveGameId("damas");
+            setLoading(false); setWaitRemaining(300); setWaitFound(false); setRoomRole("joiner"); setView("room-waiting");
+          }}
+          className={`w-full py-4 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 transition-all ${selectedBet === null ? "bg-slate-100 text-slate-300 cursor-not-allowed" : "text-white"}`}
+          style={selectedBet !== null ? { background: "linear-gradient(135deg,#7c3aed,#6d28d9)" } : {}}>
+          {loading ? <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : <><ArrowRight className="w-4 h-4" /> Entrar na Sala</>}
         </button>
       </motion.div>
     );
   }
 
-  /* ── MAIN VIEW ── */
+  // ── ENTRAR ────────────────────────────────────────────────────────────────
+  if (view === "entrar") {
+    const myActiveRooms = myRooms.filter(r => r.status === "waiting");
+    return (
+      <motion.div key="entrar" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="pb-6">
+        <button onClick={() => setView("main")} className="flex items-center gap-2 text-slate-500 text-sm font-medium mb-6 hover:text-slate-800 transition-colors">
+          <div className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center"><ChevronRight className="w-3.5 h-3.5 rotate-180 text-slate-600" /></div>
+          Voltar
+        </button>
+        <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Entrar em Sala</h2>
+        <p className="text-slate-400 text-sm mb-6">Introduz o código da sala para participar numa partida privada.</p>
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 mb-4 shadow-sm">
+          <label className="block text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Código da Sala</label>
+          <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 focus-within:border-violet-500 transition-colors mb-3.5">
+            <Hash className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <input type="text" placeholder="Ex: WM-4X7Y" value={inputCode}
+              onChange={e => { setInputCode(e.target.value.toUpperCase()); setError(""); }} maxLength={7}
+              className="flex-1 bg-transparent text-slate-900 font-syne font-bold text-base outline-none placeholder-slate-300 tracking-widest" />
+            {inputCode.length > 0 && <button onClick={() => setInputCode("")}><X className="w-4 h-4 text-slate-300 hover:text-slate-500" /></button>}
+          </div>
+          {error && <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl mb-3 text-red-700 text-sm"><AlertCircle className="w-4 h-4 flex-shrink-0" /> {error}</div>}
+          <button disabled={inputCode.length < 6 || loading}
+            onClick={() => {
+              if (inputCode.length < 6) return;
+              const matched = myRooms.find(r => r.code === inputCode && r.status === "matched");
+              if (matched) { setError("Este código já foi utilizado. A sala expirou."); return; }
+              setActiveCode(inputCode); setRoomRole("joiner"); setSelectedBet(null); setError(""); setView("join-bet");
+            }}
+            className={`w-full h-12 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 transition-all duration-200 ${
+              inputCode.length >= 6 ? "bg-slate-900 text-white hover:bg-slate-800" : "bg-slate-100 text-slate-300 cursor-not-allowed"
+            }`}>
+            {inputCode.length >= 6 ? <>Continuar <ArrowRight className="w-4 h-4" /></> : "Introduz o código"}
+          </button>
+        </div>
+        {myActiveRooms.length > 0 && (
+          <>
+            <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Minhas Salas Activas</p>
+            <div className="flex flex-col gap-2">
+              {myActiveRooms.slice(0, 3).map((room, idx) => (
+                <motion.button key={room.code} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.06 }}
+                  onClick={() => setInputCode(room.code)}
+                  className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-100 hover:border-slate-300 hover:shadow-sm transition-all duration-200 text-left w-full group">
+                  <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0">
+                    <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-card.jpg"} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-syne font-bold text-slate-900 text-sm">{room.gameName}</p>
+                    <p className="text-[10.5px] text-slate-400 font-mono mt-0.5">{room.code}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-[11px] font-bold text-violet-700">{room.betAmount} MT</p>
+                    <ChevronRight className="w-3.5 h-3.5 text-slate-300 mt-0.5 ml-auto group-hover:text-slate-600 transition-colors" />
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          </>
+        )}
+      </motion.div>
+    );
+  }
+
+  // ── MAIN ──────────────────────────────────────────────────────────────────
+  const activeRooms = myRooms.filter(r => r.status === "waiting");
   return (
     <motion.div key="main" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} className="pb-6">
-
-      {/* Title */}
       <div className="mb-5">
         <h2 className="font-syne font-bold text-slate-900 text-xl mb-1">Salas Privadas</h2>
         <p className="text-slate-400 text-sm">Entra num jogo com código ou cria a tua própria sala.</p>
       </div>
-
-      {/* Stats strip */}
       <div className="flex gap-2 mb-5">
-        {[
-          { label: "Salas Activas",   value: "247" },
-          { label: "Online Agora",    value: "1.8K" },
-          { label: "Apostas/Dia",     value: "92K MZN" },
-        ].map(s => (
-          <div key={s.label} className="flex-1 bg-white rounded-xl border border-slate-100 p-3 text-center shadow-sm">
-            <p className="font-syne font-bold text-slate-900 text-base leading-tight">{s.value}</p>
-            <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wide mt-0.5">{s.label}</p>
-          </div>
-        ))}
+        <div className="flex-1 bg-white rounded-xl border border-slate-100 p-3 text-center shadow-sm">
+          <p className="font-syne font-bold text-slate-900 text-base leading-tight">{activeRoomCount}</p>
+          <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wide mt-0.5">Salas Activas</p>
+        </div>
+        <div className="flex-1 bg-white rounded-xl border border-slate-100 p-3 text-center shadow-sm">
+          <p className="font-syne font-bold text-slate-900 text-base leading-tight">{formatOnlineCount(onlineCount)}</p>
+          <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wide mt-0.5">Online Agora</p>
+        </div>
+        <div className="flex-1 bg-white rounded-xl border border-slate-100 p-3 text-center shadow-sm">
+          <p className="font-syne font-bold text-slate-900 text-base leading-tight">92K MZN</p>
+          <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wide mt-0.5">Apostas/Dia</p>
+        </div>
       </div>
-
-      {/* Action cards */}
-      <div className="flex flex-col gap-3">
-        {/* Entrar */}
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={() => setView("entrar")}
-          className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-slate-300 hover:shadow-md transition-all duration-200 text-left w-full group"
-        >
+      <div className="flex flex-col gap-3 mb-6">
+        <motion.button whileTap={{ scale: 0.98 }} onClick={() => { setError(""); setInputCode(""); setView("entrar"); }}
+          className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-slate-300 hover:shadow-md transition-all duration-200 text-left w-full group">
           <div className="w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center flex-shrink-0 shadow-md group-hover:bg-slate-800 transition-colors">
             <Key className="w-6 h-6 text-white" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-syne font-bold text-slate-900 text-base">Entrar em Sala</p>
             <p className="text-slate-400 text-[12.5px] mt-0.5">Tens um código? Junta-te a uma partida agora.</p>
-            <p className="text-[11px] font-semibold text-violet-600 mt-1.5">{RECENT_ROOMS.length} salas visitadas recentemente</p>
+            {activeRooms.length > 0 && <p className="text-[11px] font-semibold text-violet-600 mt-1.5">{activeRooms.length} sala{activeRooms.length > 1 ? "s" : ""} activa{activeRooms.length > 1 ? "s" : ""}</p>}
           </div>
           <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 group-hover:bg-slate-900 transition-colors">
             <ArrowRight className="w-4 h-4 text-slate-500 group-hover:text-white transition-colors" />
           </div>
         </motion.button>
-
-        {/* Criar */}
-        <motion.button
-          whileTap={{ scale: 0.98 }}
-          onClick={() => setView("criar")}
-          className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-slate-300 hover:shadow-md transition-all duration-200 text-left w-full group"
-        >
-          <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center flex-shrink-0 group-hover:bg-slate-200 transition-colors">
-            <Plus className="w-6 h-6 text-slate-700" />
+        <motion.button whileTap={{ scale: 0.98 }} onClick={() => { setError(""); setSelectedGame(null); setSelectedBet(null); setView("criar"); }}
+          className="flex items-center gap-4 p-5 bg-white rounded-2xl border border-slate-100 shadow-sm hover:border-violet-200 hover:shadow-md transition-all duration-200 text-left w-full group">
+          <div className="w-12 h-12 rounded-2xl bg-violet-50 border border-violet-200 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-100 transition-colors">
+            <Plus className="w-6 h-6 text-violet-700" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <p className="font-syne font-bold text-slate-900 text-base">Criar Sala</p>
-              <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full uppercase tracking-wide">Em breve</span>
-            </div>
+            <p className="font-syne font-bold text-slate-900 text-base">Criar Sala</p>
             <p className="text-slate-400 text-[12.5px]">Cria a tua sala e desafia os teus amigos.</p>
           </div>
-          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 group-hover:bg-slate-200 transition-colors">
-            <ArrowRight className="w-4 h-4 text-slate-400" />
+          <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0 group-hover:bg-violet-600 transition-colors">
+            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-white transition-colors" />
           </div>
         </motion.button>
       </div>
-
-      {/* Recent rooms preview */}
-      <div className="mt-6">
-        <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Salas Recentes</p>
-        <div className="flex flex-col gap-2">
-          {RECENT_ROOMS.map((room, idx) => (
-            <motion.div key={room.id}
-              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + idx * 0.06 }}
-              className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm"
-            >
-              <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${room.color} flex items-center justify-center text-white font-syne font-bold text-xs flex-shrink-0`}>
-                {room.initials}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-syne font-semibold text-slate-900 text-sm">{room.game}</p>
-                <p className="text-[10.5px] text-slate-400 font-mono">{room.id}</p>
-              </div>
-              <div className="text-right flex-shrink-0">
-                <p className="text-[11px] font-bold text-slate-700">{room.bet}</p>
-                <p className="text-[9.5px] text-slate-400">{room.players} jogadores</p>
-              </div>
-            </motion.div>
-          ))}
+      {myRooms.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-[10.5px] font-bold text-slate-400 uppercase tracking-widest">Minhas Salas</p>
+            <button onClick={() => { const updated = myRooms.filter(r => r.status === "waiting"); saveRooms(updated); setMyRooms(updated); }}
+              className="text-[10px] text-red-400 font-semibold hover:underline">Limpar expiradas</button>
+          </div>
+          <div className="flex flex-col gap-2">
+            {myRooms.slice(0, 6).map((room, idx) => (
+              <motion.div key={room.code} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
+                className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
+                <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
+                  <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-card.jpg"} alt="" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-syne font-semibold text-slate-900 text-sm">{room.gameName}</p>
+                  <p className="text-[10.5px] text-slate-400 font-mono">{room.code}</p>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <p className="text-[11px] font-bold text-violet-700">{room.betAmount} MT</p>
+                  <span className={`text-[9px] font-bold uppercase ${room.status === "waiting" ? "text-emerald-500" : "text-slate-400"}`}>
+                    {room.status === "waiting" ? "Activa" : room.status === "matched" ? "Jogada" : "Expirada"}
+                  </span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </motion.div>
   );
 }
@@ -439,7 +711,7 @@ function ChatTab() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 136px)" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - 210px)" }}>
       {/* Members strip */}
       <div style={{ display: "flex", alignItems: "center", gap: 6, paddingBottom: 12, borderBottom: "1px solid #f1f5f9", marginBottom: 12 }}>
         {[

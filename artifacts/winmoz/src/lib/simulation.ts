@@ -277,6 +277,35 @@ export function generateMatchPool(count: number, epoch: number): SimMatch[] {
   return matches;
 }
 
+// ─── Sala / Online count ──────────────────────────────────────────────────────
+
+/**
+ * Returns the total "online now" count for the Salas screen.
+ * This is the sum of all live game players × a multiplier, capped by time slot.
+ * Drifts naturally using a multi-wave sine so it never looks static.
+ */
+export function getSalaOnlineCount(tick: number): number {
+  const [min, max] = getSlotRange();
+  // Base: ~1.8× the peak-slot playing count, bounded by slot
+  const basePlaying =
+    getLivePlayerCount(0, tick) +
+    getLivePlayerCount(1, tick) +
+    getLivePlayerCount(2, tick) +
+    getLivePlayerCount(3, tick) +
+    getLivePlayerCount(4, tick);
+  // Extra "browsing" users on top of active players
+  const extra = Math.round(basePlaying * 0.6 + min * 1.2);
+  const total = basePlaying + extra;
+  // Small noise wave so the number keeps moving
+  const noise = Math.round(Math.sin((tick + 99) * 0.31) * (max * 0.05));
+  return Math.max(min * 2, total + noise);
+}
+
+export function formatOnlineCount(n: number): string {
+  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(".", ",") + "K";
+  return String(n);
+}
+
 // ─── Active game persistence (back button / resume) ───────────────────────────
 
 export const ACTIVE_GAME_KEY = "wm_active_game";

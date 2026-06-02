@@ -2,8 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, Plus, Send, Mic, Smile, Users } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const CYAN = "#00D4B4";
+const CHANNEL_NAME = "group_chat_v1";
 
 type Msg = {
   id: string;
@@ -14,54 +17,33 @@ type Msg = {
   image?: string;
   time: string;
   isMe?: boolean;
-  images?: string[];
+  userId?: string;
 };
 
-const INITIAL_MSGS: Msg[] = [
+const SEED_MSGS: Msg[] = [
   {
-    id: "g0", user: "Sistema", initials: "SI", avatarBg: "#374151",
-    text: "📢 Temos uma sessão emocionante planeada para esta noite! Prepara-te para o torneio.",
-    time: "09:00", isMe: false,
-  },
-  {
-    id: "g1", user: "João Mondlane", initials: "JM", avatarBg: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+    id: "g1", user: "João Mondlane", initials: "JM",
+    avatarBg: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
     text: "Alguém quer um desafio de Damas? Aposto 500 MZN! 🎯",
-    time: "10:30", isMe: false,
+    time: "10:30",
   },
   {
-    id: "g2", user: "Maria Santos", initials: "MS", avatarBg: "linear-gradient(135deg, #ec4899, #9d174d)",
+    id: "g2", user: "Maria Santos", initials: "MS",
+    avatarBg: "linear-gradient(135deg, #ec4899, #9d174d)",
     text: "Aceito o desafio! Mas tenho que avisar — não perco fácil 😏",
-    time: "10:31", isMe: false,
+    time: "10:31",
   },
   {
-    id: "g3", user: "Carlos Fonseca", initials: "CF", avatarBg: "linear-gradient(135deg, #10b981, #065f46)",
-    text: "Eu também quero entrar! E posso vos mostrar uma estratégia infalível para o Ludo Turbo 🚀",
-    time: "10:33", isMe: false,
+    id: "g3", user: "Carlos Fonseca", initials: "CF",
+    avatarBg: "linear-gradient(135deg, #10b981, #065f46)",
+    text: "Eu também quero entrar! Ludo Turbo às 20h? 🚀",
+    time: "10:33",
   },
   {
-    id: "g4", user: "Tu", initials: "SD", avatarBg: `linear-gradient(135deg, ${CYAN}, #7C3AED)`,
-    text: "Estou a ver tudo! Quando começa a partida?",
-    time: "10:35", isMe: true,
-  },
-  {
-    id: "g5", user: "João Mondlane", initials: "JM", avatarBg: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
-    text: "Às 20h00! Vamos todos? Pode ser um torneio em grupo 🏆",
-    time: "10:36", isMe: false,
-  },
-  {
-    id: "g6", user: "Ana Ribeiro", initials: "AR", avatarBg: "linear-gradient(135deg, #f59e0b, #b45309)",
+    id: "g4", user: "Ana Ribeiro", initials: "AR",
+    avatarBg: "linear-gradient(135deg, #f59e0b, #b45309)",
     text: "Conta comigo! Já fiz a recarga. Só estou à espera da hora 🔥",
-    time: "10:38", isMe: false,
-  },
-  {
-    id: "g7", user: "Tu", initials: "SD", avatarBg: `linear-gradient(135deg, ${CYAN}, #7C3AED)`,
-    text: "Perfeito, às 20h00 então. Boa sorte a todos! 🎮",
-    time: "10:39", isMe: true,
-  },
-  {
-    id: "g8", user: "Pedro Alves", initials: "PA", avatarBg: "linear-gradient(135deg, #8b5cf6, #4c1d95)",
-    text: "Digitando....",
-    time: "10:40", isMe: false,
+    time: "10:38",
   },
 ];
 
@@ -71,66 +53,83 @@ const MEMBERS = [
   { initials: "CF", bg: "linear-gradient(135deg, #10b981, #065f46)", name: "Carlos F." },
   { initials: "AR", bg: "linear-gradient(135deg, #f59e0b, #b45309)", name: "Ana R." },
   { initials: "PA", bg: "linear-gradient(135deg, #8b5cf6, #4c1d95)", name: "Pedro A." },
-  { initials: "+", bg: "#374151", name: "+120" },
-];
-
-const AUTO = [
-  "Boa estratégia! 👍",
-  "Já estou pronto para jogar! 🎯",
-  "Alguém sabe o código da sala?",
-  "Vamos nessa! 💪",
-  "Boa sorte a todos! 🏆",
-  "Que partida incrível! 🔥",
-];
-
-const USERS = [
-  { name: "João Mondlane", initials: "JM", avatarBg: "linear-gradient(135deg, #3b82f6, #1d4ed8)" },
-  { name: "Maria Santos", initials: "MS", avatarBg: "linear-gradient(135deg, #ec4899, #9d174d)" },
-  { name: "Carlos Fonseca", initials: "CF", avatarBg: "linear-gradient(135deg, #10b981, #065f46)" },
-  { name: "Ana Ribeiro", initials: "AR", avatarBg: "linear-gradient(135deg, #f59e0b, #b45309)" },
 ];
 
 function nowTime() {
   return new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
 }
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(" ").filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export default function GrupoChat() {
   const [, setLocation] = useLocation();
-  const [messages, setMessages] = useState<Msg[]>(INITIAL_MSGS);
+  const [messages, setMessages] = useState<Msg[]>(SEED_MSGS);
   const [text, setText] = useState("");
-  const [typing, setTyping] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
-  const [onlineCount] = useState(39);
+  const [onlineCount, setOnlineCount] = useState(39);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const { user, profile } = useAuth();
+
+  const myName = profile?.full_name ?? user?.email?.split("@")[0] ?? "Jogador";
+  const myInitials = getInitials(myName);
+  const myAvatarBg = `linear-gradient(135deg, ${CYAN}, #7C3AED)`;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, typing]);
+  }, [messages]);
 
+  // Supabase Realtime channel
   useEffect(() => {
-    const interval = setInterval(() => {
-      const u = USERS[Math.floor(Math.random() * USERS.length)];
-      const txt = AUTO[Math.floor(Math.random() * AUTO.length)];
-      setMessages(p => [...p, {
-        id: Date.now().toString(), user: u.name, initials: u.initials,
-        avatarBg: u.avatarBg, text: txt, time: nowTime(),
-      }]);
-    }, 12000);
-    return () => clearInterval(interval);
-  }, []);
+    const channel = supabase.channel(CHANNEL_NAME, {
+      config: { broadcast: { self: false } },
+    });
+    channelRef.current = channel;
+
+    channel.on("broadcast", { event: "msg" }, ({ payload }) => {
+      setMessages(prev => {
+        if (prev.some(m => m.id === payload.id)) return prev;
+        return [...prev, payload as Msg];
+      });
+    });
+
+    channel.on("presence", { event: "sync" }, () => {
+      const state = channel.presenceState();
+      const count = Object.keys(state).length;
+      setOnlineCount(Math.max(39, count + 38));
+    });
+
+    channel.subscribe(async (status) => {
+      if (status === "SUBSCRIBED" && user?.id) {
+        await channel.track({ userId: user.id, name: myName });
+      }
+    });
+
+    return () => { supabase.removeChannel(channel); channelRef.current = null; };
+  }, [user?.id, myName]);
 
   const sendMsg = (msgText: string, img?: string) => {
     if (!msgText.trim() && !img) return;
-    setMessages(p => [...p, {
-      id: Date.now().toString(), user: "Tu", initials: "SD",
-      avatarBg: `linear-gradient(135deg, ${CYAN}, #7C3AED)`,
-      text: msgText.trim() || undefined, image: img,
-      time: nowTime(), isMe: true,
-    }]);
+    const msg: Msg = {
+      id: `${Date.now()}_${user?.id ?? "anon"}`,
+      user: myName,
+      initials: myInitials,
+      avatarBg: myAvatarBg,
+      text: msgText.trim() || undefined,
+      image: img,
+      time: nowTime(),
+      isMe: true,
+      userId: user?.id,
+    };
+    setMessages(prev => [...prev, msg]);
     setText("");
-    setTyping(true);
-    setTimeout(() => setTyping(false), 2500 + Math.random() * 1500);
+    channelRef.current?.send({ type: "broadcast", event: "msg", payload: msg });
   };
 
   const handleImg = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,43 +141,40 @@ export default function GrupoChat() {
     e.target.value = "";
   };
 
-  const myProfile = localStorage.getItem("winmoz_user_avatar");
-
   return (
     <div className="min-h-screen w-full flex justify-center" style={{ background: "#0f0f12" }}>
       <div className="w-full max-w-[430px] flex flex-col" style={{ height: "100dvh" }}>
 
         {/* Header */}
-        <div style={{ background: "#18181b", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingTop: 40, paddingBottom: 8, paddingLeft: 14, paddingRight: 14, flexShrink: 0 }}>
+        <div style={{ background: "#18181b", borderBottom: "1px solid rgba(255,255,255,0.06)", paddingTop: 44, paddingBottom: 10, paddingLeft: 14, paddingRight: 14, flexShrink: 0 }}>
           <div className="flex items-center gap-3">
             <button onClick={() => setLocation("/")} style={{ width: 34, height: 34, borderRadius: 999, background: "rgba(255,255,255,0.07)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>
               <ArrowLeft style={{ width: 16, height: 16, color: "#e2e8f0" }} />
             </button>
             <button onClick={() => setShowInfo(v => !v)} className="flex items-center gap-2.5 flex-1 min-w-0">
-              <div style={{ width: 38, height: 38, borderRadius: 12, background: `linear-gradient(135deg, ${CYAN}33, #7C3AED33)`, border: `1.5px solid ${CYAN}55`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
-                <Users style={{ width: 17, height: 17, color: CYAN }} />
-                <span style={{ position: "absolute", bottom: -3, right: -3, width: 12, height: 12, borderRadius: 999, background: "#22c55e", border: "2px solid #18181b", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ width: 5, height: 5, borderRadius: 999, background: "#fff" }} />
-                </span>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: `linear-gradient(135deg, ${CYAN}33, #7C3AED33)`, border: `1.5px solid ${CYAN}55`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative" }}>
+                <Users style={{ width: 18, height: 18, color: CYAN }} />
+                <span style={{ position: "absolute", bottom: -3, right: -3, width: 12, height: 12, borderRadius: 999, background: "#22c55e", border: "2px solid #18181b" }} />
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p style={{ color: "#f1f5f9", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14 }}>Grupo em Equipe</p>
+                <p style={{ color: "#f1f5f9", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14 }}>Grupo WinMoz</p>
                 <p style={{ fontSize: 10.5, color: "#71717a", marginTop: 1 }}>125 participantes · {onlineCount} online</p>
               </div>
             </button>
           </div>
         </div>
 
-        {/* Group info panel */}
+        {/* Info panel */}
         <AnimatePresence>
           {showInfo && (
-            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ background: "#1c1c1f", borderBottom: "1px solid rgba(255,255,255,0.06)", overflow: "hidden", flexShrink: 0 }}>
+            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+              style={{ background: "#1c1c1f", borderBottom: "1px solid rgba(255,255,255,0.06)", overflow: "hidden", flexShrink: 0 }}>
               <div className="px-4 py-3">
-                <p style={{ fontSize: 11, color: "#71717a", fontWeight: 600, letterSpacing: "0.5px", marginBottom: 8 }}>PARTICIPANTES ACTIVOS</p>
-                <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden">
+                <p style={{ fontSize: 11, color: "#71717a", fontWeight: 600, letterSpacing: "0.5px", marginBottom: 8, textTransform: "uppercase" }}>Participantes Activos</p>
+                <div className="flex gap-3 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden">
                   {MEMBERS.map(m => (
                     <div key={m.initials} className="flex flex-col items-center gap-1 flex-shrink-0">
-                      <div style={{ width: 38, height: 38, borderRadius: 999, background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", border: `1.5px solid ${CYAN}44` }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 999, background: m.bg, display: "flex", alignItems: "center", justifyContent: "center", border: `1.5px solid ${CYAN}44` }}>
                         <span style={{ color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12 }}>{m.initials}</span>
                       </div>
                       <span style={{ fontSize: 9, color: "#71717a", whiteSpace: "nowrap" }}>{m.name}</span>
@@ -190,51 +186,55 @@ export default function GrupoChat() {
           )}
         </AnimatePresence>
 
-
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-3" style={{ background: "#0f0f12" }}>
+        <div className="flex-1 overflow-y-auto py-4 px-3 [&::-webkit-scrollbar]:hidden" style={{ background: "#0f0f12", display: "flex", flexDirection: "column", gap: 10 }}>
           <AnimatePresence initial={false}>
             {messages.map((msg, i) => {
-              const prevMsg = messages[i - 1];
-              const sameUser = prevMsg && prevMsg.user === msg.user && !msg.isMe;
+              const prev = messages[i - 1];
+              const sameUser = prev && prev.user === msg.user && !msg.isMe && !prev.isMe;
+              const isSystem = msg.id.startsWith("sys");
+              if (isSystem) return (
+                <motion.div key={msg.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center">
+                  <span style={{ fontSize: 11, color: "#52525b", background: "#1c1c1f", borderRadius: 99, padding: "4px 12px" }}>{msg.text}</span>
+                </motion.div>
+              );
               return (
                 <motion.div key={msg.id}
-                  initial={{ opacity: 0, y: 12, scale: 0.96 }}
+                  initial={{ opacity: 0, y: 10, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ duration: 0.2, ease: "easeOut" }}
-                  className={`flex items-end gap-2 ${msg.isMe ? "flex-row-reverse" : "flex-row"}`}
+                  style={{ display: "flex", gap: 8, flexDirection: msg.isMe ? "row-reverse" : "row", alignItems: "flex-end" }}
                 >
-                  {!msg.isMe && (
-                    <div style={{ width: sameUser ? 30 : 30, height: 30, borderRadius: 999, background: sameUser ? "transparent" : msg.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, visibility: sameUser ? "hidden" : "visible" }}>
-                      <span style={{ color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 10 }}>{msg.initials}</span>
-                    </div>
-                  )}
-                  {msg.isMe && (
-                    <div style={{ width: 30, height: 30, borderRadius: 999, background: msg.avatarBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
-                      {myProfile
-                        ? <img src={myProfile} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                        : <span style={{ color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 10 }}>SD</span>
-                      }
-                    </div>
-                  )}
+                  {/* Avatar */}
+                  <div style={{
+                    width: 30, height: 30, borderRadius: "50%",
+                    background: sameUser ? "transparent" : msg.avatarBg,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0, visibility: sameUser ? "hidden" : "visible",
+                    boxShadow: msg.isMe ? `0 2px 8px ${CYAN}33` : "none",
+                  }}>
+                    <span style={{ color: msg.isMe ? "#001a16" : "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 10 }}>{msg.initials}</span>
+                  </div>
+
+                  {/* Bubble */}
                   <div style={{ maxWidth: "74%" }}>
                     {!msg.isMe && !sameUser && (
-                      <p style={{ fontSize: 10.5, color: "#9ca3af", fontWeight: 600, marginBottom: 3, paddingLeft: 2 }}>{msg.user}</p>
+                      <p style={{ fontSize: 10.5, color: "#9ca3af", fontWeight: 600, marginBottom: 4, paddingLeft: 2 }}>{msg.user}</p>
                     )}
                     {msg.image && (
-                      <img src={msg.image} alt="img" style={{ borderRadius: 12, maxWidth: "100%", maxHeight: 180, objectFit: "cover", display: "block", marginBottom: msg.text ? 4 : 0 }} />
+                      <img src={msg.image} alt="" style={{ borderRadius: 12, maxWidth: "100%", maxHeight: 200, objectFit: "cover", display: "block", marginBottom: msg.text ? 4 : 0 }} />
                     )}
                     {msg.text && (
                       <div style={{
                         background: msg.isMe ? `linear-gradient(135deg, ${CYAN}, #00a88e)` : "#27272a",
-                        borderRadius: msg.isMe ? "18px 4px 18px 18px" : "4px 18px 18px 18px",
+                        borderRadius: msg.isMe ? "18px 4px 18px 18px" : sameUser ? "18px 18px 18px 4px" : "4px 18px 18px 18px",
                         padding: "9px 13px",
                         boxShadow: msg.isMe ? `0 3px 12px ${CYAN}44` : "0 1px 4px rgba(0,0,0,0.3)",
                       }}>
-                        <p style={{ fontSize: 13.5, color: msg.isMe ? "#001a16" : "#e2e8f0", lineHeight: 1.5, margin: 0, fontWeight: msg.isMe ? 600 : 400 }}>{msg.text}</p>
+                        <p style={{ fontSize: 13.5, color: msg.isMe ? "#001a16" : "#e2e8f0", lineHeight: 1.55, margin: 0, fontWeight: msg.isMe ? 600 : 400 }}>{msg.text}</p>
                       </div>
                     )}
-                    <div className={`flex items-center gap-1 mt-1 ${msg.isMe ? "justify-end" : "justify-start"}`}>
+                    <div style={{ display: "flex", justifyContent: msg.isMe ? "flex-end" : "flex-start", marginTop: 3 }}>
                       <span style={{ fontSize: 10, color: "#52525b" }}>{msg.time}</span>
                     </div>
                   </div>
@@ -242,21 +242,6 @@ export default function GrupoChat() {
               );
             })}
           </AnimatePresence>
-
-          {/* Typing */}
-          <AnimatePresence>
-            {typing && (
-              <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="flex items-end gap-2">
-                <div style={{ width: 30, height: 30, borderRadius: 999, background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ color: "#fff", fontSize: 10, fontWeight: 700 }}>JM</span>
-                </div>
-                <div style={{ background: "#27272a", borderRadius: "4px 18px 18px 18px", padding: "10px 14px" }}>
-                  <p style={{ fontSize: 11.5, color: "#9ca3af", fontStyle: "italic" }}>A digitar...</p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           <div ref={bottomRef} />
         </div>
 
@@ -282,7 +267,8 @@ export default function GrupoChat() {
             <motion.button
               onClick={() => sendMsg(text)}
               whileTap={{ scale: 0.88 }}
-              style={{ width: 44, height: 44, borderRadius: 999, background: text.trim() ? `linear-gradient(135deg, ${CYAN}, #00a88e)` : "rgba(255,255,255,0.07)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "none", cursor: "pointer", boxShadow: text.trim() ? `0 4px 14px ${CYAN}55` : "none", transition: "background 0.2s, box-shadow 0.2s" }}>
+              style={{ width: 44, height: 44, borderRadius: 999, background: text.trim() ? `linear-gradient(135deg, ${CYAN}, #00a88e)` : "rgba(255,255,255,0.07)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, border: "none", cursor: "pointer", boxShadow: text.trim() ? `0 4px 14px ${CYAN}55` : "none", transition: "background 0.2s, box-shadow 0.2s" }}
+            >
               {text.trim()
                 ? <Send style={{ width: 17, height: 17, color: "#001a16" }} />
                 : <Mic style={{ width: 17, height: 17, color: "#52525b" }} />
