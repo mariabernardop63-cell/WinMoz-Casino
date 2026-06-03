@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { API_BASE } from "@/lib/apiBase";
 
 const CYAN = "#00D4B4";
 
@@ -75,7 +76,7 @@ export default function Recarga() {
       if (!session) { setScreen("error"); return; }
 
       const res = await Promise.race([
-        fetch("/api/recharge", {
+        fetch(`${API_BASE}/recharge`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

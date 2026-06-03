@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, CheckCheck, X } from "lucide-react";
+import { API_BASE } from "@/lib/apiBase";
 
 const CYAN = "#00D4B4";
 
@@ -76,7 +77,7 @@ export default function Suporte() {
     setHistory(newHistory);
 
     try {
-      const res = await fetch("/api/support/chat", {
+      const res = await fetch(`${API_BASE}/support/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messages: newHistory }),

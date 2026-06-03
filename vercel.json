@@ -1,4 +1,7 @@
 {
+  "buildCommand": "pnpm run typecheck:libs && pnpm --filter @workspace/winmoz run build",
+  "outputDirectory": "artifacts/winmoz/dist/public",
+  "framework": null,
   "rewrites": [
     { "source": "/assets/(.*)", "destination": "/assets/$1" },
     { "source": "/(.*)", "destination": "/index.html" }

@@ -1,4 +1,5 @@
-const BASE = "/api";
+import { API_BASE } from "./apiBase";
+const BASE = API_BASE;
 
 function getToken(): string | null {
   return localStorage.getItem("winmoz_token");

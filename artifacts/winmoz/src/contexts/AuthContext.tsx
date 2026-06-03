@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
+import { API_BASE } from "@/lib/apiBase";
 
 export interface UserProfile {
   id: string;
@@ -56,7 +57,7 @@ async function ensureProfileExists(
   extraData: { full_name?: string; phone?: string; invite_code_used?: string | null }
 ) {
   try {
-    const res = await fetch("/api/complete-registration", {
+    const res = await fetch(`${API_BASE}/complete-registration`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowLeft, ShieldCheck, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { API_BASE } from "@/lib/apiBase";
 
 function WinMozLogo() {
   return (
@@ -67,7 +68,7 @@ export default function OTP() {
         const pendingRaw = sessionStorage.getItem("pendingReg");
         const pending = pendingRaw ? JSON.parse(pendingRaw) : {};
         if (pending.full_name || pending.phone || pending.invite_code_used) {
-          await fetch("/api/complete-registration", {
+          await fetch(`${API_BASE}/complete-registration`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

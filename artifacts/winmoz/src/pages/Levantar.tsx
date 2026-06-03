@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { API_BASE } from "@/lib/apiBase";
 
 const CYAN = "#00D4B4";
 const METHOD_NAME = "M-Pesa";
@@ -115,7 +116,7 @@ export default function Levantar() {
         return;
       }
 
-      const res = await fetch("/api/withdraw", {
+      const res = await fetch(`${API_BASE}/withdraw`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Mail, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { API_BASE } from "@/lib/apiBase";
 
 function WinMozLogo() {
   return (
@@ -32,7 +33,7 @@ export default function EsqueceuSenha() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/check-email", {
+      const res = await fetch(`${API_BASE}/check-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
