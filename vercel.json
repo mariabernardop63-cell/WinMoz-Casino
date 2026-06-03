@@ -1,0 +1,5 @@
+{
+  "buildCommand": "pnpm run typecheck:libs && pnpm --filter @workspace/winmoz run build",
+  "outputDirectory": "artifacts/winmoz/dist/public",
+  "installCommand": "pnpm install --frozen-lockfile"
+}
