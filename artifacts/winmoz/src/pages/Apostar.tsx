@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { getLivePlayerCount, getSalaOnlineCount } from "@/lib/simulation";
 
 /* ── Theme ── */
 const VIOLET = "#7c3aed";
@@ -561,17 +562,17 @@ export default function Apostar() {
   const [payMethod, setPayMethod] = useState<PayMethod>("poker");
   const [screen, setScreen] = useState<Screen>("bet");
 
-  /* Live player counts */
-  const [liveOnline, setLiveOnline] = useState(game.online);
-  const [livePlaying, setLivePlaying] = useState(game.playing);
-
+  /* Live player counts — sourced from simulation engine (same data as Explorar) */
+  const [tick, setTick] = useState(0);
   useEffect(() => {
-    const iv = setInterval(() => {
-      setLiveOnline(v => Math.max(100, v + Math.floor(Math.random() * 9) - 4));
-      setLivePlaying(v => Math.max(50, v + Math.floor(Math.random() * 7) - 3));
-    }, 3200);
+    const iv = setInterval(() => setTick(t => t + 1), 15_000);
     return () => clearInterval(iv);
   }, []);
+
+  // Total online: all users on the platform (matches Explorar "online agora")
+  const liveOnline = getSalaOnlineCount(tick);
+  // Playing right now: only Damas + Ludo + Xadrez (actual board games, indices 0/1/2)
+  const livePlaying = getLivePlayerCount(0, tick) + getLivePlayerCount(1, tick) + getLivePlayerCount(2, tick);
 
   const canStart = selectedBet !== null;
 

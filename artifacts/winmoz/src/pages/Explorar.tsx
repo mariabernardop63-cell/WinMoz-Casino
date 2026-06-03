@@ -245,12 +245,23 @@ function SalaTab() {
 
   async function deductBalance(amount: number, desc: string): Promise<boolean> {
     if (!user?.id) return false;
+    const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+      Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
     try {
-      const { data } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
+      const { data } = await withTimeout(
+        supabase.from("profiles").select("balance").eq("id", user.id).single(),
+        12_000
+      );
       const bal = parseFloat(String(data?.balance ?? "0"));
       if (bal < amount) return false;
-      await supabase.from("profiles").update({ balance: bal - amount }).eq("id", user.id);
-      await supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" });
+      await withTimeout(
+        supabase.from("profiles").update({ balance: bal - amount }).eq("id", user.id),
+        12_000
+      );
+      await withTimeout(
+        supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" }),
+        12_000
+      );
       refreshProfile();
       return true;
     } catch { return false; }

@@ -13,7 +13,7 @@ import { getSyntheticUser, generateWithdrawalAmount, getWithdrawalInterval, shou
 // Generate a seed that changes each minute so entries aren't always the same
 function nowSeed() { return Math.floor(Date.now() / 60_000); }
 
-function makeSaque(extraSeed = 0) {
+function makeSaque(extraSeed = 0, timeLabel?: string) {
   const seed = nowSeed() + extraSeed + Math.floor(Math.random() * 10_000);
   const user = getSyntheticUser(seed);
   // Simple deterministic-ish RNG for amount
@@ -26,14 +26,19 @@ function makeSaque(extraSeed = 0) {
     initials: user.initials,
     bg: user.bg,
     amount: mt.toLocaleString("pt-PT") + " MT",
-    time: "agora mesmo",
+    time: timeLabel ?? "agora mesmo",
   };
 }
 
 function SaquesSection() {
   const [visible, setVisible] = useState(() => {
-    // Pre-populate with 4 entries offset by different seeds
-    return [makeSaque(0), makeSaque(111), makeSaque(222), makeSaque(333)];
+    // Pre-populate with staggered realistic timestamps
+    return [
+      makeSaque(0, "agora mesmo"),
+      makeSaque(111, "há 3 min"),
+      makeSaque(222, "há 8 min"),
+      makeSaque(333, "há 15 min"),
+    ];
   });
 
   useEffect(() => {
@@ -1231,7 +1236,12 @@ export default function Home() {
               <motion.div
                 key={game.id}
                 variants={fadeUp}
-                className="min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col"
+                onClick={() => {
+                  if (!isLoggedIn) { setLocation("/login"); return; }
+                  if (game.id === "roleta") { setLocation("/roleta"); return; }
+                  setLocation(`/apostar/${game.id}`);
+                }}
+                className="min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col cursor-pointer"
               >
                 <div
                   className="h-28 w-full relative overflow-hidden"
@@ -1271,15 +1281,9 @@ export default function Home() {
                   <p className="text-[10px] font-semibold text-blue-700 mt-0.5 uppercase tracking-wider">{game.bet}</p>
                   <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} jogando</p>
                   <div className="mt-auto">
-                    <button
-                      onClick={() => {
-                        if (!isLoggedIn) { setLocation("/login"); return; }
-                        if (game.id === "roleta") { setLocation("/roleta"); return; }
-                        setLocation(`/apostar/${game.id}`);
-                      }}
-                      className="w-full h-8 text-xs font-bold bg-blue-700 hover:bg-blue-800 text-white rounded-lg transition-colors">
+                    <div className="w-full h-8 text-xs font-bold bg-blue-700 text-white rounded-lg flex items-center justify-center">
                       Jogar
-                    </button>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -1304,7 +1308,12 @@ export default function Home() {
               <motion.div
                 key={game.id}
                 variants={fadeUp}
-                className="flex items-center p-3 rounded-xl bg-white border border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 group shadow-sm"
+                onClick={() => {
+                  if (!isLoggedIn) { setLocation("/login"); return; }
+                  if (game.gameRoute === "roleta") { setLocation("/roleta"); return; }
+                  setLocation(`/apostar/${game.gameRoute}`);
+                }}
+                className="flex items-center p-3 rounded-xl bg-white border border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 group shadow-sm cursor-pointer"
               >
                 {/* Thumbnail */}
                 <div
@@ -1340,15 +1349,9 @@ export default function Home() {
                   <p className="text-[10px] text-slate-400 mt-0.5">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} apostadores ativos</p>
                 </div>
 
-                <button
-                  onClick={() => {
-                    if (!isLoggedIn) { setLocation("/login"); return; }
-                    if (game.gameRoute === "roleta") { setLocation("/roleta"); return; }
-                    setLocation(`/apostar/${game.gameRoute}`);
-                  }}
-                  className="w-8 h-8 rounded-full bg-blue-700 hover:bg-blue-800 text-white flex items-center justify-center transition-colors shadow-md flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center shadow-md flex-shrink-0 pointer-events-none">
                   <Play className="w-3.5 h-3.5 ml-0.5"/>
-                </button>
+                </div>
               </motion.div>
             ))}
           </motion.div>
