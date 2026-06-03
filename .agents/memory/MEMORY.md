@@ -1,8 +1,10 @@
 - [Auth system](auth-system.md) — getSession() primary source + sessionStorage cache (wm_profile_cache) for instant reload; onAuthStateChange handles SIGNED_IN/OUT/TOKEN_REFRESHED
-- [Brand rename](brand-rename.md) — WinMoz → "Poker Winner"; SVG now stacked (POKER bold / WINNER thin); viewBox "0 0 102 46"; SplashScreen targetWidth 82; Registar viewBox "0 0 100 44"
+- [Brand rename](brand-rename.md) — WinMoz → "Poker Winner"; SVG: POKER bold + WINNER thin + ONLINE 45% opacity (same line); viewBox "0 0 190 46" (Home/Login), "0 0 190 44" (Registar/OTP/EsqueceuSenha/RedefinirSenha)
 - [Hooks order in SalaTab](hooks-order-sala.md) — ALL useEffects in SalaTab must be placed before ANY early returns; violating this causes React black screen (no error thrown)
 - [Supabase Node.js quirk](supabase-node-quirk.md) — Node.js 20 needs `ws` package passed as realtime transport in createClient; also remove express-session when switching to JWT
 - [Realtime Ludo architecture](realtime-ludo.md) — Supabase Broadcast for game sync; Presence for matchmaking; myColor from URL params; no AI bot; each player only rolls/selects their own color
 - [DamasGame finalizeTurn contract](damas-finalizeTurn.md) — finalBoard passed to finalizeTurn must already have move applied; callers are responsible for calling applyBoardMove before passing
 - [Rematch bug pattern](rematch-bug.md) — unhandled async rejection in handleReplay/handleRematchAccept leaves UI stuck at "checking"; fix: always wrap Supabase calls in try-catch + Promise.race timeout
+- [GrupoChat isMe bug](grupochat-isme.md) — broadcast payload includes isMe:true from sender; received messages must override with isMe:false or all messages render on the right
+- [BottomNav resume route](bottomnav-resume.md) — wm_active_game resume navigated to /${gameType}/${gameId} (wrong); correct route is /${gameType}-jogo?gameId=...&bet=...&opp=...
 - [Simulation engine](simulation-engine.md) — central lib at src/lib/simulation.ts; Mozambique time UTC+2; player counts/withdrawals/match pools all time-aware; active game stored as wm_active_game in localStorage TTL 30 min

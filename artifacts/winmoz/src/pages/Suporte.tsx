@@ -120,14 +120,17 @@ export default function Suporte() {
               <ArrowLeft style={{ width: 18, height: 18, color: "#fff" }} />
             </button>
             <div className="relative flex-shrink-0">
-              <div style={{ width: 42, height: 42, borderRadius: 999, background: `linear-gradient(135deg, ${CYAN}, #7C3AED)`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 0 14px ${CYAN}55` }}>
-                <span style={{ color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 11 }}>EPW</span>
+              <div style={{ width: 42, height: 42, borderRadius: 999, background: "#3f3f46", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 14px rgba(63,63,70,0.6)" }}>
+                <svg width="18" height="22" viewBox="0 0 18 26" fill="none">
+                  <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="#fff"/>
+                  <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="#fff" opacity="0.38"/>
+                </svg>
               </div>
               <span style={{ position: "absolute", bottom: 1, right: 1, width: 11, height: 11, borderRadius: 999, background: "#22c55e", border: "2.5px solid #1a0533" }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p style={{ color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: "0.2px" }}>EQUIPE POKER W</p>
-              <p style={{ fontSize: 11, color: "#22c55e", fontWeight: 500, marginTop: 1 }}>● Online agora · IA Avançada · Responde em segundos</p>
+              <p style={{ color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: "0.2px" }}>Atendimento 24h</p>
+              <p style={{ fontSize: 11, color: "#22c55e", fontWeight: 500, marginTop: 1 }}>● POKER AGENt · IA Avançada · Responde em segundos</p>
             </div>
             <div style={{ position: "relative" }}>
               <button onClick={() => setMenuOpen(v => !v)} style={{ width: 34, height: 34, borderRadius: 999, background: "rgba(255,255,255,0.1)", border: "none", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
@@ -167,8 +170,11 @@ export default function Suporte() {
                 style={{ display: "flex", flexDirection: msg.from === "user" ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}
               >
                 {msg.from === "support" && (
-                  <div style={{ width: 32, height: 32, borderRadius: 999, background: `linear-gradient(135deg, ${CYAN}, #7C3AED)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: `0 2px 8px ${CYAN}44`, marginBottom: 2 }}>
-                    <span style={{ color: "#fff", fontSize: 8, fontWeight: 800, fontFamily: "'Syne', sans-serif" }}>EPW</span>
+                  <div style={{ width: 32, height: 32, borderRadius: 999, background: "#3f3f46", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 8px rgba(63,63,70,0.5)", marginBottom: 2 }}>
+                    <svg width="13" height="16" viewBox="0 0 18 26" fill="none">
+                      <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="#fff"/>
+                      <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="#fff" opacity="0.38"/>
+                    </svg>
                   </div>
                 )}
                 <div style={{ maxWidth: "80%" }}>
@@ -197,8 +203,11 @@ export default function Suporte() {
           <AnimatePresence>
             {typing && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 999, background: `linear-gradient(135deg, ${CYAN}, #7C3AED)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <span style={{ color: "#fff", fontSize: 8, fontWeight: 800 }}>EPW</span>
+                <div style={{ width: 32, height: 32, borderRadius: 999, background: "#3f3f46", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <svg width="13" height="16" viewBox="0 0 18 26" fill="none">
+                    <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="#fff"/>
+                    <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="#fff" opacity="0.38"/>
+                  </svg>
                 </div>
                 <div style={{ background: "#fff", borderRadius: "4px 18px 18px 18px", padding: "12px 16px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)" }}>
                   <div style={{ display: "flex", gap: 5, alignItems: "center" }}>

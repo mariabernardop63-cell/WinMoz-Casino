@@ -69,7 +69,7 @@ export default function GrupoChat() {
     channel.on("broadcast", { event: "msg" }, ({ payload }) => {
       setMessages(prev => {
         if (prev.some(m => m.id === payload.id)) return prev;
-        return [...prev, payload as Msg];
+        return [...prev, { ...(payload as Msg), isMe: false }];
       });
     });
 

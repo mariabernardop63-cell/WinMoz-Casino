@@ -106,7 +106,9 @@ function ResumeModal({ activeGame, onClose }: { activeGame: ActiveGameRecord | n
             <motion.button whileTap={{ scale: 0.97 }}
               onClick={() => {
                 try { localStorage.removeItem("wm_active_game"); } catch { /* ignore */ }
-                go(`/${activeGame.gameType === "chess" ? "xadrez" : activeGame.gameType}/${activeGame.gameId}`);
+                const _gt = activeGame.gameType === "chess" ? "xadrez" : activeGame.gameType;
+                const _route = `${_gt}-jogo`;
+                go(`/${_route}?gameId=${activeGame.gameId}&bet=${activeGame.betAmount}&opp=${encodeURIComponent(activeGame.opponentName)}`);
               }}
               style={{ width: "100%", background: "#141418", border: "1px solid rgba(124,58,237,0.35)", borderRadius: 18, overflow: "hidden", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "stretch" }}>
               <div style={{ width: 90, flexShrink: 0, position: "relative", overflow: "hidden" }}>

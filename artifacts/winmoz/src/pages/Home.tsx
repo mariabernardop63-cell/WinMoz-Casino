@@ -203,11 +203,12 @@ function AtualizacoesSection() {
 function WinMozLogo() {
   return (
     <div className="flex items-center">
-      <svg viewBox="0 0 160 46" height="34" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg viewBox="0 0 190 46" height="34" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M1 2 L11 2 L7 44 L0 44 Z" fill="#0D0D0D"/>
         <path d="M13 2 L20 2 L16 44 L10 44 Z" fill="#0D0D0D" opacity="0.18"/>
         <text x="23" y="27" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="22" letterSpacing="0.5" fill="#0D0D0D">POKER</text>
         <text x="23" y="41" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">WINNER</text>
+        <text x="94" y="41" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D" opacity="0.45">ONLINE</text>
       </svg>
     </div>
   );
@@ -1279,7 +1280,7 @@ export default function Home() {
                 <div className="p-3 flex flex-col flex-1">
                   <h3 className="font-syne font-bold text-slate-900 text-sm tracking-wide">{game.name}</h3>
                   <p className="text-[10px] font-semibold text-blue-700 mt-0.5 uppercase tracking-wider">{game.bet}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} jogando</p>
+                  {game.id !== "xadrez" && <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} jogando</p>}
                   <div className="mt-auto">
                     <div className="w-full h-8 text-xs font-bold bg-blue-700 text-white rounded-lg flex items-center justify-center">
                       Jogar
@@ -1346,7 +1347,7 @@ export default function Home() {
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} apostadores ativos</p>
+                  {game.id !== "xr" && <p className="text-[10px] text-slate-400 mt-0.5">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} apostadores ativos</p>}
                 </div>
 
                 <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center shadow-md flex-shrink-0 pointer-events-none">

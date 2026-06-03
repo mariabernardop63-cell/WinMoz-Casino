@@ -505,14 +505,19 @@ function SalaTab() {
           onClick={async () => {
             if (!selectedBet || !selectedGame) return;
             setError(""); setLoading(true);
-            const ok = await deductBalance(selectedBet, `Criação de sala – ${selectedGame.name}`);
-            if (!ok) { setError("Saldo insuficiente. Por favor recarregue a sua conta."); setLoading(false); return; }
-            const code = genRoomCode();
-            const rec: RoomRecord = { code, gameId: selectedGame.id, gameName: selectedGame.name, betAmount: selectedBet, createdAt: Date.now(), status: "waiting" };
-            const updated = [rec, ...loadRooms()];
-            saveRooms(updated); setMyRooms(updated);
-            setActiveCode(code); setActiveGameId(selectedGame.id); setActiveBet(selectedBet);
-            setLoading(false); setView("room-created");
+            try {
+              const ok = await deductBalance(selectedBet, `Criação de sala – ${selectedGame.name}`);
+              if (!ok) { setError("Saldo insuficiente. Por favor recarregue a sua conta."); setLoading(false); return; }
+              const code = genRoomCode();
+              const rec: RoomRecord = { code, gameId: selectedGame.id, gameName: selectedGame.name, betAmount: selectedBet, createdAt: Date.now(), status: "waiting" };
+              const updated = [rec, ...loadRooms()];
+              saveRooms(updated); setMyRooms(updated);
+              setActiveCode(code); setActiveGameId(selectedGame.id); setActiveBet(selectedBet);
+              setLoading(false); setView("room-created");
+            } catch {
+              setError("Erro ao criar sala. Tenta novamente.");
+              setLoading(false);
+            }
           }}
           className={`w-full py-4 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 transition-all ${selectedBet === null ? "bg-slate-100 text-slate-300 cursor-not-allowed" : "text-white"}`}
           style={selectedBet !== null ? { background: "linear-gradient(135deg,#7c3aed,#6d28d9)" } : {}}>
