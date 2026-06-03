@@ -3,7 +3,16 @@ import Groq from "groq-sdk";
 
 const router = Router();
 
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+let _groq: Groq | null = null;
+function getGroq(): Groq {
+  if (!_groq) {
+    if (!process.env.GROQ_API_KEY) {
+      throw new Error("GROQ_API_KEY não configurada");
+    }
+    _groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  }
+  return _groq;
+}
 
 const SYSTEM_PROMPT = `És o assistente virtual da "Equipe Poker W", a equipa de suporte da plataforma de apostas e jogos WinMoz — uma plataforma moçambicana de jogos online (Damas, Xadrez, Ludo, Roleta) com apostas em Meticais (MT).
 
@@ -80,7 +89,7 @@ router.post("/support/chat", async (req, res) => {
       .map((m) => ({ role: m.role, content: String(m.content).slice(0, 2000) }))
       .slice(-20);
 
-    const completion = await groq.chat.completions.create({
+    const completion = await getGroq().chat.completions.create({
       model: "llama-3.3-70b-versatile",
       messages: [{ role: "system", content: SYSTEM_PROMPT }, ...sanitized],
       temperature: 0.72,
