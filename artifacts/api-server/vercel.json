@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../../ && pnpm run typecheck:libs && pnpm --filter @workspace/winmoz run build && mkdir -p artifacts/api-server/public && cp -r artifacts/winmoz/dist/public/. artifacts/api-server/public/",
+  "buildCommand": "cd ../../ && pnpm run typecheck:libs && pnpm --filter @workspace/winmoz run build && pnpm --filter @workspace/api-server run build && mkdir -p artifacts/api-server/public && cp -r artifacts/winmoz/dist/public/. artifacts/api-server/public/",
   "outputDirectory": "public",
   "framework": null,
   "rewrites": [
