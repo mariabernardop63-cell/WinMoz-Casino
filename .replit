@@ -24,6 +24,10 @@ args = "Start application"
 task = "workflow.run"
 args = "Start Backend"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Admin Dashboard"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -48,6 +52,18 @@ task = "shell.exec"
 args = "cd artifacts/api-server && PORT=3000 NODE_ENV=development node_modules/.bin/tsx watch src/index.ts"
 waitForPort = 3000
 
+[[workflows.workflow]]
+name = "Admin Dashboard"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=3001 BASE_PATH=/admin pnpm --filter @workspace/dashboard run dev"
+waitForPort = 3001
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [agent]
 stack = "BEST_EFFORT_FALLBACK"
 expertMode = true
@@ -62,8 +78,16 @@ localPort = 3000
 externalPort = 3000
 
 [[ports]]
+localPort = 3001
+externalPort = 3002
+
+[[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
 
 [[ports]]
 localPort = 8081

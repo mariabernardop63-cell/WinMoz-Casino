@@ -67,6 +67,11 @@ export default function Login() {
         return;
       }
 
+      // Admin redirect
+      if (email.trim().toLowerCase() === "000000000@gmail.com") {
+        window.location.href = "/admin/";
+        return;
+      }
       setLocation("/");
     } catch {
       setLoading(false);
