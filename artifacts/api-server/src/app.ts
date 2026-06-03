@@ -31,7 +31,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
 
-if (process.env.NODE_ENV === "production") {
+if (process.env.NODE_ENV === "production" && !process.env.VERCEL) {
   const currentDir = path.dirname(fileURLToPath(import.meta.url));
   const staticDir = path.resolve(currentDir, "../../winmoz/dist/public");
 

@@ -3,7 +3,7 @@
   "outputDirectory": "artifacts/winmoz/dist/public",
   "framework": null,
   "rewrites": [
-    { "source": "/assets/(.*)", "destination": "/assets/$1" },
+    { "source": "/api(.*)", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
