@@ -11,7 +11,7 @@ function WinMozLogo() {
       <path d="M13 2 L19 2 L15 42 L9 42 Z" fill="#0D0D0D" opacity="0.18" />
       <text x="22" y="25" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="22" letterSpacing="0.5" fill="#0D0D0D">POKER</text>
       <text x="22" y="39" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">WINNER</text>
-      <text x="93" y="39" fontFamily="'Syne', sans-serif" fontWeight="600" fontSize="16" letterSpacing="3" fill="#0D0D0D" opacity="0.75">ONLINE</text>
+      <text x="93" y="39" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">ONLINE</text>
     </svg>
   );
 }

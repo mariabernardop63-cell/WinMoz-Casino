@@ -197,8 +197,22 @@ function PlayerCard({ color, name, balance, isMe, isActive, piecesLeft, damesLef
           </span>
         </div>
       </div>
-      <div style={{ padding:"0 10px 0 4px", display:"flex", alignItems:"center", gap:6 }}>
-        {isActive ? <TimerArc val={timeLeft}/> : <div style={{ width:28 }}/>}
+      <div style={{ padding:"0 10px 0 4px", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+        {isActive ? <TimerArc val={timeLeft}/> : <div style={{ width:28, height:28 }}/>}
+        <div style={{ display:"flex", gap:3 }}>
+          {Array.from({ length: 5 }).map((_, i) => {
+            const alive = i < lives;
+            return (
+              <div key={i} style={{
+                width: 8, height: 8, borderRadius: "50%",
+                background: alive ? "#EF4444" : "rgba(255,255,255,0.12)",
+                border: alive ? "none" : "1px solid rgba(255,255,255,0.2)",
+                boxShadow: alive ? "0 0 4px rgba(239,68,68,0.6)" : "none",
+                transition: "all 0.3s ease",
+              }}/>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

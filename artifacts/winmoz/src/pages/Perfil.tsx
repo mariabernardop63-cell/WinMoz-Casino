@@ -96,13 +96,14 @@ export default function Perfil() {
       if (!cancelled) { setTransactions([]); setTxLoading(false); }
     }, 8000);
 
-    supabase
-      .from("transactions")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(3)
-      .then(({ data }) => {
+    Promise.resolve(
+      supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(3)
+    ).then(({ data }) => {
         if (cancelled) return;
         clearTimeout(timer);
         if (data && data.length > 0) {

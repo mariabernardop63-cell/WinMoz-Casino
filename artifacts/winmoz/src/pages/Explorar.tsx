@@ -247,21 +247,22 @@ function SalaTab() {
 
   async function deductBalance(amount: number, desc: string): Promise<boolean> {
     if (!user?.id) return false;
-    const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
-      Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
+    const withTimeout = <T,>(p: PromiseLike<T>, ms: number): Promise<T> =>
+      Promise.race([Promise.resolve(p), new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
     try {
-      const { data } = await withTimeout(
-        supabase.from("profiles").select("balance").eq("id", user.id).single(),
+      const res = await withTimeout(
+        supabase.from("profiles").select("balance").eq("id", user.id).single() as unknown as Promise<{ data: { balance: any } | null; error: any }>,
         12_000
       );
+      const data = res?.data;
       const bal = parseFloat(String(data?.balance ?? "0"));
       if (bal < amount) return false;
       await withTimeout(
-        supabase.from("profiles").update({ balance: bal - amount }).eq("id", user.id),
+        supabase.from("profiles").update({ balance: bal - amount }).eq("id", user.id) as unknown as Promise<unknown>,
         12_000
       );
       await withTimeout(
-        supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" }),
+        supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" }) as unknown as Promise<unknown>,
         12_000
       );
       refreshProfile();
