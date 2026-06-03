@@ -1,6 +1,6 @@
 # WinMoz mz
 
-A gaming and betting platform targeting the Mozambican market, supporting games like Ludo, Chess, Draughts, and Billiards with betting, financial transactions, and social features.
+A gaming and betting platform targeting the Mozambican market, supportingnjgames like Ludo, Chess, Draughts, and Billiards with betting, financial transactions, and social features.
 
 ## Run & Operate
 
