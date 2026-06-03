@@ -15,9 +15,7 @@ export default function SplashScreen() {
       setTimeout(() => setPhase("erase"),   2780),
       setTimeout(() => setPhase("barsOut"), 4060),
       setTimeout(() => setPhase("spinner"), 4500),
-      setTimeout(() => {
-        setLocation("/");
-      }, 6100),
+      setTimeout(() => { setLocation("/"); }, 6100),
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
@@ -26,7 +24,8 @@ export default function SplashScreen() {
   const showText    = phase === "draw" || phase === "hold" || phase === "erase";
   const showSpinner = phase === "spinner";
 
-  const targetWidth = (phase === "draw" || phase === "hold") ? 295 : 0;
+  // Width of the text column (enough for "POKER" at 22px bold ≈ 72px)
+  const targetWidth = (phase === "draw" || phase === "hold") ? 82 : 0;
   const widthTransition: Parameters<typeof motion.div>[0]["transition"] =
     phase === "draw"
       ? { duration: 1.38, ease: "linear" }
@@ -55,7 +54,8 @@ export default function SplashScreen() {
             exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.38 } }}
             transition={{ duration: 0.5 }}
             style={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100%", zIndex: 1, position: "relative" }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+              {/* Logo mark — vertical bars */}
               <motion.div initial={{ scaleY: 0.5, opacity: 0 }} animate={{ scaleY: 1, opacity: 1 }}
                 transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }} style={{ transformOrigin: "center" }}>
                 <svg width="22" height="46" viewBox="0 0 22 46" fill="none">
@@ -63,15 +63,38 @@ export default function SplashScreen() {
                   <path d="M13 2 L20 2 L16 44 L10 44 Z" fill="#0D0D0D" opacity="0.18" />
                 </svg>
               </motion.div>
-              <motion.div initial={{ width: 0 }} animate={{ width: targetWidth }} transition={widthTransition}
-                style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 40, letterSpacing: "-1.5px", color: "#0D0D0D", display: "inline-block", lineHeight: "46px", userSelect: "none" }}>
-                  Poker Winner
-                </span>
-                <svg style={{ display: "inline-block", verticalAlign: "top", marginLeft: 3, marginTop: 5 }} width="14" height="14" viewBox="0 0 14 14">
-                  <circle cx="7" cy="7" r="6" stroke="#0D0D0D" strokeWidth="1.4" fill="none" />
-                  <text x="7" y="11" textAnchor="middle" fontFamily="'Syne', sans-serif" fontWeight="700" fontSize="7" fill="#0D0D0D">R</text>
-                </svg>
+
+              {/* Animated text reveal — stacked POKER / WINNER */}
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: targetWidth }}
+                transition={widthTransition}
+                style={{ overflow: "hidden", height: 46, display: "flex", alignItems: "center" }}
+              >
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 0, userSelect: "none", whiteSpace: "nowrap" }}>
+                  <span style={{
+                    fontFamily: "'Syne', sans-serif",
+                    fontWeight: 800,
+                    fontSize: 22,
+                    letterSpacing: "-0.5px",
+                    color: "#0D0D0D",
+                    lineHeight: "26px",
+                    display: "block",
+                  }}>
+                    POKER
+                  </span>
+                  <span style={{
+                    fontFamily: "'Syne', sans-serif",
+                    fontWeight: 300,
+                    fontSize: 12,
+                    letterSpacing: "2.5px",
+                    color: "#0D0D0D",
+                    lineHeight: "18px",
+                    display: "block",
+                  }}>
+                    WINNER
+                  </span>
+                </div>
               </motion.div>
             </div>
           </motion.div>

@@ -1,5 +1,6 @@
 - [Auth system](auth-system.md) — getSession() primary source + sessionStorage cache (wm_profile_cache) for instant reload; onAuthStateChange handles SIGNED_IN/OUT/TOKEN_REFRESHED
-- [Brand rename](brand-rename.md) — WinMoz → "Poker Winner" everywhere; SVG viewBox widths: Login 330, Registar 320, Home 345; SplashScreen targetWidth 295; index.html title/meta updated
+- [Brand rename](brand-rename.md) — WinMoz → "Poker Winner"; SVG now stacked (POKER bold / WINNER thin); viewBox "0 0 102 46"; SplashScreen targetWidth 82; Registar viewBox "0 0 100 44"
+- [Hooks order in SalaTab](hooks-order-sala.md) — ALL useEffects in SalaTab must be placed before ANY early returns; violating this causes React black screen (no error thrown)
 - [Supabase Node.js quirk](supabase-node-quirk.md) — Node.js 20 needs `ws` package passed as realtime transport in createClient; also remove express-session when switching to JWT
 - [Realtime Ludo architecture](realtime-ludo.md) — Supabase Broadcast for game sync; Presence for matchmaking; myColor from URL params; no AI bot; each player only rolls/selects their own color
 - [DamasGame finalizeTurn contract](damas-finalizeTurn.md) — finalBoard passed to finalizeTurn must already have move applied; callers are responsible for calling applyBoardMove before passing

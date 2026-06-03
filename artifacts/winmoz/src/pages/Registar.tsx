@@ -6,10 +6,11 @@ import { supabase } from "@/lib/supabase";
 
 function WinMozLogo() {
   return (
-    <svg viewBox="0 0 320 44" height="36" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg viewBox="0 0 100 44" height="36" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M1 2 L11 2 L7 42 L0 42 Z" fill="#0D0D0D" />
       <path d="M13 2 L19 2 L15 42 L9 42 Z" fill="#0D0D0D" opacity="0.18" />
-      <text x="22" y="38" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="38" letterSpacing="-1" fill="#0D0D0D">Poker Winner</text>
+      <text x="22" y="25" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="22" letterSpacing="-0.5" fill="#0D0D0D">POKER</text>
+      <text x="22" y="39" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="12" letterSpacing="2.5" fill="#0D0D0D">WINNER</text>
     </svg>
   );
 }

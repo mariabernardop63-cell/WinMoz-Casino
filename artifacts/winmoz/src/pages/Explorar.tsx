@@ -329,6 +329,54 @@ function SalaTab() {
     return () => clearInterval(t);
   }, [view, waitRemaining, waitFound]);
 
+  // ── JOIN LOADING — fetch creator's game/bet from channel presence ──────────
+  // MUST stay here (before any early returns) to obey React Rules of Hooks
+  useEffect(() => {
+    if (view !== "join-loading" || !activeCode || !user?.id) return;
+    let done = false;
+    const ch = supabase.channel(`room_${activeCode}`, {
+      config: { presence: { key: user.id }, broadcast: { self: false } },
+    });
+
+    const tryRead = () => {
+      if (done) return;
+      const state = ch.presenceState<{ gameId?: string; betAmount?: number; displayName?: string }>();
+      const ids = Object.keys(state).filter(id => id !== user.id);
+      if (ids.length > 0) {
+        const creatorInfo = (state[ids[0]] as any)?.[0];
+        if (creatorInfo?.gameId && creatorInfo?.betAmount) {
+          done = true;
+          setActiveGameId(creatorInfo.gameId);
+          setActiveBet(creatorInfo.betAmount);
+          supabase.removeChannel(ch);
+          setView("join-confirm");
+          return;
+        }
+      }
+    };
+
+    ch.on("presence", { event: "sync" }, tryRead);
+    ch.on("presence", { event: "join" }, tryRead);
+    ch.subscribe(async status => {
+      if (status === "SUBSCRIBED") {
+        await ch.track({ userId: user.id, displayName: profile?.full_name ?? "Jogador" });
+        tryRead();
+      }
+    });
+
+    const timer = setTimeout(() => {
+      if (!done) {
+        done = true;
+        supabase.removeChannel(ch);
+        setError("Sala não encontrada ou já encerrada. Verifica o código.");
+        setView("entrar");
+      }
+    }, 4000);
+
+    return () => { done = true; clearTimeout(timer); supabase.removeChannel(ch); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, activeCode, user?.id]);
+
   // ── ROOM WAITING ──────────────────────────────────────────────────────────
   if (view === "room-waiting") {
     const mins = String(Math.floor(waitRemaining / 60)).padStart(2, "0");
@@ -492,58 +540,6 @@ function SalaTab() {
       </motion.div>
     );
   }
-
-  // ── JOIN LOADING — fetch creator's game/bet from channel presence ──────────
-  useEffect(() => {
-    if (view !== "join-loading" || !activeCode || !user?.id) return;
-    let done = false;
-    const ch = supabase.channel(`room_${activeCode}`, {
-      config: { presence: { key: user.id }, broadcast: { self: false } },
-    });
-
-    const tryRead = () => {
-      if (done) return;
-      const state = ch.presenceState<{ gameId?: string; betAmount?: number; displayName?: string }>();
-      const ids = Object.keys(state).filter(id => id !== user.id);
-      if (ids.length > 0) {
-        const creatorInfo = (state[ids[0]] as any)?.[0];
-        if (creatorInfo?.gameId && creatorInfo?.betAmount) {
-          done = true;
-          setActiveGameId(creatorInfo.gameId);
-          setActiveBet(creatorInfo.betAmount);
-          supabase.removeChannel(ch);
-          setView("join-confirm");
-          return;
-        }
-      }
-    };
-
-    ch.on("presence", { event: "sync" }, tryRead);
-    ch.on("presence", { event: "join" }, tryRead);
-    ch.subscribe(async status => {
-      if (status === "SUBSCRIBED") {
-        await ch.track({ userId: user.id, displayName: profile?.full_name ?? "Jogador" });
-        tryRead();
-      }
-    });
-
-    // Timeout after 4 s — room may not exist or creator may have left
-    const timer = setTimeout(() => {
-      if (!done) {
-        done = true;
-        supabase.removeChannel(ch);
-        setError("Sala não encontrada ou já encerrada. Verifica o código.");
-        setView("entrar");
-      }
-    }, 4000);
-
-    return () => {
-      done = true;
-      clearTimeout(timer);
-      supabase.removeChannel(ch);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, activeCode, user?.id]);
 
   // ── JOIN LOADING UI ───────────────────────────────────────────────────────
   if (view === "join-loading") {

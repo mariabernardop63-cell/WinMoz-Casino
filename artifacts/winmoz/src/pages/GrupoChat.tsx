@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { ArrowLeft, Plus, Send, Mic, Smile, Users } from "lucide-react";
+import { ArrowLeft, Plus, Send, Mic, Smile, Users, CheckCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
@@ -174,50 +174,63 @@ export default function GrupoChat() {
           <AnimatePresence initial={false}>
             {messages.map((msg, i) => {
               const prev = messages[i - 1];
-              const sameUser = prev && prev.user === msg.user && !msg.isMe && !prev.isMe;
+              const sameUser = prev && !prev.id.startsWith("sys") && prev.user === msg.user && !msg.isMe && !prev.isMe;
               const isSystem = msg.id.startsWith("sys");
+
               if (isSystem) return (
                 <motion.div key={msg.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center">
                   <span style={{ fontSize: 11, color: "#52525b", background: "#1c1c1f", borderRadius: 99, padding: "4px 12px" }}>{msg.text}</span>
                 </motion.div>
               );
+
+              /* ── Minha mensagem (direita) ── */
+              if (msg.isMe) return (
+                <motion.div key={msg.id}
+                  initial={{ opacity: 0, y: 8, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}
+                >
+                  <div style={{
+                    background: "linear-gradient(135deg, #7C3AED 0%, #4C1D95 100%)",
+                    borderRadius: "16px 4px 16px 16px",
+                    padding: "9px 14px",
+                    minWidth: 180,
+                    maxWidth: "78%",
+                    boxShadow: "0 3px 12px rgba(124,58,237,0.3)",
+                  }}>
+                    {msg.image && <img src={msg.image} alt="" style={{ borderRadius: 10, maxWidth: "100%", maxHeight: 180, objectFit: "cover", display: "block", marginBottom: msg.text ? 6 : 0 }} />}
+                    {msg.text && <p style={{ fontSize: 13.5, color: "#fff", lineHeight: 1.55, margin: 0 }}>{msg.text}</p>}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4, marginTop: 4 }}>
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.45)" }}>{msg.time}</span>
+                      <CheckCheck style={{ width: 13, height: 13, color: CYAN }} />
+                    </div>
+                  </div>
+                </motion.div>
+              );
+
+              /* ── Mensagem de outro utilizador (esquerda) ── */
               return (
                 <motion.div key={msg.id}
-                  initial={{ opacity: 0, y: 10, scale: 0.97 }}
+                  initial={{ opacity: 0, y: 8, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  style={{ display: "flex", gap: 8, flexDirection: msg.isMe ? "row-reverse" : "row", alignItems: "flex-end" }}
+                  transition={{ duration: 0.18, ease: "easeOut" }}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}
                 >
-                  {/* Avatar */}
+                  {!sameUser && (
+                    <span style={{ fontSize: 11, color: "#a1a1aa", marginLeft: 6, fontWeight: 600, letterSpacing: "0.2px" }}>{msg.user}</span>
+                  )}
                   <div style={{
-                    width: 30, height: 30, borderRadius: "50%",
-                    background: sameUser ? "transparent" : msg.avatarBg,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    flexShrink: 0, visibility: sameUser ? "hidden" : "visible",
-                    boxShadow: msg.isMe ? `0 2px 8px ${CYAN}33` : "none",
+                    background: "#1e1e26",
+                    borderRadius: sameUser ? "16px 16px 16px 4px" : "4px 16px 16px 16px",
+                    padding: "9px 14px",
+                    minWidth: 180,
+                    maxWidth: "78%",
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
                   }}>
-                    <span style={{ color: msg.isMe ? "#001a16" : "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 10 }}>{msg.initials}</span>
-                  </div>
-
-                  {/* Bubble */}
-                  <div style={{ maxWidth: "74%" }}>
-                    {!msg.isMe && !sameUser && (
-                      <p style={{ fontSize: 10.5, color: "#9ca3af", fontWeight: 600, marginBottom: 4, paddingLeft: 2 }}>{msg.user}</p>
-                    )}
-                    {msg.image && (
-                      <img src={msg.image} alt="" style={{ borderRadius: 12, maxWidth: "100%", maxHeight: 200, objectFit: "cover", display: "block", marginBottom: msg.text ? 4 : 0 }} />
-                    )}
-                    {msg.text && (
-                      <div style={{
-                        background: msg.isMe ? `linear-gradient(135deg, ${CYAN}, #00a88e)` : "#27272a",
-                        borderRadius: msg.isMe ? "18px 4px 18px 18px" : sameUser ? "18px 18px 18px 4px" : "4px 18px 18px 18px",
-                        padding: "9px 13px",
-                        boxShadow: msg.isMe ? `0 3px 12px ${CYAN}44` : "0 1px 4px rgba(0,0,0,0.3)",
-                      }}>
-                        <p style={{ fontSize: 13.5, color: msg.isMe ? "#001a16" : "#e2e8f0", lineHeight: 1.55, margin: 0, fontWeight: msg.isMe ? 600 : 400 }}>{msg.text}</p>
-                      </div>
-                    )}
-                    <div style={{ display: "flex", justifyContent: msg.isMe ? "flex-end" : "flex-start", marginTop: 3 }}>
+                    {msg.image && <img src={msg.image} alt="" style={{ borderRadius: 10, maxWidth: "100%", maxHeight: 180, objectFit: "cover", display: "block", marginBottom: msg.text ? 6 : 0 }} />}
+                    {msg.text && <p style={{ fontSize: 13.5, color: "#e2e8f0", lineHeight: 1.55, margin: 0 }}>{msg.text}</p>}
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 4 }}>
                       <span style={{ fontSize: 10, color: "#52525b" }}>{msg.time}</span>
                     </div>
                   </div>
