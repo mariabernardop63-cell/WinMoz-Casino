@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { applyGameWin } from "@/lib/game-utils";
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 type PType = "K"|"Q"|"R"|"B"|"N"|"P";
@@ -837,19 +838,20 @@ export default function ChessGame(){
   useEffect(()=>{epRef.current=ep;},[ep]);
   useEffect(()=>{statusRef.current=status;},[status]);
 
-  // Credit winner 83% of total pot when game ends
+  // Credit winner 90% of total pot when game ends (10% platform cut)
   useEffect(()=>{
     if(!winner||!profile?.id||BET<=0||gameId==="local"||winCreditedRef.current)return;
     if(winner!==myColor)return;
     winCreditedRef.current=true;
-    const payout=Math.floor(BET*2*0.83);
     (async()=>{
       try{
-        const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
-        if(data){
-          await supabase.from("profiles").update({balance:parseFloat(String(data.balance))+payout}).eq("id",profile.id);
-          await supabase.from("transactions").insert({user_id:profile.id,type:"win",amount:payout,description:`Vitória de jogo (Xadrez) +${payout} MT`,status:"approved"});
-        }
+        await applyGameWin({
+          winnerId: profile.id,
+          loserId: profile.id,
+          winnerName: profile.full_name ?? profile.email ?? "Vencedor",
+          gameType: "xadrez",
+          betAmount: BET,
+        });
       }catch{winCreditedRef.current=false;}
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps

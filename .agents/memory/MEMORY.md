@@ -1,2 +1,3 @@
 - [Winmoz admin integration](winmoz-admin.md) — admin panel at /admin/* uses nested WouterRouter; sidebar paths are relative to /admin base
 - [Supabase preference](supabase-preference.md) — user explicitly wants Supabase kept as-is, never migrate to Replit DB
+- [Winmoz real Supabase overhaul](winmoz-supabase-overhaul.md) — all admin pages replaced with real Supabase data; game win handlers use applyGameWin (10% cut); SQL migration required before using

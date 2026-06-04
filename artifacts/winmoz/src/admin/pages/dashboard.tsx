@@ -1,50 +1,33 @@
 import {
-  useGetDashboardStats,
-  useGetMatchesOverTime,
-  useGetBetsOverTime,
-  useGetGameBreakdown,
-  useListMatches,
-} from "@/admin/lib/mock-api";
-import {
-  AreaChart, Area,
-  XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import {
-  Users, Coins, Landmark,
-  MoreHorizontal, ChevronLeft, ChevronRight,
-  CheckCircle2, AlertTriangle, ClipboardList,
-  Gamepad2, ArrowUpRight, ArrowDownLeft, ArrowLeftRight,
-  Wallet, TrendingUp, Activity,
+  Users, Coins, Landmark, Gamepad2, ArrowUpRight, ArrowDownLeft,
+  Wallet, TrendingUp, Activity, RefreshCw,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  getDashboardStats, getRecentMatches, getEarningsChartData,
+  type AdminMatch,
+} from "@/lib/supabase-admin";
+import { supabase } from "@/lib/supabase";
 
 const V1 = "#6C5CE7";
 const V2 = "#a78bfa";
 const V3 = "#10b981";
 const V4 = "#f59e0b";
-const GRAD_DAMA   = "areaGradDama";
-const GRAD_LUDO   = "areaGradLudo";
-const GRAD_XADREZ = "areaGradXadrez";
-const GRAD_ROLETA = "areaGradRoleta";
 
 function LiveDot() {
   return (
     <span className="relative inline-flex items-center justify-center w-2 h-2 flex-shrink-0">
-      <span className="animate-pulse-ring absolute inset-0 rounded-full"
-        style={{ background: "rgba(16,185,129,.3)" }} />
-      <span className="animate-pulse-dot relative w-2 h-2 rounded-full"
-        style={{ background: "#10b981" }} />
+      <span className="animate-pulse-ring absolute inset-0 rounded-full" style={{ background: "rgba(16,185,129,.3)" }} />
+      <span className="animate-pulse-dot relative w-2 h-2 rounded-full" style={{ background: "#10b981" }} />
     </span>
   );
 }
 
-function NeonBadge({
-  children, variant = "live",
-}: {
-  children: React.ReactNode;
-  variant?: "live" | "purple" | "warn" | "danger";
-}) {
+function NeonBadge({ children, variant = "live" }: { children: React.ReactNode; variant?: "live" | "purple" | "warn" | "danger" }) {
   const cls = { live: "neon-live", purple: "neon-purple-badge", warn: "neon-warning", danger: "neon-danger" }[variant];
   return <span className={`neon-badge ${cls}`}>{children}</span>;
 }
@@ -53,451 +36,338 @@ function Avatar({ seed, size = 32 }: { seed: string; size?: number }) {
   const palette = ["6C5CE7", "7c3aed", "4f46e5", "0ea5e9", "10b981", "f59e0b", "ec4899"];
   const color = palette[seed.charCodeAt(0) % palette.length];
   return (
-    <img
-      src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${seed}&backgroundColor=${color}`}
-      alt={seed}
-      style={{
-        width: size, height: size,
-        borderRadius: "50%",
-        flexShrink: 0,
-        background: "white",
-        border: "1.5px solid rgba(108,92,231,.14)",
-      }}
-    />
+    <img src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${seed}&backgroundColor=${color}`} alt={seed}
+      style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, background: "white", border: "1.5px solid rgba(108,92,231,.14)" }} />
   );
 }
 
-function MacOSCircles({ delay = 0 }: { delay?: number }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      {[
-        { color: "#FF5F56", title: "Fechar" },
-        { color: "#FFBD2E", title: "Minimizar" },
-        { color: "#27C93F", title: "Maximizar" },
-      ].map((d, i) => (
-        <div
-          key={i}
-          className="gz-macos-circle"
-          title={d.title}
-          style={{
-            background: d.color,
-            boxShadow: `0 1px 3px ${d.color}66`,
-            animationDelay: `${delay + i * 70}ms`,
-          }}
-        />
-      ))}
-    </div>
-  );
+function fmt(n: number) {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return n.toFixed(2);
 }
 
-function MoneyCard({
-  label, value, icon: Icon, suffix,
-}: {
-  label: string; value: string; icon: React.ElementType; suffix?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="gz-card p-5 group cursor-default relative overflow-visible flex-1">
-      <div className="flex items-start justify-between mb-3">
-        <div className="text-[10.5px] font-black uppercase tracking-[0.1em]" style={{ color: "var(--gz-text-tertiary)" }}>
-          {label}
-        </div>
-        <div className="relative">
-          <button
-            onClick={() => setOpen(o => !o)}
-            className="w-6 h-6 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-            style={{ background: "rgba(0,0,0,.04)" }}
-          >
-            <MoreHorizontal className="w-3 h-3 text-gray-400" />
-          </button>
-          {open && (
-            <div className="absolute right-0 top-8 z-30 py-1.5 min-w-[150px] animate-float-up"
-              style={{ background: "#ffffff", borderRadius: 14, boxShadow: "0 8px 28px rgba(0,0,0,.1)" }}>
-              {["Ver detalhes", "Exportar", "Histórico"].map(a => (
-                <button key={a} onClick={() => setOpen(false)}
-                  className="w-full text-left px-3.5 py-2 text-[12px] font-medium text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
-                  {a}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center gap-2.5 mb-1">
-        <div style={{ width: 32, height: 32, borderRadius: 10, background: "rgba(0,0,0,.05)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon style={{ width: 15, height: 15, color: "#111", strokeWidth: 1.9 }} />
-        </div>
-        <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1, color: "var(--gz-text-primary)" }}>
-          {value}
-        </div>
-      </div>
-      {suffix && <div className="text-[11px] font-medium mt-1.5" style={{ color: "var(--gz-text-muted)" }}>{suffix}</div>}
-    </div>
-  );
-}
-
-function StatCard({
-  label, value, icon: Icon, badge, badgeVariant = "live", actions,
-}: {
-  label: string; value: number | string;
-  icon: React.ElementType; badge?: string;
-  badgeVariant?: "live" | "purple" | "warn" | "danger";
-  actions?: string[];
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="gz-card p-5 animate-counter relative group cursor-default overflow-visible">
-      <div className="flex items-center justify-between mb-4">
-        <div style={{ width: 38, height: 38, borderRadius: 13, background: "rgba(0,0,0,.05)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon style={{ width: 16, height: 16, color: "#111", strokeWidth: 1.9 }} />
-        </div>
-        <div className="relative">
-          <button
-            onClick={() => setOpen(o => !o)}
-            className="w-7 h-7 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all active:scale-95"
-            style={{ background: "rgba(0,0,0,.04)" }}
-          >
-            <MoreHorizontal className="w-3.5 h-3.5 text-gray-400" strokeWidth={1.8} />
-          </button>
-          {open && (
-            <div className="absolute right-0 top-9 z-30 py-1.5 min-w-[160px] animate-float-up"
-              style={{ background: "#ffffff", borderRadius: 16, boxShadow: "0 8px 32px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06)" }}>
-              {(actions ?? ["Ver detalhes", "Ver histórico", "Exportar"]).map(a => (
-                <button key={a} onClick={() => setOpen(false)}
-                  className="w-full text-left px-4 py-2.5 text-[12.5px] font-medium text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors first:rounded-t-xl last:rounded-b-xl">
-                  {a}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-      <div style={{ fontSize: 32, fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1, color: "var(--gz-text-primary)" }}>
-        {value}
-      </div>
-      <div className="text-[12px] font-semibold mt-1.5" style={{ color: "var(--gz-text-muted)" }}>
-        {label}
-      </div>
-      {badge && (
-        <div className="flex items-center gap-2 mt-3">
-          <NeonBadge variant={badgeVariant}>{badge}</NeonBadge>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ChartTip({ active, payload, label }: {
-  active?: boolean;
-  payload?: { name: string; value: number; color: string }[];
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="animate-float-up"
-      style={{
-        background: "#ffffff",
-        borderRadius: 14,
-        padding: "10px 14px",
-        boxShadow: "0 8px 28px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06)",
-      }}>
-      <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: V1 }}>
-        {label}
-      </div>
-      {payload.map(p => (
-        <div key={p.name} className="flex items-center gap-2 text-[12px]">
-          <span className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-          <span style={{ color: "var(--gz-text-muted)" }} className="capitalize">{p.name}</span>
-          <span className="font-bold ml-4" style={{ color: "var(--gz-text-primary)" }}>{p.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function MatchRow({ match, isLast }: {
-  match: { id: number; player1Name: string; player2Name: string; game: string; betAmount: number };
-  isLast: boolean;
-}) {
-  const gameColors: Record<string, string> = {
-    dama:   `linear-gradient(135deg, ${V1}, #4f46e5)`,
-    ludo:   `linear-gradient(135deg, ${V2}, #8b5cf6)`,
-    xadrez: `linear-gradient(135deg, ${V3}, #059669)`,
-    roleta: `linear-gradient(135deg, ${V4}, #d97706)`,
+function GameTypeBadge({ type }: { type: string }) {
+  const colors: Record<string, { bg: string; text: string }> = {
+    damas:  { bg: "rgba(14,165,233,.1)",  text: "#0ea5e9" },
+    ludo:   { bg: "rgba(16,185,129,.1)",  text: "#10b981" },
+    xadrez: { bg: "rgba(108,92,231,.1)",  text: V1 },
+    roleta: { bg: "rgba(245,158,11,.1)",  text: V4 },
   };
-  const gameLetters: Record<string, string> = { dama: "D", ludo: "L", xadrez: "X", roleta: "R" };
-
+  const c = colors[type] ?? { bg: "rgba(156,163,175,.1)", text: "#9ca3af" };
   return (
-    <div className="gz-row flex items-center gap-4 px-4 py-3.5" style={{ marginBottom: isLast ? 0 : 8 }}>
-      <div style={{ width: 36, height: 36, borderRadius: 12, background: gameColors[match.game] ?? gameColors.dama, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: 11, fontWeight: 900, color: "white" }}>
-        {gameLetters[match.game] ?? "?"}
-      </div>
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        <Avatar seed={match.player1Name} size={28} />
-        <span className="text-[13px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{match.player1Name}</span>
-        <span className="text-[9px] font-black px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: "rgba(108,92,231,.07)", color: V1, letterSpacing: "0.06em" }}>VS</span>
-        <span className="text-[13px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{match.player2Name}</span>
-        <Avatar seed={match.player2Name} size={28} />
-      </div>
-      <div className="text-[13px] font-extrabold flex-shrink-0" style={{ color: V1 }}>
-        MT {match.betAmount.toFixed(2)}
-      </div>
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <LiveDot />
-        <span className="text-[11px] font-semibold" style={{ color: "#059669" }}>Ao vivo</span>
-      </div>
-    </div>
-  );
-}
-
-function ActionItem({ icon: Icon, title, sub, done }: {
-  icon: React.ElementType; title: string; sub: string; done?: boolean;
-}) {
-  return (
-    <div className="gz-row flex items-center gap-3 px-4 py-3" style={{ marginBottom: 8 }}>
-      <div style={{ width: 34, height: 34, borderRadius: 11, background: done ? "rgba(16,185,129,.08)" : "rgba(0,0,0,.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-        <Icon style={{ width: 14, height: 14, strokeWidth: 1.9, color: done ? "#059669" : "#111" }} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-[12.5px] font-semibold leading-tight" style={{ color: done ? "var(--gz-text-muted)" : "var(--gz-text-primary)", textDecoration: done ? "line-through" : undefined }}>
-          {title}
-        </div>
-        <div className="text-[11px] mt-0.5" style={{ color: "var(--gz-text-tertiary)" }}>{sub}</div>
-      </div>
-      {done && <CheckCircle2 style={{ width: 15, height: 15, color: "#059669", strokeWidth: 2, flexShrink: 0 }} />}
-    </div>
+    <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-full" style={{ background: c.bg, color: c.text }}>
+      {type.charAt(0).toUpperCase() + type.slice(1)}
+    </span>
   );
 }
 
 export default function Dashboard() {
-  const { data: stats, isLoading: sLoad } = useGetDashboardStats();
-  const { data: mTime } = useGetMatchesOverTime();
-  const { data: bTime } = useGetBetsOverTime();
-  const { data: breakdown } = useGetGameBreakdown();
-  const { data: live } = useListMatches({ status: "live" });
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  const chartData = (mTime ?? []).map((p, i) => ({
-    date: p.date.slice(5),
-    dama:   p.dama,
-    ludo:   p.ludo,
-    xadrez: Math.floor(Math.random() * 12 + 3),
-    roleta: Math.floor(Math.random() * 8 + 2),
-  }));
+  const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useQuery({
+    queryKey: ["admin-dashboard-stats"],
+    queryFn: getDashboardStats,
+    refetchInterval: 30000,
+  });
 
-  const totalBetVol = stats?.totalBetVolume ?? 0;
-  const saidas = totalBetVol * 0.28;
+  const { data: recentMatches = [], isLoading: matchesLoading, refetch: refetchMatches } = useQuery({
+    queryKey: ["admin-recent-matches"],
+    queryFn: () => getRecentMatches(8),
+    refetchInterval: 15000,
+  });
 
-  const damaM   = breakdown?.damaMatches ?? 0;
-  const ludoM   = breakdown?.ludoMatches ?? 0;
-  const xadrezM = Math.floor(damaM * 0.6);
-  const roletaM = Math.floor(ludoM * 0.4);
-  const totalM  = damaM + ludoM + xadrezM + roletaM;
+  const { data: chartData = [], isLoading: chartLoading } = useQuery({
+    queryKey: ["admin-earnings-chart"],
+    queryFn: getEarningsChartData,
+    refetchInterval: 60000,
+  });
 
-  const dailyStats = [
-    { label: "Ganho hoje",      value: `MT ${(totalBetVol * 0.05).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: TrendingUp,  color: "#059669" },
-    { label: "Transações",      value: (stats?.activeBets ?? 0) + 24,    icon: ArrowLeftRight, color: V1 },
-    { label: "Usuários Online", value: stats?.onlinePlayers ?? 0,        icon: Users,          color: "#0ea5e9" },
-    { label: "Saídas",          value: `MT ${saidas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: ArrowDownLeft, color: "#ef4444" },
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([refetchStats(), refetchMatches()]);
+    setLastRefresh(new Date());
+  }, [refetchStats, refetchMatches]);
+
+  useEffect(() => {
+    const ch = supabase.channel("admin-dashboard-rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "withdrawals" }, () => refetchStats())
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, () => { refetchStats(); refetchMatches(); })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles" }, () => refetchStats())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [refetchStats, refetchMatches]);
+
+  const platformBalance = stats?.platformBalance ?? 0;
+  const todayWithdrawals = stats?.todayWithdrawals ?? 0;
+  const todayEarnings = stats?.todayEarnings ?? 0;
+  const onlineNow = stats?.onlineNow ?? 0;
+  const activeMatches = stats?.activeMatches ?? 0;
+  const totalRegistered = stats?.totalRegistered ?? 0;
+  const pendingCount = stats?.pendingWithdrawalsCount ?? 0;
+  const todayTx = stats?.todayTransactions ?? 0;
+  const gameCounts = stats?.gameCounts ?? {};
+
+  const GAMES = [
+    { key: "damas",  label: "Damas",         color: "#0ea5e9" },
+    { key: "ludo",   label: "Ludo",          color: "#10b981" },
+    { key: "xadrez", label: "Xadrez",        color: V1 },
+    { key: "roleta", label: "Roleta da Sorte", color: V4 },
   ];
 
+  const totalGames = GAMES.reduce((s, g) => s + (gameCounts[g.key] ?? 0), 0);
+
+  const Skeleton = () => <div className="h-6 w-24 rounded animate-pulse" style={{ background: "var(--gz-bg-subtle)" }} />;
+
   return (
-    <div className="flex flex-col lg:flex-row gap-5 px-5 pb-8 pt-4">
-
-      {/* ═══════════ MAIN COLUMN ═══════════ */}
-      <div className="flex-1 min-w-0 space-y-5">
-
-        {/* ── Header card ── */}
-        <div className="gz-card p-5 animate-float-up" style={{ animationDelay: "0ms" }}>
-          <MacOSCircles delay={80} />
-          <div className="flex items-end justify-between mt-4">
-            <div>
-              <h1 style={{ fontSize: 30, fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1.1, color: "var(--gz-text-primary)" }}>
-                Bom dia,{" "}
-                <span className="gz-gradient-text">Admin!</span>
-              </h1>
-              <p className="mt-1.5 text-[13px] font-medium" style={{ color: "var(--gz-text-accent)" }}>
-                Aqui está o resumo da plataforma GameZone.
-              </p>
-            </div>
-            <div className="flex items-center gap-1.5 mb-0.5">
-              {[ChevronLeft, ChevronRight].map((Icon, i) => (
-                <button key={i}
-                  className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:-translate-y-0.5 active:scale-95"
-                  style={{ background: "rgba(108,92,231,.07)", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
-                  <Icon className="w-3.5 h-3.5" style={{ color: V1 }} strokeWidth={2.3} />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* ── Saldo disponível + Saídas ── */}
-        <div className="flex gap-4">
-          <MoneyCard
-            label="Saldo disponível"
-            value={`MT ${totalBetVol.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
-            icon={Wallet}
-          />
-          <MoneyCard
-            label="Saídas"
-            value={`MT ${saidas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
-            icon={ArrowDownLeft}
-          />
-        </div>
-
-        {/* ── 4 Stat cards ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {sLoad
-            ? Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="gz-card h-[136px] animate-pulse" style={{ animationDelay: `${i * 80}ms` }} />
-            ))
-            : (<>
-              <StatCard label="Jogadores Online"        value={stats?.onlinePlayers ?? 0}      icon={Users}    badge="ativos"   badgeVariant="purple" />
-              <StatCard label="Apostas Ativas"          value={stats?.activeBets ?? 0}         icon={Coins}    badge="pendente" badgeVariant="warn"
-                actions={["Ver apostas ativas", "Cancelar todas", "Exportar"]} />
-              <StatCard label="Saques Pendentes"        value={stats?.pendingWithdrawals ?? 0} icon={Landmark} badge={`${stats?.pendingWithdrawals ?? 0} aguard.`} badgeVariant="warn"
-                actions={["Aprovar todos", "Ver detalhes"]} />
-              <StatCard label="Utilizadores Registados" value={(stats as { totalPlayers?: number } | undefined)?.totalPlayers ?? 0} icon={Users} badge="total" badgeVariant="purple" />
-            </>)
-          }
-        </div>
-
-        {/* ── Area Chart — Estatística ── */}
-        <div className="gz-card p-5">
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <div className="text-[15px] font-bold" style={{ color: "var(--gz-text-primary)" }}>Estatística</div>
-              <div className="text-[11.5px] font-medium mt-0.5" style={{ color: "var(--gz-text-accent)" }}>
-                Últimos 7 dias · Todos os jogos
-              </div>
-            </div>
-            <div className="flex items-center gap-3 flex-wrap justify-end text-[11px] font-bold" style={{ color: "var(--gz-text-tertiary)" }}>
-              <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 rounded-full" style={{ background: V1 }} />Dama</span>
-              <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 rounded-full" style={{ background: V2, opacity: .75 }} />Ludo</span>
-              <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 rounded-full" style={{ background: V3, opacity: .75 }} />Xadrez</span>
-              <span className="flex items-center gap-1.5"><span className="w-5 h-0.5 rounded-full" style={{ background: V4, opacity: .75 }} />Roleta</span>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height={168}>
-            <AreaChart data={chartData} margin={{ top: 5, right: 4, bottom: 0, left: -22 }}>
-              <defs>
-                <linearGradient id={GRAD_DAMA}   x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={V1} stopOpacity={0.22} />
-                  <stop offset="100%" stopColor={V1} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id={GRAD_LUDO}   x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={V2} stopOpacity={0.16} />
-                  <stop offset="100%" stopColor={V2} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id={GRAD_XADREZ} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={V3} stopOpacity={0.14} />
-                  <stop offset="100%" stopColor={V3} stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id={GRAD_ROLETA} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%"   stopColor={V4} stopOpacity={0.14} />
-                  <stop offset="100%" stopColor={V4} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(108,92,231,.06)" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--gz-text-tertiary)", fontWeight: 700 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 10, fill: "var(--gz-text-tertiary)", fontWeight: 700 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<ChartTip />} cursor={{ stroke: "rgba(108,92,231,.1)", strokeWidth: 1 }} />
-              <Area type="monotoneX" dataKey="dama"   stroke={V1} strokeWidth={2.2} fill={`url(#${GRAD_DAMA})`}   dot={{ r: 3, fill: V1, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: V1, strokeWidth: 2, stroke: "#fff" }} />
-              <Area type="monotoneX" dataKey="ludo"   stroke={V2} strokeWidth={2}   fill={`url(#${GRAD_LUDO})`}   strokeDasharray="6 3" dot={{ r: 3, fill: V2, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: V2, strokeWidth: 2, stroke: "#fff" }} />
-              <Area type="monotoneX" dataKey="xadrez" stroke={V3} strokeWidth={2}   fill={`url(#${GRAD_XADREZ})`} strokeDasharray="4 2" dot={{ r: 3, fill: V3, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: V3, strokeWidth: 2, stroke: "#fff" }} />
-              <Area type="monotoneX" dataKey="roleta" stroke={V4} strokeWidth={2}   fill={`url(#${GRAD_ROLETA})`} strokeDasharray="2 2" dot={{ r: 3, fill: V4, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: V4, strokeWidth: 2, stroke: "#fff" }} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* ── Recent Matches ── */}
+    <div className="p-5 pb-10 space-y-5">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <div className="flex items-center justify-between mb-3.5">
-            <div className="flex items-center gap-2.5">
-              <div style={{ width: 28, height: 28, borderRadius: 10, background: `linear-gradient(135deg, ${V1}, #4f46e5)`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 10px rgba(108,92,231,.35)" }}>
-                <Gamepad2 style={{ width: 13, height: 13, color: "white", strokeWidth: 2 }} />
-              </div>
-              <span className="text-[15px] font-bold" style={{ color: "var(--gz-text-primary)" }}>Partidas Recentes</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <LiveDot />
-              <NeonBadge variant="live">ao vivo</NeonBadge>
-            </div>
+          <h1 className="text-[22px] font-black tracking-tight" style={{ color: "var(--gz-text-primary)" }}>Dashboard</h1>
+          <div className="flex items-center gap-2 mt-0.5">
+            <LiveDot />
+            <span className="text-[12px]" style={{ color: "var(--gz-text-muted)" }}>
+              POKER WINNER · Actualizado {lastRefresh.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </span>
           </div>
+        </div>
+        <button onClick={handleRefresh}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl text-[12px] font-semibold transition-colors hover:opacity-80"
+          style={{ background: "var(--gz-bg-subtle)", color: "var(--gz-text-muted)" }}>
+          <RefreshCw style={{ width: 13, height: 13 }} />
+          Actualizar
+        </button>
+      </div>
 
-          {(live ?? []).length === 0 ? (
-            <div className="gz-card px-5 py-12 text-center">
-              <div style={{ width: 44, height: 44, borderRadius: 16, margin: "0 auto 12px", background: "rgba(108,92,231,.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Gamepad2 style={{ width: 20, height: 20, color: V1, strokeWidth: 1.5, opacity: .4 }} />
-              </div>
-              <div className="text-[13px] font-medium" style={{ color: "var(--gz-text-accent)" }}>Nenhuma partida ao vivo</div>
+      {/* Top row: Saldo + Saídas */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="gz-card p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(108,92,231,.1)" }}>
+              <Wallet style={{ width: 15, height: 15, color: "#111", strokeWidth: 1.8 }} />
             </div>
-          ) : (
-            <div>
-              {(live ?? []).map((m, i) => (
-                <MatchRow key={m.id} match={m} isLast={i === (live ?? []).length - 1} />
-              ))}
+            <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Saldo Disponível</span>
+          </div>
+          {statsLoading ? <Skeleton /> : (
+            <div className="text-[26px] font-black leading-none" style={{ color: "var(--gz-text-primary)", letterSpacing: "-0.04em" }}>
+              MT {fmt(platformBalance)}
             </div>
           )}
+          <p className="text-[10.5px] mt-1" style={{ color: "var(--gz-text-muted)" }}>10% das apostas + taxas</p>
+          <div className="flex items-center gap-1.5 mt-2">
+            <ArrowUpRight style={{ width: 12, height: 12, color: V3 }} />
+            <span className="text-[11px] font-semibold" style={{ color: V3 }}>+MT {fmt(todayEarnings)} hoje</span>
+          </div>
+        </div>
+
+        <div className="gz-card p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(239,68,68,.1)" }}>
+              <ArrowDownLeft style={{ width: 15, height: 15, color: "#111", strokeWidth: 1.8 }} />
+            </div>
+            <span className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Saídas</span>
+          </div>
+          {statsLoading ? <Skeleton /> : (
+            <div className="text-[26px] font-black leading-none" style={{ color: "var(--gz-text-primary)", letterSpacing: "-0.04em" }}>
+              MT {fmt(todayWithdrawals)}
+            </div>
+          )}
+          <p className="text-[10.5px] mt-1" style={{ color: "var(--gz-text-muted)" }}>Levantamentos aprovados hoje</p>
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-[11px] font-semibold" style={{ color: V4 }}>{pendingCount} pendente{pendingCount !== 1 ? "s" : ""}</span>
+          </div>
         </div>
       </div>
 
-      {/* ═══════════ RIGHT PANEL ═══════════ */}
-      <div className="w-full lg:w-[248px] lg:flex-shrink-0 space-y-4">
-
-        {/* Daily Stats */}
-        <div className="gz-glass p-5 animate-float-up" style={{ animationDelay: "60ms" }}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>Hoje</div>
-            <Activity style={{ width: 14, height: 14, color: V1, strokeWidth: 1.9 }} />
+      {/* 4 stat cards */}
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          { label: "Jogadores Online",  val: onlineNow,        color: V3,  icon: Users,    badge: <NeonBadge variant="live">LIVE</NeonBadge> },
+          { label: "Apostas Activas",   val: activeMatches,    color: V1,  icon: Gamepad2, badge: <NeonBadge variant="purple">EM JOGO</NeonBadge> },
+          { label: "Saques Pendentes",  val: pendingCount,     color: V4,  icon: Landmark, badge: null },
+          { label: "Utilizadores Reg.", val: totalRegistered,  color: V2,  icon: Users,    badge: null },
+        ].map(s => (
+          <div key={s.label} className="gz-card p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: s.color + "15" }}>
+                <s.icon style={{ width: 13, height: 13, color: "#111", strokeWidth: 1.9 }} />
+              </div>
+              {s.badge}
+            </div>
+            {statsLoading
+              ? <div className="h-7 w-16 rounded animate-pulse" style={{ background: "var(--gz-bg-subtle)" }} />
+              : <div className="text-[24px] font-black leading-none" style={{ color: "var(--gz-text-primary)", letterSpacing: "-0.04em" }}>{s.val}</div>
+            }
+            <div className="text-[10.5px] font-semibold mt-1" style={{ color: "var(--gz-text-muted)" }}>{s.label}</div>
           </div>
-          <div className="space-y-3">
-            {dailyStats.map(s => (
-              <div key={s.label} className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div style={{ width: 28, height: 28, borderRadius: 8, background: `${s.color}14`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <s.icon style={{ width: 13, height: 13, color: s.color, strokeWidth: 1.9 }} />
-                  </div>
-                  <span className="text-[12px] font-medium" style={{ color: "var(--gz-text-muted)" }}>{s.label}</span>
-                </div>
-                <span className="text-[13px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{s.value}</span>
+        ))}
+      </div>
+
+      {/* Main grid */}
+      <div className="grid grid-cols-3 gap-5">
+        {/* Chart — spans 2 columns */}
+        <div className="gz-card p-5 col-span-2">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <div className="text-[15px] font-black" style={{ color: "var(--gz-text-primary)" }}>Estatística de Receita</div>
+              <div className="text-[11px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>Ganhos da plataforma nos últimos 30 dias</div>
+            </div>
+            <NeonBadge variant="live">REALTIME</NeonBadge>
+          </div>
+          {chartLoading ? (
+            <div className="h-56 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full border-2 border-indigo-500/30 border-t-indigo-500 animate-spin" />
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <AreaChart data={chartData} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                <defs>
+                  <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={V1} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={V1} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(108,92,231,.06)" />
+                <XAxis dataKey="date" tick={{ fontSize: 9, fill: "var(--gz-text-muted)" }}
+                  tickFormatter={v => v.slice(5)} />
+                <YAxis tick={{ fontSize: 9, fill: "var(--gz-text-muted)" }} tickFormatter={v => `MT ${fmt(v)}`} width={55} />
+                <Tooltip
+                  contentStyle={{ background: "var(--gz-card-bg)", border: "1px solid rgba(108,92,231,.12)", borderRadius: 12, fontSize: 12 }}
+                  formatter={(v: number) => [`MT ${v.toFixed(2)}`, "Receita"]}
+                  labelFormatter={l => `Data: ${l}`} />
+                <Area type="monotone" dataKey="valor" stroke={V1} strokeWidth={2} fill="url(#chartGrad)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Right column */}
+        <div className="space-y-4">
+          {/* Today summary */}
+          <div className="gz-card p-4">
+            <div className="text-[12px] font-bold mb-3" style={{ color: "var(--gz-text-primary)" }}>Hoje</div>
+            {[
+              { label: "Ganho",        val: `MT ${fmt(todayEarnings)}`,  color: V3 },
+              { label: "Transacções",  val: todayTx,                     color: V1 },
+              { label: "Online",       val: onlineNow,                   color: V3 },
+              { label: "Saídas",       val: `MT ${fmt(todayWithdrawals)}`, color: "#ef4444" },
+            ].map(r => (
+              <div key={r.label} className="flex items-center justify-between py-1.5 border-b last:border-0" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+                <span className="text-[11px]" style={{ color: "var(--gz-text-muted)" }}>{r.label}</span>
+                {statsLoading
+                  ? <div className="h-3 w-12 rounded animate-pulse" style={{ background: "var(--gz-bg-subtle)" }} />
+                  : <span className="text-[12px] font-bold" style={{ color: r.color }}>{r.val}</span>
+                }
               </div>
             ))}
           </div>
-        </div>
 
-        {/* Número de Partidas */}
-        <div className="gz-glass p-5 animate-float-up" style={{ animationDelay: "120ms" }}>
-          <div className="text-[14px] font-bold mb-4" style={{ color: "var(--gz-text-primary)" }}>Número de Partidas</div>
-          {[
-            { label: "Dama",           matches: damaM,   color: V1 },
-            { label: "Ludo",           matches: ludoM,   color: V2 },
-            { label: "Xadrez",         matches: xadrezM, color: V3 },
-            { label: "Roleta da Sorte", matches: roletaM, color: V4 },
-          ].map(g => {
-            const pct = totalM > 0 ? Math.round((g.matches / totalM) * 100) : 25;
-            return (
-              <div key={g.label} className="mb-4 last:mb-0">
-                <div className="flex justify-between text-[12px] font-semibold mb-1.5">
-                  <span style={{ color: "var(--gz-text-secondary)" }}>{g.label}</span>
-                  <span style={{ color: g.color, fontWeight: 800 }}>{g.matches} partidas</span>
+          {/* Game counts */}
+          <div className="gz-card p-4">
+            <div className="text-[12px] font-bold mb-3" style={{ color: "var(--gz-text-primary)" }}>Partidas por Jogo</div>
+            {GAMES.map(g => {
+              const count = gameCounts[g.key] ?? 0;
+              const pct = totalGames > 0 ? (count / totalGames) * 100 : 0;
+              return (
+                <div key={g.key} className="mb-3 last:mb-0">
+                  <div className="flex justify-between items-center mb-1">
+                    <span className="text-[11px] font-semibold" style={{ color: "var(--gz-text-secondary)" }}>{g.label}</span>
+                    {statsLoading
+                      ? <div className="h-3 w-8 rounded animate-pulse" style={{ background: "var(--gz-bg-subtle)" }} />
+                      : <span className="text-[11px] font-bold" style={{ color: g.color }}>{count}</span>
+                    }
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--gz-bg-subtle)" }}>
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: g.color }} />
+                  </div>
                 </div>
-                <div className="gz-progress-track h-1.5">
-                  <div style={{ width: `${pct}%`, height: "100%", borderRadius: 100, background: g.color, transition: "width 1s ease" }} />
-                </div>
-                <div className="text-[10px] font-medium mt-1" style={{ color: "var(--gz-text-accent)" }}>{pct}% do total</div>
+              );
+            })}
+            <div className="pt-2 border-t mt-2 flex justify-between" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+              <span className="text-[10.5px]" style={{ color: "var(--gz-text-muted)" }}>Total</span>
+              <span className="text-[12px] font-black" style={{ color: "var(--gz-text-primary)" }}>{totalGames}</span>
+            </div>
+          </div>
+
+          {/* Pending actions */}
+          <div className="gz-card p-4">
+            <div className="text-[12px] font-bold mb-3" style={{ color: "var(--gz-text-primary)" }}>Acções Pendentes</div>
+            {statsLoading ? (
+              <div className="space-y-2">
+                {[1,2].map(i => <div key={i} className="h-8 rounded animate-pulse" style={{ background: "var(--gz-bg-subtle)" }} />)}
               </div>
-            );
-          })}
+            ) : (
+              <div className="space-y-2">
+                {pendingCount > 0 && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl" style={{ background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)" }}>
+                    <Landmark style={{ width: 13, height: 13, color: V4, flexShrink: 0 }} />
+                    <span className="text-[11px]" style={{ color: V4 }}>{pendingCount} saque{pendingCount !== 1 ? "s" : ""} para aprovar</span>
+                  </div>
+                )}
+                {activeMatches > 0 && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl" style={{ background: "rgba(108,92,231,.08)", border: "1px solid rgba(108,92,231,.2)" }}>
+                    <Activity style={{ width: 13, height: 13, color: V1, flexShrink: 0 }} />
+                    <span className="text-[11px]" style={{ color: V1 }}>{activeMatches} partida{activeMatches !== 1 ? "s" : ""} em curso</span>
+                  </div>
+                )}
+                {pendingCount === 0 && activeMatches === 0 && (
+                  <p className="text-[11px] text-center py-2" style={{ color: "var(--gz-text-muted)" }}>Nenhuma acção pendente ✓</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+      </div>
 
-        {/* Ações Pendentes */}
-        <div className="animate-float-up" style={{ animationDelay: "180ms" }}>
-          <div className="text-[14px] font-bold mb-3" style={{ color: "var(--gz-text-primary)" }}>Ações Pendentes</div>
-          <ActionItem icon={Landmark}      title="Aprovar saques"    sub={`${stats?.pendingWithdrawals ?? 0} saques aguardando`} />
-          <ActionItem icon={ArrowUpRight}  title="Revisar denúncias" sub={`${stats?.pendingReports ?? 0} denúncias novas`} />
-          <ActionItem icon={AlertTriangle} title="Alertas de sistema" sub="2 alertas críticos activos" />
-          <ActionItem icon={ClipboardList} title="Relatório semanal"  sub="Gerar relatório de apostas" done />
+      {/* Recent matches */}
+      <div className="gz-card overflow-hidden">
+        <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+          <div className="flex items-center gap-2">
+            <Gamepad2 style={{ width: 16, height: 16, color: V1 }} />
+            <span className="text-[14px] font-black" style={{ color: "var(--gz-text-primary)" }}>Partidas Recentes</span>
+          </div>
+          <LiveDot />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr style={{ borderBottom: "1px solid rgba(108,92,231,.06)" }}>
+                {["Jogo", "Jogadores", "Aposta", "Status", "Data"].map(h => (
+                  <th key={h} className="text-left px-5 py-3 text-[10.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {matchesLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}><td colSpan={5} className="px-5 py-3"><div className="h-4 rounded animate-pulse" style={{ background: "var(--gz-bg-subtle)" }} /></td></tr>
+                ))
+              ) : recentMatches.length === 0 ? (
+                <tr><td colSpan={5} className="px-5 py-10 text-center text-sm" style={{ color: "var(--gz-text-muted)" }}>Nenhuma partida registada ainda</td></tr>
+              ) : recentMatches.map((m: AdminMatch) => (
+                <tr key={m.id} className="hover:bg-indigo-50/10 transition-colors" style={{ borderBottom: "1px solid rgba(108,92,231,.04)" }}>
+                  <td className="px-5 py-3"><GameTypeBadge type={m.game_type} /></td>
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2">
+                      <Avatar seed={m.player1_name ?? "P1"} size={24} />
+                      <span className="text-[12px] font-medium" style={{ color: "var(--gz-text-primary)" }}>
+                        {m.player1_name ?? "—"} vs {m.player2_name ?? "—"}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3 text-[12px] font-bold" style={{ color: V1 }}>MT {Number(m.bet_amount).toFixed(2)}</td>
+                  <td className="px-5 py-3">
+                    <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full ${m.status === "active" ? "bg-green-100 text-green-700" : m.status === "completed" ? "bg-gray-100 text-gray-600" : "bg-amber-100 text-amber-700"}`}>
+                      {m.status === "active" ? "● Em Jogo" : m.status === "completed" ? "Concluída" : "Pendente"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-[11px]" style={{ color: "var(--gz-text-muted)" }}>
+                    {new Date(m.created_at).toLocaleDateString("pt-PT")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

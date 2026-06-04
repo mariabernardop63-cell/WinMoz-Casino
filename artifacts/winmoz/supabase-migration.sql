@@ -1,0 +1,261 @@
+-- =============================================
+-- POKER WINNER - Supabase Migration
+-- Execute this in the Supabase SQL Editor
+-- =============================================
+
+-- 1. Add columns to existing profiles table
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS is_blocked boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS block_type text,
+  ADD COLUMN IF NOT EXISTS last_seen_at timestamptz,
+  ADD COLUMN IF NOT EXISTS total_games integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS total_wins integer DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS is_admin boolean DEFAULT false;
+
+-- Set admin flag for the platform admin
+UPDATE profiles SET is_admin = true WHERE email = 'nexialonemz@gmail.com';
+
+-- 2. matches table
+CREATE TABLE IF NOT EXISTS matches (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_type text NOT NULL,
+  status text NOT NULL DEFAULT 'active',
+  player1_id uuid REFERENCES profiles(id) ON DELETE SET NULL,
+  player2_id uuid REFERENCES profiles(id) ON DELETE SET NULL,
+  winner_id uuid REFERENCES profiles(id) ON DELETE SET NULL,
+  player1_name text,
+  player2_name text,
+  winner_name text,
+  bet_amount numeric NOT NULL DEFAULT 0,
+  platform_fee numeric NOT NULL DEFAULT 0,
+  winner_payout numeric NOT NULL DEFAULT 0,
+  game_channel text,
+  created_at timestamptz DEFAULT now(),
+  completed_at timestamptz
+);
+
+-- 3. withdrawals table
+CREATE TABLE IF NOT EXISTS withdrawals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  user_name text,
+  amount numeric NOT NULL,
+  fee numeric NOT NULL DEFAULT 5,
+  net_amount numeric NOT NULL,
+  phone text,
+  method text DEFAULT 'M-Pesa',
+  status text NOT NULL DEFAULT 'pending',
+  rejection_reason text,
+  approved_by uuid REFERENCES profiles(id) ON DELETE SET NULL,
+  created_at timestamptz DEFAULT now(),
+  processed_at timestamptz
+);
+
+-- 4. reports table
+CREATE TABLE IF NOT EXISTS reports (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES profiles(id) ON DELETE SET NULL,
+  user_name text,
+  user_email text,
+  category text NOT NULL,
+  priority text NOT NULL DEFAULT 'Média',
+  description text NOT NULL,
+  status text NOT NULL DEFAULT 'open',
+  admin_notes text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- 5. notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  subtitle text,
+  type text NOT NULL DEFAULT 'notification',
+  image_url text,
+  action_button_label text,
+  action_button_url text,
+  target text NOT NULL DEFAULT 'all',
+  target_user_ids uuid[],
+  sent_by uuid REFERENCES profiles(id) ON DELETE SET NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+-- 6. notification_reads
+CREATE TABLE IF NOT EXISTS notification_reads (
+  notification_id uuid REFERENCES notifications(id) ON DELETE CASCADE,
+  user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  read_at timestamptz DEFAULT now(),
+  PRIMARY KEY (notification_id, user_id)
+);
+
+-- 7. support_messages
+CREATE TABLE IF NOT EXISTS support_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  user_name text,
+  sender text NOT NULL,
+  content text NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+-- 8. blocked_users
+CREATE TABLE IF NOT EXISTS blocked_users (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES profiles(id) ON DELETE CASCADE,
+  user_name text,
+  block_type text NOT NULL DEFAULT 'account',
+  reason text,
+  blocked_ip text,
+  is_active boolean DEFAULT true,
+  admin_id uuid REFERENCES profiles(id) ON DELETE SET NULL,
+  created_at timestamptz DEFAULT now(),
+  unblocked_at timestamptz
+);
+
+-- 9. platform_settings
+CREATE TABLE IF NOT EXISTS platform_settings (
+  key text PRIMARY KEY,
+  value text NOT NULL,
+  updated_at timestamptz DEFAULT now(),
+  updated_by uuid REFERENCES profiles(id) ON DELETE SET NULL
+);
+
+-- 10. platform_earnings
+CREATE TABLE IF NOT EXISTS platform_earnings (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  type text NOT NULL,
+  amount numeric NOT NULL,
+  reference_id uuid,
+  user_id uuid REFERENCES profiles(id) ON DELETE SET NULL,
+  created_at timestamptz DEFAULT now()
+);
+
+-- Initial platform settings
+INSERT INTO platform_settings (key, value) VALUES
+  ('maintenance_mode', 'false'),
+  ('game_damas_enabled', 'true'),
+  ('game_ludo_enabled', 'true'),
+  ('game_xadrez_enabled', 'true'),
+  ('game_roleta_enabled', 'true'),
+  ('deposits_enabled', 'true'),
+  ('withdrawals_enabled', 'true'),
+  ('bets_enabled', 'true'),
+  ('new_registrations_enabled', 'true'),
+  ('platform_name', 'POKER WINNER'),
+  ('withdrawal_fee', '5'),
+  ('platform_cut_pct', '10')
+ON CONFLICT (key) DO NOTHING;
+
+-- Enable RLS
+ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
+ALTER TABLE withdrawals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_reads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE support_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE blocked_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform_earnings ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if re-running
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "matches_select" ON matches;
+  DROP POLICY IF EXISTS "matches_insert" ON matches;
+  DROP POLICY IF EXISTS "matches_update" ON matches;
+  DROP POLICY IF EXISTS "withdrawals_select" ON withdrawals;
+  DROP POLICY IF EXISTS "withdrawals_insert" ON withdrawals;
+  DROP POLICY IF EXISTS "withdrawals_update" ON withdrawals;
+  DROP POLICY IF EXISTS "reports_select" ON reports;
+  DROP POLICY IF EXISTS "reports_insert" ON reports;
+  DROP POLICY IF EXISTS "reports_update" ON reports;
+  DROP POLICY IF EXISTS "notifications_select" ON notifications;
+  DROP POLICY IF EXISTS "notifications_insert" ON notifications;
+  DROP POLICY IF EXISTS "notification_reads_all" ON notification_reads;
+  DROP POLICY IF EXISTS "support_messages_select" ON support_messages;
+  DROP POLICY IF EXISTS "support_messages_insert" ON support_messages;
+  DROP POLICY IF EXISTS "blocked_users_all" ON blocked_users;
+  DROP POLICY IF EXISTS "platform_settings_select" ON platform_settings;
+  DROP POLICY IF EXISTS "platform_settings_all" ON platform_settings;
+  DROP POLICY IF EXISTS "platform_earnings_select" ON platform_earnings;
+  DROP POLICY IF EXISTS "platform_earnings_insert" ON platform_earnings;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- matches policies
+CREATE POLICY "matches_select" ON matches FOR SELECT TO authenticated USING (
+  player1_id = auth.uid() OR player2_id = auth.uid() OR winner_id = auth.uid()
+  OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+);
+CREATE POLICY "matches_insert" ON matches FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "matches_update" ON matches FOR UPDATE TO authenticated USING (true);
+
+-- withdrawals policies
+CREATE POLICY "withdrawals_select" ON withdrawals FOR SELECT TO authenticated USING (
+  user_id = auth.uid()
+  OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+);
+CREATE POLICY "withdrawals_insert" ON withdrawals FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+CREATE POLICY "withdrawals_update" ON withdrawals FOR UPDATE TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+);
+
+-- reports policies
+CREATE POLICY "reports_select" ON reports FOR SELECT TO authenticated USING (
+  user_id = auth.uid()
+  OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+);
+CREATE POLICY "reports_insert" ON reports FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "reports_update" ON reports FOR UPDATE TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+);
+
+-- notifications policies
+CREATE POLICY "notifications_select" ON notifications FOR SELECT TO authenticated USING (true);
+CREATE POLICY "notifications_insert" ON notifications FOR INSERT TO authenticated WITH CHECK (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+);
+
+-- notification_reads policies
+CREATE POLICY "notification_reads_all" ON notification_reads FOR ALL TO authenticated USING (user_id = auth.uid());
+
+-- support_messages policies
+CREATE POLICY "support_messages_select" ON support_messages FOR SELECT TO authenticated USING (
+  user_id = auth.uid()
+  OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+);
+CREATE POLICY "support_messages_insert" ON support_messages FOR INSERT TO authenticated WITH CHECK (true);
+
+-- blocked_users policies
+CREATE POLICY "blocked_users_all" ON blocked_users FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+);
+
+-- platform_settings policies
+CREATE POLICY "platform_settings_select" ON platform_settings FOR SELECT TO authenticated USING (true);
+CREATE POLICY "platform_settings_all" ON platform_settings FOR ALL TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+);
+
+-- platform_earnings policies
+CREATE POLICY "platform_earnings_select" ON platform_earnings FOR SELECT TO authenticated USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND is_admin = true)
+);
+CREATE POLICY "platform_earnings_insert" ON platform_earnings FOR INSERT TO authenticated WITH CHECK (true);
+
+-- Enable realtime for key tables
+ALTER PUBLICATION supabase_realtime ADD TABLE withdrawals;
+ALTER PUBLICATION supabase_realtime ADD TABLE notifications;
+ALTER PUBLICATION supabase_realtime ADD TABLE matches;
+ALTER PUBLICATION supabase_realtime ADD TABLE support_messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE platform_settings;
+ALTER PUBLICATION supabase_realtime ADD TABLE blocked_users;
+ALTER PUBLICATION supabase_realtime ADD TABLE profiles;
+
+-- Function to update last_seen_at
+CREATE OR REPLACE FUNCTION update_last_seen()
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE profiles SET last_seen_at = now() WHERE id = auth.uid();
+END;
+$$;

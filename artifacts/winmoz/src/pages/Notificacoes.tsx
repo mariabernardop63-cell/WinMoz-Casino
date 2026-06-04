@@ -1,196 +1,211 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import {
-  ArrowLeft, Search, Bell, ArrowDownToLine, ArrowUpFromLine,
-  LogIn, Shield, RefreshCw, Gamepad2, Gift, AlertCircle, CheckCircle2, Info, X, SlidersHorizontal
+  ArrowLeft, Bell, Search, X, Megaphone, RefreshCw,
+  CheckCircle2, Loader2,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
-type NotifCategory = "Todos" | "Financeiro" | "Sistema" | "Jogos" | "Promoções";
-const CATS: NotifCategory[] = ["Todos", "Financeiro", "Sistema", "Jogos", "Promoções"];
-
-type Notif = {
+interface AdminNotif {
   id: string;
-  category: Exclude<NotifCategory, "Todos">;
-  icon: any;
-  iconBg: string;
-  iconColor: string;
   title: string;
-  desc: string;
-  time: string;
-  date: string;
-  read: boolean;
-  badge?: "sucesso" | "pendente" | "erro" | "info";
-};
-
-const BADGE_STYLES: Record<string, { bg: string; color: string; label: string }> = {
-  sucesso:  { bg: "#dcfce7", color: "#16a34a", label: "Sucesso" },
-  pendente: { bg: "#fef3c7", color: "#d97706", label: "Pendente" },
-  erro:     { bg: "#fee2e2", color: "#dc2626", label: "Erro" },
-  info:     { bg: "#dbeafe", color: "#1d4ed8", label: "Info" },
-};
-
-const ICON_MAP: Record<string, any> = {
-  ArrowDownToLine, ArrowUpFromLine, LogIn, Shield, RefreshCw,
-  Gamepad2, Gift, AlertCircle, CheckCircle2, Info,
-};
+  subtitle: string | null;
+  type: string;
+  action_button_label: string | null;
+  action_button_url: string | null;
+  target: string;
+  created_at: string;
+  isRead: boolean;
+}
 
 const fadeUp = {
   hidden: { opacity: 0, y: 10 },
   show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" as const } },
 };
-const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
+const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 
-function resolveIcon(iconName: string) {
-  return ICON_MAP[iconName] ?? Bell;
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "agora";
+  if (mins < 60) return `há ${mins}m`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `há ${hrs}h`;
+  const days = Math.floor(hrs / 24);
+  return `há ${days}d`;
 }
 
 export default function Notificacoes() {
   const [, setLocation] = useLocation();
-  const [cat, setCat] = useState<NotifCategory>("Todos");
+  const { user } = useAuth();
+  const [notifs, setNotifs] = useState<AdminNotif[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [notifs, setNotifs] = useState<Notif[]>([]);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
-  const unread = notifs.filter(n => !n.read && !dismissed.has(n.id)).length;
+  async function fetchNotifs() {
+    if (!user) return;
+    const { data: all } = await supabase
+      .from("notifications")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(50);
 
-  const markAllRead = () => setNotifs(p => p.map(n => ({ ...n, read: true })));
-  const dismiss = (id: string) => setDismissed(p => new Set([...p, id]));
+    const { data: reads } = await supabase
+      .from("notification_reads")
+      .select("notification_id")
+      .eq("user_id", user.id);
 
-  const filtered = notifs.filter(n => {
-    if (dismissed.has(n.id)) return false;
-    if (cat !== "Todos" && n.category !== cat) return false;
-    if (search && !n.title.toLowerCase().includes(search.toLowerCase()) && !n.desc.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+    const readSet = new Set((reads ?? []).map(r => r.notification_id));
 
-  const grouped: Record<string, Notif[]> = {};
-  filtered.forEach(n => {
-    if (!grouped[n.date]) grouped[n.date] = [];
-    grouped[n.date].push(n);
-  });
+    const mapped: AdminNotif[] = (all ?? []).map(n => ({
+      ...n,
+      isRead: readSet.has(n.id),
+    }));
 
-  const markRead = (id: string) => setNotifs(p => p.map(n => n.id === id ? { ...n, read: true } : n));
+    setNotifs(mapped);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    fetchNotifs();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const ch = supabase.channel("user-notifications-rt")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, () => fetchNotifs())
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user]);
+
+  async function markRead(id: string) {
+    if (!user) return;
+    setNotifs(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    await supabase.from("notification_reads").upsert({ notification_id: id, user_id: user.id }).onConflict("notification_id,user_id");
+  }
+
+  async function markAllRead() {
+    if (!user) return;
+    const unread = notifs.filter(n => !n.isRead);
+    setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
+    await Promise.all(unread.map(n =>
+      supabase.from("notification_reads").upsert({ notification_id: n.id, user_id: user.id }).onConflict("notification_id,user_id")
+    ));
+  }
+
+  const filtered = notifs.filter(n =>
+    search === "" || n.title.toLowerCase().includes(search.toLowerCase())
+    || (n.subtitle ?? "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  const unreadCount = notifs.filter(n => !n.isRead).length;
 
   return (
-    <div className="min-h-screen w-full flex justify-center" style={{ background: "#f8f9fa" }}>
-      <div className="w-full max-w-[430px] flex flex-col pb-6">
-
-        {/* Header */}
-        <div className="sticky top-0 z-40 bg-white border-b border-slate-100 shadow-sm">
-          <div className="flex items-center gap-3 px-4 py-3.5">
-            <button onClick={() => setLocation("/")} style={{ width: 36, height: 36, borderRadius: 999, background: "#f8f9fa", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-              <ArrowLeft style={{ width: 17, height: 17, color: "#374151" }} />
-            </button>
-            <div className="flex-1">
-              <h1 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 17, color: "#111827" }}>Notificações</h1>
-              {unread > 0 && (
-                <p style={{ fontSize: 11, color: "#6b7280", marginTop: 1 }}>{unread} não lida{unread !== 1 ? "s" : ""}</p>
-              )}
-            </div>
-            {notifs.length > 0 && (
-              <button onClick={markAllRead} style={{ fontSize: 12, color: "#7c3aed", fontWeight: 600, background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}>
-                Marcar tudo
-              </button>
+    <div className="min-h-screen" style={{ background: "#fff" }}>
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-white border-b border-gray-100">
+        <div className="flex items-center justify-between px-5 pt-12 pb-4">
+          <button onClick={() => setLocation("/perfil")}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
+            <ArrowLeft className="w-5 h-5 text-gray-800" />
+          </button>
+          <div className="text-center">
+            <h1 className="font-syne font-bold text-base text-gray-900">Notificações</h1>
+            {unreadCount > 0 && (
+              <p className="text-[11px] text-indigo-600 font-semibold">{unreadCount} não lida{unreadCount !== 1 ? "s" : ""}</p>
             )}
-            <button style={{ width: 34, height: 34, borderRadius: 999, background: "#f8f9fa", border: "1px solid #e5e7eb", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
-              <SlidersHorizontal style={{ width: 15, height: 15, color: "#6b7280" }} />
+          </div>
+          <button onClick={() => fetchNotifs()} className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100">
+            <RefreshCw className="w-4 h-4 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="px-5 pb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Pesquisar notificações…"
+              className="w-full pl-9 pr-4 py-2.5 rounded-full bg-gray-100 text-sm outline-none focus:ring-2 focus:ring-indigo-200 text-gray-800" />
+          </div>
+        </div>
+
+        {unreadCount > 0 && (
+          <div className="px-5 pb-3">
+            <button onClick={markAllRead}
+              className="flex items-center gap-2 text-[12px] font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+              <CheckCircle2 className="w-4 h-4" />
+              Marcar todas como lidas
             </button>
           </div>
+        )}
+      </div>
 
-          {/* Search */}
-          <div className="px-4 pb-3">
-            <div style={{ background: "#f3f4f6", borderRadius: 12, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px" }}>
-              <Search style={{ width: 15, height: 15, color: "#9ca3af", flexShrink: 0 }} />
-              <input
-                value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Pesquisar notificações..."
-                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13.5, color: "#111827", fontFamily: "inherit" }}
-              />
-              {search && (
-                <button onClick={() => setSearch("")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex" }}>
-                  <X style={{ width: 14, height: 14, color: "#9ca3af" }} />
-                </button>
-              )}
-            </div>
+      {/* Content */}
+      <div className="pb-24 px-4 pt-3">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="w-7 h-7 text-indigo-500 animate-spin" />
           </div>
-
-          {/* Category filters */}
-          <div className="flex gap-2 px-4 pb-3 overflow-x-auto [&::-webkit-scrollbar]:hidden">
-            {CATS.map(c => (
-              <button key={c} onClick={() => setCat(c)} style={{
-                flexShrink: 0, padding: "6px 14px", borderRadius: 20, fontSize: 12.5, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", border: "none", transition: "all 0.15s",
-                background: cat === c ? "#111827" : "#f3f4f6",
-                color: cat === c ? "#fff" : "#6b7280",
-              }}>
-                {c}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 px-4 pt-3">
-          {Object.keys(grouped).length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <div style={{ width: 64, height: 64, borderRadius: 999, background: "#f3f4f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Bell style={{ width: 28, height: 28, color: "#d1d5db" }} />
-              </div>
-              <p style={{ fontSize: 15, fontWeight: 600, color: "#374151", fontFamily: "'Syne', sans-serif" }}>Sem notificações</p>
-              <p style={{ fontSize: 13, color: "#9ca3af", textAlign: "center" }}>
-                {cat !== "Todos"
-                  ? `Não há notificações em "${cat}".`
-                  : "As suas notificações aparecerão aqui."}
-              </p>
+        ) : filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 px-8 text-center">
+            <div className="w-16 h-16 rounded-3xl bg-gray-100 flex items-center justify-center mb-4">
+              <Bell className="w-8 h-8 text-gray-300" />
             </div>
-          ) : (
-            Object.entries(grouped).map(([date, items]) => (
-              <div key={date} className="mb-5">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="flex-1 h-px bg-slate-200" />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.6px", textTransform: "uppercase" }}>{date}</span>
-                  <div className="flex-1 h-px bg-slate-200" />
-                </div>
+            <h3 className="font-syne font-bold text-lg text-gray-700 mb-1">Nenhuma notificação</h3>
+            <p className="text-sm text-gray-400">
+              {search ? "Nenhuma notificação corresponde à pesquisa" : "Ainda não recebeste notificações"}
+            </p>
+          </div>
+        ) : (
+          <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-2">
+            <AnimatePresence>
+              {filtered.map(n => (
+                <motion.div
+                  key={n.id}
+                  variants={fadeUp}
+                  layout
+                  onClick={() => { markRead(n.id); if (n.action_button_url) setLocation(n.action_button_url); }}
+                  className={`relative flex items-start gap-3.5 p-4 rounded-2xl transition-all cursor-pointer ${n.isRead ? "bg-white border border-gray-100" : "bg-indigo-50/70 border border-indigo-100"}`}>
+                  {/* Icon */}
+                  <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: n.type === "announcement" ? "rgba(245,158,11,.12)" : "rgba(108,92,231,.1)" }}>
+                    {n.type === "announcement"
+                      ? <Megaphone className="w-5 h-5" style={{ color: "#f59e0b" }} />
+                      : <Bell className="w-5 h-5" style={{ color: "#6C5CE7" }} />
+                    }
+                  </div>
 
-                <motion.div variants={stagger} initial="hidden" animate="show" className="flex flex-col gap-2">
-                  {items.map(n => {
-                    const IconComp = typeof n.icon === "string" ? resolveIcon(n.icon) : (n.icon ?? Bell);
-                    const badge = n.badge ? BADGE_STYLES[n.badge] : null;
-                    return (
-                      <motion.div key={n.id} variants={fadeUp}
-                        onClick={() => markRead(n.id)}
-                        style={{ background: n.read ? "#fff" : "#f5f0ff", borderRadius: 16, border: n.read ? "1px solid #f1f5f9" : "1px solid #ddd6fe", padding: "12px 14px", display: "flex", gap: 12, cursor: "pointer", boxShadow: n.read ? "0 1px 4px rgba(0,0,0,0.04)" : "0 2px 12px rgba(124,58,237,0.10)", position: "relative", transition: "background 0.2s" }}>
-                        <div style={{ width: 42, height: 42, borderRadius: 12, background: n.iconBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                          <IconComp style={{ width: 19, height: 19, color: n.iconColor }} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: n.read ? 600 : 700, fontSize: 13.5, color: "#111827", lineHeight: 1.3 }}>{n.title}</p>
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
-                              {!n.read && <span style={{ width: 7, height: 7, borderRadius: 999, background: "#7c3aed", flexShrink: 0, display: "inline-block" }} />}
-                              <span style={{ fontSize: 10.5, color: "#9ca3af", whiteSpace: "nowrap" }}>{n.time}</span>
-                            </div>
-                          </div>
-                          <p style={{ fontSize: 12, color: "#6b7280", marginTop: 3, lineHeight: 1.5 }}>{n.desc}</p>
-                          {badge && (
-                            <div className="mt-2">
-                              <span style={{ fontSize: 10, fontWeight: 700, background: badge.bg, color: badge.color, padding: "2px 8px", borderRadius: 20 }}>
-                                {badge.label}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                        <button onClick={e => { e.stopPropagation(); dismiss(n.id); }} style={{ position: "absolute", top: 10, right: 10, background: "none", border: "none", cursor: "pointer", opacity: 0.4 }}>
-                          <X style={{ width: 12, height: 12, color: "#374151" }} />
-                        </button>
-                      </motion.div>
-                    );
-                  })}
+                  {/* Content */}
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className={`text-[13.5px] leading-snug pr-2 ${n.isRead ? "font-medium text-gray-700" : "font-bold text-gray-900"}`}>
+                        {n.title}
+                      </p>
+                      <span className="text-[10px] text-gray-400 flex-shrink-0 mt-0.5">{timeAgo(n.created_at)}</span>
+                    </div>
+                    {n.subtitle && (
+                      <p className="text-[12px] text-gray-500 mt-0.5 leading-snug">{n.subtitle}</p>
+                    )}
+                    {n.action_button_label && (
+                      <div className="mt-2">
+                        <span className="text-[11.5px] font-bold px-3 py-1 rounded-full"
+                          style={{ background: "#6C5CE7", color: "#fff" }}>
+                          {n.action_button_label}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {!n.isRead && (
+                    <span className="absolute right-4 top-4 w-2 h-2 rounded-full bg-indigo-500 flex-shrink-0" />
+                  )}
                 </motion.div>
-              </div>
-            ))
-          )}
-        </div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
+        )}
       </div>
     </div>
   );
