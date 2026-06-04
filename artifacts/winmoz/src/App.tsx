@@ -34,6 +34,7 @@ import ChessGame from "@/pages/ChessGame";
 import DamasGame from "@/pages/DamasGame";
 import Roleta from "@/pages/Roleta";
 import BilharEmBreve from "@/pages/BilharEmBreve";
+import NotificationBanner from "@/components/NotificationBanner";
 
 const queryClient = new QueryClient();
 
@@ -61,7 +62,7 @@ function Router() {
         <ProtectedRoute><GrupoChat /></ProtectedRoute>
       </Route>
       <Route path="/apostar/:gameId">
-        {(params) => (
+        {() => (
           <ProtectedRoute><Apostar /></ProtectedRoute>
         )}
       </Route>
@@ -128,6 +129,7 @@ function App() {
         <AuthProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Router />
+            <NotificationBanner />
           </WouterRouter>
           <Toaster />
         </AuthProvider>

@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useLocation } from "wouter";
-import { ArrowLeft, Flag, Bug, CreditCard, User, HelpCircle, CheckCircle2, ChevronRight } from "lucide-react";
+import { ArrowLeft, Flag, Bug, CreditCard, User, HelpCircle, CheckCircle2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CATEGORIES = [
-  { icon: Bug,         label: "Problema técnico",   desc: "Erro, crash ou mau funcionamento" },
-  { icon: CreditCard,  label: "Problema de pagamento", desc: "Depósito, levamento ou cobrança" },
-  { icon: User,        label: "Utilizador",         desc: "Comportamento abusivo ou fraude" },
-  { icon: Flag,        label: "Conteúdo impróprio", desc: "Conteúdo ofensivo ou inadequado" },
-  { icon: HelpCircle,  label: "Outro",              desc: "Qualquer outro tipo de problema" },
+  { icon: Bug,         label: "Problema técnico",     desc: "Erro, crash ou mau funcionamento"  },
+  { icon: CreditCard,  label: "Problema de pagamento", desc: "Depósito, levamento ou cobrança"   },
+  { icon: User,        label: "Utilizador",            desc: "Comportamento abusivo ou fraude"   },
+  { icon: Flag,        label: "Conteúdo impróprio",   desc: "Conteúdo ofensivo ou inadequado"   },
+  { icon: HelpCircle,  label: "Outro",                 desc: "Qualquer outro tipo de problema"   },
 ];
 
 const PRIORITIES = ["Baixa", "Média", "Alta", "Urgente"];
@@ -17,23 +19,43 @@ type Screen = "form" | "sent";
 
 export default function Reportar() {
   const [, setLocation] = useLocation();
-  const [screen, setScreen] = useState<Screen>("form");
-  const [category, setCategory] = useState<string | null>(null);
-  const [priority, setPriority] = useState("Média");
+  const { user, profile } = useAuth();
+  const [screen, setScreen]           = useState<Screen>("form");
+  const [category, setCategory]       = useState<string | null>(null);
+  const [priority, setPriority]       = useState("Média");
   const [description, setDescription] = useState("");
-  const [focused, setFocused] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [focused, setFocused]         = useState(false);
+  const [submitting, setSubmitting]   = useState(false);
+  const [errors, setErrors]           = useState<Record<string, string>>({});
+  const [ticketId, setTicketId]       = useState("");
 
-  const ticketId = "WM-" + Math.random().toString(36).slice(2, 8).toUpperCase();
-
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs: Record<string, string> = {};
-    if (!category) errs.category = "Selecciona uma categoria";
+    if (!category)                       errs.category    = "Selecciona uma categoria";
     if (description.trim().length < 20) errs.description = "Descreve o problema em pelo menos 20 caracteres";
     if (Object.keys(errs).length) { setErrors(errs); return; }
+
     setSubmitting(true);
-    setTimeout(() => { setSubmitting(false); setScreen("sent"); }, 1800);
+    try {
+      const tid = "WM-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+      const { error } = await supabase.from("reports").insert({
+        user_id:     user?.id ?? null,
+        user_name:   profile?.full_name ?? profile?.phone ?? user?.email ?? "utilizador",
+        user_email:  user?.email ?? null,
+        category,
+        priority,
+        description: description.trim(),
+        status:      "open",
+        ticket_id:   tid,
+      });
+      if (error) throw error;
+      setTicketId(tid);
+      setScreen("sent");
+    } catch {
+      setErrors({ submit: "Erro ao enviar. Verifica a tua ligação e tenta novamente." });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (screen === "sent") {
@@ -63,7 +85,7 @@ export default function Reportar() {
               style={{ width: "100%", padding: "15px", background: "#000", color: "#fff", fontSize: 14.5, fontWeight: 700, border: "none", cursor: "pointer", letterSpacing: "0.3px", fontFamily: "'Syne', sans-serif", borderRadius: 0 }}>
               Voltar ao Perfil
             </button>
-            <button onClick={() => { setScreen("form"); setCategory(null); setDescription(""); setPriority("Média"); setErrors({}); }}
+            <button onClick={() => { setScreen("form"); setCategory(null); setDescription(""); setPriority("Média"); setErrors({}); setTicketId(""); }}
               className="mt-3 text-[13px] text-slate-400 hover:text-slate-700 transition-colors">
               Enviar outro relatório
             </button>
@@ -176,6 +198,12 @@ export default function Reportar() {
                 </p>
               </div>
             </div>
+
+            {errors.submit && (
+              <div className="mb-4 p-3 rounded" style={{ background: "#fee2e2", border: "1px solid #fecaca" }}>
+                <p style={{ fontSize: 12, color: "#dc2626" }}>{errors.submit}</p>
+              </div>
+            )}
 
             {/* Submit */}
             <motion.button onClick={handleSubmit} disabled={submitting}

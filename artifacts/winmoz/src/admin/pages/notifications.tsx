@@ -2,26 +2,17 @@ import { useState } from "react";
 import {
   Bell, Send, Users, Wifi, Calendar, Clock, Repeat,
   Megaphone, Image as ImageIcon, Link as LinkIcon,
-  Plus, Trash2, ChevronDown, ChevronUp, ToggleLeft, ToggleRight,
-  CheckCircle2, Sparkles,
+  ChevronDown, ChevronUp, ToggleLeft, ToggleRight,
+  CheckCircle2, Sparkles, Trash2, AlertCircle,
 } from "lucide-react";
+import {
+  useSendNotification,
+  useGetNotificationHistory,
+} from "@/admin/lib/supabase-api";
 
 const V1 = "#6C5CE7";
 
-type Tab = "criar" | "anuncios" | "agendadas" | "historico";
-
-const SENT_HISTORY = [
-  { id: 1, title: "Bem-vindo ao POKER WINNER!",   target: "Todos",          sent: "2025-06-01 09:00", reached: 1240 },
-  { id: 2, title: "Novo jogo: Roleta da Sorte",  target: "Online",         sent: "2025-05-28 18:30", reached:  312 },
-  { id: 3, title: "Saque processado",            target: "Específico",     sent: "2025-05-25 14:00", reached:    1 },
-  { id: 4, title: "Torneio de Dama — amanhã!",  target: "Todos",          sent: "2025-05-20 20:00", reached: 980  },
-];
-
-const SCHEDULED = [
-  { id: 1, title: "Promoção de fim-de-semana",  target: "Todos",  scheduledAt: "2025-06-07 19:00", repeat: "Nenhum"           },
-  { id: 2, title: "Lembrete diário de jogo",    target: "Online", scheduledAt: "Diário às 20:00",  repeat: "Todos os dias"    },
-  { id: 3, title: "Oferta de segunda-feira",    target: "Todos",  scheduledAt: "Toda segunda-feira 09:00", repeat: "Semanal"  },
-];
+type Tab = "criar" | "anuncios" | "historico";
 
 function Section({ title, open, onToggle, children }: { title: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
@@ -63,33 +54,36 @@ function InputField({ label, placeholder, value, onChange, type = "text" }: { la
   );
 }
 
+function fmtTarget(target: string): string {
+  if (target === "all")      return "Todos";
+  if (target === "online")   return "Online";
+  if (target === "specific") return "Específico";
+  return target;
+}
+
 export default function Notifications() {
   const [activeTab, setActiveTab] = useState<Tab>("criar");
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
+  const sendNotification = useSendNotification();
+  const { data: history = [], isLoading: loadingHistory } = useGetNotificationHistory();
 
   // Notification form
-  const [notifTitle, setNotifTitle] = useState("");
+  const [notifTitle, setNotifTitle]       = useState("");
   const [notifSubtitle, setNotifSubtitle] = useState("");
-  const [notifTarget, setNotifTarget] = useState<"all" | "online" | "specific">("all");
-  const [specificUser, setSpecificUser] = useState("");
+  const [notifTarget, setNotifTarget]     = useState<"all" | "online" | "specific">("all");
+  const [specificUser, setSpecificUser]   = useState("");
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
-  const [scheduleDate, setScheduleDate] = useState("");
-  const [automationEnabled, setAutomationEnabled] = useState(false);
-  const [automationType, setAutomationType] = useState<"once_daily" | "once_weekly">("once_daily");
-  const [automationDays, setAutomationDays] = useState(7);
-  const [openSections, setOpenSections] = useState({ target: true, schedule: false, automation: false });
+  const [scheduleDate, setScheduleDate]   = useState("");
+  const [openSections, setOpenSections]   = useState({ target: true, schedule: false });
 
   // Announcement form
-  const [annTitle, setAnnTitle] = useState("");
-  const [annSubtitle, setAnnSubtitle] = useState("");
-  const [annImage, setAnnImage] = useState("");
-  const [annBtnLabel, setAnnBtnLabel] = useState("");
-  const [annBtnType, setAnnBtnType] = useState<"url" | "screen">("url");
-  const [annBtnValue, setAnnBtnValue] = useState("");
-  const [annSchedule, setAnnSchedule] = useState(false);
-  const [annScheduleDate, setAnnScheduleDate] = useState("");
-  const [annAutomation, setAnnAutomation] = useState(false);
-  const [openAnnSections, setOpenAnnSections] = useState({ content: true, action: true, schedule: false, automation: false });
+  const [annTitle, setAnnTitle]           = useState("");
+  const [annSubtitle, setAnnSubtitle]     = useState("");
+  const [annImage, setAnnImage]           = useState("");
+  const [annBtnLabel, setAnnBtnLabel]     = useState("");
+  const [annBtnType, setAnnBtnType]       = useState<"url" | "screen">("url");
+  const [annBtnValue, setAnnBtnValue]     = useState("");
+  const [openAnnSections, setOpenAnnSections] = useState({ content: true, action: true });
 
   function toggleSection(key: keyof typeof openSections) {
     setOpenSections(p => ({ ...p, [key]: !p[key] }));
@@ -98,32 +92,78 @@ export default function Notifications() {
     setOpenAnnSections(p => ({ ...p, [key]: !p[key] }));
   }
 
-  function handleSend() {
-    setShowSuccess(true);
-    setNotifTitle(""); setNotifSubtitle(""); setSpecificUser("");
-    setTimeout(() => setShowSuccess(false), 4000);
+  function handleSendNotif() {
+    if (!notifTitle.trim()) return;
+    sendNotification.mutate(
+      {
+        title:       notifTitle,
+        subtitle:    notifSubtitle || undefined,
+        type:        "notification",
+        target:      notifTarget,
+        targetUserIds: notifTarget === "specific" && specificUser ? [specificUser] : undefined,
+      },
+      {
+        onSuccess: () => {
+          setStatus("ok");
+          setNotifTitle(""); setNotifSubtitle(""); setSpecificUser("");
+          setTimeout(() => setStatus("idle"), 4000);
+        },
+        onError: () => {
+          setStatus("error");
+          setTimeout(() => setStatus("idle"), 4000);
+        },
+      }
+    );
   }
+
   function handleSendAnn() {
-    setShowSuccess(true);
-    setAnnTitle(""); setAnnSubtitle(""); setAnnImage(""); setAnnBtnLabel(""); setAnnBtnValue("");
-    setTimeout(() => setShowSuccess(false), 4000);
+    if (!annTitle.trim()) return;
+    sendNotification.mutate(
+      {
+        title:             annTitle,
+        subtitle:          annSubtitle || undefined,
+        type:              "announcement",
+        target:            "all",
+        imageUrl:          annImage || undefined,
+        actionButtonLabel: annBtnLabel || undefined,
+        actionButtonUrl:   annBtnValue || undefined,
+      },
+      {
+        onSuccess: () => {
+          setStatus("ok");
+          setAnnTitle(""); setAnnSubtitle(""); setAnnImage(""); setAnnBtnLabel(""); setAnnBtnValue("");
+          setTimeout(() => setStatus("idle"), 4000);
+        },
+        onError: () => {
+          setStatus("error");
+          setTimeout(() => setStatus("idle"), 4000);
+        },
+      }
+    );
   }
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: "criar",     label: "Criar Notificação",  icon: Bell       },
-    { id: "anuncios",  label: "Anúncios",            icon: Megaphone  },
-    { id: "agendadas", label: "Agendadas",           icon: Calendar   },
-    { id: "historico", label: "Histórico",           icon: Clock      },
+    { id: "criar",    label: "Criar Notificação", icon: Bell      },
+    { id: "anuncios", label: "Anúncios",          icon: Megaphone },
+    { id: "historico",label: "Histórico",         icon: Clock     },
   ];
 
   return (
     <div className="px-5 pb-10 pt-4">
 
-      {showSuccess && (
-        <div className="fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl animate-float-up"
+      {/* Status toast */}
+      {status === "ok" && (
+        <div className="fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl"
           style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, color: "#fff" }}>
           <CheckCircle2 style={{ width: 18, height: 18 }} />
           <span className="text-[13.5px] font-bold">Enviado com sucesso!</span>
+        </div>
+      )}
+      {status === "error" && (
+        <div className="fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl"
+          style={{ background: "#ef4444", color: "#fff" }}>
+          <AlertCircle style={{ width: 18, height: 18 }} />
+          <span className="text-[13.5px] font-bold">Erro ao enviar. Tenta novamente.</span>
         </div>
       )}
 
@@ -137,7 +177,7 @@ export default function Notifications() {
           <div>
             <h1 className="text-[22px] font-black tracking-tight" style={{ color: "var(--gz-text-primary)" }}>Notificações</h1>
             <p className="text-[12.5px] font-medium mt-0.5" style={{ color: "var(--gz-text-accent)" }}>
-              Envie notificações e anúncios aos utilizadores da plataforma
+              Envie notificações e anúncios — os utilizadores recebem em tempo real
             </p>
           </div>
         </div>
@@ -165,14 +205,30 @@ export default function Notifications() {
             <div className="text-[15px] font-bold mb-1" style={{ color: "var(--gz-text-primary)" }}>Conteúdo</div>
             <InputField label="Título" placeholder="Ex: Nova promoção disponível!" value={notifTitle} onChange={setNotifTitle} />
             <InputField label="Subtítulo (opcional)" placeholder="Ex: Aproveite até amanhã" value={notifSubtitle} onChange={setNotifSubtitle} />
+
+            {/* Preview */}
+            {notifTitle && (
+              <div className="mt-2 p-3.5 rounded-2xl" style={{ background: "rgba(108,92,231,.05)", border: "1.5px solid rgba(108,92,231,.12)" }}>
+                <div className="text-[10px] font-black uppercase tracking-wider mb-2" style={{ color: "var(--gz-text-tertiary)" }}>Pré-visualização</div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)` }}>
+                    <Bell style={{ width: 14, height: 14, color: "#fff" }} />
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{notifTitle}</div>
+                    {notifSubtitle && <div className="text-[11.5px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>{notifSubtitle}</div>}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <Section title="Destinatário" open={openSections.target} onToggle={() => toggleSection("target")}>
             <div className="grid grid-cols-3 gap-2 mt-2">
               {[
-                { id: "all" as const,      icon: Users, label: "Todos os utilizadores",         desc: "Incluindo offline" },
-                { id: "online" as const,   icon: Wifi,  label: "Utilizadores online",            desc: "Apenas activos"    },
-                { id: "specific" as const, icon: Bell,  label: "Utilizador específico",          desc: "Por nome ou ID"    },
+                { id: "all" as const,      icon: Users, label: "Todos",             desc: "Incluindo offline" },
+                { id: "online" as const,   icon: Wifi,  label: "Online",            desc: "Apenas activos"   },
+                { id: "specific" as const, icon: Bell,  label: "Específico",        desc: "Por ID"           },
               ].map(t => (
                 <button key={t.id} onClick={() => setNotifTarget(t.id)}
                   className="p-3.5 rounded-2xl text-left transition-all"
@@ -190,7 +246,7 @@ export default function Notifications() {
             </div>
             {notifTarget === "specific" && (
               <div className="mt-3">
-                <InputField label="Nome ou ID do utilizador" placeholder="Ex: João Machava" value={specificUser} onChange={setSpecificUser} />
+                <InputField label="ID do utilizador" placeholder="UUID do utilizador" value={specificUser} onChange={setSpecificUser} />
               </div>
             )}
           </Section>
@@ -204,48 +260,17 @@ export default function Notifications() {
             </div>
           </Section>
 
-          <Section title="Automação avançada" open={openSections.automation} onToggle={() => toggleSection("automation")}>
-            <div className="mt-2 space-y-4">
-              <ToggleSwitch value={automationEnabled} onChange={setAutomationEnabled} label="Activar automação" />
-              {automationEnabled && (
-                <>
-                  <div>
-                    <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-2 block" style={{ color: "var(--gz-text-tertiary)" }}>Frequência</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {[
-                        { id: "once_daily" as const,  label: "1× por dia",     icon: Repeat },
-                        { id: "once_weekly" as const, label: "1× por semana",  icon: Calendar },
-                      ].map(o => (
-                        <button key={o.id} onClick={() => setAutomationType(o.id)}
-                          className="flex items-center gap-2 p-3 rounded-xl text-[12.5px] font-semibold transition-all"
-                          style={{ border: automationType === o.id ? `1.5px solid ${V1}` : "1.5px solid rgba(108,92,231,.12)", color: automationType === o.id ? V1 : "var(--gz-text-muted)", background: automationType === o.id ? "rgba(108,92,231,.06)" : "transparent" }}>
-                          <o.icon style={{ width: 14, height: 14 }} />
-                          {o.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Duração do ciclo (dias)</label>
-                    <div className="flex items-center gap-3">
-                      <input type="range" min={1} max={30} value={automationDays} onChange={e => setAutomationDays(+e.target.value)} className="flex-1" style={{ accentColor: V1 }} />
-                      <span className="text-[14px] font-bold w-10 text-right" style={{ color: V1 }}>{automationDays}d</span>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </Section>
-
-          <button onClick={handleSend} disabled={!notifTitle.trim()}
+          <button onClick={handleSendNotif} disabled={!notifTitle.trim() || sendNotification.isPending}
             className="w-full py-3.5 rounded-2xl text-[14px] font-bold text-white flex items-center justify-center gap-2.5 transition-all hover:-translate-y-0.5 active:scale-95"
             style={{
               background: notifTitle.trim() ? `linear-gradient(135deg, ${V1}, #4f46e5)` : "rgba(108,92,231,.2)",
               boxShadow: notifTitle.trim() ? "0 6px 18px rgba(108,92,231,.4)" : "none",
               opacity: notifTitle.trim() ? 1 : 0.6,
             }}>
-            <Send style={{ width: 16, height: 16 }} />
-            {scheduleEnabled ? "Agendar notificação" : automationEnabled ? "Activar automação" : "Enviar agora"}
+            {sendNotification.isPending
+              ? <><div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /><span>A enviar…</span></>
+              : <><Send style={{ width: 16, height: 16 }} />{scheduleEnabled ? "Agendar notificação" : "Enviar agora"}</>
+            }
           </button>
         </div>
       )}
@@ -258,7 +283,7 @@ export default function Notifications() {
               <InputField label="Título" placeholder="Ex: Grande promoção de verão!" value={annTitle} onChange={setAnnTitle} />
               <InputField label="Subtítulo" placeholder="Ex: Até 50% de bónus em todos os jogos" value={annSubtitle} onChange={setAnnSubtitle} />
               <div>
-                <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Imagem (URL)</label>
+                <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Imagem (URL opcional)</label>
                 <div className="flex items-center gap-3">
                   {annImage && (
                     <img src={annImage} alt="preview" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" style={{ border: "1.5px solid rgba(108,92,231,.15)" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
@@ -269,18 +294,32 @@ export default function Notifications() {
                   </div>
                 </div>
               </div>
+
+              {/* Preview do anúncio */}
+              {annTitle && (
+                <div className="mt-1 rounded-2xl overflow-hidden" style={{ border: "1.5px solid rgba(108,92,231,.12)" }}>
+                  {annImage && <img src={annImage} alt="" className="w-full h-32 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />}
+                  <div className="p-3.5" style={{ background: "rgba(108,92,231,.03)" }}>
+                    <div className="text-[14px] font-bold mb-0.5" style={{ color: "var(--gz-text-primary)" }}>{annTitle}</div>
+                    {annSubtitle && <div className="text-[12px]" style={{ color: "var(--gz-text-muted)" }}>{annSubtitle}</div>}
+                    {annBtnLabel && (
+                      <div className="mt-2.5 px-4 py-2 rounded-xl text-[12.5px] font-bold text-center text-white inline-block" style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)` }}>{annBtnLabel}</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </Section>
 
-          <Section title="Botão de ação" open={openAnnSections.action} onToggle={() => toggleAnnSection("action")}>
+          <Section title="Botão de ação (opcional)" open={openAnnSections.action} onToggle={() => toggleAnnSection("action")}>
             <div className="space-y-3 mt-2">
               <InputField label="Texto do botão" placeholder="Ex: Jogar agora" value={annBtnLabel} onChange={setAnnBtnLabel} />
               <div>
                 <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-2 block" style={{ color: "var(--gz-text-tertiary)" }}>Destino do botão</label>
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   {[
-                    { id: "url" as const,    icon: LinkIcon, label: "URL externo"          },
-                    { id: "screen" as const, icon: Sparkles, label: "Tela do site"         },
+                    { id: "url" as const,    icon: LinkIcon, label: "URL externo"  },
+                    { id: "screen" as const, icon: Sparkles, label: "Tela do site" },
                   ].map(o => (
                     <button key={o.id} onClick={() => setAnnBtnType(o.id)}
                       className="flex items-center gap-2 p-3 rounded-xl text-[12.5px] font-semibold transition-all"
@@ -292,7 +331,7 @@ export default function Notifications() {
                 </div>
                 <InputField
                   label={annBtnType === "url" ? "URL de destino" : "Tela de destino"}
-                  placeholder={annBtnType === "url" ? "https://..." : "Ex: /jogos, /perfil, /ludo"}
+                  placeholder={annBtnType === "url" ? "https://..." : "Ex: /jogos, /perfil"}
                   value={annBtnValue}
                   onChange={setAnnBtnValue}
                 />
@@ -300,65 +339,18 @@ export default function Notifications() {
             </div>
           </Section>
 
-          <Section title="Agendar anúncio" open={openAnnSections.schedule} onToggle={() => toggleAnnSection("schedule")}>
-            <div className="mt-2 space-y-3">
-              <ToggleSwitch value={annSchedule} onChange={setAnnSchedule} label="Activar agendamento" />
-              {annSchedule && <InputField label="Data e hora" value={annScheduleDate} onChange={setAnnScheduleDate} type="datetime-local" />}
-            </div>
-          </Section>
-
-          <Section title="Automação do anúncio" open={openAnnSections.automation} onToggle={() => toggleAnnSection("automation")}>
-            <div className="mt-2 space-y-3">
-              <ToggleSwitch value={annAutomation} onChange={setAnnAutomation} label="Mostrar automaticamente" />
-              {annAutomation && (
-                <div className="text-[12px] px-3 py-2.5 rounded-xl" style={{ background: "rgba(108,92,231,.05)", color: "var(--gz-text-secondary)" }}>
-                  O anúncio aparecerá para cada utilizador uma vez por dia, durante 7 dias após a activação.
-                </div>
-              )}
-            </div>
-          </Section>
-
-          <button onClick={handleSendAnn} disabled={!annTitle.trim()}
+          <button onClick={handleSendAnn} disabled={!annTitle.trim() || sendNotification.isPending}
             className="w-full py-3.5 rounded-2xl text-[14px] font-bold text-white flex items-center justify-center gap-2.5 transition-all hover:-translate-y-0.5 active:scale-95"
             style={{
               background: annTitle.trim() ? `linear-gradient(135deg, ${V1}, #4f46e5)` : "rgba(108,92,231,.2)",
               boxShadow: annTitle.trim() ? "0 6px 18px rgba(108,92,231,.4)" : "none",
               opacity: annTitle.trim() ? 1 : 0.6,
             }}>
-            <Megaphone style={{ width: 16, height: 16 }} />
-            {annSchedule ? "Agendar anúncio" : "Publicar anúncio"}
+            {sendNotification.isPending
+              ? <><div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /><span>A publicar…</span></>
+              : <><Megaphone style={{ width: 16, height: 16 }} />Publicar anúncio</>
+            }
           </button>
-        </div>
-      )}
-
-      {/* ── Tab: Agendadas ── */}
-      {activeTab === "agendadas" && (
-        <div className="gz-card overflow-hidden">
-          <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(108,92,231,.06)" }}>
-            <span className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{SCHEDULED.length} notificações agendadas</span>
-          </div>
-          <div className="divide-y" style={{ borderColor: "rgba(108,92,231,.05)" }}>
-            {SCHEDULED.map(s => (
-              <div key={s.id} className="px-5 py-4 flex items-center gap-4 hover:bg-indigo-50/30 transition-colors">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(108,92,231,.07)" }}>
-                  <Calendar style={{ width: 16, height: 16, color: V1 }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13.5px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{s.title}</div>
-                  <div className="text-[11.5px] mt-0.5 flex items-center gap-2" style={{ color: "var(--gz-text-muted)" }}>
-                    <span>{s.target}</span>
-                    <span>·</span>
-                    <Clock style={{ width: 10, height: 10 }} />
-                    <span>{s.scheduledAt}</span>
-                    {s.repeat !== "Nenhum" && <><span>·</span><Repeat style={{ width: 10, height: 10, color: V1 }} /><span style={{ color: V1 }}>{s.repeat}</span></>}
-                  </div>
-                </div>
-                <button className="w-8 h-8 rounded-xl flex items-center justify-center hover:bg-red-50 transition-colors" title="Cancelar agendamento">
-                  <Trash2 style={{ width: 14, height: 14, color: "#ef4444" }} />
-                </button>
-              </div>
-            ))}
-          </div>
         </div>
       )}
 
@@ -366,31 +358,56 @@ export default function Notifications() {
       {activeTab === "historico" && (
         <div className="gz-card overflow-hidden">
           <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(108,92,231,.06)" }}>
-            <span className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{SENT_HISTORY.length} notificações enviadas</span>
+            <span className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>
+              {loadingHistory ? "A carregar…" : `${history.length} notificação${history.length !== 1 ? "ções" : ""} enviada${history.length !== 1 ? "s" : ""}`}
+            </span>
           </div>
+
+          {loadingHistory && (
+            <div className="flex items-center justify-center py-10">
+              <div className="w-5 h-5 rounded-full border-2 border-indigo-300 border-t-indigo-600 animate-spin" />
+            </div>
+          )}
+
+          {!loadingHistory && history.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Bell style={{ width: 28, height: 28, color: "var(--gz-text-tertiary)", opacity: .4 }} />
+              <p className="text-[13px]" style={{ color: "var(--gz-text-muted)" }}>Ainda não foram enviadas notificações.</p>
+            </div>
+          )}
+
           <div className="divide-y" style={{ borderColor: "rgba(108,92,231,.05)" }}>
-            {SENT_HISTORY.map(h => (
-              <div key={h.id} className="px-5 py-4 flex items-center gap-4 hover:bg-indigo-50/30 transition-colors">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(16,185,129,.08)" }}>
-                  <CheckCircle2 style={{ width: 16, height: 16, color: "#059669" }} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13.5px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{h.title}</div>
-                  <div className="text-[11.5px] mt-0.5 flex items-center gap-2" style={{ color: "var(--gz-text-muted)" }}>
-                    <span>{h.target}</span>
-                    <span>·</span>
-                    <span>{h.sent}</span>
+            {(history as Record<string, unknown>[]).map(h => {
+              const isAnn = h.type === "announcement";
+              return (
+                <div key={h.id as string} className="px-5 py-4 flex items-center gap-4 hover:bg-indigo-50/30 transition-colors">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: isAnn ? "rgba(245,158,11,.08)" : "rgba(16,185,129,.08)" }}>
+                    {isAnn
+                      ? <Megaphone style={{ width: 16, height: 16, color: "#f59e0b" }} />
+                      : <CheckCircle2 style={{ width: 16, height: 16, color: "#059669" }} />
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13.5px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{h.title as string}</div>
+                    <div className="text-[11.5px] mt-0.5 flex items-center gap-2" style={{ color: "var(--gz-text-muted)" }}>
+                      <span>{fmtTarget(h.target as string)}</span>
+                      <span>·</span>
+                      <Clock style={{ width: 10, height: 10 }} />
+                      <span>{new Date(h.created_at as string).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                      {isAnn && <><span>·</span><span className="font-semibold" style={{ color: "#f59e0b" }}>Anúncio</span></>}
+                    </div>
+                    {(h.subtitle as string | null) && (
+                      <div className="text-[11px] mt-0.5 truncate" style={{ color: "var(--gz-text-tertiary)" }}>{h.subtitle as string}</div>
+                    )}
                   </div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-[13px] font-bold" style={{ color: V1 }}>{h.reached.toLocaleString()}</div>
-                  <div className="text-[10.5px]" style={{ color: "var(--gz-text-muted)" }}>alcançados</div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
     </div>
   );
 }
+

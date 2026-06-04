@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, CheckCheck, X } from "lucide-react";
 import { API_BASE } from "@/lib/apiBase";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CYAN = "#00D4B4";
 
@@ -12,6 +14,7 @@ type Msg = {
   text?: string;
   image?: string;
   time: string;
+  sender?: "user" | "admin" | "ai";
 };
 
 type ChatMsg = { role: "user" | "assistant"; content: string };
@@ -22,12 +25,12 @@ function nowTime() {
 
 const INITIAL: Msg[] = [
   {
-    id: "i1", from: "support",
-    text: "Olá! 👋 Bem-vindo ao suporte da Equipe Poker W. Estou aqui para ajudar.",
+    id: "i1", from: "support", sender: "ai",
+    text: "Olá! 👋 Bem-vindo ao suporte da Equipa Poker Winner. Estou aqui para ajudar.",
     time: nowTime(),
   },
   {
-    id: "i2", from: "support",
+    id: "i2", from: "support", sender: "ai",
     text: "Em que posso ajudar hoje? Escreve a tua dúvida ou escolhe um dos temas abaixo:",
     time: nowTime(),
   },
@@ -42,28 +45,109 @@ const QUICK = [
   "Falar com alguém",
 ];
 
+async function saveMsgToSupabase(
+  userId: string,
+  userName: string,
+  sender: "user" | "admin" | "ai",
+  content: string
+) {
+  try {
+    await supabase.from("support_messages").insert({
+      user_id:       userId,
+      user_name:     userName,
+      sender,
+      content,
+      read_by_admin: false,
+    });
+  } catch {
+  }
+}
+
 export default function Suporte() {
   const [, setLocation] = useLocation();
-  const [messages, setMessages] = useState<Msg[]>(INITIAL);
-  const [history, setHistory] = useState<ChatMsg[]>([]);
-  const [text, setText] = useState("");
-  const [typing, setTyping] = useState(false);
+  const { user, profile } = useAuth();
+  const [messages, setMessages]   = useState<Msg[]>(INITIAL);
+  const [history, setHistory]     = useState<ChatMsg[]>([]);
+  const [text, setText]           = useState("");
+  const [typing, setTyping]       = useState(false);
   const [showQuick, setShowQuick] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [menuOpen, setMenuOpen]   = useState(false);
+  const [loaded, setLoaded]       = useState(false);
+  const fileRef   = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef  = useRef<HTMLInputElement>(null);
+
+  const userName = profile?.full_name ?? profile?.phone ?? user?.email ?? "utilizador";
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
+  useEffect(() => {
+    if (!user?.id || loaded) return;
+    setLoaded(true);
+
+    supabase
+      .from("support_messages")
+      .select("id, sender, content, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true })
+      .limit(100)
+      .then(({ data }) => {
+        if (!data || data.length === 0) return;
+        const dbMsgs: Msg[] = data.map(m => ({
+          id:     m.id,
+          from:   (m.sender === "user" ? "user" : "support") as "user" | "support",
+          sender: m.sender as "user" | "admin" | "ai",
+          text:   m.content,
+          time:   new Date(m.created_at).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }),
+        }));
+        setMessages([...INITIAL, ...dbMsgs]);
+        setShowQuick(false);
+
+        const chatHistory: ChatMsg[] = data
+          .filter(m => m.sender === "user" || m.sender === "ai")
+          .map(m => ({ role: m.sender === "user" ? "user" : "assistant", content: m.content }));
+        setHistory(chatHistory);
+      });
+  }, [user?.id, loaded]);
+
+  useEffect(() => {
+    if (!user?.id || !loaded) return;
+    const channel = supabase
+      .channel(`support-${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "support_messages", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          const m = payload.new as Record<string, unknown>;
+          if (m.sender === "admin") {
+            const newMsg: Msg = {
+              id:     m.id as string,
+              from:   "support",
+              sender: "admin",
+              text:   m.content as string,
+              time:   new Date(m.created_at as string).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }),
+            };
+            setMessages(prev => {
+              if (prev.some(p => p.id === newMsg.id)) return prev;
+              return [...prev, newMsg];
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user?.id, loaded]);
+
   const sendMsg = async (msgText: string, img?: string) => {
     if (!msgText.trim() && !img) return;
 
     const userMsg: Msg = {
-      id: Date.now().toString(),
+      id:   Date.now().toString(),
       from: "user",
+      sender: "user",
       text: msgText.trim() || undefined,
       image: img,
       time: nowTime(),
@@ -72,6 +156,10 @@ export default function Suporte() {
     setText("");
     setShowQuick(false);
     setTyping(true);
+
+    if (user?.id && msgText.trim()) {
+      await saveMsgToSupabase(user.id, userName, "user", msgText.trim());
+    }
 
     const newHistory: ChatMsg[] = [...history, { role: "user", content: msgText.trim() || "[imagem enviada]" }];
     setHistory(newHistory);
@@ -87,15 +175,21 @@ export default function Suporte() {
       const reply: string = data.reply ?? "Desculpa, ocorreu um erro. Tenta novamente.";
 
       setTyping(false);
-      setMessages(p => [...p, { id: `${Date.now()}_s`, from: "support", text: reply, time: nowTime() }]);
+      const aiMsg: Msg = { id: `${Date.now()}_s`, from: "support", sender: "ai", text: reply, time: nowTime() };
+      setMessages(p => [...p, aiMsg]);
       setHistory(h => [...h, { role: "assistant", content: reply }]);
+
+      if (user?.id) {
+        await saveMsgToSupabase(user.id, userName, "ai", reply);
+      }
     } catch {
       setTyping(false);
       setMessages(p => [...p, {
-        id: `${Date.now()}_err`,
-        from: "support",
-        text: "Ups, tive um problema de ligação. Por favor tenta novamente em instantes. 🙏",
-        time: nowTime(),
+        id:     `${Date.now()}_err`,
+        from:   "support",
+        sender: "ai",
+        text:   "Ups, tive um problema de ligação. Por favor tenta novamente em instantes. 🙏",
+        time:   nowTime(),
       }]);
     }
   };
@@ -139,7 +233,7 @@ export default function Suporte() {
               {menuOpen && (
                 <motion.div initial={{ opacity: 0, scale: 0.9, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} style={{ position: "absolute", top: 42, right: 0, background: "#fff", borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.18)", padding: "6px 0", width: 210, zIndex: 100 }}>
                   {[
-                    { label: "📧  support@winmoz.co.mz" },
+                    { label: "📧  support@pokerw.co.mz" },
                     { label: "📱  WhatsApp: +258 84 000 0000" },
                     { label: "✕  Fechar" },
                   ].map(item => (
@@ -170,24 +264,39 @@ export default function Suporte() {
                 style={{ display: "flex", flexDirection: msg.from === "user" ? "row-reverse" : "row", alignItems: "flex-end", gap: 8 }}
               >
                 {msg.from === "support" && (
-                  <div style={{ width: 32, height: 32, borderRadius: 999, background: "#3f3f46", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 2px 8px rgba(63,63,70,0.5)", marginBottom: 2 }}>
-                    <svg width="13" height="16" viewBox="0 0 18 26" fill="none">
-                      <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="#fff"/>
-                      <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="#fff" opacity="0.38"/>
-                    </svg>
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 999,
+                    background: msg.sender === "admin" ? "linear-gradient(135deg, #6C5CE7, #4f46e5)" : "#3f3f46",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0, boxShadow: "0 2px 8px rgba(63,63,70,0.5)", marginBottom: 2,
+                  }}>
+                    {msg.sender === "admin"
+                      ? <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>A</span>
+                      : <svg width="13" height="16" viewBox="0 0 18 26" fill="none">
+                          <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="#fff"/>
+                          <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="#fff" opacity="0.38"/>
+                        </svg>
+                    }
                   </div>
                 )}
                 <div style={{ maxWidth: "80%" }}>
                   {msg.image && <img src={msg.image} alt="" style={{ borderRadius: 14, maxWidth: "100%", maxHeight: 200, objectFit: "cover", display: "block", marginBottom: msg.text ? 4 : 0 }} />}
                   {msg.text && (
                     <div style={{
-                      background: msg.from === "support" ? "#ffffff" : "linear-gradient(135deg, #7C3AED 0%, #4C1D95 100%)",
+                      background: msg.from === "support"
+                        ? msg.sender === "admin"
+                          ? "linear-gradient(135deg, #6C5CE7, #4C1D95)"
+                          : "#ffffff"
+                        : "linear-gradient(135deg, #7C3AED 0%, #4C1D95 100%)",
                       borderRadius: msg.from === "support" ? "4px 18px 18px 18px" : "18px 4px 18px 18px",
                       padding: "10px 14px",
                       boxShadow: msg.from === "support" ? "0 1px 6px rgba(0,0,0,0.08)" : "0 3px 14px rgba(124,58,237,0.3)",
                       minWidth: 80,
                     }}>
-                      <p style={{ fontSize: 13.5, color: msg.from === "support" ? "#111827" : "#ffffff", lineHeight: 1.6, margin: 0, whiteSpace: "pre-line" }}>{msg.text}</p>
+                      {msg.sender === "admin" && (
+                        <p style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", fontWeight: 600, marginBottom: 3 }}>Admin</p>
+                      )}
+                      <p style={{ fontSize: 13.5, color: msg.from === "support" && msg.sender !== "admin" ? "#111827" : "#ffffff", lineHeight: 1.6, margin: 0, whiteSpace: "pre-line" }}>{msg.text}</p>
                     </div>
                   )}
                   <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3, justifyContent: msg.from === "user" ? "flex-end" : "flex-start" }}>
@@ -238,7 +347,7 @@ export default function Suporte() {
 
         {/* Input bar */}
         <div style={{ background: "#fff", borderTop: "1px solid #ebebf0", padding: "10px 12px", paddingBottom: "max(24px, env(safe-area-inset-bottom))", flexShrink: 0 }}>
-          <input ref={fileRef as any} type="file" accept="image/*" onChange={handleImg} style={{ display: "none" }} />
+          <input ref={fileRef as React.RefObject<HTMLInputElement>} type="file" accept="image/*" onChange={handleImg} style={{ display: "none" }} />
           <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
             <button onClick={() => fileRef.current?.click()} style={{ width: 40, height: 40, borderRadius: 999, background: "#f5f5f7", border: "none", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, cursor: "pointer" }}>
               <ImageIcon style={{ width: 18, height: 18, color: "#9ca3af" }} />

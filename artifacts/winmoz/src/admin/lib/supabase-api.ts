@@ -680,6 +680,216 @@ export function useGetNotificationHistory() {
       if (error) throw error;
       return data ?? [];
     },
-    staleTime: 30000,
+    refetchInterval: 30000,
+    staleTime: 10000,
+  });
+}
+
+/* ── Support Messages ── */
+export interface SupportConversation {
+  userId: string;
+  userName: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  lastSender: "user" | "admin" | "ai";
+}
+
+export interface SupportMessage {
+  id: string;
+  userId: string;
+  userName: string;
+  sender: "user" | "admin" | "ai";
+  content: string;
+  createdAt: string;
+  readByAdmin: boolean;
+}
+
+export function useListSupportConversations() {
+  return useQuery({
+    queryKey: ["support-conversations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("support_messages")
+        .select("user_id, user_name, sender, content, created_at, read_by_admin")
+        .order("created_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+
+      const convMap = new Map<string, SupportConversation>();
+      (data ?? []).forEach((m: Record<string, unknown>) => {
+        const uid = m.user_id as string;
+        if (!convMap.has(uid)) {
+          convMap.set(uid, {
+            userId: uid,
+            userName: (m.user_name as string) ?? "utilizador",
+            lastMessage: (m.content as string) ?? "",
+            lastMessageTime: m.created_at as string,
+            unreadCount: 0,
+            lastSender: (m.sender as "user" | "admin" | "ai") ?? "user",
+          });
+        }
+        if (m.sender === "user" && !m.read_by_admin) {
+          const conv = convMap.get(uid)!;
+          conv.unreadCount++;
+          convMap.set(uid, conv);
+        }
+      });
+
+      return Array.from(convMap.values()).sort(
+        (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
+      );
+    },
+    refetchInterval: 10000,
+    staleTime: 3000,
+  });
+}
+
+export function useGetSupportMessages(userId: string | null) {
+  return useQuery({
+    queryKey: ["support-messages", userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from("support_messages")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return (data ?? []).map((m: Record<string, unknown>) => ({
+        id: m.id as string,
+        userId: m.user_id as string,
+        userName: (m.user_name as string) ?? "utilizador",
+        sender: (m.sender as "user" | "admin" | "ai") ?? "user",
+        content: (m.content as string) ?? "",
+        createdAt: m.created_at as string,
+        readByAdmin: (m.read_by_admin as boolean) ?? false,
+      }));
+    },
+    enabled: !!userId,
+    refetchInterval: 8000,
+    staleTime: 2000,
+  });
+}
+
+export function useSendAdminSupportMessage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, userName, content }: { userId: string; userName: string; content: string }) => {
+      const { error } = await supabase.from("support_messages").insert({
+        user_id: userId,
+        user_name: userName,
+        sender: "admin",
+        content,
+        read_by_admin: true,
+      });
+      if (error) throw error;
+      return { ok: true };
+    },
+    onSuccess: (_d, { userId }) => {
+      qc.invalidateQueries({ queryKey: ["support-messages", userId] });
+      qc.invalidateQueries({ queryKey: ["support-conversations"] });
+    },
+  });
+}
+
+export function useMarkSupportMessagesRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await supabase
+        .from("support_messages")
+        .update({ read_by_admin: true })
+        .eq("user_id", userId)
+        .eq("read_by_admin", false);
+      if (error) throw error;
+      return { ok: true };
+    },
+    onSuccess: (_d, userId) => {
+      qc.invalidateQueries({ queryKey: ["support-conversations"] });
+      qc.invalidateQueries({ queryKey: ["support-messages", userId] });
+    },
+  });
+}
+
+/* ── User-side Notifications ── */
+export interface UserNotification {
+  id: string;
+  title: string;
+  subtitle: string;
+  type: string;
+  imageUrl: string | null;
+  actionButtonLabel: string | null;
+  actionButtonUrl: string | null;
+  createdAt: string;
+  isRead: boolean;
+}
+
+export function useGetUserNotifications(userId: string | null) {
+  return useQuery({
+    queryKey: ["user-notifications", userId],
+    queryFn: async () => {
+      if (!userId) return [];
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+
+      const all = (data ?? []).filter((n: Record<string, unknown>) => {
+        if (n.target === "all") return true;
+        if (n.target === "specific") {
+          const ids = n.target_user_ids as string[] | null;
+          return Array.isArray(ids) && ids.includes(userId);
+        }
+        return false;
+      });
+
+      if (all.length === 0) return [];
+      const ids = all.map((n: Record<string, unknown>) => n.id as string);
+
+      const { data: reads } = await supabase
+        .from("notification_reads")
+        .select("notification_id")
+        .eq("user_id", userId)
+        .in("notification_id", ids);
+
+      const readSet = new Set((reads ?? []).map((r: Record<string, unknown>) => r.notification_id as string));
+
+      return all.map((n: Record<string, unknown>): UserNotification => ({
+        id: n.id as string,
+        title: n.title as string,
+        subtitle: (n.subtitle as string) ?? "",
+        type: (n.type as string) ?? "notification",
+        imageUrl: n.image_url as string | null,
+        actionButtonLabel: n.action_button_label as string | null,
+        actionButtonUrl: n.action_button_url as string | null,
+        createdAt: n.created_at as string,
+        isRead: readSet.has(n.id as string),
+      }));
+    },
+    enabled: !!userId,
+    refetchInterval: 30000,
+    staleTime: 10000,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ notificationId, userId }: { notificationId: string; userId: string }) => {
+      const { error } = await supabase
+        .from("notification_reads")
+        .upsert(
+          { notification_id: notificationId, user_id: userId, read_at: new Date().toISOString() },
+          { onConflict: "notification_id,user_id" }
+        );
+      if (error) throw error;
+      return { ok: true };
+    },
+    onSuccess: (_d, { userId }) => {
+      qc.invalidateQueries({ queryKey: ["user-notifications", userId] });
+    },
   });
 }
