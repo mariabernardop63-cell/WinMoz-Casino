@@ -3,34 +3,37 @@ import {
   LayoutDashboard,
   Gamepad2,
   Users,
-  Coins,
-  Trophy,
+  ArrowLeftRight,
+  MessageCircle,
   Flag,
   Landmark,
-  ShieldCheck,
+  Bell,
   Settings,
-  UserCircle,
+  UserX,
   Wifi,
   Wallet,
-  ClipboardList,
+  ShieldCheck,
   BarChart3,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useRef, useState, useEffect } from "react";
 
 const navItems = [
-  { href: "/",              icon: LayoutDashboard, label: "Dashboard"          },
-  { href: "/matches",       icon: Gamepad2,         label: "Partidas"           },
-  { href: "/players",       icon: Users,            label: "Jogadores"          },
-  { href: "/bets",          icon: Coins,            label: "Apostas"            },
-  { href: "/ranking",       icon: Trophy,           label: "Ranking"            },
-  { href: "/reports",       icon: Flag,             label: "Denúncias"          },
-  { href: "/withdrawals",   icon: Landmark,         label: "Saques"             },
-  { href: "/antifraud",     icon: ShieldCheck,      label: "Anti-Fraude"        },
-  { href: "/online-users",  icon: Wifi,             label: "Online Agora"       },
-  { href: "/balance",       icon: Wallet,           label: "Gestão de Saldos"   },
-  { href: "/activity-logs", icon: ClipboardList,    label: "Logs de Actividade" },
-  { href: "/profile",        icon: UserCircle,       label: "Meu Perfil"         },
-  { href: "/relatorios",    icon: BarChart3,        label: "Relatórios"         },
+  { href: "/",              icon: LayoutDashboard,  label: "Dashboard"          },
+  { href: "/matches",       icon: Gamepad2,          label: "Partidas"           },
+  { href: "/players",       icon: Users,             label: "Jogadores"          },
+  { href: "/transactions",  icon: ArrowLeftRight,    label: "Transação"          },
+  { href: "/messages",      icon: MessageCircle,     label: "Mensagem"           },
+  { href: "/reports",       icon: Flag,              label: "Denúncias"          },
+  { href: "/withdrawals",   icon: Landmark,          label: "Saques"             },
+  { href: "/notifications", icon: Bell,              label: "Notificações"       },
+  { href: "/online-users",  icon: Wifi,              label: "Online Agora"       },
+  { href: "/balance",       icon: Wallet,            label: "Gestão de Saldos"   },
+  { href: "/block-users",   icon: UserX,             label: "Bloquear Usuários"  },
+  { href: "/security",      icon: ShieldCheck,       label: "Segurança"          },
+  { href: "/relatorios",    icon: BarChart3,         label: "Relatórios"         },
 ];
 
 function Tooltip({ label }: { label: string }) {
@@ -72,6 +75,34 @@ interface SidebarProps {
 
 export default function Sidebar({ onItemClick }: SidebarProps) {
   const [location] = useLocation();
+  const navRef = useRef<HTMLElement>(null);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+
+  function checkScroll() {
+    const el = navRef.current;
+    if (!el) return;
+    setCanScrollUp(el.scrollTop > 4);
+    setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+  }
+
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener("scroll", checkScroll);
+    window.addEventListener("resize", checkScroll);
+    return () => {
+      el.removeEventListener("scroll", checkScroll);
+      window.removeEventListener("resize", checkScroll);
+    };
+  }, []);
+
+  function scrollNav(dir: "up" | "down") {
+    const el = navRef.current;
+    if (!el) return;
+    el.scrollBy({ top: dir === "up" ? -80 : 80, behavior: "smooth" });
+  }
 
   return (
     <aside
@@ -80,59 +111,38 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         width: 66,
         height: "100%",
         borderRadius: 28,
-        padding: "18px 0 14px",
+        padding: "14px 0 14px",
       }}
     >
-      {/* ── Logo ── */}
-      <div className="relative mb-1 flex-shrink-0 z-10">
-        <div
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: 13,
-            background: "rgba(255,255,255,.18)",
-            border: "1px solid rgba(255,255,255,.28)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            boxShadow: "inset 0 1px 0 rgba(255,255,255,.25)",
-          }}
-        >
-          <span
-            style={{
-              fontFamily: "'Plus Jakarta Sans', sans-serif",
-              fontSize: 11,
-              fontWeight: 900,
-              color: "#fff",
-              letterSpacing: "-0.03em",
-              userSelect: "none",
-            }}
-          >
-            GZ
-          </span>
-        </div>
-        <div className="absolute inset-0 animate-glow pointer-events-none" style={{ borderRadius: 13 }} />
-      </div>
-
-      {/* ── Divider ── */}
-      <div
-        className="my-3 flex-shrink-0"
+      {/* ── Scroll Up ── */}
+      <button
+        onClick={() => scrollNav("up")}
+        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-xl mb-1 transition-all"
         style={{
-          width: 28,
-          height: 1,
-          background: "linear-gradient(90deg, transparent, rgba(255,255,255,.2), transparent)",
+          opacity: canScrollUp ? 0.85 : 0.2,
+          cursor: canScrollUp ? "pointer" : "default",
+          background: "rgba(255,255,255,.12)",
         }}
-      />
+        title="Deslizar para cima"
+        disabled={!canScrollUp}
+      >
+        <ChevronUp style={{ width: 14, height: 14, color: "#fff" }} />
+      </button>
 
       {/* ── Nav ── */}
-      <nav className="flex-1 flex flex-col items-center gap-0.5 w-full px-2.5 overflow-y-auto z-10" style={{ scrollbarWidth: "none" }}>
+      <nav
+        ref={navRef}
+        className="flex-1 flex flex-col items-center gap-0.5 w-full px-2.5 z-10 overflow-y-auto"
+        style={{ scrollbarWidth: "none" }}
+        onScroll={checkScroll}
+      >
         {navItems.map((item, i) => {
           const isActive =
             location === item.href ||
             (item.href !== "/" && location.startsWith(item.href));
 
           return (
-            <Link key={`${item.href}-${i}`} href={item.href} className="w-full" onClick={onItemClick}>
+            <Link key={`${item.href}-${i}`} href={item.href} className="w-full flex-shrink-0" onClick={onItemClick}>
               <div
                 className={cn(
                   "gz-nav-item w-full h-[42px] flex items-center justify-center cursor-pointer group",
@@ -175,8 +185,23 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         })}
       </nav>
 
+      {/* ── Scroll Down ── */}
+      <button
+        onClick={() => scrollNav("down")}
+        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-xl mt-1 transition-all"
+        style={{
+          opacity: canScrollDown ? 0.85 : 0.2,
+          cursor: canScrollDown ? "pointer" : "default",
+          background: "rgba(255,255,255,.12)",
+        }}
+        title="Deslizar para baixo"
+        disabled={!canScrollDown}
+      >
+        <ChevronDown style={{ width: 14, height: 14, color: "#fff" }} />
+      </button>
+
       {/* ── Bottom ── */}
-      <div className="flex flex-col items-center gap-1 w-full px-2.5 flex-shrink-0 z-10">
+      <div className="flex flex-col items-center gap-1 w-full px-2.5 flex-shrink-0 z-10 mt-2">
         <div
           className="mb-1"
           style={{

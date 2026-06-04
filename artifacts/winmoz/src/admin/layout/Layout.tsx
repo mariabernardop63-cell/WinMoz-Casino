@@ -1,10 +1,8 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
-import NotificationsDropdown from "./NotificationsDropdown";
-import CalendarPopover from "./CalendarPopover";
-import ProfileMenu from "./ProfileMenu";
-import { Search, X, Moon, Sun, Menu } from "lucide-react";
+import { Search, X, Moon, Sun, Menu, LogOut } from "lucide-react";
 import { useAdminTheme } from "@/admin/contexts/AdminThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -13,6 +11,12 @@ interface TopBarProps {
 function TopBar({ onMenuClick }: TopBarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const { theme, toggleTheme } = useAdminTheme();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    window.location.href = "/";
+  };
 
   return (
     <div className="gz-topbar h-[56px] flex items-center justify-between px-5 gap-3 flex-shrink-0 sticky top-0 z-40">
@@ -89,12 +93,22 @@ function TopBar({ onMenuClick }: TopBarProps) {
           }
         </button>
 
-        <CalendarPopover />
-        <NotificationsDropdown />
-
         <div className="w-px h-6 mx-0.5 hidden sm:block" style={{ background: "rgba(108,92,231,.1)" }} />
 
-        <ProfileMenu />
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 h-9 px-4 rounded-2xl transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-95"
+          style={{
+            background: "rgba(239,68,68,.08)",
+            border: "1px solid rgba(239,68,68,.15)",
+            color: "#ef4444",
+            boxShadow: "0 1px 3px rgba(0,0,0,.04)",
+          }}
+          title="Terminar Sessão"
+        >
+          <LogOut className="w-4 h-4" strokeWidth={1.8} />
+          <span className="text-[12.5px] font-bold hidden sm:inline">Terminar sessão</span>
+        </button>
       </div>
     </div>
   );
@@ -104,7 +118,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div style={{ minHeight: "100vh", background: "hsl(var(--background))" }}>
+    <div style={{ minHeight: "100vh" }}>
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40 lg:hidden"
