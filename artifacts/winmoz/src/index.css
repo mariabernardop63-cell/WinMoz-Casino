@@ -330,3 +330,237 @@
     inset: -1px;
   }
 }
+/* ═══════════════════════════════════════════
+   ADMIN PANEL — GZ Design System
+   Only active inside .admin-scope or when
+   the admin panel is mounted
+═══════════════════════════════════════════ */
+
+/* ── Admin light-mode CSS variables (applied when html.admin-light) ── */
+.admin-panel-root {
+  --gz-text-primary:   #1e1b4b;
+  --gz-text-secondary: #374151;
+  --gz-text-muted:     #9ca3af;
+  --gz-text-accent:    #b4a8f0;
+  --gz-text-tertiary:  #c4b5fd;
+  --gz-bg-subtle:      rgba(108,92,231,.05);
+  --gz-bg-input:       rgba(108,92,231,.05);
+  --gz-bg-card-btn:    #ffffff;
+  --gz-border-subtle:  rgba(108,92,231,.12);
+
+  --shadow-card:       0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06);
+  --shadow-card-hover: 0 2px 6px rgba(0,0,0,.05), 0 10px 28px rgba(108,92,231,.1);
+  --shadow-row:        0 1px 2px rgba(0,0,0,.03), 0 2px 8px rgba(0,0,0,.05);
+  --shadow-row-hover:  0 2px 6px rgba(0,0,0,.06), 0 6px 18px rgba(108,92,231,.09);
+  --shadow-sidebar:    0 8px 32px rgba(108,92,231,.32), 0 2px 8px rgba(108,92,231,.18);
+  --shadow-topbar:     0 1px 0 rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
+
+  background: hsl(248 50% 97%);
+  color: hsl(240 20% 16%);
+  font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+  min-height: 100vh;
+}
+
+/* ── Admin-scoped keyframes ── */
+@keyframes gz-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: .65; transform: scale(1.3); }
+}
+@keyframes gz-pulse-ring {
+  0%   { transform: scale(1);   opacity: .5; }
+  100% { transform: scale(2.2); opacity: 0;  }
+}
+@keyframes gz-float-up {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes gz-counter-up {
+  from { opacity: 0; transform: translateY(12px) scale(.95); }
+  to   { opacity: 1; transform: translateY(0)    scale(1); }
+}
+@keyframes gz-glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255,255,255,.14); }
+  50%       { box-shadow: 0 0 0 3px rgba(255,255,255,.24), 0 0 20px rgba(167,139,250,.3); }
+}
+@keyframes gz-macos-appear {
+  0%   { opacity: 0; transform: scale(.5); }
+  60%  { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+.admin-panel-root .animate-pulse-dot  { animation: gz-pulse-dot  1.4s ease-in-out infinite; }
+.admin-panel-root .animate-pulse-ring { animation: gz-pulse-ring 1.6s ease-out    infinite; }
+.animate-float-up                     { animation: gz-float-up   .38s ease-out    both; }
+.admin-panel-root .animate-counter    { animation: gz-counter-up .5s cubic-bezier(.34,1.56,.64,1) both; }
+.admin-panel-root .animate-glow       { animation: gz-glow-pulse 2.6s ease-in-out infinite; }
+
+/* ── GZ Cards ── */
+.gz-card {
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: var(--shadow-card, 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06));
+  border: none;
+  transition: box-shadow .22s ease, transform .22s ease;
+}
+.gz-card:hover {
+  box-shadow: var(--shadow-card-hover, 0 2px 6px rgba(0,0,0,.05), 0 10px 28px rgba(108,92,231,.1));
+  transform: translateY(-1.5px);
+}
+.gz-card-float {
+  background: #ffffff;
+  border-radius: 22px;
+  box-shadow: var(--shadow-card, 0 1px 2px rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.06));
+  border: none;
+  transition: box-shadow .22s ease, transform .22s ease;
+}
+.gz-card-float:hover {
+  box-shadow: var(--shadow-card-hover, 0 2px 6px rgba(0,0,0,.05), 0 10px 28px rgba(108,92,231,.1));
+  transform: translateY(-2px);
+}
+
+/* ── GZ Sidebar ── */
+.gz-sidebar {
+  background: linear-gradient(175deg, #7166ee 0%, #6C5CE7 45%, #5e4fdb 100%);
+  box-shadow: var(--shadow-sidebar, 0 8px 32px rgba(108,92,231,.32), 0 2px 8px rgba(108,92,231,.18));
+  overflow: hidden;
+}
+.gz-sidebar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 55%;
+  background: linear-gradient(175deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,.04) 40%, transparent 100%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── GZ Nav Items ── */
+.gz-nav-item {
+  position: relative;
+  transition: all .2s cubic-bezier(.4,0,.2,1);
+  border-radius: 14px;
+}
+.gz-nav-item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: rgba(255,255,255,0);
+  transition: background .18s ease;
+}
+.gz-nav-item:hover::before  { background: rgba(255,255,255,.12); }
+.gz-nav-item.active::before { background: rgba(255,255,255,.22); }
+
+/* ── GZ Top Bar ── */
+.gz-topbar {
+  background: hsl(248 50% 97%);
+  box-shadow: var(--shadow-topbar, 0 1px 0 rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04));
+  border-bottom: 1px solid rgba(108,92,231,.06);
+}
+
+/* ── GZ List Rows ── */
+.gz-row {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: var(--shadow-row, 0 1px 2px rgba(0,0,0,.03), 0 2px 8px rgba(0,0,0,.05));
+  transition: box-shadow .2s ease, transform .2s ease;
+  cursor: pointer;
+}
+.gz-row:hover {
+  box-shadow: var(--shadow-row-hover, 0 2px 6px rgba(0,0,0,.06), 0 6px 18px rgba(108,92,231,.09));
+  transform: translateY(-1px) translateX(1px);
+}
+.gz-tr {
+  transition: background .15s ease;
+  border-radius: 12px;
+}
+.gz-tr:hover { background: rgba(108,92,231,.04); }
+
+/* ── Neon Badges ── */
+.neon-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 100px;
+}
+.neon-live    { color: #059669; background: rgba(16,185,129,.1);  border: 1px solid rgba(16,185,129,.2); }
+.neon-purple-badge { color: #6C5CE7; background: rgba(108,92,231,.08); border: 1px solid rgba(108,92,231,.16); }
+.neon-warning { color: #d97706; background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.2); }
+.neon-danger  { color: #dc2626; background: rgba(220,38,38,.08);  border: 1px solid rgba(220,38,38,.18); }
+
+/* ── Online Dot ── */
+.online-dot {
+  position: relative;
+  display: inline-block;
+  width: 8px; height: 8px;
+}
+.online-dot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #10b981;
+  animation: gz-pulse-dot 1.4s ease-in-out infinite;
+}
+.online-dot::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(16,185,129,.45);
+  animation: gz-pulse-ring 1.6s ease-out infinite;
+}
+
+/* ── MacOS Circles ── */
+.gz-macos-circle {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: filter .15s ease, transform .15s ease;
+  animation: gz-macos-appear .5s cubic-bezier(.34,1.56,.64,1) both;
+}
+.gz-macos-circle:hover { filter: brightness(.88) saturate(1.2); transform: scale(1.12); }
+
+/* ── Gradient Text ── */
+.gz-gradient-text {
+  background: linear-gradient(130deg, #6C5CE7 0%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ── Progress Bar ── */
+.gz-progress-track {
+  background: rgba(108,92,231,.08);
+  border-radius: 100px;
+  overflow: hidden;
+}
+.gz-progress-fill {
+  height: 100%;
+  border-radius: 100px;
+  background: linear-gradient(90deg, #6C5CE7, #a78bfa);
+  transition: width 1s cubic-bezier(.4,0,.2,1);
+}
+
+/* ── Glassmorphism ── */
+.gz-glass {
+  background: rgba(255,255,255,.65);
+  backdrop-filter: blur(18px) saturate(1.6);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 22px;
+  box-shadow: 0 4px 24px rgba(108,92,231,.08), 0 1px 0 rgba(255,255,255,.9) inset, 0 -1px 0 rgba(108,92,231,.04) inset;
+  transition: box-shadow .22s ease, transform .22s ease;
+}
+.gz-glass:hover {
+  box-shadow: 0 8px 32px rgba(108,92,231,.13), 0 1px 0 rgba(255,255,255,.9) inset;
+  transform: translateY(-2px);
+}
+
+/* ── Recharts ── */
+.recharts-area-curve { filter: drop-shadow(0 2px 6px rgba(108,92,231,.18)); }

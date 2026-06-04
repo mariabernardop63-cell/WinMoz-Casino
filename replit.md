@@ -1,44 +1,55 @@
-# [Project name]
+# Winmoz
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+App de jogos e apostas online com painel de administração integrado.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/winmoz run dev` — run the frontend (port 3000)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Frontend: React + Vite + Tailwind CSS
+- Auth + DB: Supabase (external — do NOT migrate to Replit DB)
+- Routing: Wouter v3
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/winmoz/src/` — main app source
+- `artifacts/winmoz/src/pages/` — app pages (Login, Home, Explorar, jogos, carteira, etc.)
+- `artifacts/winmoz/src/admin/` — painel de admin integrado
+- `artifacts/winmoz/src/admin/pages/` — telas do admin
+- `artifacts/winmoz/src/admin/layout/` — layout do admin (sidebar, topbar)
+- `artifacts/winmoz/src/admin/lib/` — api.ts e mock-api.ts do admin
+- `artifacts/winmoz/src/contexts/AuthContext.tsx` — auth via Supabase
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Admin panel is integrated as a nested WouterRouter at `/admin/*` — avoids adding new packages
+- Admin uses mock data (api.ts + mock-api.ts) — no new backend dependencies
+- Admin CSS classes (gz-*) are scoped inside `.admin-panel-root` to avoid conflicts with main app styles
+- Supabase stays as the auth/db provider — not migrated to Replit
+- Admin access: login with nexialonemz@gmail.com → auto-redirected to /admin
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Jogos: Dama, Ludo, Xadrez, Roleta, Bilhar (em breve)
+- Carteira: depósito, levantamento, extratos
+- Social: convites, grupo chat, QR scanner
+- Admin: dashboard, partidas, jogadores, apostas, ranking, denúncias, saques, anti-fraude, logs
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Manter o Supabase como base de dados — NÃO migrar para o ambiente Replit
+- Não adicionar dependências desnecessárias que causam problemas no Vercel
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Admin panel uses its own nested Router (WouterRouter base="/admin") — sidebar links are relative to /admin
+- The admin CSS token variables (--gz-*) need .admin-panel-root wrapper to take effect
+- Admin profile route inside the admin panel is `/profile` (not `/admin/profile`) because the base is already `/admin`
 
 ## Pointers
 

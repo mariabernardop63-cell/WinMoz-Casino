@@ -1,0 +1,2 @@
+- [Winmoz admin integration](winmoz-admin.md) — admin panel at /admin/* uses nested WouterRouter; sidebar paths are relative to /admin base
+- [Supabase preference](supabase-preference.md) — user explicitly wants Supabase kept as-is, never migrate to Replit DB

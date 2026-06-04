@@ -68,7 +68,12 @@ export default function Login() {
         return;
       }
 
-      setLocation("/");
+      const adminEmail = "nexialonemz@gmail.com";
+      if (email.trim().toLowerCase() === adminEmail) {
+        setLocation("/admin");
+      } else {
+        setLocation("/");
+      }
     } catch {
       setLoading(false);
       setErrors({ general: "Ligação lenta ou sem resposta. Tenta novamente." });

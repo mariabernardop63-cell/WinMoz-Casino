@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
+import AdminApp from "@/admin/AdminApp";
 import Home from "@/pages/Home";
 import Explorar from "@/pages/Explorar";
 import Login from "@/pages/Login";
@@ -110,6 +111,11 @@ function Router() {
         <ProtectedRoute><Roleta /></ProtectedRoute>
       </Route>
       <Route path="/bilhar-em-breve" component={BilharEmBreve} />
+
+      {/* Admin panel — accessible at /admin and all sub-paths */}
+      <Route path="/admin" component={AdminApp} />
+      <Route path="/admin/:rest*" component={AdminApp} />
+
       <Route component={NotFound} />
     </Switch>
   );
