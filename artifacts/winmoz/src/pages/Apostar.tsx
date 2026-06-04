@@ -844,10 +844,10 @@ export default function Apostar() {
             <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#a1a1aa", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 12 }}>Modo de Jogo</p>
             <SegmentedToggle
               value={gameMode}
-              onChange={(v) => setGameMode(v as GameMode)}
+              onChange={(v) => { if (v === "squad") return; setGameMode(v as GameMode); }}
               options={[
                 { value: "solo", label: "1VS1 Solo", icon: <Swords style={{ width: 14, height: 14 }} /> },
-                { value: "squad", label: "2VS2 Squad", icon: <Users style={{ width: 14, height: 14 }} /> },
+                { value: "squad", label: "2VS2 Em Breve", icon: <Users style={{ width: 14, height: 14 }} /> },
               ]}
             />
           </motion.div>

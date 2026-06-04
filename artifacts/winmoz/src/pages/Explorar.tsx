@@ -41,6 +41,7 @@ function GameCard({ game, tick }: { game: typeof jogosCardsMeta[0]; tick: number
   const count = getLivePlayerCount(game.baseIdx, tick);
   const handlePlay = () => {
     if (!user) { setLocation("/login"); return; }
+    if (game.id === "bilhar") { setLocation("/bilhar-em-breve"); return; }
     if (game.id === "roleta") { setLocation("/roleta"); return; }
     setLocation(`/apostar/${betId}`);
   };
