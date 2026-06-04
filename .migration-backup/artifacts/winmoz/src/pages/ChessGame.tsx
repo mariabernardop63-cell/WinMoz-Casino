@@ -253,21 +253,103 @@ const PIECE_SYMBOLS:Record<PColor,Record<PType,string>>={
   b:{K:"♚",Q:"♛",R:"♜",B:"♝",N:"♞",P:"♟"},
 };
 
+function PieceSVG({ t, w }: { t: PType; w: boolean }) {
+  const body    = w ? "#F0EAD8" : "#3C3535";
+  const light   = w ? "#FFFFFF" : "#5A5252";
+  const mid     = w ? "#D0C8B8" : "#2A2525";
+  const dark    = w ? "#A09080" : "#0E0A0A";
+  const base    = w ? "#C8C0A8" : "#221E1E";
+  const shadow  = "rgba(0,0,0,0.35)";
+  const gloss   = w ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.18)";
+
+  return (
+    <svg viewBox="0 0 40 52" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display:"block" }}>
+      {/* Drop shadow */}
+      <ellipse cx="20" cy="50" rx="14" ry="2.5" fill={shadow}/>
+
+      {/* Base platform */}
+      <rect x="7" y="44" width="26" height="5.5" rx="2.8" fill={dark}/>
+      <rect x="8" y="43" width="24" height="5.5" rx="2.5" fill={base}/>
+      <rect x="9" y="43" width="22" height="2" rx="1" fill={light} opacity="0.35"/>
+
+      {t === "P" && <>
+        <ellipse cx="20" cy="39" rx="7" ry="2" fill={mid}/>
+        <rect x="17" y="27" width="6" height="13" rx="3" fill={body}/>
+        <circle cx="20" cy="22" r="9" fill={body}/>
+        <circle cx="20" cy="22" r="9" fill="none" stroke={dark} strokeWidth="0.8"/>
+        <ellipse cx="17" cy="17" rx="4.5" ry="3.5" fill={gloss}/>
+      </>}
+
+      {t === "R" && <>
+        <rect x="14" y="16" width="12" height="27" rx="1.5" fill={body}/>
+        <rect x="12" y="38" width="16" height="5" rx="1.5" fill={mid}/>
+        <rect x="11" y="12" width="5" height="9" rx="1" fill={body}/>
+        <rect x="17.5" y="12" width="5" height="9" rx="1" fill={body}/>
+        <rect x="24" y="12" width="5" height="9" rx="1" fill={body}/>
+        <rect x="11" y="18" width="18" height="3" rx="0" fill={mid}/>
+        <rect x="12" y="38" width="16" height="2" rx="1" fill={light} opacity="0.3"/>
+        <rect x="12" y="16" width="4" height="26" rx="1" fill={light} opacity="0.2"/>
+      </>}
+
+      {t === "N" && <>
+        <path d="M14 43 L13 30 Q11 22 14 17 Q17 11 22 9 Q28 8 30 13 Q32 18 27 22 Q32 21 31 27 Q29 32 23 32 L22 43 Z" fill={body}/>
+        <path d="M14 43 L13 30 Q11 22 14 17 Q17 11 22 9 Q28 8 30 13 Q32 18 27 22 Q32 21 31 27 Q29 32 23 32 L22 43 Z" fill="none" stroke={dark} strokeWidth="0.8"/>
+        <ellipse cx="18" cy="14" rx="5" ry="4" fill={gloss}/>
+        <circle cx="26.5" cy="12.5" r="2" fill={dark} opacity="0.5"/>
+        <circle cx="26.5" cy="12.5" r="1" fill={light} opacity="0.4"/>
+        <path d="M17 24 Q15 28 16 32" stroke={mid} strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+      </>}
+
+      {t === "B" && <>
+        <ellipse cx="20" cy="40" rx="8" ry="2" fill={mid}/>
+        <path d="M15 40 Q11 30 13 20 Q15 11 20 9 Q25 11 27 20 Q29 30 25 40 Z" fill={body}/>
+        <path d="M15 40 Q11 30 13 20 Q15 11 20 9 Q25 11 27 20 Q29 30 25 40 Z" fill="none" stroke={dark} strokeWidth="0.8"/>
+        <circle cx="20" cy="8" r="5" fill={body}/>
+        <circle cx="20" cy="8" r="5" fill="none" stroke={dark} strokeWidth="0.8"/>
+        <circle cx="20" cy="5.5" r="2" fill={dark} opacity="0.4"/>
+        <ellipse cx="17" cy="15" rx="4" ry="3" fill={gloss}/>
+      </>}
+
+      {t === "Q" && <>
+        <ellipse cx="20" cy="41" rx="10" ry="2" fill={mid}/>
+        <path d="M12 41 Q9 32 11 22 Q13 13 20 11 Q27 13 29 22 Q31 32 28 41 Z" fill={body}/>
+        <path d="M12 41 Q9 32 11 22 Q13 13 20 11 Q27 13 29 22 Q31 32 28 41 Z" fill="none" stroke={dark} strokeWidth="0.8"/>
+        <polygon points="13,13 11,3 18,10" fill={body}/>
+        <polygon points="20,11 20,1 24,10 16,10" fill={body}/>
+        <polygon points="27,13 29,3 22,10" fill={body}/>
+        <circle cx="12" cy="3.5" r="3" fill={body}/>
+        <circle cx="12" cy="3.5" r="3" fill="none" stroke={dark} strokeWidth="0.7"/>
+        <circle cx="20" cy="1.5" r="3" fill={body}/>
+        <circle cx="20" cy="1.5" r="3" fill="none" stroke={dark} strokeWidth="0.7"/>
+        <circle cx="28" cy="3.5" r="3" fill={body}/>
+        <circle cx="28" cy="3.5" r="3" fill="none" stroke={dark} strokeWidth="0.7"/>
+        <ellipse cx="16" cy="19" rx="4.5" ry="3.5" fill={gloss}/>
+      </>}
+
+      {t === "K" && <>
+        <ellipse cx="20" cy="41" rx="10" ry="2" fill={mid}/>
+        <path d="M12 41 Q9 32 11 22 Q13 13 20 11 Q27 13 29 22 Q31 32 28 41 Z" fill={body}/>
+        <path d="M12 41 Q9 32 11 22 Q13 13 20 11 Q27 13 29 22 Q31 32 28 41 Z" fill="none" stroke={dark} strokeWidth="0.8"/>
+        <rect x="18" y="2" width="4" height="13" rx="2" fill={body}/>
+        <rect x="18" y="2" width="4" height="13" rx="2" fill="none" stroke={dark} strokeWidth="0.7"/>
+        <rect x="14" y="5.5" width="12" height="4" rx="2" fill={body}/>
+        <rect x="14" y="5.5" width="12" height="4" rx="2" fill="none" stroke={dark} strokeWidth="0.7"/>
+        <ellipse cx="16" cy="19" rx="4.5" ry="3.5" fill={gloss}/>
+      </>}
+    </svg>
+  );
+}
+
 function ChessPiece({piece}:{piece:Piece}){
-  const isWhite=piece.c==="w";
   return(
     <div style={{
       width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",
-      fontSize:"min(9vw,46px)",lineHeight:1,userSelect:"none",
-      color:isWhite?"#FFFFFF":"#111111",
-      textShadow:isWhite
-        ?"0 1px 3px rgba(0,0,0,0.9),0 0 8px rgba(0,0,0,0.5)"
-        :"0 1px 3px rgba(255,255,255,0.3),0 0 6px rgba(0,0,0,0.6)",
-      filter:isWhite
-        ?"drop-shadow(0 2px 4px rgba(0,0,0,0.8))"
-        :"drop-shadow(0 2px 4px rgba(0,0,0,0.9))",
+      padding:"5%", boxSizing:"border-box",
+      filter: piece.c==="w"
+        ? "drop-shadow(0 3px 6px rgba(0,0,0,0.8))"
+        : "drop-shadow(0 3px 6px rgba(0,0,0,0.9))",
     }}>
-      {PIECE_SYMBOLS[piece.c][piece.t]}
+      <PieceSVG t={piece.t} w={piece.c==="w"}/>
     </div>
   );
 }

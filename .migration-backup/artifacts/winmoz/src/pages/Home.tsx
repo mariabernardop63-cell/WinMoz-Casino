@@ -208,7 +208,7 @@ function WinMozLogo() {
         <path d="M13 2 L20 2 L16 44 L10 44 Z" fill="#0D0D0D" opacity="0.18"/>
         <text x="23" y="27" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="22" letterSpacing="0.5" fill="#0D0D0D">POKER</text>
         <text x="23" y="41" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">WINNER</text>
-        <text x="94" y="41" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D" opacity="0.45">ONLINE</text>
+        <text x="94" y="41" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">ONLINE</text>
       </svg>
     </div>
   );
@@ -999,7 +999,8 @@ function HeroBanner() {
                 onClick={() => {
                   if (slide.cta === "Conversar") setLocation("/grupo-chat");
                   else if (slide.cta === "Jogar Agora") {
-                    if (slide.id === "roleta") setLocation("/roleta");
+                    if (slide.id === "bilhar") setLocation("/bilhar-em-breve");
+                    else if (slide.id === "roleta") setLocation("/roleta");
                     else setLocation(`/apostar/${slide.id}`);
                   }
                 }}
@@ -1075,7 +1076,7 @@ const games = [
     id: "damas",
     name: "DAMAS",
     sub: "Jogo de Tabuleiro",
-    bet: "50–5.000 MT",
+    bet: "10–5.000 MT",
     rating: "4.8",
     baseIdx: 0,
     image: "/damas-card.jpg",
@@ -1086,7 +1087,7 @@ const games = [
     id: "ludo",
     name: "LUDO",
     sub: "Jogo de Dados",
-    bet: "20–2.000 MT",
+    bet: "10–5.000 MT",
     rating: "4.9",
     baseIdx: 1,
     image: "/ludo-card2.png",
@@ -1098,7 +1099,7 @@ const games = [
     id: "xadrez",
     name: "XADREZ",
     sub: "Estratégia Real",
-    bet: "100–10.000 MT",
+    bet: "10–5.000 MT",
     rating: "4.7",
     baseIdx: 2,
     image: "/xadrez-card.jpg",
@@ -1109,7 +1110,7 @@ const games = [
     id: "bilhar",
     name: "BILHAR",
     sub: "Jogo de Mesa",
-    bet: "50–3.000 MT",
+    bet: "10–5.000 MT",
     rating: "4.6",
     baseIdx: 5,
     image: "/bilhar-card.webp",
@@ -1120,7 +1121,7 @@ const games = [
     id: "roleta",
     name: "ROLETA",
     sub: "Roleta da Sorte",
-    bet: "20–1.000 MT",
+    bet: "10–5.000 MT",
     rating: "4.5",
     baseIdx: 6,
     image: "/roleta-card.jpg",
@@ -1239,6 +1240,7 @@ export default function Home() {
                 variants={fadeUp}
                 onClick={() => {
                   if (!isLoggedIn) { setLocation("/login"); return; }
+                  if (game.id === "bilhar") { setLocation("/bilhar-em-breve"); return; }
                   if (game.id === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.id}`);
                 }}
@@ -1280,7 +1282,7 @@ export default function Home() {
                 <div className="p-3 flex flex-col flex-1">
                   <h3 className="font-syne font-bold text-slate-900 text-sm tracking-wide">{game.name}</h3>
                   <p className="text-[10px] font-semibold text-blue-700 mt-0.5 uppercase tracking-wider">{game.bet}</p>
-                  {game.id !== "xadrez" && <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} jogando</p>}
+                  {game.id !== "bilhar" && <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} jogando</p>}
                   <div className="mt-auto">
                     <div className="w-full h-8 text-xs font-bold bg-blue-700 text-white rounded-lg flex items-center justify-center">
                       Jogar
@@ -1311,6 +1313,7 @@ export default function Home() {
                 variants={fadeUp}
                 onClick={() => {
                   if (!isLoggedIn) { setLocation("/login"); return; }
+                  if (game.gameRoute === "bilhar") { setLocation("/bilhar-em-breve"); return; }
                   if (game.gameRoute === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.gameRoute}`);
                 }}
@@ -1347,7 +1350,7 @@ export default function Home() {
                       </span>
                     )}
                   </div>
-                  {game.id !== "xr" && <p className="text-[10px] text-slate-400 mt-0.5">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} apostadores ativos</p>}
+                  {game.id !== "bi" && <p className="text-[10px] text-slate-400 mt-0.5">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} apostadores ativos</p>}
                 </div>
 
                 <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center shadow-md flex-shrink-0 pointer-events-none">

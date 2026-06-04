@@ -41,6 +41,7 @@ function GameCard({ game, tick }: { game: typeof jogosCardsMeta[0]; tick: number
   const count = getLivePlayerCount(game.baseIdx, tick);
   const handlePlay = () => {
     if (!user) { setLocation("/login"); return; }
+    if (game.id === "bilhar") { setLocation("/bilhar-em-breve"); return; }
     if (game.id === "roleta") { setLocation("/roleta"); return; }
     setLocation(`/apostar/${betId}`);
   };
@@ -70,9 +71,11 @@ function GameCard({ game, tick }: { game: typeof jogosCardsMeta[0]; tick: number
         </div>
         <div className="flex items-center gap-2 mt-0.5">
           <span className="text-[10px] text-slate-400">{game.desc}</span>
-          <span className="text-[10px] text-violet-600 font-medium flex items-center gap-0.5">
-            <Users className="w-2.5 h-2.5" />{formatPlayerCount(count)} a jogar
-          </span>
+          {game.id !== "bilhar" && (
+            <span className="text-[10px] text-violet-600 font-medium flex items-center gap-0.5">
+              <Users className="w-2.5 h-2.5" />{formatPlayerCount(count)} a jogar
+            </span>
+          )}
         </div>
       </div>
       <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-violet-500 transition-colors flex-shrink-0" />
@@ -245,21 +248,22 @@ function SalaTab() {
 
   async function deductBalance(amount: number, desc: string): Promise<boolean> {
     if (!user?.id) return false;
-    const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
-      Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
+    const withTimeout = <T,>(p: PromiseLike<T>, ms: number): Promise<T> =>
+      Promise.race([Promise.resolve(p), new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
     try {
-      const { data } = await withTimeout(
-        supabase.from("profiles").select("balance").eq("id", user.id).single(),
+      const res = await withTimeout(
+        supabase.from("profiles").select("balance").eq("id", user.id).single() as unknown as Promise<{ data: { balance: any } | null; error: any }>,
         12_000
       );
+      const data = res?.data;
       const bal = parseFloat(String(data?.balance ?? "0"));
       if (bal < amount) return false;
       await withTimeout(
-        supabase.from("profiles").update({ balance: bal - amount }).eq("id", user.id),
+        supabase.from("profiles").update({ balance: bal - amount }).eq("id", user.id) as unknown as Promise<unknown>,
         12_000
       );
       await withTimeout(
-        supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" }),
+        supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" }) as unknown as Promise<unknown>,
         12_000
       );
       refreshProfile();

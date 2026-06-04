@@ -12,7 +12,7 @@ function WinMozLogo() {
       <path d="M13 2 L19 2 L15 42 L9 42 Z" fill="#0D0D0D" opacity="0.18" />
       <text x="22" y="25" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="22" letterSpacing="0.5" fill="#0D0D0D">POKER</text>
       <text x="22" y="39" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">WINNER</text>
-      <text x="93" y="39" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D" opacity="0.45">ONLINE</text>
+      <text x="93" y="39" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">ONLINE</text>
     </svg>
   );
 }
@@ -51,11 +51,24 @@ export default function OTP() {
 
     const type = otpType === "recovery" ? "recovery" : "signup";
 
-    const { data, error: verifyError } = await supabase.auth.verifyOtp({
-      email,
-      token: codeStr,
-      type,
-    });
+    let data: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>["data"] | undefined;
+    let verifyError: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>["error"] | undefined;
+    try {
+      const result = await Promise.race([
+        supabase.auth.verifyOtp({ email, token: codeStr, type }),
+        new Promise<never>((_, rej) =>
+          setTimeout(() => rej(new Error("timeout")), 15000)
+        ),
+      ]);
+      data = result.data;
+      verifyError = result.error;
+    } catch {
+      setVerifying(false);
+      setError("Tempo esgotado. Verifica a tua ligação à internet e tenta novamente.");
+      setCode(["", "", "", "", "", ""]);
+      setTimeout(() => inputRefs.current[0]?.focus(), 50);
+      return;
+    }
 
     if (verifyError) {
       setVerifying(false);
@@ -70,16 +83,23 @@ export default function OTP() {
         const pendingRaw = sessionStorage.getItem("pendingReg");
         const pending = pendingRaw ? JSON.parse(pendingRaw) : {};
         if (pending.full_name || pending.phone || pending.invite_code_used) {
-          await fetch(`${API_BASE}/complete-registration`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              user_id: data.session.user.id,
-              full_name: pending.full_name,
-              phone: pending.phone,
-              invite_code_used: pending.invite_code_used,
-            }),
-          });
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 5000);
+          try {
+            await fetch(`${API_BASE}/complete-registration`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              signal: ctrl.signal,
+              body: JSON.stringify({
+                user_id: data.session.user.id,
+                full_name: pending.full_name,
+                phone: pending.phone,
+                invite_code_used: pending.invite_code_used,
+              }),
+            });
+          } finally {
+            clearTimeout(timer);
+          }
           sessionStorage.removeItem("pendingReg");
         }
       } catch { /* non-critical */ }

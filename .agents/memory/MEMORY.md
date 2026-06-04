@@ -1,1 +1,0 @@
-- [WinMoz port to Replit](winmoz-port.md) — Vite+React gaming app ported from Vercel; Supabase kept as DB; 6 UI fixes applied.

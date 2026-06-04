@@ -32,6 +32,7 @@ import LudoGame from "@/pages/LudoGame";
 import ChessGame from "@/pages/ChessGame";
 import DamasGame from "@/pages/DamasGame";
 import Roleta from "@/pages/Roleta";
+import BilharEmBreve from "@/pages/BilharEmBreve";
 
 const queryClient = new QueryClient();
 
@@ -108,6 +109,7 @@ function Router() {
       <Route path="/roleta">
         <ProtectedRoute><Roleta /></ProtectedRoute>
       </Route>
+      <Route path="/bilhar-em-breve" component={BilharEmBreve} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -105,7 +105,6 @@ function ResumeModal({ activeGame, onClose }: { activeGame: ActiveGameRecord | n
           <div style={{ padding: "0 22px", marginBottom: 16 }}>
             <motion.button whileTap={{ scale: 0.97 }}
               onClick={() => {
-                try { localStorage.removeItem("wm_active_game"); } catch { /* ignore */ }
                 const _gt = activeGame.gameType === "chess" ? "xadrez" : activeGame.gameType;
                 const _route = `${_gt}-jogo`;
                 go(`/${_route}?gameId=${activeGame.gameId}&bet=${activeGame.betAmount}&opp=${encodeURIComponent(activeGame.opponentName)}`);

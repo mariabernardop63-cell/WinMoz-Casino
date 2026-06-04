@@ -217,9 +217,7 @@ export default function GrupoChat() {
                   transition={{ duration: 0.18, ease: "easeOut" }}
                   style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2 }}
                 >
-                  {!sameUser && (
-                    <span style={{ fontSize: 11, color: "#a1a1aa", marginLeft: 6, fontWeight: 600, letterSpacing: "0.2px" }}>{msg.user}</span>
-                  )}
+                  <span style={{ fontSize: 11, color: "#a1a1aa", marginLeft: 6, fontWeight: 600, letterSpacing: "0.2px" }}>{msg.user}</span>
                   <div style={{
                     background: "#1e1e26",
                     borderRadius: sameUser ? "16px 16px 16px 4px" : "4px 16px 16px 16px",
