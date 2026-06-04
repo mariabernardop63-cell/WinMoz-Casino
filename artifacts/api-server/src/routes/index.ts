@@ -25,6 +25,122 @@ router.post("/complete-registration", async (req, res) => {
   }
 });
 
+/* ── Recharge code validation ── */
+router.post("/recharge", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+
+    if (!token) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const { code } = req.body as { code?: string };
+    if (!code || code.length !== 15) {
+      res.status(400).json({ error: "Código inválido" });
+      return;
+    }
+
+    const supabaseUrl = process.env["SUPABASE_URL"];
+    const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      req.log.error("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured");
+      res.status(500).json({ error: "Serviço indisponível" });
+      return;
+    }
+
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Verify the user JWT and get user id
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+    if (userError || !userData.user) {
+      res.status(401).json({ error: "Sessão inválida" });
+      return;
+    }
+    const userId = userData.user.id;
+
+    // Look up the recharge code — must exist, be unused and belong to this platform
+    const { data: codeRow, error: codeError } = await supabaseAdmin
+      .from("recharge_codes")
+      .select("id, amount, used, used_by")
+      .eq("code", code)
+      .single();
+
+    if (codeError || !codeRow) {
+      res.status(400).json({ error: "Código inválido ou não encontrado" });
+      return;
+    }
+
+    if (codeRow.used) {
+      res.status(400).json({ error: "Código já utilizado" });
+      return;
+    }
+
+    const amount: number = Number(codeRow.amount);
+    if (!amount || amount <= 0) {
+      res.status(400).json({ error: "Código sem valor associado" });
+      return;
+    }
+
+    // Mark code as used
+    const { error: markError } = await supabaseAdmin
+      .from("recharge_codes")
+      .update({ used: true, used_by: userId, used_at: new Date().toISOString() })
+      .eq("id", codeRow.id);
+
+    if (markError) {
+      req.log.error({ markError }, "Failed to mark recharge code as used");
+      res.status(500).json({ error: "Erro ao processar recarga" });
+      return;
+    }
+
+    // Credit user balance
+    const { data: profileData, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("balance")
+      .eq("id", userId)
+      .single();
+
+    if (profileError || !profileData) {
+      res.status(500).json({ error: "Erro ao obter saldo do utilizador" });
+      return;
+    }
+
+    const currentBalance = Number(profileData.balance ?? 0);
+    const newBalance = currentBalance + amount;
+
+    const { error: balanceError } = await supabaseAdmin
+      .from("profiles")
+      .update({ balance: newBalance })
+      .eq("id", userId);
+
+    if (balanceError) {
+      req.log.error({ balanceError }, "Failed to update user balance");
+      res.status(500).json({ error: "Erro ao actualizar saldo" });
+      return;
+    }
+
+    // Record transaction
+    await supabaseAdmin.from("transactions").insert({
+      user_id: userId,
+      type: "recharge",
+      amount,
+      description: "Recarga de saldo",
+      created_at: new Date().toISOString(),
+    });
+
+    res.json({ success: true, amount });
+  } catch (err) {
+    req.log.error({ err }, "Recharge error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── AI Support Chat (Groq) ── */
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "llama3-8b-8192";

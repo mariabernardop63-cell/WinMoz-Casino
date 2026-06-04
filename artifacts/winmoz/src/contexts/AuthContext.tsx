@@ -19,6 +19,7 @@ interface AuthContextType {
   user: { id: string; email: string } | null;
   profile: UserProfile | null;
   loading: boolean;
+  sessionReady: boolean;
   refreshProfile: () => Promise<void>;
   forceRefresh: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -111,6 +112,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(cachedProfile ?? null);
   // If we already have a cache hit, skip the loading spinner
   const [loading, setLoading] = useState(!cachedProfile);
+  // sessionReady becomes true only after initFromSession() confirms the Supabase session
+  const [sessionReady, setSessionReady] = useState(false);
 
   const activeUidRef = useRef<string | null>(cachedProfile?.id ?? null);
   const signedInHandledRef = useRef(false);
@@ -166,6 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           activeUidRef.current = id;
           signedInHandledRef.current = true;
           setLoading(false);
+          setSessionReady(true);
           // Refresh balance/profile silently in background
           const fresh = await fetchProfile(id);
           if (!cancelled && activeUidRef.current === id && fresh) {
@@ -183,9 +187,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (data) saveAndSet({ ...data, email });
           signedInHandledRef.current = true;
           setLoading(false);
+          setSessionReady(true);
         }
       } catch {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) { setLoading(false); setSessionReady(true); }
       }
     };
 
@@ -193,7 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Safety net — never leave the app stuck in loading state
     const safetyTimer = setTimeout(() => {
-      if (!cancelled) setLoading(false);
+      if (!cancelled) { setLoading(false); setSessionReady(true); }
     }, 8000);
 
     // ── onAuthStateChange handles live sign-in, sign-out, and token refresh ──
@@ -264,7 +269,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, refreshProfile, forceRefresh, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, sessionReady, refreshProfile, forceRefresh, signOut }}>
       {children}
     </AuthContext.Provider>
   );

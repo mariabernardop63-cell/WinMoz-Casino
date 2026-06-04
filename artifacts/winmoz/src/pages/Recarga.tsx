@@ -14,17 +14,6 @@ function fmtMZN(val: number) {
   return val.toFixed(2).replace(".", ",");
 }
 
-const FULL_CODE_MAP: Record<string, number> = {
-  "000000000000000": 200,
-};
-
-const CODE_MAP: Record<string, number> = {
-  "1": 200,
-  "2": 50,
-  "3": 100,
-  "4": 200,
-  "5": 500,
-};
 
 function formatDisplay(raw: string): string {
   const digits = raw.slice(0, 15);
@@ -55,10 +44,6 @@ export default function Recarga() {
 
   const handleSubmit = async () => {
     if (!isComplete) return;
-
-    const resolved = FULL_CODE_MAP[digits] ?? CODE_MAP[digits[0]] ?? 0;
-
-    if (!resolved) { setScreen("error"); return; }
     setScreen("processing");
 
     const timeout = (ms: number) =>
@@ -82,12 +67,15 @@ export default function Recarga() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ amount: resolved }),
+          body: JSON.stringify({ code: digits }),
         }),
         timeout(15000),
       ]) as Response;
 
       if (!res.ok) { setScreen("error"); return; }
+
+      const data = await res.json();
+      const creditedAmount: number = data.amount ?? 0;
 
       try {
         await Promise.race([refreshProfile(), timeout(8000)]);
@@ -95,7 +83,7 @@ export default function Recarga() {
         /* refresh failed but recharge succeeded — proceed */
       }
 
-      setAmount(resolved);
+      setAmount(creditedAmount);
       setScreen("success");
     } catch {
       setScreen("error");
@@ -179,22 +167,10 @@ export default function Recarga() {
                     className="w-full rounded-xl px-4 py-3 text-center overflow-hidden"
                     style={{ background: "#2c2c2e" }}
                   >
-                    {(() => {
-                      const amt = FULL_CODE_MAP[digits] ?? CODE_MAP[digits[0]];
-                      return amt ? (
-                        <>
-                          <p className="text-xs mb-0.5" style={{ color: "#636366" }}>Valor detectado</p>
-                          <p className="font-bold text-xl" style={{ color: CYAN, fontFamily: "system-ui" }}>
-                            +{fmtMZN(amt)} MZN
-                          </p>
-                        </>
-                      ) : (
-                        <div className="flex items-center justify-center gap-1.5">
-                          <AlertTriangle style={{ width: 14, height: 14, color: "#e74c3c" }} />
-                          <p className="text-sm font-medium" style={{ color: "#e74c3c" }}>Código inválido</p>
-                        </div>
-                      );
-                    })()}
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Zap style={{ width: 14, height: 14, color: CYAN }} />
+                      <p className="text-sm font-medium" style={{ color: CYAN }}>Código pronto para validar</p>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>

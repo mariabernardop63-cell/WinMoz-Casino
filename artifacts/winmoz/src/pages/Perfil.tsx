@@ -72,7 +72,7 @@ export default function Perfil() {
   const [balanceVisible, setBalanceVisible] = useState(true);
   const [ferramentasOpen, setFerramentasOpen] = useState(false);
   const [, setLocation] = useLocation();
-  const { profile, signOut, user } = useAuth();
+  const { profile, signOut, user, sessionReady } = useAuth();
 
   const [transactions, setTransactions] = useState<Tx[]>([]);
   const [txLoading, setTxLoading] = useState(true);
@@ -87,9 +87,13 @@ export default function Perfil() {
   const userId = user?.id ?? null;
 
   useEffect(() => {
+    // Wait until Supabase session is confirmed before fetching — prevents
+    // the query firing before the auth token is loaded (causes RLS to reject on refresh)
+    if (!sessionReady) return;
     if (!userId) { setTxLoading(false); return; }
 
     let cancelled = false;
+    setTxLoading(true);
 
     // 8-second hard timeout so the spinner never hangs forever
     const timer = setTimeout(() => {
@@ -132,7 +136,7 @@ export default function Perfil() {
       });
 
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [userId]);
+  }, [userId, sessionReady]);
 
   const handleAction = (label: string) => {
     if (label === "Levantar")  setLocation("/levantar");
