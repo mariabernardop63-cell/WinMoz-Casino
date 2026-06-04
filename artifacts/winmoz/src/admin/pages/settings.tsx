@@ -1,9 +1,24 @@
 import { useState, useEffect } from "react";
-import { Settings as SettingsIcon, Bell, Shield, Globe, Gamepad2, Wallet, AlertTriangle, Save, Loader2 } from "lucide-react";
-import { getPlatformSettings, updateMultipleSettings, type PlatformSettings } from "@/lib/supabase-admin";
+import { Settings as SettingsIcon, Shield, Globe, Gamepad2, Wallet, AlertTriangle, Save, Loader2 } from "lucide-react";
+import { getPlatformSettings, updateMultipleSettings } from "@/lib/supabase-admin";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+
+interface LocalSettings {
+  maintenance_mode: boolean;
+  game_damas_enabled: boolean;
+  game_ludo_enabled: boolean;
+  game_xadrez_enabled: boolean;
+  game_roleta_enabled: boolean;
+  deposits_enabled: boolean;
+  withdrawals_enabled: boolean;
+  bets_enabled: boolean;
+  new_registrations_enabled: boolean;
+  withdrawal_fee: number;
+  platform_cut_pct: number;
+  platform_name: string;
+}
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -26,7 +41,7 @@ function SettingRow({ label, description, children }: { label: string; descripti
   );
 }
 
-const DEFAULTS: PlatformSettings = {
+const DEFAULTS: LocalSettings = {
   maintenance_mode: false,
   game_damas_enabled: true,
   game_ludo_enabled: true,
@@ -41,30 +56,42 @@ const DEFAULTS: PlatformSettings = {
   platform_name: "POKER WINNER",
 };
 
+function rawToLocal(raw: Record<string, string>): LocalSettings {
+  const boolKeys = ["maintenance_mode","game_damas_enabled","game_ludo_enabled","game_xadrez_enabled","game_roleta_enabled","deposits_enabled","withdrawals_enabled","bets_enabled","new_registrations_enabled"] as const;
+  const result = { ...DEFAULTS };
+  for (const k of boolKeys) {
+    if (k in raw) (result as Record<string, unknown>)[k] = raw[k] === "true";
+  }
+  if ("withdrawal_fee" in raw) result.withdrawal_fee = Number(raw.withdrawal_fee);
+  if ("platform_cut_pct" in raw) result.platform_cut_pct = Number(raw.platform_cut_pct);
+  if ("platform_name" in raw) result.platform_name = raw.platform_name;
+  return result;
+}
+
 export default function Settings() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [settings, setSettings] = useState<PlatformSettings>(DEFAULTS);
+  const [settings, setSettings] = useState<LocalSettings>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     getPlatformSettings().then(s => {
-      setSettings(s);
+      setSettings(rawToLocal(s));
       setLoading(false);
     });
 
     const ch = supabase.channel("settings-rt")
       .on("postgres_changes", { event: "*", schema: "public", table: "platform_settings" }, () => {
-        getPlatformSettings().then(s => setSettings(s));
+        getPlatformSettings().then(s => setSettings(rawToLocal(s)));
       })
       .subscribe();
 
     return () => { supabase.removeChannel(ch); };
   }, []);
 
-  const toggle = (key: keyof PlatformSettings) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+  const toggle = (key: keyof LocalSettings) => {
+    setSettings(prev => ({ ...prev, [key]: !(prev[key] as boolean) }));
   };
 
   const handleSave = async () => {

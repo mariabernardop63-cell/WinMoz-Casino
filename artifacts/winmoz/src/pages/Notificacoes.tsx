@@ -83,7 +83,7 @@ export default function Notificacoes() {
   async function markRead(id: string) {
     if (!user) return;
     setNotifs(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-    await supabase.from("notification_reads").upsert({ notification_id: id, user_id: user.id }).onConflict("notification_id,user_id");
+    await supabase.from("notification_reads").upsert({ notification_id: id, user_id: user.id }, { onConflict: "notification_id,user_id" });
   }
 
   async function markAllRead() {
@@ -91,7 +91,7 @@ export default function Notificacoes() {
     const unread = notifs.filter(n => !n.isRead);
     setNotifs(prev => prev.map(n => ({ ...n, isRead: true })));
     await Promise.all(unread.map(n =>
-      supabase.from("notification_reads").upsert({ notification_id: n.id, user_id: user.id }).onConflict("notification_id,user_id")
+      supabase.from("notification_reads").upsert({ notification_id: n.id, user_id: user.id }, { onConflict: "notification_id,user_id" })
     ));
   }
 
