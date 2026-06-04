@@ -1,5 +1,5 @@
 import { useParams, useLocation } from "wouter";
-import { useGetPlayer, useSuspendPlayer, getGetPlayerQueryKey } from "@/admin/lib/mock-api";
+import { useGetPlayer, useSuspendPlayer, getGetPlayerQueryKey } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Trophy, TrendingUp, Coins, Calendar } from "lucide-react";
 
@@ -7,7 +7,7 @@ export default function PlayerDetail() {
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
-  const id = Number(params.id);
+  const id = params.id ?? "";
   const { data: player, isLoading } = useGetPlayer(id, { query: { enabled: !!id, queryKey: getGetPlayerQueryKey(id) } });
   const suspendPlayer = useSuspendPlayer();
 
@@ -28,10 +28,14 @@ export default function PlayerDetail() {
     : "0.0";
 
   const statusMap: Record<string, string> = {
-    online: "bg-green-100 text-green-700",
-    in_game: "bg-blue-100 text-blue-700",
-    offline: "bg-gray-100 text-gray-500",
+    online:    "bg-green-100 text-green-700",
+    in_game:   "bg-blue-100 text-blue-700",
+    offline:   "bg-gray-100 text-gray-500",
     suspended: "bg-red-100 text-red-700",
+  };
+
+  const statusLabels: Record<string, string> = {
+    online: "Online", in_game: "Em jogo", offline: "Offline", suspended: "Suspenso",
   };
 
   return (
@@ -45,12 +49,13 @@ export default function PlayerDetail() {
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div className="flex items-center gap-5 mb-6">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
-                {player.username[0].toUpperCase()}
+                {(player.username ?? "?")[0].toUpperCase()}
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">{player.username}</h2>
+                {player.email && <div className="text-xs text-gray-400 mt-0.5">{player.email}</div>}
                 <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${statusMap[player.status] ?? "bg-gray-100"}`}>
-                  {player.status}
+                  {statusLabels[player.status] ?? player.status}
                 </span>
               </div>
               <div className="ml-auto">
@@ -69,10 +74,10 @@ export default function PlayerDetail() {
 
             <div className="grid grid-cols-4 gap-4">
               {[
-                { label: "Vitórias", value: player.wins, icon: Trophy, color: "bg-green-100 text-green-600" },
-                { label: "Derrotas", value: player.losses, icon: TrendingUp, color: "bg-red-100 text-red-500" },
-                { label: "Taxa de Vitória", value: `${winRate}%`, icon: TrendingUp, color: "bg-indigo-100 text-indigo-600" },
-                { label: "Total Apostado", value: `R$ ${(player.totalBets ?? 0).toFixed(2)}`, icon: Coins, color: "bg-purple-100 text-purple-600" },
+                { label: "Vitórias",        value: player.wins,                                    icon: Trophy,       color: "bg-green-100 text-green-600"   },
+                { label: "Derrotas",         value: player.losses,                                  icon: TrendingUp,   color: "bg-red-100 text-red-500"       },
+                { label: "Taxa de Vitória",  value: `${winRate}%`,                                  icon: TrendingUp,   color: "bg-indigo-100 text-indigo-600" },
+                { label: "Saldo",            value: `MT ${(player.balance ?? 0).toFixed(2)}`,       icon: Coins,        color: "bg-purple-100 text-purple-600" },
               ].map((stat) => (
                 <div key={stat.label} className="bg-gray-50 rounded-xl p-4">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${stat.color}`}>
@@ -92,7 +97,7 @@ export default function PlayerDetail() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-400">Saldo</span>
-                <span className="font-semibold text-indigo-600">R$ {player.balance.toFixed(2)}</span>
+                <span className="font-semibold text-indigo-600">MT {(player.balance ?? 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400 flex items-center gap-1"><Calendar className="w-3 h-3" /> Membro desde</span>
@@ -100,7 +105,7 @@ export default function PlayerDetail() {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Status</span>
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusMap[player.status]}`}>{player.status}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusMap[player.status] ?? "bg-gray-100"}`}>{statusLabels[player.status] ?? player.status}</span>
               </div>
             </div>
           </div>

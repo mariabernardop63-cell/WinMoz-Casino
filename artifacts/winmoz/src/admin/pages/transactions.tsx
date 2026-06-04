@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListBets, useCancelBet, getListBetsQueryKey } from "@/admin/lib/mock-api";
+import { useListBets, useCancelBet, getListBetsQueryKey } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { XCircle, ArrowLeftRight, ArrowUpRight, ArrowDownLeft, RefreshCw } from "lucide-react";
 
@@ -44,9 +44,9 @@ export default function Transactions() {
   const { data: bets, isLoading } = useListBets(params);
   const cancelBet = useCancelBet();
 
-  const [confirmId, setConfirmId] = useState<number | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
-  function handleCancel(id: number) {
+  function handleCancel(id: string) {
     setConfirmId(id);
   }
 

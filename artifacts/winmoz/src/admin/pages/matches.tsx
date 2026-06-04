@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListMatches } from "@/admin/lib/mock-api";
+import { useListMatches } from "@/admin/lib/supabase-api";
 import { Link } from "wouter";
 import { Gamepad2, ChevronRight, Search } from "lucide-react";
 

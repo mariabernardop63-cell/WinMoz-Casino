@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetRanking } from "@/admin/lib/mock-api";
+import { useGetRanking } from "@/admin/lib/supabase-api";
 import { Trophy, Medal } from "lucide-react";
 
 function RankIcon({ rank }: { rank: number }) {

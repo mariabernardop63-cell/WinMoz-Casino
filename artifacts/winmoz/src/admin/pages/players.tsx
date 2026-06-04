@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListPlayers, useSuspendPlayer, getListPlayersQueryKey } from "@/admin/lib/mock-api";
+import { useListPlayers, useSuspendPlayer, getListPlayersQueryKey } from "@/admin/lib/supabase-api";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { Search, ChevronRight, UserX } from "lucide-react";
@@ -32,7 +32,7 @@ export default function Players() {
     search === "" || p.username.toLowerCase().includes(search.toLowerCase())
   );
 
-  function handleSuspend(id: number) {
+  function handleSuspend(id: string) {
     suspendPlayer.mutate({ id, data: { reason: "Violação dos termos de uso" } }, {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: getListPlayersQueryKey() })
     });
@@ -104,7 +104,7 @@ export default function Players() {
                         {p.status !== "suspended" && (
                           <button
                             data-testid={`button-suspend-${p.id}`}
-                            onClick={() => handleSuspend(p.id)}
+                            onClick={() => handleSuspend(p.id as string)}
                             disabled={suspendPlayer.isPending}
                             title="Suspender jogador"
                             className="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors"

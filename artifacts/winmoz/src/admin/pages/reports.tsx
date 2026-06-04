@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListReports, useResolveReport, getListReportsQueryKey } from "@/admin/lib/mock-api";
+import { useListReports, useResolveReport, getListReportsQueryKey } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, XCircle, Flag, Bug, CreditCard, User, HelpCircle, AlertTriangle } from "lucide-react";
 
@@ -37,13 +37,13 @@ function CategoryIcon({ category }: { category?: string }) {
 
 export default function Reports() {
   const [statusFilter, setStatusFilter] = useState("all");
-  const [confirmAction, setConfirmAction] = useState<{ id: number; action: "reviewed" | "dismissed" } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{ id: string; action: "reviewed" | "dismissed" } | null>(null);
   const queryClient = useQueryClient();
   const params = statusFilter !== "all" ? { status: statusFilter as "pending" | "reviewed" | "dismissed" } : {};
   const { data: reports, isLoading } = useListReports(params);
   const resolveReport = useResolveReport();
 
-  function handleAction(id: number, action: "reviewed" | "dismissed") {
+  function handleAction(id: string, action: "reviewed" | "dismissed") {
     setConfirmAction({ id, action });
   }
 
@@ -208,7 +208,7 @@ export default function Reports() {
                     {r.status === "pending" && (
                       <div className="flex items-center gap-2 flex-shrink-0">
                         <button data-testid={`button-review-${r.id}`}
-                          onClick={() => handleAction(r.id, "reviewed")}
+                          onClick={() => handleAction(r.id as string, "reviewed")}
                           disabled={resolveReport.isPending}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold transition-all hover:shadow-md"
                           style={{ background: "rgba(16,185,129,.08)", color: "#059669", border: "1px solid rgba(16,185,129,.2)" }}
@@ -217,7 +217,7 @@ export default function Reports() {
                           Aprovar
                         </button>
                         <button data-testid={`button-dismiss-${r.id}`}
-                          onClick={() => handleAction(r.id, "dismissed")}
+                          onClick={() => handleAction(r.id as string, "dismissed")}
                           disabled={resolveReport.isPending}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold transition-all hover:shadow-md"
                           style={{ background: "rgba(0,0,0,.04)", color: "#6b7280", border: "1px solid rgba(0,0,0,.08)" }}

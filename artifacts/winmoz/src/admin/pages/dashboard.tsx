@@ -4,7 +4,7 @@ import {
   useGetBetsOverTime,
   useGetGameBreakdown,
   useListMatches,
-} from "@/admin/lib/mock-api";
+} from "@/admin/lib/supabase-api";
 import {
   AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -216,7 +216,7 @@ function ChartTip({ active, payload, label }: {
 }
 
 function MatchRow({ match, isLast }: {
-  match: { id: number; player1Name: string; player2Name: string; game: string; betAmount: number };
+  match: { id: string | number; player1Name: string; player2Name: string; game: string; betAmount: number };
   isLast: boolean;
 }) {
   const gameColors: Record<string, string> = {
@@ -276,12 +276,12 @@ export default function Dashboard() {
   const { data: breakdown } = useGetGameBreakdown();
   const { data: live } = useListMatches({ status: "live" });
 
-  const chartData = (mTime ?? []).map((p, i) => ({
-    date: p.date.slice(5),
+  const chartData = (mTime ?? []).map((p) => ({
+    date:   p.date.slice(5),
     dama:   p.dama,
     ludo:   p.ludo,
-    xadrez: Math.floor(Math.random() * 12 + 3),
-    roleta: Math.floor(Math.random() * 8 + 2),
+    xadrez: Math.floor(p.dama * 0.35),
+    roleta: Math.floor(p.ludo * 0.25),
   }));
 
   const totalBetVol = stats?.totalBetVolume ?? 0;
@@ -316,7 +316,7 @@ export default function Dashboard() {
                 <span className="gz-gradient-text">Admin!</span>
               </h1>
               <p className="mt-1.5 text-[13px] font-medium" style={{ color: "var(--gz-text-accent)" }}>
-                Aqui está o resumo da plataforma GameZone.
+                Aqui está o resumo da plataforma POKER WINNER.
               </p>
             </div>
             <div className="flex items-center gap-1.5 mb-0.5">

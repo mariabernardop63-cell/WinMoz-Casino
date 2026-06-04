@@ -26,7 +26,7 @@ export default function Settings() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Administração da plataforma GameZone</p>
+        <p className="text-sm text-gray-500 mt-0.5">Administração da plataforma POKER WINNER</p>
       </div>
 
       <div className="grid grid-cols-2 gap-6">
@@ -93,7 +93,7 @@ export default function Settings() {
       <div className="mt-6 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white">
         <div className="flex items-center gap-3 mb-2">
           <SettingsIcon className="w-5 h-5" />
-          <div className="font-semibold">GameZone Admin v1.0</div>
+          <div className="font-semibold">POKER WINNER Admin v1.0</div>
         </div>
         <div className="text-sm text-indigo-200">Plataforma multiplayer de Dama e Ludo com apostas em tempo real.</div>
         <div className="flex items-center gap-4 mt-4 text-xs text-indigo-300">

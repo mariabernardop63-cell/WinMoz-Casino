@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListBets, useCancelBet, getListBetsQueryKey } from "@/admin/lib/mock-api";
+import { useListBets, useCancelBet, getListBetsQueryKey } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { XCircle } from "lucide-react";
 
@@ -24,7 +24,7 @@ export default function Bets() {
   const { data: bets, isLoading } = useListBets(params);
   const cancelBet = useCancelBet();
 
-  function handleCancel(id: number) {
+  function handleCancel(id: string) {
     cancelBet.mutate({ id }, {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: getListBetsQueryKey() })
     });

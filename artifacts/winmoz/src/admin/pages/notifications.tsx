@@ -11,7 +11,7 @@ const V1 = "#6C5CE7";
 type Tab = "criar" | "anuncios" | "agendadas" | "historico";
 
 const SENT_HISTORY = [
-  { id: 1, title: "Bem-vindo ao GameZone!",      target: "Todos",          sent: "2025-06-01 09:00", reached: 1240 },
+  { id: 1, title: "Bem-vindo ao POKER WINNER!",   target: "Todos",          sent: "2025-06-01 09:00", reached: 1240 },
   { id: 2, title: "Novo jogo: Roleta da Sorte",  target: "Online",         sent: "2025-05-28 18:30", reached:  312 },
   { id: 3, title: "Saque processado",            target: "Específico",     sent: "2025-05-25 14:00", reached:    1 },
   { id: 4, title: "Torneio de Dama — amanhã!",  target: "Todos",          sent: "2025-05-20 20:00", reached: 980  },

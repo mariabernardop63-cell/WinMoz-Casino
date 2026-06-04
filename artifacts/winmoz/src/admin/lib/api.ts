@@ -101,7 +101,7 @@ const MOCK_ADMIN_PROFILE: AdminProfile = {
   id: 1,
   name: "Administrador Principal",
   username: "admin",
-  email: "admin@gamezone.pt",
+  email: "nexialonemz@gmail.com",
   phone: "+351 912 345 678",
   role: "super_admin",
   avatarUrl: null,

@@ -1,4 +1,4 @@
-import { useGetAntiFraudAlerts } from "@/admin/lib/mock-api";
+import { useGetAntiFraudAlerts } from "@/admin/lib/supabase-api";
 import { ShieldAlert, AlertTriangle, AlertOctagon, Info } from "lucide-react";
 
 function SeverityBadge({ severity }: { severity: string }) {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListWithdrawals, useApproveWithdrawal, useRejectWithdrawal, getListWithdrawalsQueryKey } from "@/admin/lib/mock-api";
+import { useListWithdrawals, useApproveWithdrawal, useRejectWithdrawal, getListWithdrawalsQueryKey } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, XCircle, Landmark } from "lucide-react";
 
@@ -25,13 +25,13 @@ export default function Withdrawals() {
   const approveWithdrawal = useApproveWithdrawal();
   const rejectWithdrawal  = useRejectWithdrawal();
 
-  const [confirmModal, setConfirmModal] = useState<{ id: number; type: ConfirmType; playerName: string; amount: number } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ id: string; type: ConfirmType; playerName: string; amount: number } | null>(null);
 
-  function handleApprove(id: number, playerName: string, amount: number) {
+  function handleApprove(id: string, playerName: string, amount: number) {
     setConfirmModal({ id, type: "approve", playerName, amount });
   }
 
-  function handleReject(id: number, playerName: string, amount: number) {
+  function handleReject(id: string, playerName: string, amount: number) {
     setConfirmModal({ id, type: "reject", playerName, amount });
   }
 
@@ -171,7 +171,7 @@ export default function Withdrawals() {
                       {w.status === "pending" && (
                         <div className="flex items-center gap-2">
                           <button data-testid={`button-approve-${w.id}`}
-                            onClick={() => handleApprove(w.id, w.playerName, w.amount)}
+                            onClick={() => handleApprove(w.id as string, w.playerName, w.amount)}
                             disabled={approveWithdrawal.isPending || rejectWithdrawal.isPending}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11.5px] font-bold transition-all hover:shadow-md"
                             style={{ background: "rgba(16,185,129,.08)", color: "#059669", border: "1px solid rgba(16,185,129,.2)" }}
@@ -180,7 +180,7 @@ export default function Withdrawals() {
                             Aprovar
                           </button>
                           <button data-testid={`button-reject-${w.id}`}
-                            onClick={() => handleReject(w.id, w.playerName, w.amount)}
+                            onClick={() => handleReject(w.id as string, w.playerName, w.amount)}
                             disabled={approveWithdrawal.isPending || rejectWithdrawal.isPending}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11.5px] font-bold transition-all hover:shadow-md"
                             style={{ background: "rgba(239,68,68,.06)", color: "#ef4444", border: "1px solid rgba(239,68,68,.16)" }}
