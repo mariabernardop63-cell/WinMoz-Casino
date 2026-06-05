@@ -409,7 +409,7 @@ function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQui
 // ─── Main Game Component ──────────────────────────────────────────────────────
 export default function DamasGame() {
   const [, setLocation] = useLocation();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
 
   const sp = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const gameId   = sp.get("gameId") ?? "local";
@@ -473,6 +473,7 @@ export default function DamasGame() {
           if (data) {
             await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) + payout }).eq("id", profile.id);
             await supabase.from("transactions").insert({ user_id: profile.id, type: "win", amount: payout, description: `Vitória de jogo (Damas) +${payout} MT`, status: "approved" });
+            await refreshProfile();
           }
         }
         // Update match record as finished (only player "w" to avoid duplicate updates)
@@ -630,6 +631,7 @@ export default function DamasGame() {
             if(data){
               await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
               await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta de jogo (Damas)", status: "approved" });
+              await refreshProfile();
             }
           }catch{ betDeductedRef.current = false; }
         }

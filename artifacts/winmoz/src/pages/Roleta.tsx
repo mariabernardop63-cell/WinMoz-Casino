@@ -284,7 +284,7 @@ const FREE_SPINS_INITIAL = 3;
 
 export default function Roleta() {
   const [, setLocation] = useLocation();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<typeof SECTORS[0] | null>(null);
@@ -325,13 +325,15 @@ export default function Roleta() {
     if (freeSpinsLeft > 0) {
       setFreeSpinsLeft(s => s - 1);
     } else {
-      // Paid spin: deduct 5 MT
-      if (balance < PAID_SPIN_COST) return;
-      const newBal = balance - PAID_SPIN_COST;
+      // Paid spin: read fresh balance from Supabase, then deduct
+      if (!profile?.id) return;
+      const { data: freshData } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+      const freshBal = freshData ? parseFloat(String(freshData.balance)) : balance;
+      if (freshBal < PAID_SPIN_COST) return;
+      const newBal = Math.round((freshBal - PAID_SPIN_COST) * 100) / 100;
       setLocalBalance(newBal);
-      if (profile?.id) {
-        await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
-      }
+      await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
+      await refreshProfile();
     }
 
     setSpinning(true);

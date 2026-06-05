@@ -431,12 +431,22 @@ function MatchmakingScreen({
     };
 
     channel.on("presence", { event: "sync" }, tryMatch);
-    channel.on("presence", { event: "join" },  tryMatch);
+    channel.on("presence", { event: "join" }, () => {
+      // Small delay to ensure presenceState is updated before checking
+      setTimeout(tryMatch, 150);
+    });
     channel.subscribe(async (status) => {
-      if (status === "SUBSCRIBED") await channel.track({ userId, displayName });
+      if (status === "SUBSCRIBED") {
+        await channel.track({ userId, displayName });
+        // Initial check in case both users subscribed at similar times
+        setTimeout(tryMatch, 300);
+      }
     });
 
-    return () => { supabase.removeChannel(channel); channelRef.current = null; };
+    // Polling fallback: re-check presence every 3 s in case events were missed
+    const poll = setInterval(() => { if (!matchedRef.current) tryMatch(); }, 3000);
+
+    return () => { clearInterval(poll); supabase.removeChannel(channel); channelRef.current = null; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -1047,7 +1047,7 @@ function WinScreen({ winner, winnerName, loserName, betAmount, isWinner, onRepla
 // ─── Main Game Component ────────────────────────────────────────────────────────
 export default function LudoGame() {
   const [,setLocation] = useLocation();
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
 
   // ── URL params ─────────────────────────────────────────────────────────────────
   const searchParams = new URLSearchParams(
@@ -1145,6 +1145,7 @@ export default function LudoGame() {
               description: `Vitória de jogo (Ludo) +${payout} MT`,
               status: "approved",
             });
+            await refreshProfile();
           }
         }
         // Only "blue" (first player) updates the match record
@@ -1476,6 +1477,7 @@ export default function LudoGame() {
                 description: "Aposta de jogo (Ludo)",
                 status: "approved",
               });
+              await refreshProfile();
             }
           } catch { betDeductedRef.current = false; }
         }

@@ -793,7 +793,7 @@ function ChessBoard({board,selected,legalDests,lastMove,checkSquare,myColor,onSq
 // ─── Main Chess Game Component ──────────────────────────────────────────────────
 export default function ChessGame(){
   const[,setLocation]=useLocation();
-  const{profile}=useAuth();
+  const{profile,refreshProfile}=useAuth();
 
   const sp=new URLSearchParams(typeof window!=="undefined"?window.location.search:"");
   const gameId=sp.get("gameId")??"local";
@@ -849,6 +849,7 @@ export default function ChessGame(){
         if(data){
           await supabase.from("profiles").update({balance:parseFloat(String(data.balance))+payout}).eq("id",profile.id);
           await supabase.from("transactions").insert({user_id:profile.id,type:"win",amount:payout,description:`Vitória de jogo (Xadrez) +${payout} MT`,status:"approved"});
+          await refreshProfile();
         }
       }catch{winCreditedRef.current=false;}
     })();
@@ -1006,6 +1007,7 @@ export default function ChessGame(){
             if(data){
               await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
               await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de jogo (Xadrez)",status:"approved"});
+              await refreshProfile();
             }
           }catch{betDeductedRef.current=false;}
         }
