@@ -1,6 +1,15 @@
 import { useQuery, useMutation, useQueryClient, useQueryClient as useQC } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 import { useEffect } from "react";
+
+const _adminUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "https://placeholder.supabase.co";
+const _adminKey = (import.meta.env.VITE_SUPABASE_SERVICE_ROLE as string)
+  || (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
+  || "placeholder";
+const adminSupabase = createClient(_adminUrl, _adminKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
 
 /* ──────────────────────────────────────────────────────────────
    SUPABASE-BACKED ADMIN API
@@ -50,7 +59,6 @@ export function useGetDashboardStats() {
       today.setHours(0, 0, 0, 0);
       const todayISO = today.toISOString();
 
-      // Each query runs independently — a missing table returns 0, never crashes
       const safeCount = async (q: Promise<{ count: number | null; error: unknown }>) => {
         try { const r = await q; return r.count ?? 0; } catch { return 0; }
       };
@@ -60,35 +68,40 @@ export function useGetDashboardStats() {
 
       const [
         totalPlayers,
-        activeBets,
         onlineProfiles,
         pendingWithdrawalsData,
         approvedWithdrawalsData,
         todayWithdrawalsData,
         txToday,
-        earningsData,
-        earningsTodayData,
+        allBetsData,
+        allWinsData,
+        todayBetsData,
+        todayWinsData,
         pendingReportsData,
       ] = await Promise.all([
-        safeCount(supabase.from("profiles").select("*", { count: "exact", head: true }) as any),
-        safeCount(supabase.from("matches").select("*", { count: "exact", head: true })
-          .in("status", ["active", "live", "in_progress"]) as any),
-        safeData(supabase.from("profiles").select("last_seen_at")
+        safeCount(adminSupabase.from("profiles").select("*", { count: "exact", head: true }) as any),
+        safeData(adminSupabase.from("profiles").select("last_seen_at")
           .gte("last_seen_at", new Date(Date.now() - 2 * 60 * 1000).toISOString()) as any),
-        safeData(supabase.from("transactions").select("id")
+        safeData(adminSupabase.from("transactions").select("id")
           .eq("type", "withdrawal").eq("status", "pending") as any),
-        safeData(supabase.from("transactions").select("amount")
+        safeData(adminSupabase.from("transactions").select("amount")
           .eq("type", "withdrawal").eq("status", "approved") as any),
-        safeData(supabase.from("transactions").select("amount")
+        safeData(adminSupabase.from("transactions").select("amount")
           .eq("type", "withdrawal").eq("status", "approved")
           .gte("created_at", todayISO) as any),
-        safeData(supabase.from("matches").select("id")
+        safeData(adminSupabase.from("transactions").select("id")
+          .eq("type", "bet").gte("created_at", todayISO) as any),
+        safeData(adminSupabase.from("transactions").select("amount")
+          .eq("type", "bet").eq("status", "approved") as any),
+        safeData(adminSupabase.from("transactions").select("amount")
+          .eq("type", "win").eq("status", "approved") as any),
+        safeData(adminSupabase.from("transactions").select("amount")
+          .eq("type", "bet").eq("status", "approved")
           .gte("created_at", todayISO) as any),
-        safeData(supabase.from("matches").select("bet_amount")
-          .eq("status", "finished") as any),
-        safeData(supabase.from("matches").select("bet_amount")
-          .eq("status", "finished").gte("created_at", todayISO) as any),
-        safeData(supabase.from("reports").select("id").eq("status", "open") as any),
+        safeData(adminSupabase.from("transactions").select("amount")
+          .eq("type", "win").eq("status", "approved")
+          .gte("created_at", todayISO) as any),
+        safeData(adminSupabase.from("reports").select("id").eq("status", "open") as any),
       ]);
 
       const pendingWithdrawals = (pendingWithdrawalsData as unknown[]).length;
@@ -96,11 +109,22 @@ export function useGetDashboardStats() {
         .reduce((s, w) => s + Math.abs(Number(w.amount ?? 0)), 0);
       const todaySaidas = (todayWithdrawalsData as { amount: number }[])
         .reduce((s, w) => s + Math.abs(Number(w.amount ?? 0)), 0);
-      // 10% da aposta total (bet_amount * 2) por partida terminada
-      const platformRevenue = (earningsData as { bet_amount: number }[])
-        .reduce((s, m) => s + Number(m.bet_amount ?? 0) * 0.2, 0);
-      const todayEarnings = (earningsTodayData as { bet_amount: number }[])
-        .reduce((s, m) => s + Number(m.bet_amount ?? 0) * 0.2, 0);
+
+      // Receita da plataforma = total apostado - total pago aos vencedores
+      const totalBets = (allBetsData as { amount: number }[])
+        .reduce((s, t) => s + Math.abs(Number(t.amount ?? 0)), 0);
+      const totalWins = (allWinsData as { amount: number }[])
+        .reduce((s, t) => s + Math.abs(Number(t.amount ?? 0)), 0);
+      const platformRevenue = Math.max(0, totalBets - totalWins);
+
+      const todayBets = (todayBetsData as { amount: number }[])
+        .reduce((s, t) => s + Math.abs(Number(t.amount ?? 0)), 0);
+      const todayWins = (todayWinsData as { amount: number }[])
+        .reduce((s, t) => s + Math.abs(Number(t.amount ?? 0)), 0);
+      const todayEarnings = Math.max(0, todayBets - todayWins);
+
+      // Active bets: pending bet transactions (game in progress)
+      const activeBets = (txToday as unknown[]).length;
 
       return {
         liveMatches:              activeBets,
@@ -134,10 +158,12 @@ export function useGetMatchesOverTime() {
         const end   = new Date(d); end.setHours(23, 59, 59, 999);
 
         const [{ count: dama }, { count: ludo }] = await Promise.all([
-          supabase.from("matches").select("*", { count: "exact", head: true })
-            .eq("game_type", "dama").gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
-          supabase.from("matches").select("*", { count: "exact", head: true })
-            .eq("game_type", "ludo").gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
+          adminSupabase.from("transactions").select("*", { count: "exact", head: true })
+            .eq("type", "bet").ilike("description", "%Dama%")
+            .gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
+          adminSupabase.from("transactions").select("*", { count: "exact", head: true })
+            .eq("type", "bet").ilike("description", "%Ludo%")
+            .gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
         ]);
         days.push({ date: start.toISOString().slice(0, 10), dama: dama ?? 0, ludo: ludo ?? 0 });
       }
@@ -159,13 +185,15 @@ export function useGetBetsOverTime() {
         const end   = new Date(d); end.setHours(23, 59, 59, 999);
 
         const [{ data: damaData }, { data: ludoData }] = await Promise.all([
-          supabase.from("matches").select("bet_amount")
-            .eq("game_type", "dama").gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
-          supabase.from("matches").select("bet_amount")
-            .eq("game_type", "ludo").gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
+          adminSupabase.from("transactions").select("amount")
+            .eq("type", "bet").ilike("description", "%Dama%")
+            .gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
+          adminSupabase.from("transactions").select("amount")
+            .eq("type", "bet").ilike("description", "%Ludo%")
+            .gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
         ]);
-        const dama = (damaData ?? []).reduce((s: number, m: { bet_amount: number }) => s + (m.bet_amount ?? 0), 0);
-        const ludo = (ludoData ?? []).reduce((s: number, m: { bet_amount: number }) => s + (m.bet_amount ?? 0), 0);
+        const dama = (damaData ?? []).reduce((s: number, m: { amount: number }) => s + Math.abs(m.amount ?? 0), 0);
+        const ludo = (ludoData ?? []).reduce((s: number, m: { amount: number }) => s + Math.abs(m.amount ?? 0), 0);
         days.push({ date: start.toISOString().slice(0, 10), dama, ludo });
       }
       return days;
@@ -184,14 +212,14 @@ export function useGetGameBreakdown() {
         { count: xadrezMatches, data: xadrezData },
         { count: roletaMatches, data: roletaData },
       ] = await Promise.all([
-        supabase.from("matches").select("bet_amount", { count: "exact" }).eq("game_type", "dama"),
-        supabase.from("matches").select("bet_amount", { count: "exact" }).eq("game_type", "ludo"),
-        supabase.from("matches").select("bet_amount", { count: "exact" }).eq("game_type", "xadrez"),
-        supabase.from("matches").select("bet_amount", { count: "exact" }).eq("game_type", "roleta"),
+        adminSupabase.from("transactions").select("amount", { count: "exact" }).eq("type", "bet").ilike("description", "%Dama%"),
+        adminSupabase.from("transactions").select("amount", { count: "exact" }).eq("type", "bet").ilike("description", "%Ludo%"),
+        adminSupabase.from("transactions").select("amount", { count: "exact" }).eq("type", "bet").ilike("description", "%Xadrez%"),
+        adminSupabase.from("transactions").select("amount", { count: "exact" }).eq("type", "bet").ilike("description", "%Roleta%"),
       ]);
 
-      const sum = (arr: { bet_amount: number }[] | null) =>
-        (arr ?? []).reduce((s, m) => s + (m.bet_amount ?? 0), 0);
+      const sum = (arr: { amount: number }[] | null) =>
+        (arr ?? []).reduce((s, m) => s + Math.abs(m.amount ?? 0), 0);
 
       const dm = damaMatches   ?? 0;
       const lm = ludoMatches   ?? 0;
@@ -204,10 +232,10 @@ export function useGetGameBreakdown() {
         ludoMatches:    lm,
         xadrezMatches:  xadrezMatches  ?? 0,
         roletaMatches:  roletaMatches  ?? 0,
-        damaBetVolume:  sum(damaData   as { bet_amount: number }[]),
-        ludoBetVolume:  sum(ludoData   as { bet_amount: number }[]),
-        xadrezBetVolume: sum(xadrezData as { bet_amount: number }[]),
-        roletaBetVolume: sum(roletaData as { bet_amount: number }[]),
+        damaBetVolume:  sum(damaData   as { amount: number }[]),
+        ludoBetVolume:  sum(ludoData   as { amount: number }[]),
+        xadrezBetVolume: sum(xadrezData as { amount: number }[]),
+        roletaBetVolume: sum(roletaData as { amount: number }[]),
       };
     },
     staleTime: 60000,
@@ -243,23 +271,133 @@ function mapMatch(m: Record<string, unknown>): AdminMatch {
   };
 }
 
+function parseTxGameType(description: string): string {
+  const d = (description ?? "").toLowerCase();
+  if (d.includes("xadrez")) return "xadrez";
+  if (d.includes("ludo"))   return "ludo";
+  if (d.includes("roleta")) return "roleta";
+  if (d.includes("dama") || d.includes("damas")) return "dama";
+  return "dama";
+}
+
 export function useListMatches(params?: { status?: string; game?: string }) {
   return useQuery({
     queryKey: ["matches", params],
     queryFn: async () => {
-      let q = supabase.from("matches").select("*").order("created_at", { ascending: false }).limit(200);
-      if (params?.status && params.status !== "all") {
-        // "live" or "active" means in-progress matches
-        if (params.status === "live" || params.status === "active") {
-          q = q.in("status", ["active", "live", "in_progress"]);
+      // Reconstruct matches from transaction pairs (bets within ~60s of each other)
+      const [{ data: bets }, { data: wins }, { data: profiles }] = await Promise.all([
+        adminSupabase.from("transactions")
+          .select("id, user_id, amount, description, created_at")
+          .eq("type", "bet").eq("status", "approved")
+          .order("created_at", { ascending: true })
+          .limit(600),
+        adminSupabase.from("transactions")
+          .select("id, user_id, amount, description, created_at")
+          .eq("type", "win").eq("status", "approved"),
+        adminSupabase.from("profiles")
+          .select("id, full_name, phone"),
+      ]);
+
+      const profileName = (id: string) => {
+        const p = (profiles ?? []).find((x: Record<string, unknown>) => x.id === id);
+        return (p as Record<string, unknown> | undefined)?.full_name as string
+          || (p as Record<string, unknown> | undefined)?.phone as string
+          || "—";
+      };
+
+      const matched = new Set<string>();
+      const matchList: AdminMatch[] = [];
+      const sortedBets = (bets ?? []) as Record<string, unknown>[];
+
+      for (let i = 0; i < sortedBets.length; i++) {
+        if (matched.has(sortedBets[i].id as string)) continue;
+        const b1 = sortedBets[i];
+        const game = parseTxGameType(b1.description as string);
+        const t1 = new Date(b1.created_at as string).getTime();
+        const amt1 = Math.abs(Number(b1.amount));
+
+        // Look for a second bet from a different user within 60 seconds, same amount & game
+        let b2: Record<string, unknown> | null = null;
+        for (let j = i + 1; j < sortedBets.length; j++) {
+          if (matched.has(sortedBets[j].id as string)) continue;
+          const b = sortedBets[j];
+          const timeDiff = Math.abs(new Date(b.created_at as string).getTime() - t1);
+          if (timeDiff > 60000) break;
+          if (
+            b.user_id !== b1.user_id &&
+            Math.abs(Number(b.amount)) === amt1 &&
+            parseTxGameType(b.description as string) === game
+          ) {
+            b2 = b;
+            break;
+          }
+        }
+
+        if (b2) {
+          matched.add(b1.id as string);
+          matched.add(b2.id as string);
+
+          // Find win transaction for this match (within 10 minutes after bets)
+          const winTx = (wins ?? []).find((w: Record<string, unknown>) => {
+            const wt = new Date(w.created_at as string).getTime();
+            const delta = wt - t1;
+            return (w.user_id === b1.user_id || w.user_id === b2!.user_id)
+              && delta >= -5000 && delta <= 600000;
+          }) as Record<string, unknown> | undefined;
+
+          const status: AdminMatch["status"] = winTx ? "finished" : "active";
+          matchList.push({
+            id: b1.id as string,
+            game,
+            player1Name: profileName(b1.user_id as string),
+            player2Name: profileName(b2.user_id as string),
+            betAmount: amt1,
+            status,
+            winnerName: winTx ? profileName(winTx.user_id as string) : null,
+            winnerId: (winTx?.user_id as string) ?? null,
+            createdAt: b1.created_at as string,
+            durationSeconds: winTx
+              ? Math.round((new Date(winTx.created_at as string).getTime() - t1) / 1000)
+              : null,
+          });
         } else {
-          q = q.eq("status", params.status);
+          // Solo bet (creating or waiting for opponent)
+          matched.add(b1.id as string);
+          matchList.push({
+            id: b1.id as string,
+            game,
+            player1Name: profileName(b1.user_id as string),
+            player2Name: "—",
+            betAmount: amt1,
+            status: "pending",
+            winnerName: null,
+            winnerId: null,
+            createdAt: b1.created_at as string,
+            durationSeconds: null,
+          });
         }
       }
-      if (params?.game && params.game !== "all") q = q.eq("game_type", params.game);
-      const { data, error } = await q;
-      if (error) return [];
-      return (data ?? []).map(m => mapMatch(m as Record<string, unknown>));
+
+      // Most recent first
+      let result = matchList.reverse();
+
+      if (params?.status && params.status !== "all") {
+        const fs = params.status;
+        if (fs === "live" || fs === "active") {
+          result = result.filter(m => m.status === "active");
+        } else if (fs === "finished") {
+          result = result.filter(m => m.status === "finished");
+        } else if (fs === "pending") {
+          result = result.filter(m => m.status === "pending");
+        } else if (fs === "cancelled") {
+          result = result.filter(m => (m.status as string) === "cancelled");
+        }
+      }
+      if (params?.game && params.game !== "all") {
+        result = result.filter(m => m.game === params.game);
+      }
+
+      return result;
     },
     refetchInterval: 10000,
     staleTime: 3000,
@@ -271,7 +409,7 @@ export function useGetMatch(id: string, _opts?: unknown) {
     queryKey: ["match", id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase.from("matches").select("*").eq("id", id).single();
+      const { data, error } = await adminSupabase.from("matches").select("*").eq("id", id).single();
       if (error) return null;
       return mapMatch(data as Record<string, unknown>);
     },
@@ -327,14 +465,14 @@ function mapPlayer(p: Record<string, unknown>): AdminPlayer {
 
   return {
     id:         p.id as string,
-    username:   (p.username as string)  ?? (p.full_name as string) ?? "utilizador",
+    username:   (p.full_name as string) ?? (p.phone as string) ?? "utilizador",
     status,
     balance:    (p.balance as number)   ?? 0,
     wins,
     losses,
     totalBets:  0,
     createdAt:  p.created_at as string,
-    email:      p.email as string | undefined,
+    email:      (p.phone as string | undefined),
     isBlocked:  blocked,
   };
 }
@@ -363,7 +501,7 @@ export function useGetPlayer(id: string, _opts?: unknown) {
     queryKey: ["player", id],
     queryFn: async () => {
       if (!id) return null;
-      const { data, error } = await supabase.from("profiles").select("*").eq("id", id).single();
+      const { data, error } = await adminSupabase.from("profiles").select("*").eq("id", id).single();
       if (error) return null;
       return mapPlayer(data as Record<string, unknown>);
     },
@@ -376,12 +514,12 @@ export function useSuspendPlayer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: { reason: string } }) => {
-      const { error } = await supabase
+      const { error } = await adminSupabase
         .from("profiles")
         .update({ is_blocked: true, block_type: "account" })
         .eq("id", id);
       if (error) throw error;
-      await supabase.from("blocked_users").insert({
+      await adminSupabase.from("blocked_users").insert({
         user_id: id,
         block_type: "account",
         reason: data.reason,
@@ -396,32 +534,47 @@ export function useSuspendPlayer() {
   });
 }
 
-/* ── Bets (treated as matches for now) ── */
+/* ── Bets (from transactions table) ── */
 export function useListBets(params?: { status?: string }) {
   return useQuery({
     queryKey: ["bets", params],
     queryFn: async () => {
-      let q = supabase.from("matches")
-        .select("id, game_type, player1_name, player2_name, bet_amount, winner_payout, status, created_at")
+      let q = adminSupabase.from("transactions")
+        .select("id, user_id, type, amount, description, status, created_at")
+        .in("type", ["bet", "win"])
         .order("created_at", { ascending: false })
         .limit(100);
 
       if (params?.status && params.status !== "all") {
-        if (params.status === "active")    q = q.in("status", ["active", "pending"]);
-        if (params.status === "settled")   q = q.eq("status", "finished");
-        if (params.status === "cancelled") q = q.eq("status", "cancelled");
+        if (params.status === "active")    q = q.eq("status", "pending");
+        if (params.status === "settled")   q = q.eq("status", "approved");
+        if (params.status === "cancelled") q = q.eq("status", "rejected");
       }
 
       const { data, error } = await q;
       if (error) return [];
-      return (data ?? []).map((m: Record<string, unknown>) => ({
+
+      const rows = (data ?? []) as Record<string, unknown>[];
+      const userIds = [...new Set(rows.map(r => r.user_id as string).filter(Boolean))];
+      let profileMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await adminSupabase.from("profiles").select("id, full_name, phone").in("id", userIds);
+        profileMap = Object.fromEntries(
+          (profiles ?? []).map((p: Record<string, unknown>) => [
+            p.id as string,
+            (p.full_name as string) ?? (p.phone as string) ?? "—",
+          ])
+        );
+      }
+
+      return rows.map((m: Record<string, unknown>) => ({
         id:         m.id as string,
-        playerName: (m.player1_name as string) ?? "—",
-        game:       (m.game_type as string)    ?? "dama",
+        playerName: profileMap[m.user_id as string] ?? "—",
+        game:       parseTxGame(m.description),
         matchId:    m.id as string,
-        amount:     (m.bet_amount as number)   ?? 0,
-        payout:     (m.winner_payout as number) || null,
-        status:     mapBetStatus(m.status as string),
+        amount:     Math.abs(Number(m.amount ?? 0)),
+        payout:     (m.type as string) === "win" ? Math.abs(Number(m.amount ?? 0)) : null,
+        status:     mapBetStatus((m.status as string) === "approved" ? "finished" : (m.status as string)),
         createdAt:  m.created_at as string,
       }));
     },
@@ -478,7 +631,7 @@ export function useListTransactions(params?: { status?: string; type?: string })
   return useQuery({
     queryKey: ["transactions", params],
     queryFn: async () => {
-      let q = supabase
+      let q = adminSupabase
         .from("transactions")
         .select("id, user_id, type, amount, status, description, created_at")
         .order("created_at", { ascending: false })
@@ -504,14 +657,14 @@ export function useListTransactions(params?: { status?: string; type?: string })
 
       let profileMap: Record<string, string> = {};
       if (userIds.length > 0) {
-        const { data: profiles } = await supabase
+        const { data: profiles } = await adminSupabase
           .from("profiles")
-          .select("id, username, full_name")
+          .select("id, full_name, phone")
           .in("id", userIds);
         profileMap = Object.fromEntries(
           (profiles ?? []).map((p: Record<string, unknown>) => [
             p.id as string,
-            (p.username as string) ?? (p.full_name as string) ?? "—",
+            (p.full_name as string) ?? (p.phone as string) ?? "—",
           ])
         );
       }
@@ -543,7 +696,7 @@ export function useCancelBet() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      const { error } = await supabase.from("matches").update({ status: "cancelled" }).eq("id", id);
+      const { error } = await adminSupabase.from("transactions").update({ status: "rejected" }).eq("id", id);
       if (error) throw error;
       return { ok: true };
     },
@@ -556,9 +709,9 @@ export function useGetRanking(_params?: { game?: string }) {
   return useQuery({
     queryKey: ["ranking", _params],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await adminSupabase
         .from("profiles")
-        .select("id, username, total_wins, total_games, balance")
+        .select("id, full_name, phone, total_wins, total_games, balance")
         .order("total_wins", { ascending: false })
         .limit(50);
       if (error) throw error;
@@ -570,7 +723,7 @@ export function useGetRanking(_params?: { game?: string }) {
         return {
           playerId:      p.id as string,
           rank:          i + 1,
-          username:      (p.username as string) ?? "utilizador",
+          username:      (p.full_name as string) ?? (p.phone as string) ?? "utilizador",
           wins,
           losses,
           winRate:       total > 0 ? Math.round((wins / total) * 1000) / 10 : 0,
@@ -622,7 +775,7 @@ export function useListReports(params?: { status?: string }) {
   return useQuery({
     queryKey: ["reports", params],
     queryFn: async () => {
-      let q = supabase.from("reports").select("*").order("created_at", { ascending: false }).limit(100);
+      let q = adminSupabase.from("reports").select("*").order("created_at", { ascending: false }).limit(100);
       if (params?.status && params.status !== "all") {
         const dbStatus = params.status === "pending" ? "open" : params.status === "reviewed" ? "resolved" : "dismissed";
         q = q.eq("status", dbStatus);
@@ -643,7 +796,7 @@ export function useResolveReport() {
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: { action: string; notes: string } }) => {
       const dbStatus = data.action === "reviewed" ? "resolved" : "dismissed";
-      const { error } = await supabase
+      const { error } = await adminSupabase
         .from("reports")
         .update({ status: dbStatus, admin_notes: data.notes, updated_at: new Date().toISOString() })
         .eq("id", id);
@@ -694,7 +847,7 @@ export function useListWithdrawals(params?: { status?: string }) {
   return useQuery({
     queryKey: ["withdrawals", params],
     queryFn: async () => {
-      let q = supabase
+      let q = adminSupabase
         .from("transactions")
         .select("*")
         .eq("type", "withdrawal")
@@ -717,7 +870,7 @@ export function useApproveWithdrawal() {
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
       // Fetch the transaction and verify it's still pending
-      const { data: txData, error: fetchErr } = await supabase
+      const { data: txData, error: fetchErr } = await adminSupabase
         .from("transactions")
         .select("id, status")
         .eq("id", id)
@@ -728,7 +881,7 @@ export function useApproveWithdrawal() {
       if (tx.status !== "pending") throw new Error("Levantamento já processado");
 
       // Update status to approved
-      const { error } = await supabase
+      const { error } = await adminSupabase
         .from("transactions")
         .update({ status: "approved" })
         .eq("id", id);
@@ -748,7 +901,7 @@ export function useRejectWithdrawal() {
   return useMutation({
     mutationFn: async ({ id, data: _data }: { id: string; data: { reason: string } }) => {
       // Fetch the transaction with balance info
-      const { data: txData, error: fetchErr } = await supabase
+      const { data: txData, error: fetchErr } = await adminSupabase
         .from("transactions")
         .select("id, amount, user_id, status")
         .eq("id", id)
@@ -759,7 +912,7 @@ export function useRejectWithdrawal() {
       if (tx.status !== "pending") throw new Error("Levantamento já processado");
 
       // Update status to rejected
-      const { error: updateErr } = await supabase
+      const { error: updateErr } = await adminSupabase
         .from("transactions")
         .update({ status: "rejected" })
         .eq("id", id);
@@ -769,7 +922,7 @@ export function useRejectWithdrawal() {
       // Restore user balance (the withdrawal amount is stored as negative)
       const withdrawalAmount = Math.abs(Number(tx.amount ?? 0));
       if (withdrawalAmount > 0 && tx.user_id) {
-        const { data: profileData, error: profileErr } = await supabase
+        const { data: profileData, error: profileErr } = await adminSupabase
           .from("profiles")
           .select("balance")
           .eq("id", tx.user_id as string)
@@ -778,7 +931,7 @@ export function useRejectWithdrawal() {
         if (!profileErr && profileData) {
           const profile = profileData as Record<string, unknown>;
           const restored = Math.round((Number(profile.balance ?? 0) + withdrawalAmount) * 100) / 100;
-          await supabase
+          await adminSupabase
             .from("profiles")
             .update({ balance: restored })
             .eq("id", tx.user_id as string);
@@ -804,9 +957,9 @@ export function useGetAntiFraudAlerts() {
         { data: reports },
         { count: suspicious },
       ] = await Promise.all([
-        supabase.from("blocked_users").select("*").eq("is_active", true).limit(50),
-        supabase.from("reports").select("*").eq("status", "open").order("created_at", { ascending: false }).limit(20),
-        supabase.from("reports").select("*", { count: "exact", head: true }).eq("status", "resolved"),
+        adminSupabase.from("blocked_users").select("*").eq("is_active", true).limit(50),
+        adminSupabase.from("reports").select("*").eq("status", "open").order("created_at", { ascending: false }).limit(20),
+        adminSupabase.from("reports").select("*", { count: "exact", head: true }).eq("status", "resolved"),
       ]);
 
       const alerts = (blocked ?? []).map((b: Record<string, unknown>) => ({
@@ -845,7 +998,7 @@ export function useGetPlatformSettings() {
   return useQuery({
     queryKey: ["platform-settings"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("platform_settings").select("*");
+      const { data, error } = await adminSupabase.from("platform_settings").select("*");
       if (error) throw error;
       const map: Record<string, string> = {};
       (data ?? []).forEach((s: { key: string; value: string }) => { map[s.key] = s.value; });
@@ -860,7 +1013,7 @@ export function useUpdatePlatformSetting() {
   return useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase
+      const { error } = await adminSupabase
         .from("platform_settings")
         .update({ value, updated_at: new Date().toISOString(), updated_by: user?.id ?? null })
         .eq("key", key);
@@ -885,7 +1038,7 @@ export function useSendNotification() {
       actionButtonUrl?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("notifications").insert({
+      const { error } = await adminSupabase.from("notifications").insert({
         title:               payload.title,
         subtitle:            payload.subtitle ?? null,
         type:                payload.type ?? "notification",
@@ -1010,7 +1163,7 @@ export function useSendAdminSupportMessage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, userName, content }: { userId: string; userName: string; content: string }) => {
-      const { error } = await supabase.from("support_messages").insert({
+      const { error } = await adminSupabase.from("support_messages").insert({
         user_id: userId,
         user_name: userName,
         sender: "admin",

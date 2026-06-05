@@ -62,15 +62,15 @@ async function searchPlayers(q: string): Promise<PlayerResult[]> {
   if (q.length < 2) return [];
   const { data } = await supabase
     .from("profiles")
-    .select("id, username, full_name, balance, avatar_url")
-    .or(`username.ilike.%${q}%,full_name.ilike.%${q}%,phone.ilike.%${q}%`)
+    .select("id, full_name, phone, balance, avatar_url")
+    .or(`full_name.ilike.%${q}%,phone.ilike.%${q}%`)
     .limit(10);
   return (data ?? []).map(p => ({
     id: p.id as string,
-    username: (p.username || p.full_name || "utilizador") as string,
-    full_name: p.full_name as string | null,
+    username: ((p as Record<string, unknown>).full_name || (p as Record<string, unknown>).phone || "utilizador") as string,
+    full_name: (p as Record<string, unknown>).full_name as string | null,
     balance: Number(p.balance ?? 0),
-    avatar_url: p.avatar_url as string | null,
+    avatar_url: (p as Record<string, unknown>).avatar_url as string | null,
   }));
 }
 
