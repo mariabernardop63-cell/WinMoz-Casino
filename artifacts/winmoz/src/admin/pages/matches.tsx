@@ -131,7 +131,7 @@ export default function Matches() {
                         <span className="font-medium text-gray-800">{m.player2Name}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 font-semibold text-gray-800">R$ {m.betAmount.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 font-semibold text-gray-800">MT {m.betAmount.toFixed(2)}</td>
                     <td className="px-5 py-3.5"><StatusBadge status={m.status} /></td>
                     <td className="px-5 py-3.5 text-gray-600">{m.winnerName ?? <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs">{new Date(m.createdAt).toLocaleDateString("pt-BR")}</td>

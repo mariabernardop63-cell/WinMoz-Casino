@@ -4,6 +4,7 @@ import {
   useGetBetsOverTime,
   useGetGameBreakdown,
   useListMatches,
+  useAdminRealtimeSync,
 } from "@/admin/lib/supabase-api";
 import {
   AreaChart, Area,
@@ -270,11 +271,13 @@ function ActionItem({ icon: Icon, title, sub, done }: {
 }
 
 export default function Dashboard() {
+  useAdminRealtimeSync();
+
   const { data: stats, isLoading: sLoad } = useGetDashboardStats();
   const { data: mTime } = useGetMatchesOverTime();
   const { data: bTime } = useGetBetsOverTime();
   const { data: breakdown } = useGetGameBreakdown();
-  const { data: live } = useListMatches({ status: "live" });
+  const { data: live } = useListMatches({ status: "active" });
 
   const chartData = (mTime ?? []).map((p) => ({
     date:   p.date.slice(5),
@@ -284,8 +287,8 @@ export default function Dashboard() {
     roleta: Math.floor(p.ludo * 0.25),
   }));
 
-  const totalBetVol = stats?.totalBetVolume ?? 0;
-  const saidas = totalBetVol * 0.28;
+  const platformRevenue = stats?.platformRevenue ?? 0;
+  const totalApprovedWithdrawals = stats?.totalApprovedWithdrawals ?? 0;
 
   const damaM   = breakdown?.damaMatches ?? 0;
   const ludoM   = breakdown?.ludoMatches ?? 0;
@@ -294,10 +297,10 @@ export default function Dashboard() {
   const totalM  = damaM + ludoM + xadrezM + roletaM;
 
   const dailyStats = [
-    { label: "Ganho hoje",      value: `MT ${(totalBetVol * 0.05).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: TrendingUp,  color: "#059669" },
-    { label: "Transações",      value: (stats?.activeBets ?? 0) + 24,    icon: ArrowLeftRight, color: V1 },
+    { label: "Ganho hoje",      value: `MT ${(stats?.todayEarnings ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: TrendingUp,  color: "#059669" },
+    { label: "Transações",      value: stats?.todayTransactions ?? 0,    icon: ArrowLeftRight, color: V1 },
     { label: "Usuários Online", value: stats?.onlinePlayers ?? 0,        icon: Users,          color: "#0ea5e9" },
-    { label: "Saídas",          value: `MT ${saidas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: ArrowDownLeft, color: "#ef4444" },
+    { label: "Saídas",          value: `MT ${(stats?.todaySaidas ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: ArrowDownLeft, color: "#ef4444" },
   ];
 
   return (
@@ -335,13 +338,15 @@ export default function Dashboard() {
         <div className="flex gap-4">
           <MoneyCard
             label="Saldo disponível"
-            value={`MT ${totalBetVol.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
+            value={`MT ${platformRevenue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
             icon={Wallet}
+            suffix="Lucro total da plataforma (apostas + taxas)"
           />
           <MoneyCard
             label="Saídas"
-            value={`MT ${saidas.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
+            value={`MT ${totalApprovedWithdrawals.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
             icon={ArrowDownLeft}
+            suffix="Total de levantamentos aprovados"
           />
         </div>
 

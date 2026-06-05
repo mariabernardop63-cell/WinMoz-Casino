@@ -1,16 +1,51 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueryClient as useQC } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { useEffect } from "react";
 
 /* ──────────────────────────────────────────────────────────────
    SUPABASE-BACKED ADMIN API
    Drop-in replacement for mock-api.ts — same hook signatures
 ────────────────────────────────────────────────────────────── */
 
+/* ── Realtime invalidator — subscribes to key tables and
+       refreshes queries automatically without page reload ── */
+export function useAdminRealtimeSync() {
+  const qc = useQC();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, () => {
+        qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        qc.invalidateQueries({ queryKey: ["matches"] });
+        qc.invalidateQueries({ queryKey: ["bets"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
+        qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        qc.invalidateQueries({ queryKey: ["players"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "withdrawals" }, () => {
+        qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        qc.invalidateQueries({ queryKey: ["withdrawals"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "platform_earnings" }, () => {
+        qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [qc]);
+}
+
 /* ── Dashboard Stats ── */
 export function useGetDashboardStats() {
   return useQuery({
     queryKey: ["dashboard-stats"],
     queryFn: async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayISO = today.toISOString();
+
       const [
         { count: totalPlayers },
         { count: activeBets },
@@ -18,40 +53,63 @@ export function useGetDashboardStats() {
         { count: pendingReports },
         { data: onlineProfiles },
         { data: revenueData },
+        { data: approvedWithdrawalsData },
+        { data: todayEarningsData },
+        { data: todayWithdrawalsData },
+        { count: todayTransactions },
       ] = await Promise.all([
         supabase.from("profiles").select("*", { count: "exact", head: true }),
-        supabase.from("matches").select("*", { count: "exact", head: true }).eq("status", "active"),
-        supabase.from("withdrawals").select("*", { count: "exact", head: true }).eq("status", "pending"),
-        supabase.from("reports").select("*", { count: "exact", head: true }).eq("status", "open"),
+        supabase.from("matches").select("*", { count: "exact", head: true })
+          .in("status", ["active", "live", "in_progress"]),
+        supabase.from("withdrawals").select("*", { count: "exact", head: true })
+          .eq("status", "pending"),
+        supabase.from("reports").select("*", { count: "exact", head: true })
+          .eq("status", "open"),
         supabase.from("profiles")
           .select("last_seen_at")
           .gte("last_seen_at", new Date(Date.now() - 5 * 60 * 1000).toISOString()),
         supabase.from("platform_earnings").select("amount"),
+        supabase.from("withdrawals").select("amount")
+          .eq("status", "approved"),
+        supabase.from("platform_earnings").select("amount")
+          .gte("created_at", todayISO),
+        supabase.from("withdrawals").select("amount")
+          .eq("status", "approved")
+          .gte("processed_at", todayISO),
+        supabase.from("matches").select("*", { count: "exact", head: true })
+          .gte("created_at", todayISO),
       ]);
 
-      const platformRevenue = (revenueData ?? []).reduce((s: number, r: { amount: number }) => s + (r.amount ?? 0), 0);
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const { data: registeredTodayData } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", today.toISOString());
+      const platformRevenue = (revenueData ?? []).reduce(
+        (s: number, r: { amount: number }) => s + Number(r.amount ?? 0), 0
+      );
+      const totalApprovedWithdrawals = (approvedWithdrawalsData ?? []).reduce(
+        (s: number, w: { amount: number }) => s + Number(w.amount ?? 0), 0
+      );
+      const todayEarnings = (todayEarningsData ?? []).reduce(
+        (s: number, r: { amount: number }) => s + Number(r.amount ?? 0), 0
+      );
+      const todaySaidas = (todayWithdrawalsData ?? []).reduce(
+        (s: number, w: { amount: number }) => s + Number(w.amount ?? 0), 0
+      );
 
       return {
-        liveMatches: activeBets ?? 0,
-        onlinePlayers: onlineProfiles?.length ?? 0,
-        activeBets: activeBets ?? 0,
-        pendingWithdrawals: pendingWithdrawals ?? 0,
-        totalPlayers: totalPlayers ?? 0,
-        registeredToday: (registeredTodayData as unknown as number) ?? 0,
+        liveMatches:              activeBets ?? 0,
+        onlinePlayers:            onlineProfiles?.length ?? 0,
+        activeBets:               activeBets ?? 0,
+        pendingWithdrawals:       pendingWithdrawals ?? 0,
+        totalPlayers:             totalPlayers ?? 0,
         platformRevenue,
-        totalBetVolume: platformRevenue * 10,
-        pendingReports: pendingReports ?? 0,
+        totalApprovedWithdrawals,
+        pendingReports:           pendingReports ?? 0,
+        todayEarnings,
+        todaySaidas,
+        todayTransactions:        todayTransactions ?? 0,
+        todayOnline:              onlineProfiles?.length ?? 0,
       };
     },
-    refetchInterval: 30000,
-    staleTime: 10000,
+    refetchInterval: 10000,
+    staleTime: 5000,
   });
 }
 
@@ -534,14 +592,49 @@ export function useApproveWithdrawal() {
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
+
+      const { data: withdrawalData, error: fetchError } = await supabase
+        .from("withdrawals")
+        .select("amount, user_id, user_name")
+        .eq("id", id)
+        .single();
+
+      if (fetchError || !withdrawalData) throw fetchError ?? new Error("Levantamento não encontrado");
+
+      const amount = Number(withdrawalData.amount ?? 0);
+      let feeRate = 0;
+      if (amount >= 50 && amount < 500) feeRate = 0.05;
+      else if (amount >= 500 && amount <= 5000) feeRate = 0.10;
+      const feeAmount = Math.round(amount * feeRate * 100) / 100;
+
       const { error } = await supabase
         .from("withdrawals")
-        .update({ status: "approved", approved_by: user?.id ?? null, processed_at: new Date().toISOString() })
+        .update({
+          status: "approved",
+          approved_by: user?.id ?? null,
+          processed_at: new Date().toISOString(),
+          fee: feeAmount,
+          net_amount: amount - feeAmount,
+        })
         .eq("id", id);
       if (error) throw error;
+
+      if (feeAmount > 0) {
+        await supabase.from("platform_earnings").insert({
+          amount: feeAmount,
+          source: "withdrawal_fee",
+          description: `Taxa de levantamento — ${withdrawalData.user_name ?? "utilizador"} (${(feeRate * 100).toFixed(0)}% de MT ${amount.toFixed(2)})`,
+          reference_id: id,
+          created_at: new Date().toISOString(),
+        });
+      }
+
       return { ok: true };
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["withdrawals"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["withdrawals"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    },
   });
 }
 
