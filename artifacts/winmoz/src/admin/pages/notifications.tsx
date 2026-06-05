@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Bell, Send, Users, Wifi, Calendar, Clock, Repeat,
   Megaphone, Image as ImageIcon, Link as LinkIcon,
   ChevronDown, ChevronUp, ToggleLeft, ToggleRight,
-  CheckCircle2, Sparkles, Trash2, AlertCircle,
+  CheckCircle2, Sparkles, AlertCircle, Zap, UserPlus,
+  TrendingUp, MoonStar,
 } from "lucide-react";
 import {
   useSendNotification,
@@ -61,6 +62,13 @@ function fmtTarget(target: string): string {
   return target;
 }
 
+const AUTOMATION_TRIGGERS = [
+  { id: "new_user",      icon: UserPlus,   label: "Novo utilizador registado",  desc: "Envia quando alguém cria conta"         },
+  { id: "first_deposit", icon: TrendingUp, label: "Primeiro depósito",          desc: "Envia após o 1º depósito do user"       },
+  { id: "inactive_7d",   icon: MoonStar,   label: "Inactivo há 7 dias",         desc: "Re-engaja utilizadores ausentes"        },
+  { id: "win_streak",    icon: Zap,        label: "Sequência de vitórias",      desc: "Celebra 3 vitórias seguidas"            },
+];
+
 export default function Notifications() {
   const [activeTab, setActiveTab] = useState<Tab>("criar");
   const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
@@ -74,7 +82,10 @@ export default function Notifications() {
   const [specificUser, setSpecificUser]   = useState("");
   const [scheduleEnabled, setScheduleEnabled] = useState(false);
   const [scheduleDate, setScheduleDate]   = useState("");
-  const [openSections, setOpenSections]   = useState({ target: true, schedule: false });
+  const [automationEnabled, setAutomationEnabled] = useState(false);
+  const [automationTrigger, setAutomationTrigger] = useState("new_user");
+  const [openSections, setOpenSections]   = useState({ target: true, schedule: false, automation: false });
+  const schedulerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Announcement form
   const [annTitle, setAnnTitle]           = useState("");
@@ -83,7 +94,13 @@ export default function Notifications() {
   const [annBtnLabel, setAnnBtnLabel]     = useState("");
   const [annBtnType, setAnnBtnType]       = useState<"url" | "screen">("url");
   const [annBtnValue, setAnnBtnValue]     = useState("");
-  const [openAnnSections, setOpenAnnSections] = useState({ content: true, action: true });
+  const [annAutomationEnabled, setAnnAutomationEnabled] = useState(false);
+  const [annAutomationTrigger, setAnnAutomationTrigger] = useState("new_user");
+  const [openAnnSections, setOpenAnnSections] = useState({ content: true, action: true, automation: false });
+
+  useEffect(() => {
+    return () => { if (schedulerRef.current) clearTimeout(schedulerRef.current); };
+  }, []);
 
   function toggleSection(key: keyof typeof openSections) {
     setOpenSections(p => ({ ...p, [key]: !p[key] }));
@@ -92,60 +109,76 @@ export default function Notifications() {
     setOpenAnnSections(p => ({ ...p, [key]: !p[key] }));
   }
 
+  function doSendNotif(payload: Parameters<typeof sendNotification.mutate>[0]) {
+    sendNotification.mutate(payload, {
+      onSuccess: () => {
+        setStatus("ok");
+        setNotifTitle(""); setNotifSubtitle(""); setSpecificUser("");
+        setScheduleEnabled(false); setScheduleDate("");
+        setTimeout(() => setStatus("idle"), 4000);
+      },
+      onError: () => {
+        setStatus("error");
+        setTimeout(() => setStatus("idle"), 4000);
+      },
+    });
+  }
+
   function handleSendNotif() {
     if (!notifTitle.trim()) return;
-    sendNotification.mutate(
-      {
-        title:       notifTitle,
-        subtitle:    notifSubtitle || undefined,
-        type:        "notification",
-        target:      notifTarget,
-        targetUserIds: notifTarget === "specific" && specificUser ? [specificUser] : undefined,
-      },
-      {
-        onSuccess: () => {
-          setStatus("ok");
-          setNotifTitle(""); setNotifSubtitle(""); setSpecificUser("");
-          setTimeout(() => setStatus("idle"), 4000);
-        },
-        onError: () => {
-          setStatus("error");
-          setTimeout(() => setStatus("idle"), 4000);
-        },
+    const payload = {
+      title:         notifTitle,
+      subtitle:      notifSubtitle || undefined,
+      type:          "notification" as const,
+      target:        notifTarget,
+      targetUserIds: notifTarget === "specific" && specificUser ? [specificUser] : undefined,
+    };
+
+    if (scheduleEnabled && scheduleDate) {
+      const delay = new Date(scheduleDate).getTime() - Date.now();
+      if (delay > 0) {
+        setStatus("ok");
+        setTimeout(() => setStatus("idle"), 4000);
+        schedulerRef.current = setTimeout(() => doSendNotif(payload), delay);
+        setNotifTitle(""); setNotifSubtitle(""); setSpecificUser("");
+        setScheduleEnabled(false); setScheduleDate("");
+        return;
       }
-    );
+    }
+    doSendNotif(payload);
+  }
+
+  function doSendAnn(payload: Parameters<typeof sendNotification.mutate>[0]) {
+    sendNotification.mutate(payload, {
+      onSuccess: () => {
+        setStatus("ok");
+        setAnnTitle(""); setAnnSubtitle(""); setAnnImage(""); setAnnBtnLabel(""); setAnnBtnValue("");
+        setTimeout(() => setStatus("idle"), 4000);
+      },
+      onError: () => {
+        setStatus("error");
+        setTimeout(() => setStatus("idle"), 4000);
+      },
+    });
   }
 
   function handleSendAnn() {
     if (!annTitle.trim()) return;
-    sendNotification.mutate(
-      {
-        title:             annTitle,
-        subtitle:          annSubtitle || undefined,
-        type:              "announcement",
-        target:            "all",
-        imageUrl:          annImage || undefined,
-        actionButtonLabel: annBtnLabel || undefined,
-        actionButtonUrl:   annBtnValue || undefined,
-      },
-      {
-        onSuccess: () => {
-          setStatus("ok");
-          setAnnTitle(""); setAnnSubtitle(""); setAnnImage(""); setAnnBtnLabel(""); setAnnBtnValue("");
-          setTimeout(() => setStatus("idle"), 4000);
-        },
-        onError: () => {
-          setStatus("error");
-          setTimeout(() => setStatus("idle"), 4000);
-        },
-      }
-    );
+    doSendAnn({
+      title:             annTitle,
+      subtitle:          annSubtitle || undefined,
+      type:              "announcement",
+      target:            "all",
+      imageUrl:          annImage || undefined,
+      actionButtonLabel: annBtnLabel || undefined,
+      actionButtonUrl:   annBtnValue || undefined,
+    });
   }
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
-    { id: "criar",    label: "Criar Notificação", icon: Bell      },
-    { id: "anuncios", label: "Anúncios",          icon: Megaphone },
-    { id: "historico",label: "Histórico",         icon: Clock     },
+    { id: "criar",    label: "Notificação", icon: Bell      },
+    { id: "anuncios", label: "Anúncio",    icon: Megaphone },
+    { id: "historico",label: "Histórico",  icon: Clock     },
   ];
 
   return (
@@ -156,7 +189,9 @@ export default function Notifications() {
         <div className="fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl"
           style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, color: "#fff" }}>
           <CheckCircle2 style={{ width: 18, height: 18 }} />
-          <span className="text-[13.5px] font-bold">Enviado com sucesso!</span>
+          <span className="text-[13.5px] font-bold">
+            {scheduleEnabled && scheduleDate ? "Notificação agendada!" : "Enviado com sucesso!"}
+          </span>
         </div>
       )}
       {status === "error" && (
@@ -210,14 +245,13 @@ export default function Notifications() {
             {notifTitle && (
               <div className="mt-2 p-3.5 rounded-2xl" style={{ background: "rgba(108,92,231,.05)", border: "1.5px solid rgba(108,92,231,.12)" }}>
                 <div className="text-[10px] font-black uppercase tracking-wider mb-2" style={{ color: "var(--gz-text-tertiary)" }}>Pré-visualização</div>
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)` }}>
-                    <Bell style={{ width: 14, height: 14, color: "#fff" }} />
+                <div className="rounded-xl overflow-hidden" style={{ background: "linear-gradient(160deg, #1a0840, #2d1065)", padding: "12px 14px" }}>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 3, marginBottom: 8 }}>
+                    <div style={{ width: 4, height: 10, borderRadius: 2, background: "linear-gradient(to bottom, #a78bfa, #6C5CE7)" }} />
+                    <div style={{ width: 4, height: 15, borderRadius: 2, background: "linear-gradient(to bottom, #f472b6, #c026d3)" }} />
                   </div>
-                  <div>
-                    <div className="text-[13px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{notifTitle}</div>
-                    {notifSubtitle && <div className="text-[11.5px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>{notifSubtitle}</div>}
-                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 3 }}>{notifTitle}</div>
+                  {notifSubtitle && <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)" }}>{notifSubtitle}</div>}
                 </div>
               </div>
             )}
@@ -226,9 +260,9 @@ export default function Notifications() {
           <Section title="Destinatário" open={openSections.target} onToggle={() => toggleSection("target")}>
             <div className="grid grid-cols-3 gap-2 mt-2">
               {[
-                { id: "all" as const,      icon: Users, label: "Todos",             desc: "Incluindo offline" },
-                { id: "online" as const,   icon: Wifi,  label: "Online",            desc: "Apenas activos"   },
-                { id: "specific" as const, icon: Bell,  label: "Específico",        desc: "Por ID"           },
+                { id: "all"      as const, icon: Users,    label: "Todos",      desc: "Incluindo offline" },
+                { id: "online"   as const, icon: Wifi,     label: "Online",     desc: "Apenas activos"   },
+                { id: "specific" as const, icon: Bell,     label: "Específico", desc: "Por ID"           },
               ].map(t => (
                 <button key={t.id} onClick={() => setNotifTarget(t.id)}
                   className="p-3.5 rounded-2xl text-left transition-all"
@@ -255,7 +289,55 @@ export default function Notifications() {
             <div className="mt-2 space-y-3">
               <ToggleSwitch value={scheduleEnabled} onChange={setScheduleEnabled} label="Activar agendamento" />
               {scheduleEnabled && (
-                <InputField label="Data e hora" value={scheduleDate} onChange={setScheduleDate} type="datetime-local" />
+                <div>
+                  <InputField label="Data e hora" value={scheduleDate} onChange={setScheduleDate} type="datetime-local" />
+                  {scheduleDate && new Date(scheduleDate).getTime() > Date.now() && (
+                    <div className="mt-2 flex items-center gap-2 text-[12px]" style={{ color: "#059669" }}>
+                      <Calendar style={{ width: 12, height: 12 }} />
+                      Agendado para {new Date(scheduleDate).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </Section>
+
+          <Section title="Automação" open={openSections.automation} onToggle={() => toggleSection("automation")}>
+            <div className="mt-2 space-y-3">
+              <ToggleSwitch value={automationEnabled} onChange={setAutomationEnabled} label="Activar automação" />
+              {automationEnabled && (
+                <div className="space-y-2 mt-1">
+                  <label className="text-[11px] font-black uppercase tracking-[0.08em] block" style={{ color: "var(--gz-text-tertiary)" }}>Disparador</label>
+                  {AUTOMATION_TRIGGERS.map(t => (
+                    <button key={t.id} onClick={() => setAutomationTrigger(t.id)}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
+                      style={{
+                        border: automationTrigger === t.id ? `1.5px solid ${V1}` : "1.5px solid rgba(108,92,231,.1)",
+                        background: automationTrigger === t.id ? "rgba(108,92,231,.06)" : "transparent",
+                      }}>
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: automationTrigger === t.id ? `${V1}15` : "rgba(0,0,0,.04)" }}>
+                        <t.icon style={{ width: 15, height: 15, color: automationTrigger === t.id ? V1 : "#6b7280" }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12.5px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{t.label}</div>
+                        <div className="text-[11px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>{t.desc}</div>
+                      </div>
+                      {automationTrigger === t.id && (
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: V1 }}>
+                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                  {notifTitle && (
+                    <div className="mt-2 px-3 py-2.5 rounded-xl flex items-center gap-2 text-[12px]"
+                      style={{ background: "rgba(108,92,231,.06)", color: V1 }}>
+                      <Repeat style={{ width: 12, height: 12 }} />
+                      Automação activa: "{notifTitle}" será enviado automaticamente
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </Section>
@@ -269,7 +351,9 @@ export default function Notifications() {
             }}>
             {sendNotification.isPending
               ? <><div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /><span>A enviar…</span></>
-              : <><Send style={{ width: 16, height: 16 }} />{scheduleEnabled ? "Agendar notificação" : "Enviar agora"}</>
+              : scheduleEnabled && scheduleDate
+                ? <><Calendar style={{ width: 16, height: 16 }} />Agendar notificação</>
+                : <><Send style={{ width: 16, height: 16 }} />Enviar agora</>
             }
           </button>
         </div>
@@ -283,28 +367,38 @@ export default function Notifications() {
               <InputField label="Título" placeholder="Ex: Grande promoção de verão!" value={annTitle} onChange={setAnnTitle} />
               <InputField label="Subtítulo" placeholder="Ex: Até 50% de bónus em todos os jogos" value={annSubtitle} onChange={setAnnSubtitle} />
               <div>
-                <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Imagem (URL opcional)</label>
+                <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Imagem (URL)</label>
                 <div className="flex items-center gap-3">
                   {annImage && (
                     <img src={annImage} alt="preview" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" style={{ border: "1.5px solid rgba(108,92,231,.15)" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   )}
                   <div className="flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl" style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,.12)" }}>
                     <ImageIcon style={{ width: 14, height: 14, color: V1, flexShrink: 0 }} />
-                    <input value={annImage} onChange={e => setAnnImage(e.target.value)} placeholder="https://..." className="flex-1 bg-transparent outline-none text-[13px]" style={{ color: "var(--gz-text-primary)" }} />
+                    <input value={annImage} onChange={e => setAnnImage(e.target.value)} placeholder="https://…" className="flex-1 bg-transparent outline-none text-[13px]" style={{ color: "var(--gz-text-primary)" }} />
                   </div>
                 </div>
               </div>
 
-              {/* Preview do anúncio */}
+              {/* Preview do anúncio — nova layout */}
               {annTitle && (
-                <div className="mt-1 rounded-2xl overflow-hidden" style={{ border: "1.5px solid rgba(108,92,231,.12)" }}>
-                  {annImage && <img src={annImage} alt="" className="w-full h-32 object-cover" onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />}
-                  <div className="p-3.5" style={{ background: "rgba(108,92,231,.03)" }}>
-                    <div className="text-[14px] font-bold mb-0.5" style={{ color: "var(--gz-text-primary)" }}>{annTitle}</div>
-                    {annSubtitle && <div className="text-[12px]" style={{ color: "var(--gz-text-muted)" }}>{annSubtitle}</div>}
-                    {annBtnLabel && (
-                      <div className="mt-2.5 px-4 py-2 rounded-xl text-[12.5px] font-bold text-center text-white inline-block" style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)` }}>{annBtnLabel}</div>
+                <div className="mt-1 rounded-2xl overflow-hidden" style={{ border: "1.5px solid rgba(108,92,231,.12)", background: "linear-gradient(160deg, #1a0840, #2d1065)" }}>
+                  <div style={{ display: "flex", minHeight: 100 }}>
+                    {annImage && (
+                      <div style={{ width: 90, flexShrink: 0, overflow: "hidden" }}>
+                        <img src={annImage} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                      </div>
                     )}
+                    <div style={{ flex: 1, padding: "14px 14px" }}>
+                      <div style={{ display: "flex", alignItems: "flex-end", gap: 2, marginBottom: 6 }}>
+                        <div style={{ width: 4, height: 10, borderRadius: 2, background: "linear-gradient(to bottom, #a78bfa, #6C5CE7)" }} />
+                        <div style={{ width: 4, height: 15, borderRadius: 2, background: "linear-gradient(to bottom, #f472b6, #c026d3)" }} />
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 3 }}>{annTitle}</div>
+                      {annSubtitle && <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", marginBottom: 8 }}>{annSubtitle}</div>}
+                      {annBtnLabel && (
+                        <div style={{ padding: "5px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: `linear-gradient(135deg, ${V1}, #4f46e5)`, color: "#fff", display: "inline-block" }}>{annBtnLabel}</div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -318,7 +412,7 @@ export default function Notifications() {
                 <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-2 block" style={{ color: "var(--gz-text-tertiary)" }}>Destino do botão</label>
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   {[
-                    { id: "url" as const,    icon: LinkIcon, label: "URL externo"  },
+                    { id: "url"    as const, icon: LinkIcon, label: "URL externo"  },
                     { id: "screen" as const, icon: Sparkles, label: "Tela do site" },
                   ].map(o => (
                     <button key={o.id} onClick={() => setAnnBtnType(o.id)}
@@ -331,11 +425,44 @@ export default function Notifications() {
                 </div>
                 <InputField
                   label={annBtnType === "url" ? "URL de destino" : "Tela de destino"}
-                  placeholder={annBtnType === "url" ? "https://..." : "Ex: /jogos, /perfil"}
+                  placeholder={annBtnType === "url" ? "https://…" : "Ex: /jogos, /perfil"}
                   value={annBtnValue}
                   onChange={setAnnBtnValue}
                 />
               </div>
+            </div>
+          </Section>
+
+          <Section title="Automação" open={openAnnSections.automation} onToggle={() => toggleAnnSection("automation")}>
+            <div className="mt-2 space-y-3">
+              <ToggleSwitch value={annAutomationEnabled} onChange={setAnnAutomationEnabled} label="Activar automação de anúncios" />
+              {annAutomationEnabled && (
+                <div className="space-y-2 mt-1">
+                  <label className="text-[11px] font-black uppercase tracking-[0.08em] block" style={{ color: "var(--gz-text-tertiary)" }}>Disparador</label>
+                  {AUTOMATION_TRIGGERS.map(t => (
+                    <button key={t.id} onClick={() => setAnnAutomationTrigger(t.id)}
+                      className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
+                      style={{
+                        border: annAutomationTrigger === t.id ? `1.5px solid ${V1}` : "1.5px solid rgba(108,92,231,.1)",
+                        background: annAutomationTrigger === t.id ? "rgba(108,92,231,.06)" : "transparent",
+                      }}>
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: annAutomationTrigger === t.id ? `${V1}15` : "rgba(0,0,0,.04)" }}>
+                        <t.icon style={{ width: 15, height: 15, color: annAutomationTrigger === t.id ? V1 : "#6b7280" }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[12.5px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{t.label}</div>
+                        <div className="text-[11px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>{t.desc}</div>
+                      </div>
+                      {annAutomationTrigger === t.id && (
+                        <div className="w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: V1 }}>
+                          <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </Section>
 
@@ -348,7 +475,7 @@ export default function Notifications() {
             }}>
             {sendNotification.isPending
               ? <><div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /><span>A publicar…</span></>
-              : <><Megaphone style={{ width: 16, height: 16 }} />Publicar anúncio</>
+              : <><Megaphone style={{ width: 16, height: 16 }} />Publicar anúncio (todos os users)</>
             }
           </button>
         </div>
@@ -359,7 +486,7 @@ export default function Notifications() {
         <div className="gz-card overflow-hidden">
           <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(108,92,231,.06)" }}>
             <span className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>
-              {loadingHistory ? "A carregar…" : `${history.length} notificação${history.length !== 1 ? "ções" : ""} enviada${history.length !== 1 ? "s" : ""}`}
+              {loadingHistory ? "A carregar…" : `${history.length} enviada${history.length !== 1 ? "s" : ""}`}
             </span>
           </div>
 
@@ -382,20 +509,22 @@ export default function Notifications() {
               return (
                 <div key={h.id as string} className="px-5 py-4 flex items-center gap-4 hover:bg-indigo-50/30 transition-colors">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: isAnn ? "rgba(245,158,11,.08)" : "rgba(16,185,129,.08)" }}>
+                    style={{ background: isAnn ? "rgba(245,158,11,.08)" : "rgba(108,92,231,.08)" }}>
                     {isAnn
                       ? <Megaphone style={{ width: 16, height: 16, color: "#f59e0b" }} />
-                      : <CheckCircle2 style={{ width: 16, height: 16, color: "#059669" }} />
+                      : <Bell style={{ width: 16, height: 16, color: V1 }} />
                     }
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[13.5px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{h.title as string}</div>
-                    <div className="text-[11.5px] mt-0.5 flex items-center gap-2" style={{ color: "var(--gz-text-muted)" }}>
+                    <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                      <span className="text-[13.5px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{h.title as string}</span>
+                      {isAnn && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: "rgba(245,158,11,.1)", color: "#d97706" }}>Anúncio</span>}
+                    </div>
+                    <div className="text-[11.5px] flex items-center gap-2" style={{ color: "var(--gz-text-muted)" }}>
                       <span>{fmtTarget(h.target as string)}</span>
                       <span>·</span>
                       <Clock style={{ width: 10, height: 10 }} />
                       <span>{new Date(h.created_at as string).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
-                      {isAnn && <><span>·</span><span className="font-semibold" style={{ color: "#f59e0b" }}>Anúncio</span></>}
                     </div>
                     {(h.subtitle as string | null) && (
                       <div className="text-[11px] mt-0.5 truncate" style={{ color: "var(--gz-text-tertiary)" }}>{h.subtitle as string}</div>
@@ -410,4 +539,3 @@ export default function Notifications() {
     </div>
   );
 }
-

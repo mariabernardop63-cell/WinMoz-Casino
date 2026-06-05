@@ -1059,7 +1059,7 @@ export function useGetNotificationHistory() {
   return useQuery({
     queryKey: ["notification-history"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await adminSupabase
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
@@ -1067,8 +1067,8 @@ export function useGetNotificationHistory() {
       if (error) throw error;
       return data ?? [];
     },
-    refetchInterval: 30000,
-    staleTime: 10000,
+    refetchInterval: 15000,
+    staleTime: 5000,
   });
 }
 
@@ -1217,15 +1217,16 @@ export function useGetUserNotifications(userId: string | null) {
     queryKey: ["user-notifications", userId],
     queryFn: async () => {
       if (!userId) return [];
-      const { data, error } = await supabase
+      const { data, error } = await adminSupabase
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
-        .limit(50);
+        .limit(100);
       if (error) throw error;
 
       const all = (data ?? []).filter((n: Record<string, unknown>) => {
-        if (n.target === "all") return true;
+        if (n.target === "all")    return true;
+        if (n.target === "online") return true;
         if (n.target === "specific") {
           const ids = n.target_user_ids as string[] | null;
           return Array.isArray(ids) && ids.includes(userId);
@@ -1257,8 +1258,8 @@ export function useGetUserNotifications(userId: string | null) {
       }));
     },
     enabled: !!userId,
-    refetchInterval: 30000,
-    staleTime: 10000,
+    refetchInterval: 8000,
+    staleTime: 3000,
   });
 }
 
@@ -1266,7 +1267,7 @@ export function useMarkNotificationRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ notificationId, userId }: { notificationId: string; userId: string }) => {
-      const { error } = await supabase
+      const { error } = await adminSupabase
         .from("notification_reads")
         .upsert(
           { notification_id: notificationId, user_id: userId, read_at: new Date().toISOString() },
@@ -1278,5 +1279,94 @@ export function useMarkNotificationRead() {
     onSuccess: (_d, { userId }) => {
       qc.invalidateQueries({ queryKey: ["user-notifications", userId] });
     },
+  });
+}
+
+/* ── Block Users ── */
+export interface BlockedProfile {
+  id: string;
+  name: string;
+  phone: string;
+  blockType: "account" | "ip" | "device";
+  blockedAt: string;
+  severity: "high" | "medium" | "low";
+}
+
+export function useListBlockedUsers() {
+  return useQuery({
+    queryKey: ["blocked-users"],
+    queryFn: async () => {
+      const { data, error } = await adminSupabase
+        .from("profiles")
+        .select("id, full_name, phone, block_type, is_blocked, updated_at")
+        .eq("is_blocked", true)
+        .order("updated_at", { ascending: false });
+      if (error) return [];
+      return (data ?? []).map((p: Record<string, unknown>): BlockedProfile => ({
+        id:        p.id as string,
+        name:      (p.full_name as string) || (p.phone as string) || "Utilizador",
+        phone:     (p.phone as string) || "—",
+        blockType: ((p.block_type as string) as "account" | "ip" | "device") || "account",
+        blockedAt: (p.updated_at as string) || new Date().toISOString(),
+        severity:  "medium",
+      }));
+    },
+    refetchInterval: 20000,
+    staleTime: 8000,
+  });
+}
+
+export function useBlockUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ userId, blockType }: { userId: string; blockType: string }) => {
+      const { error } = await adminSupabase
+        .from("profiles")
+        .update({ is_blocked: true, block_type: blockType })
+        .eq("id", userId);
+      if (error) throw error;
+      return { ok: true };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["blocked-users"] }),
+  });
+}
+
+export function useUnblockUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      const { error } = await adminSupabase
+        .from("profiles")
+        .update({ is_blocked: false, block_type: null })
+        .eq("id", userId);
+      if (error) throw error;
+      return { ok: true };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["blocked-users"] }),
+  });
+}
+
+export function useSearchProfilesForBlock(query: string) {
+  return useQuery({
+    queryKey: ["search-profiles-block", query],
+    queryFn: async () => {
+      if (query.trim().length < 2) return [];
+      const { data, error } = await adminSupabase
+        .from("profiles")
+        .select("id, full_name, phone, is_blocked, block_type, avatar_url")
+        .or(`full_name.ilike.%${query}%,phone.ilike.%${query}%`)
+        .limit(8);
+      if (error) return [];
+      return (data ?? []).map((p: Record<string, unknown>) => ({
+        id:        p.id as string,
+        name:      (p.full_name as string) || (p.phone as string) || "Utilizador",
+        phone:     (p.phone as string) || "—",
+        isBlocked: (p.is_blocked as boolean) || false,
+        blockType: (p.block_type as string) || null,
+        avatarUrl: (p.avatar_url as string) || null,
+      }));
+    },
+    enabled: query.trim().length >= 2,
+    staleTime: 5000,
   });
 }

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useListReports, useResolveReport, getListReportsQueryKey } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, XCircle, Flag, Bug, CreditCard, User, HelpCircle, AlertTriangle } from "lucide-react";
+import { CheckCircle, XCircle, Flag, Bug, CreditCard, User, HelpCircle, AlertTriangle, Hash } from "lucide-react";
 
 const V1 = "#6C5CE7";
 
@@ -9,7 +9,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   "Problema técnico":      Bug,
   "Problema de pagamento": CreditCard,
   "Utilizador":            User,
-  "Conteúdo impróprio":    Flag,
+  "Conteúdo impróprio":   Flag,
   "Outro":                 HelpCircle,
 };
 
@@ -107,7 +107,7 @@ export default function Reports() {
           <div>
             <h1 className="text-[22px] font-black tracking-tight" style={{ color: "var(--gz-text-primary)" }}>Denúncias</h1>
             <p className="text-[12.5px] font-medium mt-0.5" style={{ color: "var(--gz-text-accent)" }}>
-              Gestão de relatórios enviados pelos utilizadores
+              Relatórios enviados pelos utilizadores via "Reportar Problema"
             </p>
           </div>
         </div>
@@ -134,7 +134,7 @@ export default function Reports() {
       <div className="gz-card overflow-hidden">
         <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "rgba(108,92,231,.06)" }}>
           {["all", "pending", "reviewed", "dismissed"].map(s => (
-            <button key={s} data-testid={`filter-report-${s}`} onClick={() => setStatusFilter(s)}
+            <button key={s} onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${statusFilter === s ? "text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               style={statusFilter === s ? { background: `linear-gradient(135deg, ${V1}, #4f46e5)` } : {}}>
               {s === "all" ? "Todas" : s === "pending" ? "Pendentes" : s === "reviewed" ? "Revisadas" : "Arquivadas"}
@@ -148,19 +148,23 @@ export default function Reports() {
               <div key={i} className="p-5 h-24 animate-pulse m-2 rounded-2xl" style={{ background: "var(--gz-bg-subtle)" }} />
             ))
           ) : (reports ?? []).length === 0 ? (
-            <div className="px-5 py-12 text-center">
+            <div className="px-5 py-14 text-center">
               <Flag style={{ width: 28, height: 28, color: "var(--gz-text-tertiary)", margin: "0 auto 8px", strokeWidth: 1.3 }} />
               <div className="text-[13px] font-medium" style={{ color: "var(--gz-text-accent)" }}>Nenhuma denúncia encontrada</div>
+              <div className="text-[12px] mt-1" style={{ color: "var(--gz-text-muted)" }}>
+                Os relatórios enviados pelos utilizadores aparecerão aqui
+              </div>
             </div>
           ) : (
             (reports ?? []).map((r) => {
               const categoryLabel = (r as { category?: string }).category ?? "Outro";
               const priority      = (r as { priority?: string }).priority ?? "Média";
               const priorityInfo  = PRIORITY_COLORS[priority] ?? PRIORITY_COLORS["Média"];
+              const ticketId      = (r as { matchId?: string | null }).matchId;
+              const isTicket      = ticketId && ticketId.startsWith("WM-");
 
               return (
-                <div key={r.id} data-testid={`report-row-${r.id}`}
-                  className="px-5 py-4 hover:bg-indigo-50/20 transition-colors">
+                <div key={r.id} className="px-5 py-4 hover:bg-indigo-50/20 transition-colors">
                   <div className="flex items-start gap-4">
 
                     {/* Category icon */}
@@ -181,47 +185,50 @@ export default function Reports() {
                         <StatusBadge status={r.status} />
                       </div>
 
-                      {/* Reporter info */}
+                      {/* Reporter */}
                       <div className="flex items-center gap-1.5 mb-1.5 text-[12.5px]">
+                        <User style={{ width: 11, height: 11, color: "var(--gz-text-muted)" }} />
+                        <span style={{ color: "var(--gz-text-muted)" }}>Enviado por</span>
                         <span className="font-bold" style={{ color: "var(--gz-text-primary)" }}>{r.reporterName}</span>
-                        <span style={{ color: "var(--gz-text-muted)" }}>denunciou</span>
-                        <span className="font-bold" style={{ color: "#ef4444" }}>{r.accusedName}</span>
                       </div>
 
                       {/* Description */}
                       {r.description && (
                         <div className="text-[12.5px] leading-relaxed px-3.5 py-2.5 rounded-xl mb-2"
                           style={{ background: "var(--gz-bg-subtle)", color: "var(--gz-text-secondary)", border: "1px solid rgba(108,92,231,.08)" }}>
-                          "{r.description}"
+                          {r.description}
                         </div>
                       )}
 
                       {/* Meta */}
                       <div className="flex items-center gap-3 text-[11px]" style={{ color: "var(--gz-text-muted)" }}>
-                        <span>Partida #{r.matchId}</span>
-                        <span>·</span>
-                        <span>{new Date(r.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                        {isTicket && (
+                          <>
+                            <span className="flex items-center gap-1">
+                              <Hash style={{ width: 9, height: 9 }} />
+                              {ticketId}
+                            </span>
+                            <span>·</span>
+                          </>
+                        )}
+                        <span>{new Date(r.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
                     </div>
 
                     {/* Actions */}
                     {r.status === "pending" && (
                       <div className="flex items-center gap-2 flex-shrink-0">
-                        <button data-testid={`button-review-${r.id}`}
-                          onClick={() => handleAction(r.id as string, "reviewed")}
+                        <button onClick={() => handleAction(r.id as string, "reviewed")}
                           disabled={resolveReport.isPending}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold transition-all hover:shadow-md"
-                          style={{ background: "rgba(16,185,129,.08)", color: "#059669", border: "1px solid rgba(16,185,129,.2)" }}
-                          title="Marcar como revisado">
+                          style={{ background: "rgba(16,185,129,.08)", color: "#059669", border: "1px solid rgba(16,185,129,.2)" }}>
                           <CheckCircle style={{ width: 13, height: 13 }} />
-                          Aprovar
+                          Resolver
                         </button>
-                        <button data-testid={`button-dismiss-${r.id}`}
-                          onClick={() => handleAction(r.id as string, "dismissed")}
+                        <button onClick={() => handleAction(r.id as string, "dismissed")}
                           disabled={resolveReport.isPending}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold transition-all hover:shadow-md"
-                          style={{ background: "rgba(0,0,0,.04)", color: "#6b7280", border: "1px solid rgba(0,0,0,.08)" }}
-                          title="Arquivar">
+                          style={{ background: "rgba(0,0,0,.04)", color: "#6b7280", border: "1px solid rgba(0,0,0,.08)" }}>
                           <XCircle style={{ width: 13, height: 13 }} />
                           Arquivar
                         </button>
