@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updateLastSeen(userId);
     heartbeatRef.current = setInterval(() => {
       updateLastSeen(userId);
-    }, 60_000);
+    }, 30_000);
   };
 
   const stopHeartbeat = () => {

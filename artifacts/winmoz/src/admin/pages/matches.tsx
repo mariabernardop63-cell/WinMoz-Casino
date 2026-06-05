@@ -1,18 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListMatches } from "@/admin/lib/supabase-api";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import { Link } from "wouter";
 import { Gamepad2, ChevronRight, Search } from "lucide-react";
 
+const STATUS_LABEL: Record<string, string> = {
+  live:       "Em Curso",
+  active:     "Em Curso",
+  in_progress:"Em Curso",
+  finished:   "Terminada",
+  pending:    "Pendente",
+  cancelled:  "Cancelada",
+};
+
+const STATUS_CLASS: Record<string, string> = {
+  live:        "bg-green-100 text-green-700",
+  active:      "bg-green-100 text-green-700",
+  in_progress: "bg-green-100 text-green-700",
+  finished:    "bg-gray-100 text-gray-600",
+  pending:     "bg-amber-100 text-amber-700",
+  cancelled:   "bg-red-100 text-red-600",
+};
+
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    live: "bg-green-100 text-green-700",
-    finished: "bg-gray-100 text-gray-600",
-    pending: "bg-amber-100 text-amber-700",
-  };
+  const isLive = status === "live" || status === "active" || status === "in_progress";
   return (
-    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${map[status] ?? "bg-gray-100 text-gray-500"}`}>
-      {status === "live" && <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" />}
-      {status}
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_CLASS[status] ?? "bg-gray-100 text-gray-500"}`}>
+      {isLive && <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse" />}
+      {STATUS_LABEL[status] ?? status}
     </span>
   );
 }
@@ -29,9 +45,21 @@ export default function Matches() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [gameFilter, setGameFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const qc = useQueryClient();
 
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-matches-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, () => {
+        qc.invalidateQueries({ queryKey: ["matches"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [qc]);
+
+  const dbStatus = statusFilter === "live" ? "active" : statusFilter;
   const params = {
-    ...(statusFilter !== "all" ? { status: statusFilter as "live" | "finished" | "pending" } : {}),
+    ...(dbStatus !== "all" ? { status: dbStatus as "live" | "finished" | "pending" | "active" } : {}),
     ...(gameFilter !== "all" ? { game: gameFilter as "dama" | "ludo" } : {}),
   };
 
@@ -64,14 +92,19 @@ export default function Matches() {
             />
           </div>
           <div className="flex items-center gap-2">
-            {["all", "live", "finished", "pending"].map(s => (
+            {[
+              { key: "all",      label: "Todos"     },
+              { key: "live",     label: "Em Curso"  },
+              { key: "finished", label: "Terminadas"},
+              { key: "pending",  label: "Pendentes" },
+            ].map(s => (
               <button
-                key={s}
-                data-testid={`filter-status-${s}`}
-                onClick={() => setStatusFilter(s)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${statusFilter === s ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                key={s.key}
+                data-testid={`filter-status-${s.key}`}
+                onClick={() => setStatusFilter(s.key)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${statusFilter === s.key ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               >
-                {s === "all" ? "Todos" : s.charAt(0).toUpperCase() + s.slice(1)}
+                {s.label}
               </button>
             ))}
           </div>

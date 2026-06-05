@@ -14,7 +14,7 @@ export function useAdminRealtimeSync() {
 
   useEffect(() => {
     const channel = supabase
-      .channel("admin-realtime")
+      .channel("admin-realtime-v2")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, () => {
         qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
         qc.invalidateQueries({ queryKey: ["matches"] });
@@ -23,11 +23,17 @@ export function useAdminRealtimeSync() {
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
         qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
         qc.invalidateQueries({ queryKey: ["players"] });
+        qc.invalidateQueries({ queryKey: ["online-players-real"] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => {
         qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
         qc.invalidateQueries({ queryKey: ["withdrawals"] });
         qc.invalidateQueries({ queryKey: ["transactions"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "reports" }, () => {
+        qc.invalidateQueries({ queryKey: ["reports"] });
+        qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        qc.invalidateQueries({ queryKey: ["antifraud"] });
       })
       .subscribe();
 
@@ -62,13 +68,13 @@ export function useGetDashboardStats() {
         txToday,
         earningsData,
         earningsTodayData,
+        pendingReportsData,
       ] = await Promise.all([
         safeCount(supabase.from("profiles").select("*", { count: "exact", head: true }) as any),
         safeCount(supabase.from("matches").select("*", { count: "exact", head: true })
           .in("status", ["active", "live", "in_progress"]) as any),
         safeData(supabase.from("profiles").select("last_seen_at")
-          .gte("last_seen_at", new Date(Date.now() - 5 * 60 * 1000).toISOString()) as any),
-        // Withdrawals via transactions table (always exists)
+          .gte("last_seen_at", new Date(Date.now() - 2 * 60 * 1000).toISOString()) as any),
         safeData(supabase.from("transactions").select("id")
           .eq("type", "withdrawal").eq("status", "pending") as any),
         safeData(supabase.from("transactions").select("amount")
@@ -81,6 +87,7 @@ export function useGetDashboardStats() {
         safeData(supabase.from("platform_earnings").select("amount") as any),
         safeData(supabase.from("platform_earnings").select("amount")
           .gte("created_at", todayISO) as any),
+        safeData(supabase.from("reports").select("id").eq("status", "open") as any),
       ]);
 
       const pendingWithdrawals = (pendingWithdrawalsData as unknown[]).length;
@@ -101,15 +108,15 @@ export function useGetDashboardStats() {
         totalPlayers,
         platformRevenue,
         totalApprovedWithdrawals,
-        pendingReports:           0,
+        pendingReports:           (pendingReportsData as unknown[]).length,
         todayEarnings,
         todaySaidas,
         todayTransactions:        (txToday as unknown[]).length,
         todayOnline:              (onlineProfiles as unknown[]).length,
       };
     },
-    refetchInterval: 10000,
-    staleTime: 5000,
+    refetchInterval: 8000,
+    staleTime: 3000,
   });
 }
 
@@ -238,15 +245,22 @@ export function useListMatches(params?: { status?: string; game?: string }) {
   return useQuery({
     queryKey: ["matches", params],
     queryFn: async () => {
-      let q = supabase.from("matches").select("*").order("created_at", { ascending: false }).limit(100);
-      if (params?.status && params.status !== "all") q = q.eq("status", params.status);
-      if (params?.game   && params.game !== "all")   q = q.eq("game_type", params.game);
+      let q = supabase.from("matches").select("*").order("created_at", { ascending: false }).limit(200);
+      if (params?.status && params.status !== "all") {
+        // "live" or "active" means in-progress matches
+        if (params.status === "live" || params.status === "active") {
+          q = q.in("status", ["active", "live", "in_progress"]);
+        } else {
+          q = q.eq("status", params.status);
+        }
+      }
+      if (params?.game && params.game !== "all") q = q.eq("game_type", params.game);
       const { data, error } = await q;
       if (error) return [];
       return (data ?? []).map(m => mapMatch(m as Record<string, unknown>));
     },
-    refetchInterval: 15000,
-    staleTime: 5000,
+    refetchInterval: 10000,
+    staleTime: 3000,
   });
 }
 
@@ -584,10 +598,10 @@ function mapReport(r: Record<string, unknown>): AdminReport {
   return {
     id:           r.id as string,
     reporterName: (r.user_name as string)    ?? (r.user_email as string) ?? "utilizador",
-    accusedName:  (r.admin_notes as string)  ?? "—",
+    accusedName:  (r.accused_name as string) ?? (r.ticket_id as string)  ?? "—",
     reason:       (r.category as string)     ?? "Outro",
     description:  (r.description as string)  ?? "",
-    matchId:      null,
+    matchId:      (r.ticket_id as string)    ?? null,
     status:       mapReportStatus(r.status as string),
     createdAt:    r.created_at as string,
     category:     (r.category as string)     ?? "Outro",
@@ -706,14 +720,34 @@ export function useApproveWithdrawal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      const token = await getAdminToken();
-      const res = await fetch("/api/admin/withdraw/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ id }),
-      });
-      const json = await res.json() as { success?: boolean; error?: string };
-      if (!res.ok || !json.success) throw new Error(json.error ?? "Erro ao aprovar");
+      // Try API server first (uses service role for full access)
+      try {
+        const token = await getAdminToken();
+        const res = await fetch("/api/admin/withdraw/approve", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ id }),
+        });
+        const json = await res.json() as { success?: boolean; error?: string };
+        if (res.ok && json.success) return { ok: true };
+        // If API server returns a business error (not a network error), throw it
+        if (res.status < 500) throw new Error(json.error ?? "Erro ao aprovar");
+        // Fall through to direct Supabase if server error
+      } catch (apiErr) {
+        // Only fall back on network errors; rethrow business errors
+        const msg = apiErr instanceof Error ? apiErr.message : String(apiErr);
+        if (!msg.includes("Failed to fetch") && !msg.includes("NetworkError") && !msg.includes("Serviço indisponível")) {
+          throw apiErr;
+        }
+      }
+      // Fallback: update status directly via Supabase
+      const { data: txData, error: fetchErr } = await supabase
+        .from("transactions").select("id, status").eq("id", id).single();
+      if (fetchErr || !txData) throw new Error("Levantamento não encontrado");
+      if ((txData as Record<string, unknown>).status !== "pending") throw new Error("Levantamento já processado");
+      const { error } = await supabase
+        .from("transactions").update({ status: "approved" }).eq("id", id);
+      if (error) throw new Error("Erro ao aprovar saque");
       return { ok: true };
     },
     onSuccess: () => {
@@ -727,14 +761,42 @@ export function useRejectWithdrawal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: { reason: string } }) => {
-      const token = await getAdminToken();
-      const res = await fetch("/api/admin/withdraw/reject", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ id, reason: data.reason }),
-      });
-      const json = await res.json() as { success?: boolean; error?: string };
-      if (!res.ok || !json.success) throw new Error(json.error ?? "Erro ao rejeitar");
+      // Try API server first (handles balance restoration)
+      try {
+        const token = await getAdminToken();
+        const res = await fetch("/api/admin/withdraw/reject", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ id, reason: data.reason }),
+        });
+        const json = await res.json() as { success?: boolean; error?: string };
+        if (res.ok && json.success) return { ok: true };
+        if (res.status < 500) throw new Error(json.error ?? "Erro ao rejeitar");
+      } catch (apiErr) {
+        const msg = apiErr instanceof Error ? apiErr.message : String(apiErr);
+        if (!msg.includes("Failed to fetch") && !msg.includes("NetworkError") && !msg.includes("Serviço indisponível")) {
+          throw apiErr;
+        }
+      }
+      // Fallback: update status + restore balance directly via Supabase
+      const { data: txData, error: fetchErr } = await supabase
+        .from("transactions").select("id, amount, user_id, status").eq("id", id).single();
+      if (fetchErr || !txData) throw new Error("Levantamento não encontrado");
+      const tx = txData as Record<string, unknown>;
+      if (tx.status !== "pending") throw new Error("Levantamento já processado");
+      const { error: updateErr } = await supabase
+        .from("transactions").update({ status: "rejected" }).eq("id", id);
+      if (updateErr) throw new Error("Erro ao rejeitar saque");
+      // Restore balance
+      const withdrawalAmount = Math.abs(Number(tx.amount ?? 0));
+      if (withdrawalAmount > 0 && tx.user_id) {
+        const { data: profileData } = await supabase
+          .from("profiles").select("balance").eq("id", tx.user_id as string).single();
+        if (profileData) {
+          const restored = Math.round((Number((profileData as Record<string, unknown>).balance ?? 0) + withdrawalAmount) * 100) / 100;
+          await supabase.from("profiles").update({ balance: restored }).eq("id", tx.user_id as string);
+        }
+      }
       return { ok: true };
     },
     onSuccess: () => {

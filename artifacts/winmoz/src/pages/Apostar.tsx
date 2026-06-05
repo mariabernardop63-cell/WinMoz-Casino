@@ -390,23 +390,24 @@ function MatchmakingScreen({
 
   useEffect(() => {
     const channelName = `matchmaking_${gameType}_${betAmount}`;
-    // Use Broadcast only — more reliable than Presence across devices/networks
+    let poll: ReturnType<typeof setInterval> | null = null;
+
     const channel = supabase.channel(channelName, {
-      config: { broadcast: { self: false } },
+      config: { broadcast: { self: false, ack: false } },
     });
     channelRef.current = channel;
 
     const announcePresence = () => {
       if (matchedRef.current) return;
-      channel.send({ type: "broadcast", event: "looking", payload: { userId, displayName } });
+      channel.send({ type: "broadcast", event: "looking", payload: { userId, displayName } })
+        .catch(() => { /* ignore send errors */ });
     };
 
-    // Listen for match_found broadcast sent by the other player (who is alphabetically first)
     channel.on("broadcast", { event: "match_found" }, ({ payload }) => {
       if (matchedRef.current) return;
-      // Only process if I am one of the matched players
       if (payload.blue !== userId && payload.green !== userId) return;
       matchedRef.current = true;
+      if (poll) { clearInterval(poll); poll = null; }
       const myColor: string = payload.blue === userId ? "blue" : "green";
       const oppName: string =
         myColor === "green"
@@ -416,36 +417,39 @@ function MatchmakingScreen({
       setTimeout(() => { onMatched(payload.gameId as string, myColor, oppName); supabase.removeChannel(channel); }, 1500);
     });
 
-    // Listen for other players announcing they are looking
     channel.on("broadcast", { event: "looking" }, ({ payload }) => {
       const oppId   = payload.userId   as string;
       const oppName = payload.displayName as string;
       if (!oppId || oppId === userId || matchedRef.current) return;
-      // Alphabetically-first ID becomes the host and creates the match
       const firstId = [userId, oppId].sort()[0];
-      if (firstId !== userId) return; // opponent will host; wait for their match_found
+      if (firstId !== userId) return;
       matchedRef.current = true;
+      if (poll) { clearInterval(poll); poll = null; }
       const gameId = `${userId}_${oppId}`;
       channel.send({
         type: "broadcast",
         event: "match_found",
         payload: { gameId, blue: userId, green: oppId, blueName: displayName, greenName: oppName },
-      });
+      }).catch(() => { /* ignore */ });
       setFound(true);
       setTimeout(() => { onMatched(gameId, "blue", oppName); supabase.removeChannel(channel); }, 1500);
     });
 
     channel.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        // Announce immediately once subscribed
-        setTimeout(announcePresence, 200);
+        // Announce immediately and start the periodic re-announce ONLY after subscribed
+        setTimeout(announcePresence, 100);
+        if (!poll && !matchedRef.current) {
+          poll = setInterval(announcePresence, 2500);
+        }
       }
     });
 
-    // Re-announce every 3 s so late joiners can hear us
-    const poll = setInterval(announcePresence, 3000);
-
-    return () => { clearInterval(poll); supabase.removeChannel(channel); channelRef.current = null; };
+    return () => {
+      if (poll) { clearInterval(poll); poll = null; }
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
