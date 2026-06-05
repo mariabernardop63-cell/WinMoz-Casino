@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient, useQueryClient as useQC } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { API_BASE } from "@/lib/apiBase";
 import { useEffect } from "react";
 
 /* ──────────────────────────────────────────────────────────────
@@ -711,44 +710,28 @@ export function useListWithdrawals(params?: { status?: string }) {
 
 export function getListWithdrawalsQueryKey() { return ["withdrawals"]; }
 
-async function getAdminToken(): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error("Sessão inválida");
-  return session.access_token;
-}
-
 export function useApproveWithdrawal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      // Try API server first (uses service role for full access)
-      try {
-        const token = await getAdminToken();
-        const res = await fetch(`${API_BASE}/admin/withdraw/approve`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ id }),
-        });
-        const json = await res.json() as { success?: boolean; error?: string };
-        if (res.ok && json.success) return { ok: true };
-        // If API server returns a business error (not a network error), throw it
-        if (res.status < 500) throw new Error(json.error ?? "Erro ao aprovar");
-        // Fall through to direct Supabase if server error
-      } catch (apiErr) {
-        // Only fall back on network errors; rethrow business errors
-        const msg = apiErr instanceof Error ? apiErr.message : String(apiErr);
-        if (!msg.includes("Failed to fetch") && !msg.includes("NetworkError") && !msg.includes("Serviço indisponível")) {
-          throw apiErr;
-        }
-      }
-      // Fallback: update status directly via Supabase
+      // Fetch the transaction and verify it's still pending
       const { data: txData, error: fetchErr } = await supabase
-        .from("transactions").select("id, status").eq("id", id).single();
+        .from("transactions")
+        .select("id, status")
+        .eq("id", id)
+        .single();
+
       if (fetchErr || !txData) throw new Error("Levantamento não encontrado");
-      if ((txData as Record<string, unknown>).status !== "pending") throw new Error("Levantamento já processado");
+      const tx = txData as Record<string, unknown>;
+      if (tx.status !== "pending") throw new Error("Levantamento já processado");
+
+      // Update status to approved
       const { error } = await supabase
-        .from("transactions").update({ status: "approved" }).eq("id", id);
-      if (error) throw new Error("Erro ao aprovar saque");
+        .from("transactions")
+        .update({ status: "approved" })
+        .eq("id", id);
+
+      if (error) throw new Error(`Erro ao aprovar: ${error.message}`);
       return { ok: true };
     },
     onSuccess: () => {
@@ -761,43 +744,45 @@ export function useApproveWithdrawal() {
 export function useRejectWithdrawal() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { reason: string } }) => {
-      // Try API server first (handles balance restoration)
-      try {
-        const token = await getAdminToken();
-        const res = await fetch(`${API_BASE}/admin/withdraw/reject`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ id, reason: data.reason }),
-        });
-        const json = await res.json() as { success?: boolean; error?: string };
-        if (res.ok && json.success) return { ok: true };
-        if (res.status < 500) throw new Error(json.error ?? "Erro ao rejeitar");
-      } catch (apiErr) {
-        const msg = apiErr instanceof Error ? apiErr.message : String(apiErr);
-        if (!msg.includes("Failed to fetch") && !msg.includes("NetworkError") && !msg.includes("Serviço indisponível")) {
-          throw apiErr;
-        }
-      }
-      // Fallback: update status + restore balance directly via Supabase
+    mutationFn: async ({ id, data: _data }: { id: string; data: { reason: string } }) => {
+      // Fetch the transaction with balance info
       const { data: txData, error: fetchErr } = await supabase
-        .from("transactions").select("id, amount, user_id, status").eq("id", id).single();
+        .from("transactions")
+        .select("id, amount, user_id, status")
+        .eq("id", id)
+        .single();
+
       if (fetchErr || !txData) throw new Error("Levantamento não encontrado");
       const tx = txData as Record<string, unknown>;
       if (tx.status !== "pending") throw new Error("Levantamento já processado");
+
+      // Update status to rejected
       const { error: updateErr } = await supabase
-        .from("transactions").update({ status: "rejected" }).eq("id", id);
-      if (updateErr) throw new Error("Erro ao rejeitar saque");
-      // Restore balance
+        .from("transactions")
+        .update({ status: "rejected" })
+        .eq("id", id);
+
+      if (updateErr) throw new Error(`Erro ao rejeitar: ${updateErr.message}`);
+
+      // Restore user balance (the withdrawal amount is stored as negative)
       const withdrawalAmount = Math.abs(Number(tx.amount ?? 0));
       if (withdrawalAmount > 0 && tx.user_id) {
-        const { data: profileData } = await supabase
-          .from("profiles").select("balance").eq("id", tx.user_id as string).single();
-        if (profileData) {
-          const restored = Math.round((Number((profileData as Record<string, unknown>).balance ?? 0) + withdrawalAmount) * 100) / 100;
-          await supabase.from("profiles").update({ balance: restored }).eq("id", tx.user_id as string);
+        const { data: profileData, error: profileErr } = await supabase
+          .from("profiles")
+          .select("balance")
+          .eq("id", tx.user_id as string)
+          .single();
+
+        if (!profileErr && profileData) {
+          const profile = profileData as Record<string, unknown>;
+          const restored = Math.round((Number(profile.balance ?? 0) + withdrawalAmount) * 100) / 100;
+          await supabase
+            .from("profiles")
+            .update({ balance: restored })
+            .eq("id", tx.user_id as string);
         }
       }
+
       return { ok: true };
     },
     onSuccess: () => {
