@@ -348,7 +348,7 @@ export function useListPlayers() {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(200);
-      if (error) throw error;
+      if (error) return [];
       return (data ?? []).map(p => mapPlayer(p as Record<string, unknown>));
     },
     refetchInterval: 30000,

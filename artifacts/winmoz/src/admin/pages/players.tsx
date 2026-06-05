@@ -88,9 +88,9 @@ export default function Players() {
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
-                          {p.username[0].toUpperCase()}
+                          {((p.username || p.id || "?")[0] ?? "?").toUpperCase()}
                         </div>
-                        <span className="font-medium text-gray-800">{p.username}</span>
+                        <span className="font-medium text-gray-800">{p.username || "utilizador"}</span>
                       </div>
                     </td>
                     <td className="px-5 py-3.5"><StatusBadge status={p.status} /></td>

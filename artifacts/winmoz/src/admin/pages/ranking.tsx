@@ -34,7 +34,7 @@ export default function Ranking() {
             return (
               <div key={entry.playerId} className={`bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col items-center justify-end ${heights[idx]}`}>
                 <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${gradients[idx]} flex items-center justify-center text-white text-lg font-bold mb-2 shadow-md`}>
-                  {entry.username[0].toUpperCase()}
+                  {((entry.username || "?")[0] ?? "?").toUpperCase()}
                 </div>
                 <div className="font-semibold text-gray-800 text-sm">{entry.username}</div>
                 <div className="text-xs text-gray-400">{entry.wins}V · {entry.winRate}%</div>
@@ -68,7 +68,7 @@ export default function Ranking() {
               <div key={entry.playerId} data-testid={`rank-row-${entry.playerId}`} className="px-5 py-4 flex items-center gap-4 hover:bg-gray-50/50 transition-colors">
                 <RankIcon rank={entry.rank} />
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
-                  {entry.username[0].toUpperCase()}
+                  {((entry.username || "?")[0] ?? "?").toUpperCase()}
                 </div>
                 <div className="flex-1">
                   <div className="font-semibold text-gray-800">{entry.username}</div>

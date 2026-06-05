@@ -9,6 +9,7 @@ const V1 = "#6C5CE7";
 export interface RealOnlinePlayer {
   id: string;
   username: string;
+  avatarUrl: string | null;
   status: "online" | "in_game" | "idle" | "offline" | "suspended";
   balance: number;
   updatedAt: string;
@@ -26,7 +27,8 @@ function getStatus(p: Record<string, unknown>): RealOnlinePlayer["status"] {
 function mapProfile(p: Record<string, unknown>): RealOnlinePlayer {
   return {
     id: p.id as string,
-    username: (p.username as string) ?? (p.full_name as string) ?? "utilizador",
+    username: (p.username as string) || (p.full_name as string) || "utilizador",
+    avatarUrl: (p.avatar_url as string) ?? null,
     status: getStatus(p),
     balance: Number(p.balance ?? 0),
     updatedAt: (p.last_seen_at as string) ?? (p.updated_at as string) ?? (p.created_at as string),
@@ -52,15 +54,24 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function Avatar({ seed, size = 36 }: { seed: string; size?: number }) {
+function Avatar({ seed, avatarUrl, size = 36 }: { seed: string; avatarUrl?: string | null; size?: number }) {
   const palette = ["6C5CE7", "7c3aed", "4f46e5", "0ea5e9", "10b981", "f59e0b"];
-  const color = palette[seed.charCodeAt(0) % palette.length];
+  const color = palette[(seed || "?").charCodeAt(0) % palette.length];
+  const initials = ((seed || "?")[0] ?? "?").toUpperCase();
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={seed}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextSibling as HTMLElement | null)?.removeAttribute("hidden"); }}
+        style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, objectFit: "cover", border: "1.5px solid rgba(108,92,231,.12)" }}
+      />
+    );
+  }
   return (
-    <img
-      src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${seed}&backgroundColor=${color}`}
-      alt={seed}
-      style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, background: "white", border: "1.5px solid rgba(108,92,231,.12)" }}
-    />
+    <div style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, background: `#${color}`, border: "1.5px solid rgba(108,92,231,.12)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: size * 0.4 }}>
+      {initials}
+    </div>
   );
 }
 
@@ -215,7 +226,7 @@ export default function OnlineUsersPage() {
           <div className="divide-y" style={{ borderColor: "rgba(108,92,231,.04)" }}>
             {players.map(player => (
               <div key={player.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-indigo-50/40 transition-colors group">
-                <Avatar seed={player.username} />
+                <Avatar seed={player.username} avatarUrl={player.avatarUrl} />
                 <div className="flex-1 min-w-0">
                   <div className="text-[13.5px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{player.username}</div>
                   <div className="flex items-center gap-1.5 mt-0.5">
