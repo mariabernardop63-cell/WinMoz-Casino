@@ -1125,24 +1125,45 @@ export default function LudoGame() {
   useEffect(()=>{winnerRef.current=winner;},[winner]);
   useEffect(()=>{stuckTurnsRef.current=stuckTurns;},[stuckTurns]);
 
-  // Credit winner 83% of total pot when game ends
+  // Credit winner + register match result when game ends
   useEffect(()=>{
     if(!winner||!profile?.id||BET_AMOUNT<=0||gameId==="local"||winCreditedRef.current) return;
-    if(winner!==myColor) return;
     winCreditedRef.current = true;
     const payout = Math.floor(BET_AMOUNT * 2 * 0.83);
+    const platformFee = BET_AMOUNT * 2 - payout;
+    const isWinner = winner === myColor;
     (async()=>{
       try {
-        const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-        if(data){
-          await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) + payout }).eq("id", profile.id);
-          await supabase.from("transactions").insert({
-            user_id: profile.id,
-            type: "win",
-            amount: payout,
-            description: `Vitória de jogo (Ludo) +${payout} MT`,
-            status: "approved",
-          });
+        if (isWinner) {
+          const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+          if(data){
+            await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) + payout }).eq("id", profile.id);
+            await supabase.from("transactions").insert({
+              user_id: profile.id,
+              type: "win",
+              amount: payout,
+              description: `Vitória de jogo (Ludo) +${payout} MT`,
+              status: "approved",
+            });
+          }
+        }
+        // Only "blue" (first player) updates the match record
+        if (myColor === "blue") {
+          await supabase.from("matches").update({
+            status: "finished",
+            winner_name: winner === "blue" ? playerName : opponentName,
+            winner_id: winner === "blue" ? profile.id : null,
+            completed_at: new Date().toISOString(),
+          }).eq("id", gameId);
+          if (platformFee > 0) {
+            await supabase.from("platform_earnings").insert({
+              amount: platformFee,
+              source: "game_fee",
+              description: `Taxa de jogo (Ludo) — aposta ${BET_AMOUNT} MT`,
+              reference_id: gameId,
+              created_at: new Date().toISOString(),
+            });
+          }
         }
       } catch { winCreditedRef.current = false; }
     })();
@@ -1457,6 +1478,22 @@ export default function LudoGame() {
               });
             }
           } catch { betDeductedRef.current = false; }
+        }
+        // Only "blue" (first player) registers the match to avoid duplicates
+        if (myColor === "blue" && BET_AMOUNT > 0 && gameId !== "local") {
+          try {
+            await supabase.from("matches").upsert({
+              id: gameId,
+              game_type: "ludo",
+              player1_id: profile.id,
+              player1_name: playerName,
+              player2_name: opponentName,
+              bet_amount: BET_AMOUNT,
+              winner_payout: Math.floor(BET_AMOUNT * 2 * 0.83),
+              status: "active",
+              created_at: new Date().toISOString(),
+            }, { onConflict: "id" });
+          } catch { /* non-critical */ }
         }
       }
     });

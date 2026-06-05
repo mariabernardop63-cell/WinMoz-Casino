@@ -642,14 +642,43 @@ export function useRejectWithdrawal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: { reason: string } }) => {
+      const { data: withdrawalData, error: fetchError } = await supabase
+        .from("withdrawals")
+        .select("amount, user_id")
+        .eq("id", id)
+        .single();
+
+      if (fetchError || !withdrawalData) throw fetchError ?? new Error("Levantamento não encontrado");
+
       const { error } = await supabase
         .from("withdrawals")
         .update({ status: "rejected", rejection_reason: data.reason, processed_at: new Date().toISOString() })
         .eq("id", id);
       if (error) throw error;
+
+      // Restore the user's balance on rejection
+      const amount = Number(withdrawalData.amount ?? 0);
+      if (amount > 0 && withdrawalData.user_id) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("balance")
+          .eq("id", withdrawalData.user_id)
+          .single();
+        if (profileData) {
+          const restored = Math.round((Number(profileData.balance ?? 0) + amount) * 100) / 100;
+          await supabase
+            .from("profiles")
+            .update({ balance: restored })
+            .eq("id", withdrawalData.user_id);
+        }
+      }
+
       return { ok: true };
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["withdrawals"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["withdrawals"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    },
   });
 }
 

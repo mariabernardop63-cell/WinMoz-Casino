@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { useLocation } from "wouter";
 import {
-  ChevronLeft, Bell, ChevronUp, ChevronDown, Delete,
+  ChevronLeft, Bell, Delete,
   CheckCircle2, XCircle, AlertTriangle, Smartphone, Pencil, Info,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -18,7 +18,15 @@ function fmtMZN(val: number) {
   return `${Number(int).toLocaleString("pt-PT")},${dec}`;
 }
 
-type Screen = "amount" | "confirm" | "success" | "pending" | "rejected";
+type Screen = "amount" | "confirm" | "pending" | "approved" | "rejected";
+
+function ChevronRightIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
 
 function SwipeToConfirm({ onConfirm, disabled }: { onConfirm: () => void; disabled?: boolean }) {
   const x = useMotionValue(0);
@@ -42,7 +50,7 @@ function SwipeToConfirm({ onConfirm, disabled }: { onConfirm: () => void; disabl
         style={{ x, marginLeft: 6, width: 52, height: 52, background: CYAN, borderRadius: "50%" }}
         onDragEnd={(_, info) => {
           const cw = containerRef.current?.offsetWidth ?? 340;
-          if (info.offset.x > cw * 0.65) { onConfirm(); }
+          if (info.offset.x > cw * 0.65) { if (!disabled) onConfirm(); }
           else { x.set(0); }
         }}
         onClick={() => !disabled && onConfirm()}
@@ -51,14 +59,6 @@ function SwipeToConfirm({ onConfirm, disabled }: { onConfirm: () => void; disabl
         <ChevronRightIcon className="w-7 h-7 text-black" />
       </motion.div>
     </div>
-  );
-}
-
-function ChevronRightIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
   );
 }
 
@@ -71,8 +71,10 @@ export default function Levantar() {
   const [screen, setScreen] = useState<Screen>("amount");
   const [rawCents, setRawCents] = useState(0);
   const [processingConfirm, setProcessingConfirm] = useState(false);
+  const [withdrawalId, setWithdrawalId] = useState<string | null>(null);
   const [txId] = useState(() => "TX" + Date.now().toString(36).toUpperCase());
   const [txDate] = useState(() => new Date().toLocaleString("pt-PT"));
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const amountVal = rawCents / 100;
   const phoneDisplay = userPhone || "+258 8XX XXX XXX";
@@ -97,14 +99,41 @@ export default function Levantar() {
 
   const canProceed = amountVal >= MIN_WITHDRAW && amountVal <= MAX_WITHDRAW;
 
-  const handleConfirm = async () => {
-    setProcessingConfirm(true);
+  // Poll withdrawal status in realtime until it's no longer pending
+  const startPolling = (wId: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    pollingRef.current = setInterval(async () => {
+      try {
+        const { data } = await supabase
+          .from("withdrawals")
+          .select("status")
+          .eq("id", wId)
+          .single();
+        if (data?.status === "approved") {
+          clearInterval(pollingRef.current!);
+          pollingRef.current = null;
+          await refreshProfile();
+          setScreen("approved");
+        } else if (data?.status === "rejected") {
+          clearInterval(pollingRef.current!);
+          pollingRef.current = null;
+          // Restore balance on rejection — re-fetch fresh profile
+          await refreshProfile();
+          setScreen("rejected");
+        }
+      } catch { /* silently ignore */ }
+    }, 3000);
+  };
 
-    if (amountVal > balance) {
-      setProcessingConfirm(false);
-      setScreen("rejected");
-      return;
-    }
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  const handleConfirm = async () => {
+    if (processingConfirm) return;
+    setProcessingConfirm(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -125,14 +154,22 @@ export default function Levantar() {
         body: JSON.stringify({ amount: amountVal, phone: profile?.phone }),
       });
 
-      if (!res.ok) {
+      const json = await res.json() as { success?: boolean; withdrawalId?: string; error?: string };
+
+      if (!res.ok || !json.success) {
         setProcessingConfirm(false);
         setScreen("rejected");
         return;
       }
 
+      // Balance already debited by API — refresh profile
       await refreshProfile();
       setProcessingConfirm(false);
+
+      if (json.withdrawalId) {
+        setWithdrawalId(json.withdrawalId);
+        startPolling(json.withdrawalId);
+      }
       setScreen("pending");
     } catch {
       setProcessingConfirm(false);
@@ -140,6 +177,7 @@ export default function Levantar() {
     }
   };
 
+  // ─── Amount Screen ────────────────────────────────────────────────────────
   if (screen === "amount") {
     return (
       <div className="min-h-screen w-full flex justify-center" style={{ background: "#000" }}>
@@ -230,6 +268,7 @@ export default function Levantar() {
     );
   }
 
+  // ─── Confirm Screen ───────────────────────────────────────────────────────
   if (screen === "confirm") {
     return (
       <div className="min-h-screen w-full flex justify-center" style={{ background: "#000" }}>
@@ -294,15 +333,13 @@ export default function Levantar() {
     );
   }
 
+  // ─── Pending Screen (realtime waiting) ────────────────────────────────────
   if (screen === "pending") {
     return (
       <div className="min-h-screen w-full flex justify-center" style={{ background: "#000" }}>
         <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
           <div className="flex items-center justify-between pt-12 pb-8">
-            <button onClick={() => setLocation("/perfil")}
-              className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#1c1c1e" }}>
-              <ChevronLeft className="w-5 h-5 text-white" />
-            </button>
+            <div className="w-10" />
             <p className="font-semibold text-white text-base">Levantamento</p>
             <div className="w-10" />
           </div>
@@ -310,11 +347,13 @@ export default function Levantar() {
           <motion.div className="flex flex-col items-center mb-8"
             initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
             transition={{ type: "spring", stiffness: 280, damping: 20 }}>
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5 shadow-2xl"
-              style={{ background: "linear-gradient(135deg, #f59e0b, #d97706)" }}>
-              <CheckCircle2 className="w-10 h-10 text-white" strokeWidth={2.5} />
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5 shadow-2xl relative"
+              style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}>
+              <div className="absolute inset-0 rounded-full border-4 border-transparent animate-spin"
+                style={{ borderTopColor: "#a78bfa" }} />
+              <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
             </div>
-            <p className="text-white/50 text-sm font-medium uppercase tracking-widest mb-1">Pedido Submetido</p>
+            <p className="text-white/50 text-sm font-medium uppercase tracking-widest mb-1">A Processar</p>
             <p className="text-white font-light text-center"
               style={{ fontSize: "2.8rem", fontFamily: "system-ui", lineHeight: 1.1 }}>
               {fmtMZN(amountVal)}<span className="text-2xl text-white/40 ml-1">MZN</span>
@@ -334,11 +373,11 @@ export default function Levantar() {
                 { label: "Data",     val: txDate },
                 { label: "Carteira", val: `${METHOD_NAME} · ${phoneDisplay}` },
                 { label: "Valor",    val: `${fmtMZN(amountVal)} MZN` },
-                { label: "Estado",   val: "Pendente (análise manual)", highlight: true },
+                { label: "Estado",   val: "Em verificação…", highlight: true },
               ].map(row => (
                 <div key={row.label} className="flex items-center justify-between">
                   <span className="text-sm" style={{ color: "#8e8e93" }}>{row.label}</span>
-                  <span className="text-sm font-medium" style={{ color: (row as any).highlight ? "#f59e0b" : "#fff", maxWidth: 200, textAlign: "right" }}>
+                  <span className="text-sm font-medium" style={{ color: (row as any).highlight ? "#a78bfa" : "#fff", maxWidth: 200, textAlign: "right" }}>
                     {row.val}
                   </span>
                 </div>
@@ -347,30 +386,27 @@ export default function Levantar() {
           </motion.div>
 
           <div className="flex items-start gap-2 p-3 rounded-xl mb-6" style={{ background: "#1c1c1e" }}>
-            <Info style={{ width: 14, height: 14, color: "#f59e0b", marginTop: 2, flexShrink: 0 }} />
+            <Info style={{ width: 14, height: 14, color: "#a78bfa", marginTop: 2, flexShrink: 0 }} />
             <p className="text-xs" style={{ color: "#8e8e93", lineHeight: 1.5 }}>
-              O teu pedido foi recebido e está em análise. O pagamento será processado manualmente pela nossa equipa.
+              O teu pedido foi recebido e está a ser verificado. Aguarda a confirmação — esta página actualiza automaticamente em tempo real.
             </p>
           </div>
 
-          <div className="flex flex-col gap-3">
-            <button onClick={() => setLocation("/perfil")}
-              className="w-full h-14 rounded-full font-semibold text-base text-black"
-              style={{ background: CYAN }}>
-              Voltar ao Perfil
-            </button>
-            <button onClick={() => { setRawCents(0); setScreen("amount"); }}
-              className="w-full h-14 rounded-full font-medium text-sm"
-              style={{ background: "#1c1c1e", color: "#8e8e93" }}>
-              Novo Levantamento
-            </button>
-          </div>
+          <motion.div
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="flex items-center justify-center gap-2 py-3 rounded-xl mb-4"
+            style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.2)" }}>
+            <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+            <span className="text-xs font-semibold text-violet-400">A aguardar aprovação do administrador…</span>
+          </motion.div>
         </div>
       </div>
     );
   }
 
-  if (screen === "success") {
+  // ─── Approved Screen ──────────────────────────────────────────────────────
+  if (screen === "approved") {
     return (
       <div className="min-h-screen w-full flex justify-center" style={{ background: "#000" }}>
         <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
@@ -389,11 +425,12 @@ export default function Levantar() {
               style={{ background: "linear-gradient(135deg, #00b09b, #00D4B4)" }}>
               <CheckCircle2 className="w-10 h-10 text-white" strokeWidth={2.5} />
             </div>
-            <p className="text-white/50 text-sm font-medium uppercase tracking-widest mb-1">Aprovado</p>
+            <p className="text-white/50 text-sm font-medium uppercase tracking-widest mb-1">Aprovado!</p>
             <p className="text-white font-light text-center"
               style={{ fontSize: "2.8rem", fontFamily: "system-ui", lineHeight: 1.1 }}>
               {fmtMZN(amountVal)}<span className="text-2xl text-white/40 ml-1">MZN</span>
             </p>
+            <p className="text-white/40 text-sm mt-2">O pagamento foi aprovado e enviado para o teu M-Pesa.</p>
           </motion.div>
           <div className="flex flex-col gap-3">
             <button onClick={() => setLocation("/perfil")}
@@ -407,6 +444,7 @@ export default function Levantar() {
     );
   }
 
+  // ─── Rejected Screen ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen w-full flex justify-center" style={{ background: "#000" }}>
       <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
@@ -434,7 +472,7 @@ export default function Levantar() {
         <div className="flex items-start gap-3 p-3.5 rounded-2xl mb-6" style={{ background: "#1c1c1e" }}>
           <AlertTriangle style={{ width: 16, height: 16, color: "#f39c12", flexShrink: 0, marginTop: 2 }} />
           <p className="text-xs leading-relaxed" style={{ color: "#8e8e93" }}>
-            Saldo insuficiente ou erro ao processar. Recarrega a conta ou tenta novamente.
+            O teu pedido de levantamento foi recusado pelo administrador. O valor foi devolvido ao teu saldo.
           </p>
         </div>
         <div className="flex flex-col gap-3">

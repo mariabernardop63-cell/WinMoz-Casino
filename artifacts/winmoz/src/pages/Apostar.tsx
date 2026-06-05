@@ -294,9 +294,8 @@ function MobileWalletPINScreen({
 
 /* ── Rejected Screen ── */
 function RejectedScreen({
-  amount, onRetry, onRecharge,
-}: { amount: number; onRetry: () => void; onRecharge: () => void }) {
-  const balance = parseFloat(localStorage.getItem("winmoz_balance") || "0");
+  amount, balance, onRetry, onRecharge,
+}: { amount: number; balance: number; onRetry: () => void; onRecharge: () => void }) {
   return (
     <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
       <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
@@ -712,12 +711,12 @@ export default function Apostar() {
     if (!canStart) return;
 
     if (payMethod === "carteira") {
-      /* Carteira Móvel → PIN confirmation screen, no balance debit */
+      /* Carteira Móvel → PIN confirmation screen, no balance debit here (deducted in game) */
       setScreen("pin-confirmation");
       return;
     }
 
-    /* Conta Poker → check Supabase balance */
+    /* Conta Poker → verify Supabase balance is sufficient */
     setScreen("processing");
     try {
       let freshBalance = 0;
@@ -731,10 +730,14 @@ export default function Apostar() {
       } else {
         freshBalance = parseFloat(String(profile?.balance ?? "0"));
       }
-      await new Promise(res => setTimeout(res, 2000));
-      setScreen(freshBalance >= (selectedBet ?? 0) ? "matchmaking" : "rejected");
+      await new Promise(res => setTimeout(res, 1200));
+      if (freshBalance < (selectedBet ?? 0)) {
+        setScreen("rejected");
+        return;
+      }
+      setScreen("matchmaking");
     } catch {
-      await new Promise(res => setTimeout(res, 2000));
+      await new Promise(res => setTimeout(res, 1200));
       const fallback = parseFloat(String(profile?.balance ?? "0"));
       setScreen(fallback >= (selectedBet ?? 0) ? "matchmaking" : "rejected");
     }
@@ -762,6 +765,7 @@ export default function Apostar() {
     return (
       <RejectedScreen
         amount={selectedBet ?? 0}
+        balance={parseFloat(String(profile?.balance ?? "0")) || 0}
         onRetry={() => setScreen("bet")}
         onRecharge={() => setLocation("/recarga")}
       />

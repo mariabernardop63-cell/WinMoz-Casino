@@ -52,6 +52,15 @@ async function fetchProfile(userId: string, attempt = 0): Promise<UserProfile | 
   }
 }
 
+async function updateLastSeen(userId: string) {
+  try {
+    await supabase
+      .from("profiles")
+      .update({ last_seen_at: new Date().toISOString() })
+      .eq("id", userId);
+  } catch { /* silently fail */ }
+}
+
 async function ensureProfileExists(
   userId: string,
   email: string,
@@ -110,17 +119,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     cachedProfile ? { id: cachedProfile.id, email: cachedProfile.email ?? "" } : null
   );
   const [profile, setProfile] = useState<UserProfile | null>(cachedProfile ?? null);
-  // If we already have a cache hit, skip the loading spinner
   const [loading, setLoading] = useState(!cachedProfile);
-  // sessionReady becomes true only after initFromSession() confirms the Supabase session
   const [sessionReady, setSessionReady] = useState(false);
 
   const activeUidRef = useRef<string | null>(cachedProfile?.id ?? null);
   const signedInHandledRef = useRef(false);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const saveAndSet = (p: UserProfile) => {
     setProfile(p);
     saveCachedProfile(p);
+  };
+
+  const startHeartbeat = (userId: string) => {
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+    updateLastSeen(userId);
+    heartbeatRef.current = setInterval(() => {
+      updateLastSeen(userId);
+    }, 60_000);
+  };
+
+  const stopHeartbeat = () => {
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
   };
 
   const refreshProfile = async () => {
@@ -137,6 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     activeUidRef.current = null;
     signedInHandledRef.current = false;
+    stopHeartbeat();
     clearCachedProfile();
     try { await supabase.auth.signOut(); } catch { /* ignore */ }
     setUser(null);
@@ -146,15 +170,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    // ── getSession() is the primary and most reliable source on page reload ──
-    // It reads the stored token directly; doesn't depend on event timing.
     const initFromSession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (cancelled) return;
 
         if (!session?.user) {
-          // No valid session — wipe any stale cache
           clearCachedProfile();
           setUser(null);
           setProfile(null);
@@ -164,13 +185,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const { id, email = "" } = session.user;
 
-        // If the cache already seeded this exact user, just do a silent background refresh
         if (cachedProfile?.id === id) {
           activeUidRef.current = id;
           signedInHandledRef.current = true;
           setLoading(false);
           setSessionReady(true);
-          // Refresh balance/profile silently in background
+          startHeartbeat(id);
           const fresh = await fetchProfile(id);
           if (!cancelled && activeUidRef.current === id && fresh) {
             saveAndSet({ ...fresh, email });
@@ -178,7 +198,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Different user or no cache — load fresh
         activeUidRef.current = id;
         if (!cancelled) setUser({ id, email });
 
@@ -188,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           signedInHandledRef.current = true;
           setLoading(false);
           setSessionReady(true);
+          startHeartbeat(id);
         }
       } catch {
         if (!cancelled) { setLoading(false); setSessionReady(true); }
@@ -196,19 +216,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     initFromSession();
 
-    // Safety net — never leave the app stuck in loading state
     const safetyTimer = setTimeout(() => {
       if (!cancelled) { setLoading(false); setSessionReady(true); }
     }, 8000);
 
-    // ── onAuthStateChange handles live sign-in, sign-out, and token refresh ──
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (cancelled) return;
 
         if (event === "SIGNED_IN" && session?.user) {
           const { id, email = "" } = session.user;
-          // Avoid re-running if initFromSession already handled this user
           if (signedInHandledRef.current && activeUidRef.current === id) return;
 
           activeUidRef.current = id;
@@ -232,11 +249,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (data) saveAndSet({ ...data, email });
             signedInHandledRef.current = true;
             setLoading(false);
+            startHeartbeat(id);
           }
 
         } else if (event === "SIGNED_OUT") {
           activeUidRef.current = null;
           signedInHandledRef.current = false;
+          stopHeartbeat();
           clearCachedProfile();
           if (!cancelled) {
             setUser(null);
@@ -247,7 +266,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else if (event === "TOKEN_REFRESHED" && session?.user) {
           const { id, email = "" } = session.user;
           if (!cancelled) setUser(prev => (prev?.id === id ? prev : { id, email }));
-          // Silent profile refresh after token is renewed
           const data = await fetchProfile(id);
           if (!cancelled && activeUidRef.current === id && data) {
             saveAndSet({ ...data, email });
@@ -265,6 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       clearTimeout(safetyTimer);
       subscription.unsubscribe();
+      stopHeartbeat();
     };
   }, []);
 

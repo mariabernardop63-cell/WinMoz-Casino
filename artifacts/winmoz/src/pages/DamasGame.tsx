@@ -458,18 +458,41 @@ export default function DamasGame() {
   useEffect(() => { winnerRef.current = winner; }, [winner]);
   useEffect(() => { livesRef.current = lives; }, [lives]);
 
-  // Credit winner 83% of total pot when game ends
+  // Credit winner + register match result when game ends
   useEffect(() => {
     if (!winner || !profile?.id || BET <= 0 || gameId === "local" || winCreditedRef.current) return;
-    if (winner !== myColor) return;
     winCreditedRef.current = true;
     const payout = Math.floor(BET * 2 * 0.83);
+    const platformFee = BET * 2 - payout;
+    const isWinner = winner === myColor;
     (async () => {
       try {
-        const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-        if (data) {
-          await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) + payout }).eq("id", profile.id);
-          await supabase.from("transactions").insert({ user_id: profile.id, type: "win", amount: payout, description: `Vitória de jogo (Damas) +${payout} MT`, status: "approved" });
+        // Credit winner's balance
+        if (isWinner) {
+          const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+          if (data) {
+            await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) + payout }).eq("id", profile.id);
+            await supabase.from("transactions").insert({ user_id: profile.id, type: "win", amount: payout, description: `Vitória de jogo (Damas) +${payout} MT`, status: "approved" });
+          }
+        }
+        // Update match record as finished (only player "w" to avoid duplicate updates)
+        if (myColor === "w") {
+          await supabase.from("matches").update({
+            status: "finished",
+            winner_name: winner === "w" ? playerName : opponentName,
+            winner_id: winner === "w" ? profile.id : null,
+            completed_at: new Date().toISOString(),
+          }).eq("id", gameId);
+          // Register platform earnings (fee)
+          if (platformFee > 0) {
+            await supabase.from("platform_earnings").insert({
+              amount: platformFee,
+              source: "game_fee",
+              description: `Taxa de jogo (Damas) — aposta ${BET} MT`,
+              reference_id: gameId,
+              created_at: new Date().toISOString(),
+            });
+          }
         }
       } catch { winCreditedRef.current = false; }
     })();
@@ -609,6 +632,22 @@ export default function DamasGame() {
               await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta de jogo (Damas)", status: "approved" });
             }
           }catch{ betDeductedRef.current = false; }
+        }
+        // Only player "w" (blue/first) registers the match to avoid duplicates
+        if (myColor === "w" && BET > 0 && gameId !== "local") {
+          try {
+            await supabase.from("matches").upsert({
+              id: gameId,
+              game_type: "dama",
+              player1_id: profile.id,
+              player1_name: playerName,
+              player2_name: opponentName,
+              bet_amount: BET,
+              winner_payout: Math.floor(BET * 2 * 0.83),
+              status: "active",
+              created_at: new Date().toISOString(),
+            }, { onConflict: "id" });
+          } catch { /* non-critical */ }
         }
       }
     });
