@@ -101,7 +101,7 @@ const MOCK_ADMIN_PROFILE: AdminProfile = {
   id: 1,
   name: "Administrador Principal",
   username: "admin",
-  email: "nexialonemz@gmail.com",
+  email: "123456789@gmail.com",
   phone: "+351 912 345 678",
   role: "super_admin",
   avatarUrl: null,

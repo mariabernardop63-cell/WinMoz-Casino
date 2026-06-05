@@ -68,7 +68,7 @@ export default function Login() {
         return;
       }
 
-      const adminEmail = "nexialonemz@gmail.com";
+      const adminEmail = "123456789@gmail.com";
       if (email.trim().toLowerCase() === adminEmail) {
         setLocation("/admin");
       } else {

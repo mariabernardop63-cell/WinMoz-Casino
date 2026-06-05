@@ -84,9 +84,10 @@ export function useGetDashboardStats() {
           .gte("created_at", todayISO) as any),
         safeData(supabase.from("matches").select("id")
           .gte("created_at", todayISO) as any),
-        safeData(supabase.from("platform_earnings").select("amount") as any),
-        safeData(supabase.from("platform_earnings").select("amount")
-          .gte("created_at", todayISO) as any),
+        safeData(supabase.from("matches").select("bet_amount")
+          .eq("status", "finished") as any),
+        safeData(supabase.from("matches").select("bet_amount")
+          .eq("status", "finished").gte("created_at", todayISO) as any),
         safeData(supabase.from("reports").select("id").eq("status", "open") as any),
       ]);
 
@@ -95,10 +96,11 @@ export function useGetDashboardStats() {
         .reduce((s, w) => s + Math.abs(Number(w.amount ?? 0)), 0);
       const todaySaidas = (todayWithdrawalsData as { amount: number }[])
         .reduce((s, w) => s + Math.abs(Number(w.amount ?? 0)), 0);
-      const platformRevenue = (earningsData as { amount: number }[])
-        .reduce((s, r) => s + Number(r.amount ?? 0), 0);
-      const todayEarnings = (earningsTodayData as { amount: number }[])
-        .reduce((s, r) => s + Number(r.amount ?? 0), 0);
+      // 10% da aposta total (bet_amount * 2) por partida terminada
+      const platformRevenue = (earningsData as { bet_amount: number }[])
+        .reduce((s, m) => s + Number(m.bet_amount ?? 0) * 0.2, 0);
+      const todayEarnings = (earningsTodayData as { bet_amount: number }[])
+        .reduce((s, m) => s + Number(m.bet_amount ?? 0) * 0.2, 0);
 
       return {
         liveMatches:              activeBets,

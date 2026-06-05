@@ -81,13 +81,22 @@ const FILTER_TABS = [
 ] as const;
 
 async function fetchOnlinePlayers(): Promise<RealOnlinePlayer[]> {
-  const { data, error } = await supabase
+  // Try with last_seen_at ordering first; fall back to updated_at if column missing
+  let result = await supabase
     .from("profiles")
-    .select("id, username, full_name, balance, last_seen_at, updated_at, created_at, is_blocked")
+    .select("*")
     .order("last_seen_at", { ascending: false, nullsFirst: false })
     .limit(300);
-  if (error) return [];
-  return (data ?? []).map(p => mapProfile(p as Record<string, unknown>));
+  if (result.error) {
+    // last_seen_at may not exist — retry with updated_at ordering
+    result = await supabase
+      .from("profiles")
+      .select("*")
+      .order("updated_at", { ascending: false, nullsFirst: false })
+      .limit(300);
+  }
+  if (result.error) return [];
+  return (result.data ?? []).map(p => mapProfile(p as Record<string, unknown>));
 }
 
 export default function OnlineUsersPage() {
