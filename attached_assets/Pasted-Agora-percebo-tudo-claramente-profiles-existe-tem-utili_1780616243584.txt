@@ -1,0 +1,67 @@
+Agora percebo tudo claramente:
+
+profiles — existe ✅ (tem utilizadores)
+matches — existe mas está vazia (0 partidas)
+withdrawals — existe mas está vazia
+platform_earnings — existe mas está vazia
+O problema não é o código — é que a tabela platform_earnings e as tabelas de jogo ainda não têm dados reais, e a tabela matches não tem a coluna last_seen_at em profiles para detectar jogadores online. Vou verificar a estrutura real das tabelas.
+
+
+2 actions
+Agora percebo tudo. O Supabase está ligado, a tabela profiles tem dados (e a coluna last_seen_at existe mas é null em todos os utilizadores), e matches, withdrawals e platform_earnings estão vazias.
+
+O problema principal: o last_seen_at nunca é atualizado quando um utilizador entra, então jogadores online sempre mostra 0. Preciso de:
+
+Atualizar last_seen_at no login/sessão do utilizador
+Verificar se matches tem as colunas certas (game_type, player1_name, etc.)
+Verificar colunas de withdrawals e platform_earnings
+
+3 actions
+As colunas existem nas tabelas (retornam arrays vazios sem erros). O problema é que:
+
+last_seen_at nunca é atualizado — nenhum código o faz
+matches está vazia — os jogos não estão a ser registados na tabela
+Deixa-me ver o AuthContext e como os jogos guardam dados no Supabase.
+
+
+3 actions
+Agora entendo o problema completo. Preciso de:
+
+Atualizar last_seen_at no AuthContext quando o utilizador está online
+Verificar o simulation.ts para perceber como os jogos funcionam e registar partidas na tabela matches
+Vou ler os ficheiros relevantes em paralelo.
+
+
+3 actions
+Agora tenho o contexto completo. Os jogos usam dados sintéticos/simulados — não há integração real com Supabase nos jogos. Preciso de:
+
+Atualizar last_seen_at no AuthContext para jogadores online funcionarem
+Ver o Apostar.tsx e DamasGame.tsx para perceber onde registar partidas reais na tabela matches
+
+3 actions
+Agora tenho o contexto completo. Vou fazer todas as correções necessárias em paralelo:
+
+last_seen_at — atualizar no AuthContext para jogadores online funcionarem
+Registar partidas em matches — quando o Apostar.tsx faz match e quando o jogo termina
+Registar lucro em platform_earnings — quando jogo termina (10% do pote)
+Registar levantamentos em withdrawals — no Levantar.tsx
+
+2 actions
+Agora vejo o fluxo completo. Vou fazer todas as correções necessárias em paralelo:
+
+AuthContext — atualizar last_seen_at periodicamente
+Apostar.tsx — registar partida em matches quando match é encontrado + registar lucro quando jogo termina
+Levantar.tsx — registar levantamento em withdrawals + mostrar taxa real
+API Server — endpoint /withdraw que guarda em withdrawals
+
+3 actions
+Agora vou ler as partes restantes do Apostar.tsx e DamasGame.tsx para ver onde o jogo termina e onde posso inserir os registos:
+
+
+3 actions
+Tenho todo o contexto necessário. Agora vou implementar todas as correções em paralelo:
+
+AuthContext — heartbeat de last_seen_at a cada 60s
+DamasGame — registar partida em matches quando começa + lucro em platform_earnings quando termina
+Apostar — registar partida em matches quando match é criado
+Levantar — inserir em withdrawals diretamente no Supabase (evitar dependência da API)
