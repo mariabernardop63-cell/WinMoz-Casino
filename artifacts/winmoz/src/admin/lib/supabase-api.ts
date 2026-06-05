@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, useQueryClient as useQC } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { API_BASE } from "@/lib/apiBase";
 import { useEffect } from "react";
 
 /* ──────────────────────────────────────────────────────────────
@@ -723,7 +724,7 @@ export function useApproveWithdrawal() {
       // Try API server first (uses service role for full access)
       try {
         const token = await getAdminToken();
-        const res = await fetch("/api/admin/withdraw/approve", {
+        const res = await fetch(`${API_BASE}/admin/withdraw/approve`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ id }),
@@ -764,7 +765,7 @@ export function useRejectWithdrawal() {
       // Try API server first (handles balance restoration)
       try {
         const token = await getAdminToken();
-        const res = await fetch("/api/admin/withdraw/reject", {
+        const res = await fetch(`${API_BASE}/admin/withdraw/reject`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ id, reason: data.reason }),

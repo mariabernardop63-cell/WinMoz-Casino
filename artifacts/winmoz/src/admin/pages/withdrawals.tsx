@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useListWithdrawals, useApproveWithdrawal, useRejectWithdrawal, getListWithdrawalsQueryKey } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, XCircle, Landmark } from "lucide-react";
+import { toast } from "sonner";
 
 const V1 = "#6C5CE7";
 
@@ -42,14 +43,22 @@ export default function Withdrawals() {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListWithdrawalsQueryKey() });
           setConfirmModal(null);
-        }
+          toast.success("Saque aprovado com sucesso!");
+        },
+        onError: (err) => {
+          toast.error(`Erro ao aprovar: ${err instanceof Error ? err.message : "Tenta novamente"}`);
+        },
       });
     } else {
       rejectWithdrawal.mutate({ id: confirmModal.id, data: { reason: "Documentação insuficiente" } }, {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListWithdrawalsQueryKey() });
           setConfirmModal(null);
-        }
+          toast.success("Saque recusado.");
+        },
+        onError: (err) => {
+          toast.error(`Erro ao recusar: ${err instanceof Error ? err.message : "Tenta novamente"}`);
+        },
       });
     }
   }

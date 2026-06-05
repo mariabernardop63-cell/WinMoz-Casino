@@ -1,6 +1,7 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { ErrorBoundary } from "@/admin/components/ErrorBoundary";
 import { AdminThemeProvider } from "@/admin/contexts/AdminThemeContext";
+import { Toaster } from "@/components/ui/sonner";
 import AdminLayout from "@/admin/layout/Layout";
 import Dashboard from "@/admin/pages/dashboard";
 import Matches from "@/admin/pages/matches";
@@ -56,6 +57,7 @@ export default function AdminApp() {
         <WouterRouter base={ADMIN_BASE}>
           <div className="admin-panel-root">
             <AdminRouter />
+            <Toaster position="top-right" richColors />
           </div>
         </WouterRouter>
       </AdminThemeProvider>
