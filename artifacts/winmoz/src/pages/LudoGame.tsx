@@ -1065,6 +1065,16 @@ export default function LudoGame() {
     ? `${Number(profile.balance).toLocaleString("pt-MZ")} MT`
     : "0 MT";
   const opponentName = oppFromUrl ? decodeURIComponent(oppFromUrl) : "Adversário";
+
+  // Saved state for reconnection support
+  const _savedLudo=(()=>{
+    if(gameId==="local") return null;
+    try{
+      const s=sessionStorage.getItem(`wm_ludo_${gameId}`);
+      return s?JSON.parse(s) as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;lives:{blue:number;green:number}}:null;
+    }catch{return null;}
+  })();
+
   const [opponentBal, setOpponentBal] = useState("—");
   const [opponentTimeLeft, setOpponentTimeLeft] = useState(30);
   const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
@@ -1078,16 +1088,16 @@ export default function LudoGame() {
     {id:"G2",player:"green",pos:-1},{id:"G3",player:"green",pos:-1},
   ]);
 
-  const [pieces,setPieces]         = useState<GamePiece[]>(initialPieces);
-  const [turn,setTurn]             = useState<Player>("blue");
-  const [phase,setPhase]           = useState<Phase>("roll");
-  const [diceBlue,setDiceBlue]     = useState<number|null>(null);
-  const [diceGreen,setDiceGreen]   = useState<number|null>(null);
+  const [pieces,setPieces]         = useState<GamePiece[]>(_savedLudo?.pieces ?? initialPieces());
+  const [turn,setTurn]             = useState<Player>(_savedLudo?.turn ?? "blue");
+  const [phase,setPhase]           = useState<Phase>(_savedLudo?.phase ?? "roll");
+  const [diceBlue,setDiceBlue]     = useState<number|null>(_savedLudo?.diceBlue ?? null);
+  const [diceGreen,setDiceGreen]   = useState<number|null>(_savedLudo?.diceGreen ?? null);
   const [rollingBlue,setRollingB]  = useState(false);
   const [rollingGreen,setRollingG] = useState(false);
   const [movable,setMovable]       = useState<PieceId[]>([]);
   const [winner,setWinner]         = useState<Player|null>(null);
-  const [lives,setLives]           = useState({blue:5,green:5});
+  const [lives,setLives]           = useState(_savedLudo?.lives ?? {blue:5,green:5});
   const [timeLeft,setTimeLeft]     = useState(30);
 
   // ── Dice algorithm state ────────────────────────────────────────────────────
@@ -1124,6 +1134,26 @@ export default function LudoGame() {
   useEffect(()=>{turnRef.current=turn;},[turn]);
   useEffect(()=>{winnerRef.current=winner;},[winner]);
   useEffect(()=>{stuckTurnsRef.current=stuckTurns;},[stuckTurns]);
+
+  // Persist game state for reconnection
+  useEffect(()=>{
+    if(gameId==="local"||winner||phase==="done") return;
+    try{
+      sessionStorage.setItem(`wm_ludo_${gameId}`,JSON.stringify({
+        pieces:piecesRef.current,turn,phase,
+        diceBlue:diceBlueRef.current,diceGreen:diceGreenRef.current,
+        lives,
+      }));
+    }catch{/* ignore */}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[pieces,turn,phase,lives]);
+
+  useEffect(()=>{
+    if((winner||phase==="done")&&gameId!=="local"){
+      try{sessionStorage.removeItem(`wm_ludo_${gameId}`);}catch{}
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[winner,phase]);
 
   // Credit winner + register match result when game ends
   useEffect(()=>{
@@ -1426,6 +1456,22 @@ export default function LudoGame() {
       setMsg(`${opponentName} desistiu! Tu venceste!`);
     });
 
+    channel.on("broadcast",{ event:"ludo_resync_req" },()=>{
+      if(winnerRef.current||phaseRef.current==="done") return;
+      channel.send({ type:"broadcast", event:"ludo_resync_state", payload:{
+        pieces:piecesRef.current, turn:turnRef.current, phase:phaseRef.current,
+        diceBlue:diceBlueRef.current, diceGreen:diceGreenRef.current,
+      }});
+    });
+
+    channel.on("broadcast",{ event:"ludo_resync_state" },({ payload })=>{
+      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null};
+      setPieces(p.pieces); setTurn(p.turn); setPhase(p.phase);
+      setDiceBlue(p.diceBlue); setDiceGreen(p.diceGreen);
+      piecesRef.current=p.pieces; turnRef.current=p.turn; phaseRef.current=p.phase;
+      diceBlueRef.current=p.diceBlue; diceGreenRef.current=p.diceGreen;
+    });
+
     channel.on("broadcast",{ event:"rematch_request" },({ payload })=>{
       setRematchRequester((payload.name as string) ?? opponentName);
       setRematchPhase("received");
@@ -1462,6 +1508,11 @@ export default function LudoGame() {
     channel.subscribe(async(status)=>{
       if(status==="SUBSCRIBED"&&profile?.id){
         await channel.track({ userId:profile.id, color:myColor, balance:playerBal });
+        if(_savedLudo&&gameId!=="local"){
+          setTimeout(()=>{
+            channel.send({type:"broadcast",event:"ludo_resync_req",payload:{}});
+          },800);
+        }
         // Deduct bet from balance when game starts (once per game)
         if(BET_AMOUNT > 0 && !betDeductedRef.current){
           betDeductedRef.current = true;

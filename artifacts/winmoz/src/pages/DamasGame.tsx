@@ -371,7 +371,7 @@ function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQui
               <div>
                 <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",color:"rgba(255,255,255,0.4)",marginBottom:4}}>GANHOS</p>
                 <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#FFD700",lineHeight:1}}>
-                  +{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
+                  +{Math.floor(betAmount * 2 * 0.83).toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
               <div style={{width:44,height:44,borderRadius:12,background:"rgba(255,215,0,0.12)",
@@ -423,9 +423,18 @@ export default function DamasGame() {
   const playerBal    = profile?.balance ? `${Number(profile.balance).toLocaleString("pt-MZ")} MT` : "0 MT";
   const opponentName = oppUrl ? decodeURIComponent(oppUrl) : "Adversário";
 
+  // Saved state for reconnection support (navigating away and back)
+  const _savedDamas = (() => {
+    if (gameId === "local") return null;
+    try {
+      const s = sessionStorage.getItem(`wm_damas_${gameId}`);
+      return s ? JSON.parse(s) as { board: Board; turn: PColor; seq: number } : null;
+    } catch { return null; }
+  })();
+
   // ── Game state ────────────────────────────────────────────────────────────
-  const [board, setBoard]         = useState<Board>(makeInitialBoard);
-  const [turn, setTurn]           = useState<PColor>("w");
+  const [board, setBoard]         = useState<Board>(_savedDamas?.board ?? makeInitialBoard());
+  const [turn, setTurn]           = useState<PColor>(_savedDamas?.turn ?? "w");
   const [selected, setSelected]   = useState<Sq | null>(null);
   const [validDests, setValidDests] = useState<Sq[]>([]);
   const [validCapDests, setValidCapDests] = useState<{ to: Sq; cap: Sq }[]>([]);
@@ -439,7 +448,7 @@ export default function DamasGame() {
   const [lastMove, setLastMove]     = useState<{ from:Sq; to:Sq } | null>(null);
   const [selectableKeys, setSelectableKeys] = useState<Set<string>>(new Set());
   const [lives, setLives]           = useState<Record<PColor, number>>({ w:5, b:5 });
-  const seqRef  = useRef(0);
+  const seqRef  = useRef(_savedDamas?.seq ?? 0);
   const livesRef = useRef<Record<PColor, number>>({ w:5, b:5 });
   const boardRef = useRef(board);
   const turnRef  = useRef(turn);
@@ -457,6 +466,24 @@ export default function DamasGame() {
   useEffect(() => { turnRef.current = turn; }, [turn]);
   useEffect(() => { winnerRef.current = winner; }, [winner]);
   useEffect(() => { livesRef.current = lives; }, [lives]);
+
+  // Persist game state for reconnection (navigating away and back)
+  useEffect(() => {
+    if (gameId === "local" || winner) return;
+    try {
+      sessionStorage.setItem(`wm_damas_${gameId}`, JSON.stringify({
+        board: boardRef.current, turn, seq: seqRef.current,
+      }));
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board, turn]);
+
+  useEffect(() => {
+    if (winner && gameId !== "local") {
+      try { sessionStorage.removeItem(`wm_damas_${gameId}`); } catch {}
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winner]);
 
   // Credit winner + register match result when game ends
   useEffect(() => {
@@ -592,6 +619,25 @@ export default function DamasGame() {
       setWinReason(`${opponentName} desistiu da partida!`);
     });
 
+    ch.on("broadcast", { event: "damas_resync_req" }, () => {
+      if (winnerRef.current) return;
+      ch.send({
+        type: "broadcast", event: "damas_resync_state",
+        payload: { board: boardRef.current, turn: turnRef.current, seq: seqRef.current },
+      });
+    });
+
+    ch.on("broadcast", { event: "damas_resync_state" }, ({ payload }) => {
+      const incoming = payload as { board: Board; turn: PColor; seq: number };
+      if ((incoming.seq ?? 0) >= seqRef.current) {
+        setBoard(incoming.board);
+        setTurn(incoming.turn);
+        seqRef.current = incoming.seq ?? seqRef.current;
+        boardRef.current = incoming.board;
+        turnRef.current = incoming.turn;
+      }
+    });
+
     ch.on("broadcast", { event: "rematch_request" }, ({ payload }) => {
       setRematchRequester((payload.name as string) ?? opponentName);
       setRematchPhase("received");
@@ -624,6 +670,12 @@ export default function DamasGame() {
     ch.subscribe(async (status) => {
       if (status === "SUBSCRIBED" && profile?.id) {
         await ch.track({ userId: profile.id, color: myColor, balance: playerBal });
+        // If reconnecting (saved state exists), request current board from opponent
+        if (_savedDamas && gameId !== "local") {
+          setTimeout(() => {
+            ch.send({ type: "broadcast", event: "damas_resync_req", payload: {} });
+          }, 800);
+        }
         if(BET > 0 && !betDeductedRef.current){
           betDeductedRef.current = true;
           try{

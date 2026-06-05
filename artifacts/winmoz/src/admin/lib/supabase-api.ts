@@ -27,6 +27,7 @@ export function useAdminRealtimeSync() {
       .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => {
         qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
         qc.invalidateQueries({ queryKey: ["withdrawals"] });
+        qc.invalidateQueries({ queryKey: ["transactions"] });
       })
       .subscribe();
 
@@ -420,6 +421,107 @@ function mapBetStatus(s: string): "active" | "settled" | "cancelled" {
 }
 
 export function getListBetsQueryKey() { return ["bets"]; }
+
+/* ── Transactions (real transactions table) ── */
+export interface AdminTransaction {
+  id: string;
+  playerName: string;
+  type: "bet" | "deposit" | "withdrawal" | "win";
+  amount: number;
+  payout: number | null;
+  status: "active" | "settled" | "cancelled" | "pending" | "approved" | "rejected";
+  game: string;
+  createdAt: string;
+}
+
+function parseTxGame(description: unknown): string {
+  try {
+    const desc = typeof description === "string" ? JSON.parse(description) : null;
+    if (desc?.game) return desc.game;
+  } catch { /* not JSON */ }
+  const s = String(description ?? "");
+  if (s.includes("Damas")) return "dama";
+  if (s.includes("Ludo"))  return "ludo";
+  if (s.includes("Xadrez")) return "xadrez";
+  if (s.includes("Roleta")) return "roleta";
+  return "—";
+}
+
+function mapTxStatus(status: string, type: string): AdminTransaction["status"] {
+  if (type === "withdrawal") {
+    if (status === "pending")  return "pending";
+    if (status === "approved") return "approved";
+    if (status === "rejected") return "rejected";
+  }
+  if (status === "approved") return "settled";
+  if (status === "rejected") return "cancelled";
+  return "active";
+}
+
+export function useListTransactions(params?: { status?: string; type?: string }) {
+  return useQuery({
+    queryKey: ["transactions", params],
+    queryFn: async () => {
+      let q = supabase
+        .from("transactions")
+        .select("id, user_id, type, amount, status, description, created_at")
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (params?.status && params.status !== "all") {
+        const s = params.status;
+        if (s === "active")    q = q.eq("status", "pending");
+        else if (s === "settled")   q = q.in("status", ["approved"]);
+        else if (s === "cancelled") q = q.eq("status", "rejected");
+        else q = q.eq("status", s);
+      }
+      if (params?.type && params.type !== "all") {
+        if (params.type === "bet") q = q.in("type", ["bet", "win"]);
+        else q = q.eq("type", params.type);
+      }
+
+      const { data, error } = await q;
+      if (error) return [] as AdminTransaction[];
+
+      const rows = (data ?? []) as Record<string, unknown>[];
+      const userIds = [...new Set(rows.map(r => r.user_id as string).filter(Boolean))];
+
+      let profileMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, username, full_name")
+          .in("id", userIds);
+        profileMap = Object.fromEntries(
+          (profiles ?? []).map((p: Record<string, unknown>) => [
+            p.id as string,
+            (p.username as string) ?? (p.full_name as string) ?? "—",
+          ])
+        );
+      }
+
+      return rows.map(tx => {
+        const txType = (tx.type as string) ?? "bet";
+        const rawAmount = Number(tx.amount ?? 0);
+        const amount = Math.abs(rawAmount);
+        return {
+          id:         tx.id as string,
+          playerName: profileMap[tx.user_id as string] ?? "—",
+          type:       (txType === "win" ? "bet" : txType) as AdminTransaction["type"],
+          amount,
+          payout:     txType === "win" ? amount : null,
+          status:     mapTxStatus(tx.status as string, txType),
+          game:       parseTxGame(tx.description),
+          createdAt:  tx.created_at as string,
+        } satisfies AdminTransaction;
+      });
+    },
+    refetchInterval: 10000,
+    staleTime: 5000,
+  });
+}
+
+export function getListTransactionsQueryKey() { return ["transactions"]; }
 
 export function useCancelBet() {
   const qc = useQueryClient();

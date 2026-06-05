@@ -165,39 +165,85 @@ export default function Levantar() {
     setProcessingConfirm(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-
-      if (!token) {
+      if (!user?.id) {
         setProcessingConfirm(false);
         setScreen("rejected");
         return;
       }
 
-      const res = await fetch(`${API_BASE}/withdraw`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ amount: amountVal, phone: profile?.phone }),
-      });
+      // Try API server first; fall back to direct Supabase if unavailable
+      let withdrawalId: string | null = null;
+      let apiSuccess = false;
 
-      const json = await res.json() as { success?: boolean; withdrawalId?: string; error?: string };
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) {
+          const res = await fetch(`${API_BASE}/withdraw`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ amount: amountVal, phone: profile?.phone }),
+          });
+          if (res.ok) {
+            const json = await res.json() as { success?: boolean; withdrawalId?: string };
+            if (json.success && json.withdrawalId) {
+              withdrawalId = json.withdrawalId;
+              apiSuccess = true;
+            }
+          }
+        }
+      } catch { /* fall through to direct Supabase */ }
 
-      if (!res.ok || !json.success) {
-        setProcessingConfirm(false);
-        setScreen("rejected");
-        return;
+      if (!apiSuccess) {
+        // Direct Supabase path (API server unavailable)
+        const { data: profileData } = await supabase
+          .from("profiles").select("balance").eq("id", user.id).single();
+        const currentBalance = parseFloat(String(profileData?.balance ?? "0")) || 0;
+
+        if (currentBalance < amountVal) {
+          setProcessingConfirm(false);
+          setScreen("rejected");
+          return;
+        }
+
+        const newBalance = Math.round((currentBalance - amountVal) * 100) / 100;
+        const { error: balErr } = await supabase
+          .from("profiles").update({ balance: newBalance }).eq("id", user.id);
+        if (balErr) { setProcessingConfirm(false); setScreen("rejected"); return; }
+
+        const { data: txRow, error: txErr } = await supabase
+          .from("transactions").insert({
+            user_id: user.id,
+            type: "withdrawal",
+            amount: -amountVal,
+            description: JSON.stringify({
+              method: "M-Pesa",
+              phone: profile?.phone ?? null,
+              userName: profile?.full_name ?? "utilizador",
+            }),
+            status: "pending",
+            created_at: new Date().toISOString(),
+          }).select("id").single();
+
+        if (txErr || !txRow) {
+          // Restore balance on failure
+          await supabase.from("profiles").update({ balance: currentBalance }).eq("id", user.id);
+          setProcessingConfirm(false);
+          setScreen("rejected");
+          return;
+        }
+        withdrawalId = txRow.id;
       }
 
-      // Balance already debited by API — refresh profile
       await refreshProfile();
       setProcessingConfirm(false);
 
-      if (json.withdrawalId) {
-        setWithdrawalId(json.withdrawalId);
-        startPolling(json.withdrawalId);
+      if (withdrawalId) {
+        setWithdrawalId(withdrawalId);
+        startPolling(withdrawalId);
       }
       setScreen("pending");
     } catch {

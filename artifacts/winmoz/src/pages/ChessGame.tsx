@@ -638,7 +638,7 @@ function WinScreen({winner,winnerName,loserName,reason,betAmount,isWinner,onRepl
                 <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",
                   color:"rgba(255,255,255,0.4)",marginBottom:4}}>GANHOS</p>
                 <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#FFD700",lineHeight:1}}>
-                  +{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
+                  +{Math.floor(betAmount * 2 * 0.83).toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
               <div style={{width:44,height:44,borderRadius:12,background:"rgba(255,215,0,0.12)",
@@ -807,16 +807,25 @@ export default function ChessGame(){
   const playerName=myNameUrl?decodeURIComponent(myNameUrl):(profile?.full_name??"Jogador");
   const opponentName=oppFromUrl?decodeURIComponent(oppFromUrl):"Adversário";
 
+  // Saved state for reconnection support
+  const _savedChess=(()=>{
+    if(gameId==="local")return null;
+    try{
+      const s=sessionStorage.getItem(`wm_chess_${gameId}`);
+      return s?JSON.parse(s) as{board:Board;turn:PColor;ep:Sq|null;history:string[];captured:Record<PColor,PType[]>;status:GameStatus}:null;
+    }catch{return null;}
+  })();
+
   // ── Game state ────────────────────────────────────────────────────────────────
-  const[board,setBoard]=useState<Board>(makeInitialBoard);
-  const[turn,setTurn]=useState<PColor>("w");
-  const[ep,setEp]=useState<Sq|null>(null);
+  const[board,setBoard]=useState<Board>(_savedChess?.board??makeInitialBoard());
+  const[turn,setTurn]=useState<PColor>(_savedChess?.turn??"w");
+  const[ep,setEp]=useState<Sq|null>(_savedChess?.ep??null);
   const[selected,setSelected]=useState<Sq|null>(null);
   const[legalDests,setLegalDests]=useState<Sq[]>([]);
   const[lastMove,setLastMove]=useState<[Sq,Sq]|null>(null);
-  const[history,setHistory]=useState<string[]>([]);
-  const[captured,setCaptured]=useState<Record<PColor,PType[]>>({w:[],b:[]});
-  const[status,setStatus]=useState<GameStatus>("playing");
+  const[history,setHistory]=useState<string[]>(_savedChess?.history??[]);
+  const[captured,setCaptured]=useState<Record<PColor,PType[]>>(_savedChess?.captured??{w:[],b:[]});
+  const[status,setStatus]=useState<GameStatus>(_savedChess?.status??"playing");
   const[winner,setWinner]=useState<PColor|null>(null);
   const[winReason,setWinReason]=useState("");
   const[promotionPending,setPromotionPending]=useState<{from:Sq;to:Sq}|null>(null);
@@ -837,6 +846,24 @@ export default function ChessGame(){
   useEffect(()=>{epRef.current=ep;},[ep]);
   useEffect(()=>{statusRef.current=status;},[status]);
 
+  // Persist game state for reconnection
+  useEffect(()=>{
+    if(gameId==="local"||winner||status==="checkmate"||status==="stalemate")return;
+    try{
+      sessionStorage.setItem(`wm_chess_${gameId}`,JSON.stringify({
+        board:boardRef.current,turn,ep:epRef.current,history,captured,status,
+      }));
+    }catch{/* ignore */}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[board,turn,history]);
+
+  useEffect(()=>{
+    if((winner||status==="checkmate"||status==="stalemate")&&gameId!=="local"){
+      try{sessionStorage.removeItem(`wm_chess_${gameId}`);}catch{}
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[winner,status]);
+
   // Credit winner 83% of total pot when game ends
   useEffect(()=>{
     if(!winner||!profile?.id||BET<=0||gameId==="local"||winCreditedRef.current)return;
@@ -853,6 +880,26 @@ export default function ChessGame(){
         }
       }catch{winCreditedRef.current=false;}
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[winner]);
+
+  // Platform fee (only white's client inserts to avoid duplicates)
+  useEffect(()=>{
+    if(!winner||BET<=0||gameId==="local"||myColor!=="w")return;
+    const platformFee=BET*2-Math.floor(BET*2*0.83);
+    if(platformFee>0){
+      supabase.from("platform_earnings").insert({
+        amount:platformFee,source:"game_fee",
+        description:`Taxa de jogo (Xadrez) — aposta ${BET} MT`,
+        reference_id:gameId,created_at:new Date().toISOString(),
+      }).then(()=>{}).catch(()=>{});
+    }
+    supabase.from("matches").update({
+      status:"finished",
+      winner_name:winner==="w"?playerName:opponentName,
+      winner_id:winner==="w"?profile?.id:null,
+      completed_at:new Date().toISOString(),
+    }).eq("id",gameId).then(()=>{}).catch(()=>{});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[winner]);
 
@@ -978,6 +1025,20 @@ export default function ChessGame(){
       setStatus("checkmate");
     });
 
+    ch.on("broadcast",{event:"chess_resync_req"},()=>{
+      if(statusRef.current==="checkmate"||statusRef.current==="stalemate")return;
+      ch.send({type:"broadcast",event:"chess_resync_state",payload:{
+        board:boardRef.current,turn:turnRef.current,ep:epRef.current,
+        status:statusRef.current,
+      }});
+    });
+
+    ch.on("broadcast",{event:"chess_resync_state"},({payload})=>{
+      const p=payload as{board:Board;turn:PColor;ep:Sq|null;status:GameStatus};
+      setBoard(p.board);setTurn(p.turn);setEp(p.ep);setStatus(p.status);
+      boardRef.current=p.board;turnRef.current=p.turn;epRef.current=p.ep;statusRef.current=p.status;
+    });
+
     ch.on("broadcast",{event:"rematch_request"},({payload})=>{
       setRematchRequester((payload.name as string)??opponentName);
       setRematchPhase("received");
@@ -1000,6 +1061,11 @@ export default function ChessGame(){
 
     ch.subscribe(async(status)=>{
       if(status==="SUBSCRIBED"&&profile?.id){
+        if(_savedChess&&gameId!=="local"){
+          setTimeout(()=>{
+            ch.send({type:"broadcast",event:"chess_resync_req",payload:{}});
+          },800);
+        }
         if(BET>0&&!betDeductedRef.current){
           betDeductedRef.current=true;
           try{
