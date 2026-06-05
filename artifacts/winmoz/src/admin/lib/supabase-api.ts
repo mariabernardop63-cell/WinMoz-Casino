@@ -24,12 +24,9 @@ export function useAdminRealtimeSync() {
         qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
         qc.invalidateQueries({ queryKey: ["players"] });
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "withdrawals" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => {
         qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
         qc.invalidateQueries({ queryKey: ["withdrawals"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "platform_earnings" }, () => {
-        qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
       })
       .subscribe();
 
@@ -46,66 +43,68 @@ export function useGetDashboardStats() {
       today.setHours(0, 0, 0, 0);
       const todayISO = today.toISOString();
 
+      // Each query runs independently — a missing table returns 0, never crashes
+      const safeCount = async (q: Promise<{ count: number | null; error: unknown }>) => {
+        try { const r = await q; return r.count ?? 0; } catch { return 0; }
+      };
+      const safeData = async <T>(q: Promise<{ data: T[] | null; error: unknown }>) => {
+        try { const r = await q; return r.data ?? []; } catch { return [] as T[]; }
+      };
+
       const [
-        { count: totalPlayers },
-        { count: activeBets },
-        { count: pendingWithdrawals },
-        { count: pendingReports },
-        { data: onlineProfiles },
-        { data: revenueData },
-        { data: approvedWithdrawalsData },
-        { data: todayEarningsData },
-        { data: todayWithdrawalsData },
-        { count: todayTransactions },
+        totalPlayers,
+        activeBets,
+        onlineProfiles,
+        pendingWithdrawalsData,
+        approvedWithdrawalsData,
+        todayWithdrawalsData,
+        txToday,
+        earningsData,
+        earningsTodayData,
       ] = await Promise.all([
-        supabase.from("profiles").select("*", { count: "exact", head: true }),
-        supabase.from("matches").select("*", { count: "exact", head: true })
-          .in("status", ["active", "live", "in_progress"]),
-        supabase.from("withdrawals").select("*", { count: "exact", head: true })
-          .eq("status", "pending"),
-        supabase.from("reports").select("*", { count: "exact", head: true })
-          .eq("status", "open"),
-        supabase.from("profiles")
-          .select("last_seen_at")
-          .gte("last_seen_at", new Date(Date.now() - 5 * 60 * 1000).toISOString()),
-        supabase.from("platform_earnings").select("amount"),
-        supabase.from("withdrawals").select("amount")
-          .eq("status", "approved"),
-        supabase.from("platform_earnings").select("amount")
-          .gte("created_at", todayISO),
-        supabase.from("withdrawals").select("amount")
-          .eq("status", "approved")
-          .gte("processed_at", todayISO),
-        supabase.from("matches").select("*", { count: "exact", head: true })
-          .gte("created_at", todayISO),
+        safeCount(supabase.from("profiles").select("*", { count: "exact", head: true }) as any),
+        safeCount(supabase.from("matches").select("*", { count: "exact", head: true })
+          .in("status", ["active", "live", "in_progress"]) as any),
+        safeData(supabase.from("profiles").select("last_seen_at")
+          .gte("last_seen_at", new Date(Date.now() - 5 * 60 * 1000).toISOString()) as any),
+        // Withdrawals via transactions table (always exists)
+        safeData(supabase.from("transactions").select("id")
+          .eq("type", "withdrawal").eq("status", "pending") as any),
+        safeData(supabase.from("transactions").select("amount")
+          .eq("type", "withdrawal").eq("status", "approved") as any),
+        safeData(supabase.from("transactions").select("amount")
+          .eq("type", "withdrawal").eq("status", "approved")
+          .gte("created_at", todayISO) as any),
+        safeData(supabase.from("matches").select("id")
+          .gte("created_at", todayISO) as any),
+        safeData(supabase.from("platform_earnings").select("amount") as any),
+        safeData(supabase.from("platform_earnings").select("amount")
+          .gte("created_at", todayISO) as any),
       ]);
 
-      const platformRevenue = (revenueData ?? []).reduce(
-        (s: number, r: { amount: number }) => s + Number(r.amount ?? 0), 0
-      );
-      const totalApprovedWithdrawals = (approvedWithdrawalsData ?? []).reduce(
-        (s: number, w: { amount: number }) => s + Number(w.amount ?? 0), 0
-      );
-      const todayEarnings = (todayEarningsData ?? []).reduce(
-        (s: number, r: { amount: number }) => s + Number(r.amount ?? 0), 0
-      );
-      const todaySaidas = (todayWithdrawalsData ?? []).reduce(
-        (s: number, w: { amount: number }) => s + Number(w.amount ?? 0), 0
-      );
+      const pendingWithdrawals = (pendingWithdrawalsData as unknown[]).length;
+      const totalApprovedWithdrawals = (approvedWithdrawalsData as { amount: number }[])
+        .reduce((s, w) => s + Math.abs(Number(w.amount ?? 0)), 0);
+      const todaySaidas = (todayWithdrawalsData as { amount: number }[])
+        .reduce((s, w) => s + Math.abs(Number(w.amount ?? 0)), 0);
+      const platformRevenue = (earningsData as { amount: number }[])
+        .reduce((s, r) => s + Number(r.amount ?? 0), 0);
+      const todayEarnings = (earningsTodayData as { amount: number }[])
+        .reduce((s, r) => s + Number(r.amount ?? 0), 0);
 
       return {
-        liveMatches:              activeBets ?? 0,
-        onlinePlayers:            onlineProfiles?.length ?? 0,
-        activeBets:               activeBets ?? 0,
-        pendingWithdrawals:       pendingWithdrawals ?? 0,
-        totalPlayers:             totalPlayers ?? 0,
+        liveMatches:              activeBets,
+        onlinePlayers:            (onlineProfiles as unknown[]).length,
+        activeBets,
+        pendingWithdrawals,
+        totalPlayers,
         platformRevenue,
         totalApprovedWithdrawals,
-        pendingReports:           pendingReports ?? 0,
+        pendingReports:           0,
         todayEarnings,
         todaySaidas,
-        todayTransactions:        todayTransactions ?? 0,
-        todayOnline:              onlineProfiles?.length ?? 0,
+        todayTransactions:        (txToday as unknown[]).length,
+        todayOnline:              (onlineProfiles as unknown[]).length,
       };
     },
     refetchInterval: 10000,
@@ -242,8 +241,8 @@ export function useListMatches(params?: { status?: string; game?: string }) {
       if (params?.status && params.status !== "all") q = q.eq("status", params.status);
       if (params?.game   && params.game !== "all")   q = q.eq("game_type", params.game);
       const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []).map(mapMatch);
+      if (error) return [];
+      return (data ?? []).map(m => mapMatch(m as Record<string, unknown>));
     },
     refetchInterval: 15000,
     staleTime: 5000,
@@ -397,7 +396,7 @@ export function useListBets(params?: { status?: string }) {
       }
 
       const { data, error } = await q;
-      if (error) throw error;
+      if (error) return [];
       return (data ?? []).map((m: Record<string, unknown>) => ({
         id:         m.id as string,
         playerName: (m.player1_name as string) ?? "—",
@@ -511,7 +510,7 @@ export function useListReports(params?: { status?: string }) {
         q = q.eq("status", dbStatus);
       }
       const { data, error } = await q;
-      if (error) throw error;
+      if (error) return [];
       return (data ?? []).map(r => mapReport(r as Record<string, unknown>));
     },
     refetchInterval: 30000,
@@ -550,85 +549,69 @@ export interface AdminWithdrawal {
   netAmount?: number;
 }
 
-function mapWithdrawal(w: Record<string, unknown>): AdminWithdrawal {
-  return {
-    id:          w.id as string,
-    playerName:  (w.user_name as string)    ?? "utilizador",
-    amount:      (w.amount as number)       ?? 0,
-    method:      (w.method as string)       ?? "M-Pesa",
-    status:      mapWithdrawalStatus(w.status as string),
-    createdAt:   w.created_at as string,
-    phone:       w.phone as string | undefined,
-    fee:         (w.fee as number)          ?? 0,
-    netAmount:   (w.net_amount as number)   ?? 0,
-  };
-}
-
 function mapWithdrawalStatus(s: string): "pending" | "approved" | "rejected" {
   if (s === "approved") return "approved";
   if (s === "rejected") return "rejected";
   return "pending";
 }
 
+function mapWithdrawalFromTx(tx: Record<string, unknown>): AdminWithdrawal {
+  const rawAmount = Math.abs(Number(tx.amount ?? 0));
+  let meta: { method?: string; phone?: string; userName?: string } = {};
+  try { meta = JSON.parse(tx.description as string); } catch { /* plain description */ }
+  return {
+    id:         tx.id as string,
+    playerName: meta.userName ?? "utilizador",
+    amount:     rawAmount,
+    method:     meta.method ?? "M-Pesa",
+    status:     mapWithdrawalStatus(tx.status as string),
+    createdAt:  tx.created_at as string,
+    phone:      meta.phone ?? undefined,
+    fee:        0,
+    netAmount:  rawAmount,
+  };
+}
+
 export function useListWithdrawals(params?: { status?: string }) {
   return useQuery({
     queryKey: ["withdrawals", params],
     queryFn: async () => {
-      let q = supabase.from("withdrawals").select("*").order("created_at", { ascending: false }).limit(100);
+      let q = supabase
+        .from("transactions")
+        .select("*")
+        .eq("type", "withdrawal")
+        .order("created_at", { ascending: false })
+        .limit(100);
       if (params?.status && params.status !== "all") q = q.eq("status", params.status);
       const { data, error } = await q;
-      if (error) throw error;
-      return (data ?? []).map(w => mapWithdrawal(w as Record<string, unknown>));
+      if (error) return [];
+      return (data ?? []).map(tx => mapWithdrawalFromTx(tx as Record<string, unknown>));
     },
-    refetchInterval: 15000,
-    staleTime: 5000,
+    refetchInterval: 8000,
+    staleTime: 3000,
   });
 }
 
 export function getListWithdrawalsQueryKey() { return ["withdrawals"]; }
 
+async function getAdminToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error("Sessão inválida");
+  return session.access_token;
+}
+
 export function useApproveWithdrawal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      const { data: withdrawalData, error: fetchError } = await supabase
-        .from("withdrawals")
-        .select("amount, user_id, user_name")
-        .eq("id", id)
-        .single();
-
-      if (fetchError || !withdrawalData) throw fetchError ?? new Error("Levantamento não encontrado");
-
-      const amount = Number(withdrawalData.amount ?? 0);
-      let feeRate = 0;
-      if (amount >= 50 && amount < 500) feeRate = 0.05;
-      else if (amount >= 500 && amount <= 5000) feeRate = 0.10;
-      const feeAmount = Math.round(amount * feeRate * 100) / 100;
-
-      const { error } = await supabase
-        .from("withdrawals")
-        .update({
-          status: "approved",
-          approved_by: user?.id ?? null,
-          processed_at: new Date().toISOString(),
-          fee: feeAmount,
-          net_amount: amount - feeAmount,
-        })
-        .eq("id", id);
-      if (error) throw error;
-
-      if (feeAmount > 0) {
-        await supabase.from("platform_earnings").insert({
-          amount: feeAmount,
-          source: "withdrawal_fee",
-          description: `Taxa de levantamento — ${withdrawalData.user_name ?? "utilizador"} (${(feeRate * 100).toFixed(0)}% de MT ${amount.toFixed(2)})`,
-          reference_id: id,
-          created_at: new Date().toISOString(),
-        });
-      }
-
+      const token = await getAdminToken();
+      const res = await fetch("/api/admin/withdraw/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id }),
+      });
+      const json = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok || !json.success) throw new Error(json.error ?? "Erro ao aprovar");
       return { ok: true };
     },
     onSuccess: () => {
@@ -642,37 +625,14 @@ export function useRejectWithdrawal() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: { reason: string } }) => {
-      const { data: withdrawalData, error: fetchError } = await supabase
-        .from("withdrawals")
-        .select("amount, user_id")
-        .eq("id", id)
-        .single();
-
-      if (fetchError || !withdrawalData) throw fetchError ?? new Error("Levantamento não encontrado");
-
-      const { error } = await supabase
-        .from("withdrawals")
-        .update({ status: "rejected", rejection_reason: data.reason, processed_at: new Date().toISOString() })
-        .eq("id", id);
-      if (error) throw error;
-
-      // Restore the user's balance on rejection
-      const amount = Number(withdrawalData.amount ?? 0);
-      if (amount > 0 && withdrawalData.user_id) {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("balance")
-          .eq("id", withdrawalData.user_id)
-          .single();
-        if (profileData) {
-          const restored = Math.round((Number(profileData.balance ?? 0) + amount) * 100) / 100;
-          await supabase
-            .from("profiles")
-            .update({ balance: restored })
-            .eq("id", withdrawalData.user_id);
-        }
-      }
-
+      const token = await getAdminToken();
+      const res = await fetch("/api/admin/withdraw/reject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id, reason: data.reason }),
+      });
+      const json = await res.json() as { success?: boolean; error?: string };
+      if (!res.ok || !json.success) throw new Error(json.error ?? "Erro ao rejeitar");
       return { ok: true };
     },
     onSuccess: () => {

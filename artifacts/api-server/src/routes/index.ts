@@ -260,30 +260,128 @@ router.post("/withdraw", async (req, res) => {
       .from("profiles").update({ balance: newBalance }).eq("id", userId);
     if (balanceError) { res.status(500).json({ error: "Erro ao debitar saldo" }); return; }
 
-    const { data: withdrawalRow, error: withdrawalError } = await admin
-      .from("withdrawals").insert({
+    const withdrawalPhone = phone ?? profileData.phone ?? null;
+    const withdrawalMeta = JSON.stringify({
+      method: "M-Pesa",
+      phone: withdrawalPhone,
+      userName: profileData.full_name ?? "utilizador",
+    });
+
+    const { data: txRow, error: txError } = await admin
+      .from("transactions").insert({
         user_id: userId,
-        user_name: profileData.full_name ?? "utilizador",
-        amount,
-        method: "M-Pesa",
-        phone: phone ?? profileData.phone ?? null,
+        type: "withdrawal",
+        amount: -amount,
+        description: withdrawalMeta,
         status: "pending",
         created_at: new Date().toISOString(),
       }).select("id").single();
-    if (withdrawalError) { res.status(500).json({ error: "Erro ao registar levantamento" }); return; }
 
-    await admin.from("transactions").insert({
-      user_id: userId,
-      type: "withdrawal",
-      amount: -amount,
-      description: `Pedido de levantamento via M-Pesa`,
-      status: "pending",
-      created_at: new Date().toISOString(),
-    });
+    if (txError) {
+      req.log.error({ txError }, "Failed to record withdrawal transaction");
+      const { error: restoreError } = await admin
+        .from("profiles").update({ balance: currentBalance }).eq("id", userId);
+      if (restoreError) req.log.error({ restoreError }, "Failed to restore balance after tx error");
+      res.status(500).json({ error: "Erro ao registar levantamento" }); return;
+    }
 
-    res.json({ success: true, withdrawalId: withdrawalRow.id, newBalance });
+    res.json({ success: true, withdrawalId: txRow.id, newBalance });
   } catch (err) {
     req.log.error({ err }, "Withdraw error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Admin: Approve withdrawal ── */
+router.post("/admin/withdraw/approve", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const { id } = req.body as { id?: string };
+    if (!id) { res.status(400).json({ error: "id required" }); return; }
+
+    const supabaseUrl = process.env["SUPABASE_URL"];
+    const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+    if (!supabaseUrl || !supabaseServiceKey) {
+      res.status(500).json({ error: "Serviço indisponível" }); return;
+    }
+
+    const { createClient } = await import("@supabase/supabase-js");
+    const admin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Verify caller is authenticated
+    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    if (userError || !userData.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
+
+    // Fetch the withdrawal transaction
+    const { data: txData, error: txFetchError } = await admin
+      .from("transactions").select("id, amount, user_id, status").eq("id", id).single();
+    if (txFetchError || !txData) { res.status(404).json({ error: "Levantamento não encontrado" }); return; }
+    if (txData.status !== "pending") { res.status(400).json({ error: "Levantamento já processado" }); return; }
+
+    const { error: updateError } = await admin
+      .from("transactions").update({ status: "approved" }).eq("id", id);
+    if (updateError) { res.status(500).json({ error: "Erro ao aprovar" }); return; }
+
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "Admin approve withdrawal error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Admin: Reject withdrawal ── */
+router.post("/admin/withdraw/reject", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const { id, reason } = req.body as { id?: string; reason?: string };
+    if (!id) { res.status(400).json({ error: "id required" }); return; }
+
+    const supabaseUrl = process.env["SUPABASE_URL"];
+    const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+    if (!supabaseUrl || !supabaseServiceKey) {
+      res.status(500).json({ error: "Serviço indisponível" }); return;
+    }
+
+    const { createClient } = await import("@supabase/supabase-js");
+    const admin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    if (userError || !userData.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
+
+    const { data: txData, error: txFetchError } = await admin
+      .from("transactions").select("id, amount, user_id, status").eq("id", id).single();
+    if (txFetchError || !txData) { res.status(404).json({ error: "Levantamento não encontrado" }); return; }
+    if (txData.status !== "pending") { res.status(400).json({ error: "Levantamento já processado" }); return; }
+
+    // Mark as rejected
+    const { error: updateError } = await admin
+      .from("transactions").update({ status: "rejected" }).eq("id", id);
+    if (updateError) { res.status(500).json({ error: "Erro ao rejeitar" }); return; }
+
+    // Restore user balance
+    const withdrawalAmount = Math.abs(Number(txData.amount ?? 0));
+    if (withdrawalAmount > 0 && txData.user_id) {
+      const { data: profileData } = await admin
+        .from("profiles").select("balance").eq("id", txData.user_id).single();
+      if (profileData) {
+        const restored = Math.round((Number(profileData.balance ?? 0) + withdrawalAmount) * 100) / 100;
+        await admin.from("profiles").update({ balance: restored }).eq("id", txData.user_id);
+      }
+    }
+
+    res.json({ success: true, reason: reason ?? "" });
+  } catch (err) {
+    req.log.error({ err }, "Admin reject withdrawal error");
     res.status(500).json({ error: "Erro interno" });
   }
 });

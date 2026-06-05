@@ -65,7 +65,12 @@ function SwipeToConfirm({ onConfirm, disabled }: { onConfirm: () => void; disabl
 export default function Levantar() {
   const [, setLocation] = useLocation();
   const { user, profile, refreshProfile } = useAuth();
-  const balance = parseFloat(String(profile?.balance ?? "0")) || 0;
+
+  // Always read balance fresh from Supabase — never trust the stale context cache
+  const [freshBalance, setFreshBalance] = useState<number | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(true);
+
+  const balance = freshBalance ?? parseFloat(String(profile?.balance ?? "0")) || 0;
   const userPhone = profile?.phone ? `+258 ${profile.phone.slice(0, 3)} ${profile.phone.slice(3, 6)} ${profile.phone.slice(6)}` : "";
 
   const [screen, setScreen] = useState<Screen>("amount");
@@ -105,7 +110,7 @@ export default function Levantar() {
     pollingRef.current = setInterval(async () => {
       try {
         const { data } = await supabase
-          .from("withdrawals")
+          .from("transactions")
           .select("status")
           .eq("id", wId)
           .single();
@@ -117,7 +122,6 @@ export default function Levantar() {
         } else if (data?.status === "rejected") {
           clearInterval(pollingRef.current!);
           pollingRef.current = null;
-          // Restore balance on rejection — re-fetch fresh profile
           await refreshProfile();
           setScreen("rejected");
         }
@@ -125,11 +129,33 @@ export default function Levantar() {
     }, 3000);
   };
 
+  // Read balance directly from Supabase (bypasses stale sessionStorage cache)
   useEffect(() => {
+    let active = true;
+    const load = async () => {
+      setBalanceLoading(true);
+      try {
+        if (user?.id) {
+          const { data } = await supabase
+            .from("profiles").select("balance, phone").eq("id", user.id).single();
+          if (active && data) {
+            setFreshBalance(parseFloat(String(data.balance ?? "0")) || 0);
+          }
+        } else {
+          // Fallback: refresh context
+          await refreshProfile();
+          setFreshBalance(parseFloat(String(profile?.balance ?? "0")) || 0);
+        }
+      } catch { /* use context fallback */ }
+      if (active) setBalanceLoading(false);
+    };
+    load();
     return () => {
+      active = false;
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleConfirm = async () => {
     if (processingConfirm) return;
@@ -214,7 +240,11 @@ export default function Levantar() {
               <span className="text-white/40 text-xl mb-3">MZN</span>
             </div>
             <p className="text-white/30 text-xs mb-5">
-              Saldo disponível: <span style={{ color: CYAN }}>{fmtMZN(balance)} MZN</span>
+              Saldo disponível:{" "}
+              {balanceLoading
+                ? <span style={{ color: CYAN }}>a carregar…</span>
+                : <span style={{ color: CYAN }}>{fmtMZN(balance)} MZN</span>
+              }
             </p>
 
             <div className="flex gap-2 mb-6">
@@ -253,14 +283,16 @@ export default function Levantar() {
               </div>
             )}
 
-            <button onClick={() => canProceed && setScreen("confirm")} disabled={!canProceed}
+            <button
+              onClick={() => !balanceLoading && canProceed && setScreen("confirm")}
+              disabled={balanceLoading || !canProceed}
               className="w-full h-14 rounded-full font-syne font-bold text-base transition-all mb-8"
               style={{
-                background: canProceed ? CYAN : "#1c1c1e",
-                color: canProceed ? "#000" : "#3a3a3c",
-                cursor: canProceed ? "pointer" : "default",
+                background: (!balanceLoading && canProceed) ? CYAN : "#1c1c1e",
+                color: (!balanceLoading && canProceed) ? "#000" : "#3a3a3c",
+                cursor: (!balanceLoading && canProceed) ? "pointer" : "default",
               }}>
-              Continuar
+              {balanceLoading ? "A verificar saldo…" : "Continuar"}
             </button>
           </div>
         </div>
