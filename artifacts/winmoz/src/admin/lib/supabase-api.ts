@@ -2,6 +2,23 @@ import { useQuery, useMutation, useQueryClient, useQueryClient as useQC } from "
 import { supabase } from "@/lib/supabase";
 import { useEffect } from "react";
 
+/* ── API Server proxy (uses SUPABASE_SERVICE_ROLE_KEY, bypasses RLS) ── */
+async function adminApi<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? "";
+  const base = (import.meta.env.VITE_API_URL as string ?? "").replace(/\/+$/, "");
+  const res = await fetch(`${base}/api${path}`, {
+    method: init?.method ?? "GET",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as Record<string, string>;
+    throw new Error(err.error ?? `API error ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 /* ──────────────────────────────────────────────────────────────
    SUPABASE-BACKED ADMIN API
    Drop-in replacement for mock-api.ts — same hook signatures
@@ -41,175 +58,62 @@ export function useAdminRealtimeSync() {
   }, [qc]);
 }
 
+/* ── Shared return-type interfaces ── */
+export interface DashboardStats {
+  liveMatches: number; onlinePlayers: number; activeBets: number;
+  pendingWithdrawals: number; totalPlayers: number; platformRevenue: number;
+  totalApprovedWithdrawals: number; pendingReports: number; todayEarnings: number;
+  todaySaidas: number; todayTransactions: number; todayOnline: number;
+}
+export interface ChartDay { date: string; dama: number; ludo: number; }
+export interface GameBreakdown {
+  dama: number; ludo: number; damaMatches: number; ludoMatches: number;
+  xadrezMatches: number; roletaMatches: number; damaBetVolume: number;
+  ludoBetVolume: number; xadrezBetVolume: number; roletaBetVolume: number;
+}
+export interface RankingEntry {
+  playerId: string; rank: number; username: string;
+  wins: number; losses: number; winRate: number; totalEarnings: number;
+}
+export interface AntiFraudAlert {
+  id: string; playerName: string; type: string;
+  severity: "high" | "medium" | "low"; description: string; createdAt: string;
+}
+export interface AntiFraudData {
+  flaggedAccounts: number; suspiciousBets: number;
+  unusualPatterns: number; resolvedToday: number; alerts: AntiFraudAlert[];
+}
+
 /* ── Dashboard Stats ── */
 export function useGetDashboardStats() {
-  return useQuery({
+  return useQuery<DashboardStats>({
     queryKey: ["dashboard-stats"],
-    queryFn: async () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayISO = today.toISOString();
-
-      // Each query runs independently — a missing table returns 0, never crashes
-      const safeCount = async (q: Promise<{ count: number | null; error: unknown }>) => {
-        try { const r = await q; return r.count ?? 0; } catch { return 0; }
-      };
-      const safeData = async <T>(q: Promise<{ data: T[] | null; error: unknown }>) => {
-        try { const r = await q; return r.data ?? []; } catch { return [] as T[]; }
-      };
-
-      const [
-        totalPlayers,
-        activeBets,
-        onlineProfiles,
-        pendingWithdrawalsData,
-        approvedWithdrawalsData,
-        todayWithdrawalsData,
-        txToday,
-        earningsData,
-        earningsTodayData,
-        pendingReportsData,
-      ] = await Promise.all([
-        safeCount(supabase.from("profiles").select("*", { count: "exact", head: true }) as any),
-        safeCount(supabase.from("matches").select("*", { count: "exact", head: true })
-          .in("status", ["active", "live", "in_progress"]) as any),
-        safeData(supabase.from("profiles").select("last_seen_at")
-          .gte("last_seen_at", new Date(Date.now() - 2 * 60 * 1000).toISOString()) as any),
-        safeData(supabase.from("transactions").select("id")
-          .eq("type", "withdrawal").eq("status", "pending") as any),
-        safeData(supabase.from("transactions").select("amount")
-          .eq("type", "withdrawal").eq("status", "approved") as any),
-        safeData(supabase.from("transactions").select("amount")
-          .eq("type", "withdrawal").eq("status", "approved")
-          .gte("created_at", todayISO) as any),
-        safeData(supabase.from("matches").select("id")
-          .gte("created_at", todayISO) as any),
-        safeData(supabase.from("matches").select("bet_amount")
-          .eq("status", "finished") as any),
-        safeData(supabase.from("matches").select("bet_amount")
-          .eq("status", "finished").gte("created_at", todayISO) as any),
-        safeData(supabase.from("reports").select("id").eq("status", "open") as any),
-      ]);
-
-      const pendingWithdrawals = (pendingWithdrawalsData as unknown[]).length;
-      const totalApprovedWithdrawals = (approvedWithdrawalsData as { amount: number }[])
-        .reduce((s, w) => s + Math.abs(Number(w.amount ?? 0)), 0);
-      const todaySaidas = (todayWithdrawalsData as { amount: number }[])
-        .reduce((s, w) => s + Math.abs(Number(w.amount ?? 0)), 0);
-      // 10% da aposta total (bet_amount * 2) por partida terminada
-      const platformRevenue = (earningsData as { bet_amount: number }[])
-        .reduce((s, m) => s + Number(m.bet_amount ?? 0) * 0.2, 0);
-      const todayEarnings = (earningsTodayData as { bet_amount: number }[])
-        .reduce((s, m) => s + Number(m.bet_amount ?? 0) * 0.2, 0);
-
-      return {
-        liveMatches:              activeBets,
-        onlinePlayers:            (onlineProfiles as unknown[]).length,
-        activeBets,
-        pendingWithdrawals,
-        totalPlayers,
-        platformRevenue,
-        totalApprovedWithdrawals,
-        pendingReports:           (pendingReportsData as unknown[]).length,
-        todayEarnings,
-        todaySaidas,
-        todayTransactions:        (txToday as unknown[]).length,
-        todayOnline:              (onlineProfiles as unknown[]).length,
-      };
-    },
+    queryFn: () => adminApi<DashboardStats>("/admin/dashboard-stats"),
     refetchInterval: 8000,
     staleTime: 3000,
   });
 }
 
 export function useGetMatchesOverTime() {
-  return useQuery({
+  return useQuery<ChartDay[]>({
     queryKey: ["matches-over-time"],
-    queryFn: async () => {
-      const days: { date: string; dama: number; ludo: number }[] = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const start = new Date(d); start.setHours(0, 0, 0, 0);
-        const end   = new Date(d); end.setHours(23, 59, 59, 999);
-
-        const [{ count: dama }, { count: ludo }] = await Promise.all([
-          supabase.from("matches").select("*", { count: "exact", head: true })
-            .eq("game_type", "dama").gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
-          supabase.from("matches").select("*", { count: "exact", head: true })
-            .eq("game_type", "ludo").gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
-        ]);
-        days.push({ date: start.toISOString().slice(0, 10), dama: dama ?? 0, ludo: ludo ?? 0 });
-      }
-      return days;
-    },
+    queryFn: () => adminApi<ChartDay[]>("/admin/matches-over-time"),
     staleTime: 60000,
   });
 }
 
 export function useGetBetsOverTime() {
-  return useQuery({
+  return useQuery<ChartDay[]>({
     queryKey: ["bets-over-time"],
-    queryFn: async () => {
-      const days: { date: string; dama: number; ludo: number }[] = [];
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        const start = new Date(d); start.setHours(0, 0, 0, 0);
-        const end   = new Date(d); end.setHours(23, 59, 59, 999);
-
-        const [{ data: damaData }, { data: ludoData }] = await Promise.all([
-          supabase.from("matches").select("bet_amount")
-            .eq("game_type", "dama").gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
-          supabase.from("matches").select("bet_amount")
-            .eq("game_type", "ludo").gte("created_at", start.toISOString()).lte("created_at", end.toISOString()),
-        ]);
-        const dama = (damaData ?? []).reduce((s: number, m: { bet_amount: number }) => s + (m.bet_amount ?? 0), 0);
-        const ludo = (ludoData ?? []).reduce((s: number, m: { bet_amount: number }) => s + (m.bet_amount ?? 0), 0);
-        days.push({ date: start.toISOString().slice(0, 10), dama, ludo });
-      }
-      return days;
-    },
+    queryFn: () => adminApi<ChartDay[]>("/admin/bets-over-time"),
     staleTime: 60000,
   });
 }
 
 export function useGetGameBreakdown() {
-  return useQuery({
+  return useQuery<GameBreakdown>({
     queryKey: ["game-breakdown"],
-    queryFn: async () => {
-      const [
-        { count: damaMatches, data: damaData },
-        { count: ludoMatches, data: ludoData },
-        { count: xadrezMatches, data: xadrezData },
-        { count: roletaMatches, data: roletaData },
-      ] = await Promise.all([
-        supabase.from("matches").select("bet_amount", { count: "exact" }).eq("game_type", "dama"),
-        supabase.from("matches").select("bet_amount", { count: "exact" }).eq("game_type", "ludo"),
-        supabase.from("matches").select("bet_amount", { count: "exact" }).eq("game_type", "xadrez"),
-        supabase.from("matches").select("bet_amount", { count: "exact" }).eq("game_type", "roleta"),
-      ]);
-
-      const sum = (arr: { bet_amount: number }[] | null) =>
-        (arr ?? []).reduce((s, m) => s + (m.bet_amount ?? 0), 0);
-
-      const dm = damaMatches   ?? 0;
-      const lm = ludoMatches   ?? 0;
-      const total = dm + lm + (xadrezMatches ?? 0) + (roletaMatches ?? 0);
-
-      return {
-        dama:           total > 0 ? Math.round((dm / total) * 100) : 0,
-        ludo:           total > 0 ? Math.round((lm / total) * 100) : 0,
-        damaMatches:    dm,
-        ludoMatches:    lm,
-        xadrezMatches:  xadrezMatches  ?? 0,
-        roletaMatches:  roletaMatches  ?? 0,
-        damaBetVolume:  sum(damaData   as { bet_amount: number }[]),
-        ludoBetVolume:  sum(ludoData   as { bet_amount: number }[]),
-        xadrezBetVolume: sum(xadrezData as { bet_amount: number }[]),
-        roletaBetVolume: sum(roletaData as { bet_amount: number }[]),
-      };
-    },
+    queryFn: () => adminApi<GameBreakdown>("/admin/game-breakdown"),
     staleTime: 60000,
   });
 }
@@ -247,19 +151,11 @@ export function useListMatches(params?: { status?: string; game?: string }) {
   return useQuery({
     queryKey: ["matches", params],
     queryFn: async () => {
-      let q = supabase.from("matches").select("*").order("created_at", { ascending: false }).limit(200);
-      if (params?.status && params.status !== "all") {
-        // "live" or "active" means in-progress matches
-        if (params.status === "live" || params.status === "active") {
-          q = q.in("status", ["active", "live", "in_progress"]);
-        } else {
-          q = q.eq("status", params.status);
-        }
-      }
-      if (params?.game && params.game !== "all") q = q.eq("game_type", params.game);
-      const { data, error } = await q;
-      if (error) return [];
-      return (data ?? []).map(m => mapMatch(m as Record<string, unknown>));
+      const qs = new URLSearchParams();
+      if (params?.status) qs.set("status", params.status);
+      if (params?.game)   qs.set("game",   params.game);
+      const raw = await adminApi<Record<string, unknown>[]>(`/admin/matches?${qs}`);
+      return raw.map(m => mapMatch(m));
     },
     refetchInterval: 10000,
     staleTime: 3000,
@@ -343,13 +239,8 @@ export function useListPlayers() {
   return useQuery({
     queryKey: ["players"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(200);
-      if (error) return [];
-      return (data ?? []).map(p => mapPlayer(p as Record<string, unknown>));
+      const raw = await adminApi<Record<string, unknown>[]>("/admin/players");
+      return raw.map(p => mapPlayer(p));
     },
     refetchInterval: 30000,
     staleTime: 10000,
@@ -401,20 +292,10 @@ export function useListBets(params?: { status?: string }) {
   return useQuery({
     queryKey: ["bets", params],
     queryFn: async () => {
-      let q = supabase.from("matches")
-        .select("id, game_type, player1_name, player2_name, bet_amount, winner_payout, status, created_at")
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (params?.status && params.status !== "all") {
-        if (params.status === "active")    q = q.in("status", ["active", "pending"]);
-        if (params.status === "settled")   q = q.eq("status", "finished");
-        if (params.status === "cancelled") q = q.eq("status", "cancelled");
-      }
-
-      const { data, error } = await q;
-      if (error) return [];
-      return (data ?? []).map((m: Record<string, unknown>) => ({
+      const qs = new URLSearchParams();
+      if (params?.status) qs.set("status", params.status);
+      const raw = await adminApi<Record<string, unknown>[]>(`/admin/matches?${qs}`);
+      return raw.map((m) => ({
         id:         m.id as string,
         playerName: (m.player1_name as string) ?? "—",
         game:       (m.game_type as string)    ?? "dama",
@@ -553,31 +434,9 @@ export function useCancelBet() {
 
 /* ── Ranking ── */
 export function useGetRanking(_params?: { game?: string }) {
-  return useQuery({
+  return useQuery<RankingEntry[]>({
     queryKey: ["ranking", _params],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, username, total_wins, total_games, balance")
-        .order("total_wins", { ascending: false })
-        .limit(50);
-      if (error) throw error;
-
-      return (data ?? []).map((p: Record<string, unknown>, i: number) => {
-        const wins   = (p.total_wins  as number) ?? 0;
-        const total  = (p.total_games as number) ?? 0;
-        const losses = Math.max(0, total - wins);
-        return {
-          playerId:      p.id as string,
-          rank:          i + 1,
-          username:      (p.username as string) ?? "utilizador",
-          wins,
-          losses,
-          winRate:       total > 0 ? Math.round((wins / total) * 1000) / 10 : 0,
-          totalEarnings: (p.balance as number) ?? 0,
-        };
-      });
-    },
+    queryFn: () => adminApi<RankingEntry[]>("/admin/ranking"),
     staleTime: 60000,
   });
 }
@@ -622,14 +481,9 @@ export function useListReports(params?: { status?: string }) {
   return useQuery({
     queryKey: ["reports", params],
     queryFn: async () => {
-      let q = supabase.from("reports").select("*").order("created_at", { ascending: false }).limit(100);
-      if (params?.status && params.status !== "all") {
-        const dbStatus = params.status === "pending" ? "open" : params.status === "reviewed" ? "resolved" : "dismissed";
-        q = q.eq("status", dbStatus);
-      }
-      const { data, error } = await q;
-      if (error) return [];
-      return (data ?? []).map(r => mapReport(r as Record<string, unknown>));
+      const qs = params?.status ? `?status=${encodeURIComponent(params.status)}` : "";
+      const raw = await adminApi<Record<string, unknown>[]>(`/admin/reports${qs}`);
+      return raw.map(r => mapReport(r));
     },
     refetchInterval: 30000,
     staleTime: 10000,
@@ -642,13 +496,7 @@ export function useResolveReport() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: { action: string; notes: string } }) => {
-      const dbStatus = data.action === "reviewed" ? "resolved" : "dismissed";
-      const { error } = await supabase
-        .from("reports")
-        .update({ status: dbStatus, admin_notes: data.notes, updated_at: new Date().toISOString() })
-        .eq("id", id);
-      if (error) throw error;
-      return { ok: true };
+      return adminApi(`/admin/reports/${id}`, { method: "PATCH", body: data });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["reports"] }),
   });
@@ -796,45 +644,9 @@ export function useRejectWithdrawal() {
 
 /* ── Anti-Fraud ── */
 export function useGetAntiFraudAlerts() {
-  return useQuery({
+  return useQuery<AntiFraudData>({
     queryKey: ["antifraud"],
-    queryFn: async () => {
-      const [
-        { data: blocked },
-        { data: reports },
-        { count: suspicious },
-      ] = await Promise.all([
-        supabase.from("blocked_users").select("*").eq("is_active", true).limit(50),
-        supabase.from("reports").select("*").eq("status", "open").order("created_at", { ascending: false }).limit(20),
-        supabase.from("reports").select("*", { count: "exact", head: true }).eq("status", "resolved"),
-      ]);
-
-      const alerts = (blocked ?? []).map((b: Record<string, unknown>) => ({
-        id:          b.id as string,
-        playerName:  (b.user_name as string) ?? "utilizador",
-        type:        (b.block_type as string) ?? "account",
-        severity:    "high" as const,
-        description: (b.reason as string) ?? "Conta bloqueada pelo administrador.",
-        createdAt:   b.created_at as string,
-      }));
-
-      const reportAlerts = (reports ?? []).slice(0, Math.max(0, 4 - alerts.length)).map((r: Record<string, unknown>) => ({
-        id:          r.id as string,
-        playerName:  (r.user_name as string)   ?? "utilizador",
-        type:        (r.category as string)    ?? "report",
-        severity:    ((r.priority as string) === "Urgente" || (r.priority as string) === "Alta") ? "high" as const : "medium" as const,
-        description: (r.description as string) ?? "",
-        createdAt:   r.created_at as string,
-      }));
-
-      return {
-        flaggedAccounts:  (blocked ?? []).length,
-        suspiciousBets:   suspicious ?? 0,
-        unusualPatterns:  (reports ?? []).filter((r: Record<string, unknown>) => r.priority === "Alta" || r.priority === "Urgente").length,
-        resolvedToday:    suspicious ?? 0,
-        alerts:           [...alerts, ...reportAlerts].slice(0, 4),
-      };
-    },
+    queryFn: () => adminApi<AntiFraudData>("/admin/antifraud"),
     refetchInterval: 30000,
     staleTime: 10000,
   });

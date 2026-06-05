@@ -60,14 +60,17 @@ function PlayerAvatar({ username, avatarUrl, size = 36 }: { username: string; av
 
 async function searchPlayers(q: string): Promise<PlayerResult[]> {
   if (q.length < 2) return [];
-  const { data } = await supabase
-    .from("profiles")
-    .select("id, username, full_name, balance, avatar_url")
-    .or(`username.ilike.%${q}%,full_name.ilike.%${q}%,phone.ilike.%${q}%`)
-    .limit(10);
-  return (data ?? []).map(p => ({
+  const base = (import.meta.env.VITE_API_URL as string ?? "").replace(/\/+$/, "");
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? "";
+  const res = await fetch(`${base}/api/admin/players/search?q=${encodeURIComponent(q)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return [];
+  const data = await res.json() as Record<string, unknown>[];
+  return data.map(p => ({
     id: p.id as string,
-    username: (p.username || p.full_name || "utilizador") as string,
+    username: ((p.username || p.full_name || "utilizador") as string),
     full_name: p.full_name as string | null,
     balance: Number(p.balance ?? 0),
     avatar_url: p.avatar_url as string | null,
@@ -75,27 +78,14 @@ async function searchPlayers(q: string): Promise<PlayerResult[]> {
 }
 
 async function fetchAdjustments(): Promise<Adjustment[]> {
-  const { data, error } = await supabase
-    .from("balance_adjustments")
-    .select("id, user_id, amount, balance_before, balance_after, reason, note, created_at, profiles:user_id(username, full_name, avatar_url)")
-    .order("created_at", { ascending: false })
-    .limit(100);
-  if (error) return [];
-  return (data ?? []).map((r: Record<string, unknown>) => {
-    const prof = (r.profiles as Record<string, unknown>) ?? {};
-    return {
-      id: r.id as string,
-      user_id: r.user_id as string,
-      amount: Number(r.amount ?? 0),
-      balance_before: Number(r.balance_before ?? 0),
-      balance_after: Number(r.balance_after ?? 0),
-      reason: (r.reason as string) ?? "manual_adjustment",
-      note: r.note as string | null,
-      created_at: r.created_at as string,
-      player_name: (prof.username || prof.full_name || "utilizador") as string,
-      avatar_url: prof.avatar_url as string | null,
-    };
+  const base = (import.meta.env.VITE_API_URL as string ?? "").replace(/\/+$/, "");
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? "";
+  const res = await fetch(`${base}/api/admin/balance-adjustments`, {
+    headers: { Authorization: `Bearer ${token}` },
   });
+  if (!res.ok) return [];
+  return res.json() as Promise<Adjustment[]>;
 }
 
 async function applyAdjustment(params: {
@@ -105,37 +95,20 @@ async function applyAdjustment(params: {
   reason: string;
   note: string;
 }): Promise<void> {
-  const { userId, amount, type, reason, note } = params;
-
-  const { data: profileData, error: fetchErr } = await supabase
-    .from("profiles")
-    .select("balance")
-    .eq("id", userId)
-    .single();
-  if (fetchErr) throw new Error("Não foi possível obter o saldo actual do jogador.");
-
-  const currentBalance = Number(profileData.balance ?? 0);
-  const delta = type === "add" ? amount : -amount;
-  const newBalance = Math.max(0, currentBalance + delta);
-
-  const { error: updateErr } = await supabase
-    .from("profiles")
-    .update({ balance: newBalance })
-    .eq("id", userId);
-  if (updateErr) throw new Error("Erro ao actualizar saldo: " + updateErr.message);
-
-  const { error: logErr } = await supabase
-    .from("balance_adjustments")
-    .insert({
-      user_id: userId,
-      amount: delta,
-      balance_before: currentBalance,
-      balance_after: newBalance,
-      reason,
-      note: note || null,
-    });
-  if (logErr) {
-    console.warn("Ajuste aplicado mas não foi possível registar o histórico:", logErr.message);
+  const base = (import.meta.env.VITE_API_URL as string ?? "").replace(/\/+$/, "");
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token ?? "";
+  const res = await fetch(`${base}/api/admin/balance-adjust`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      userId: params.userId, amount: params.amount,
+      type: params.type, reason: params.reason, note: params.note,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({})) as Record<string, string>;
+    throw new Error(err.error ?? "Erro ao ajustar saldo");
   }
 }
 

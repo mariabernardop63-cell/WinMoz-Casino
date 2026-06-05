@@ -76,5 +76,5 @@ channel = "stable-25_05"
 [userenv.shared]
 VITE_SUPABASE_URL = "https://oekucnfyckmzhirkqglq.supabase.co"
 SUPABASE_URL = "https://oekucnfyckmzhirkqglq.supabase.co"
-VITE_API_URL = ""
+VITE_API_URL = "https://8080-d3a5371f-d441-41a0-bd93-3c5ee4d21df3-00-19nx4s4pqtx98.riker.replit.dev"
 PORT = "3000"

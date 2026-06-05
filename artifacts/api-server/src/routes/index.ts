@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { createClient } from "@supabase/supabase-js";
 import healthRouter from "./health";
 
 const router: IRouter = Router();
@@ -386,4 +387,321 @@ router.post("/admin/withdraw/reject", async (req, res) => {
   }
 });
 
+
+// ═══════════════════════════════════════════════════════════════════
+//  ADMIN ROUTES — uses SUPABASE_SERVICE_ROLE_KEY to bypass RLS
+// ═══════════════════════════════════════════════════════════════════
+
+async function getAdminDb() {
+  const url = process.env["SUPABASE_URL"];
+  const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!url || !key) throw Object.assign(new Error("SUPABASE_SERVICE_ROLE_KEY não configurada nas variáveis de ambiente do Replit."), { status: 503 });
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
+
+async function verifyToken(authHeader: string) {
+  const token = (authHeader ?? "").startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) throw Object.assign(new Error("Unauthorized"), { status: 401 });
+  const db = await getAdminDb();
+  const { data, error } = await db.auth.getUser(token);
+  if (error || !data.user) throw Object.assign(new Error("Sessão inválida"), { status: 401 });
+  return { user: data.user, db };
+}
+
+type Req = import("express").Request;
+type Res = import("express").Response;
+function ar(fn: (req: Req, res: Res) => Promise<void>) {
+  return async (req: Req, res: Res) => {
+    try { await fn(req, res); }
+    catch (err: unknown) {
+      const e = err as Error & { status?: number };
+      res.status(e.status ?? 500).json({ error: e.message ?? "Erro interno" });
+    }
+  };
+}
+
+/* ── Dashboard Stats ── */
+router.get("/admin/dashboard-stats", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayISO = today.toISOString();
+  const twoMin = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+
+  const [
+    { count: totalPlayers },
+    { count: activeBets },
+    { data: online },
+    { data: pendingWd },
+    { data: approvedWd },
+    { data: todayWd },
+    { data: txToday },
+    { data: finishedAll },
+    { data: finishedToday },
+    { count: pendingReports },
+  ] = await Promise.all([
+    db.from("profiles").select("*", { count: "exact", head: true }),
+    db.from("matches").select("*", { count: "exact", head: true }).in("status", ["active", "live", "in_progress"]),
+    db.from("profiles").select("id").gte("last_seen_at", twoMin),
+    db.from("transactions").select("id").eq("type", "withdrawal").eq("status", "pending"),
+    db.from("transactions").select("amount").eq("type", "withdrawal").eq("status", "approved"),
+    db.from("transactions").select("amount").eq("type", "withdrawal").eq("status", "approved").gte("created_at", todayISO),
+    db.from("matches").select("id").gte("created_at", todayISO),
+    db.from("matches").select("bet_amount").eq("status", "finished"),
+    db.from("matches").select("bet_amount").eq("status", "finished").gte("created_at", todayISO),
+    db.from("transactions").select("*", { count: "exact", head: true }).eq("type", "report").eq("status", "open"),
+  ]);
+
+  const sum = (arr: unknown[] | null, f: (x: Record<string,unknown>) => number) =>
+    (arr ?? []).reduce((s, x) => s + f(x as Record<string,unknown>), 0);
+
+  res.json({
+    liveMatches:             activeBets ?? 0,
+    onlinePlayers:           (online ?? []).length,
+    activeBets:              activeBets ?? 0,
+    pendingWithdrawals:      (pendingWd ?? []).length,
+    totalPlayers:            totalPlayers ?? 0,
+    platformRevenue:         sum(finishedAll, m => Number(m.bet_amount ?? 0) * 0.2),
+    totalApprovedWithdrawals:sum(approvedWd, w => Math.abs(Number(w.amount ?? 0))),
+    pendingReports:          pendingReports ?? 0,
+    todayEarnings:           sum(finishedToday, m => Number(m.bet_amount ?? 0) * 0.2),
+    todaySaidas:             sum(todayWd, w => Math.abs(Number(w.amount ?? 0))),
+    todayTransactions:       (txToday ?? []).length,
+    todayOnline:             (online ?? []).length,
+  });
+}));
+
+/* ── Matches ── */
+router.get("/admin/matches", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const { status, game } = req.query as Record<string, string>;
+  let q = db.from("matches").select("*").order("created_at", { ascending: false }).limit(200);
+  if (status && status !== "all") {
+    if (status === "live" || status === "active") q = q.in("status", ["active","live","in_progress"]) as typeof q;
+    else q = q.eq("status", status) as typeof q;
+  }
+  if (game && game !== "all") q = q.eq("game_type", game) as typeof q;
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  res.json(data ?? []);
+}));
+
+/* ── Matches over time (7 days) ── */
+router.get("/admin/matches-over-time", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const days: { date: string; dama: number; ludo: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const start = new Date(d); start.setHours(0,0,0,0);
+    const end   = new Date(d); end.setHours(23,59,59,999);
+    const [{ count: dama }, { count: ludo }] = await Promise.all([
+      db.from("matches").select("*",{count:"exact",head:true}).eq("game_type","dama").gte("created_at",start.toISOString()).lte("created_at",end.toISOString()),
+      db.from("matches").select("*",{count:"exact",head:true}).eq("game_type","ludo").gte("created_at",start.toISOString()).lte("created_at",end.toISOString()),
+    ]);
+    days.push({ date: start.toISOString().slice(0,10), dama: dama??0, ludo: ludo??0 });
+  }
+  res.json(days);
+}));
+
+/* ── Bets over time (7 days) ── */
+router.get("/admin/bets-over-time", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const days: { date: string; dama: number; ludo: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const start = new Date(d); start.setHours(0,0,0,0);
+    const end   = new Date(d); end.setHours(23,59,59,999);
+    const [{ data: damaData }, { data: ludoData }] = await Promise.all([
+      db.from("matches").select("bet_amount").eq("game_type","dama").gte("created_at",start.toISOString()).lte("created_at",end.toISOString()),
+      db.from("matches").select("bet_amount").eq("game_type","ludo").gte("created_at",start.toISOString()).lte("created_at",end.toISOString()),
+    ]);
+    const betSum = (arr: unknown[]|null) => (arr??[]).reduce((s,m) => s + Number((m as Record<string,unknown>).bet_amount??0),0);
+    days.push({ date: start.toISOString().slice(0,10), dama: betSum(damaData), ludo: betSum(ludoData) });
+  }
+  res.json(days);
+}));
+
+/* ── Game breakdown ── */
+router.get("/admin/game-breakdown", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const games = ["dama","ludo","xadrez","roleta"];
+  const results = await Promise.all(games.map(g =>
+    db.from("matches").select("bet_amount",{count:"exact"}).eq("game_type",g)
+  ));
+  const [dama,ludo,xadrez,roleta] = results;
+  const total = (dama.count??0)+(ludo.count??0)+(xadrez.count??0)+(roleta.count??0);
+  const betSum = (arr: unknown[]|null) => (arr??[]).reduce((s,m) => s+Number((m as Record<string,unknown>).bet_amount??0),0);
+  res.json({
+    dama:           total > 0 ? Math.round(((dama.count??0)/total)*100) : 0,
+    ludo:           total > 0 ? Math.round(((ludo.count??0)/total)*100) : 0,
+    damaMatches:    dama.count??0, ludoMatches:  ludo.count??0,
+    xadrezMatches:  xadrez.count??0, roletaMatches: roleta.count??0,
+    damaBetVolume:  betSum(dama.data),  ludoBetVolume: betSum(ludo.data),
+    xadrezBetVolume:betSum(xadrez.data),roletaBetVolume:betSum(roleta.data),
+  });
+}));
+
+/* ── Players ── */
+router.get("/admin/players", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const { data, error } = await db.from("profiles").select("*").order("created_at",{ascending:false}).limit(200);
+  if (error) throw new Error(error.message);
+  res.json(data ?? []);
+}));
+
+router.get("/admin/players/search", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const q = String(req.query.q ?? "").trim();
+  if (q.length < 1) { res.json([]); return; }
+  const { data, error } = await db.from("profiles")
+    .select("id,username,full_name,balance,avatar_url,phone")
+    .or(`username.ilike.%${q}%,full_name.ilike.%${q}%,phone.ilike.%${q}%`)
+    .limit(10);
+  if (error) throw new Error(error.message);
+  res.json(data ?? []);
+}));
+
+/* ── Ranking ── */
+router.get("/admin/ranking", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const { data, error } = await db.from("profiles")
+    .select("id,username,total_wins,total_games,balance")
+    .order("total_wins",{ascending:false}).limit(50);
+  if (error) throw new Error(error.message);
+  res.json((data ?? []).map((p: Record<string,unknown>, i: number) => {
+    const wins  = Number(p.total_wins??0);
+    const total = Number(p.total_games??0);
+    return {
+      playerId: p.id, rank: i+1,
+      username: (p.username as string)??"utilizador",
+      wins, losses: Math.max(0, total-wins),
+      winRate: total > 0 ? Math.round((wins/total)*1000)/10 : 0,
+      totalEarnings: Number(p.balance??0),
+    };
+  }));
+}));
+
+/* ── Reports (stored in transactions with type='report') ── */
+router.post("/admin/report-submit", ar(async (req, res) => {
+  const db = await getAdminDb();
+  const { user_id, user_name, user_email, accused_name, category, priority, description, ticket_id } = req.body as Record<string, string>;
+  const meta = JSON.stringify({ user_name, user_email, accused_name: accused_name??null, category, priority, description, ticket_id });
+  const { data, error } = await db.from("transactions").insert({
+    user_id: user_id || null, type: "report", amount: 0,
+    description: meta, status: "open", created_at: new Date().toISOString(),
+  }).select("id").single();
+  if (error) throw new Error(error.message);
+  res.json({ success: true, id: (data as Record<string,unknown>).id });
+}));
+
+router.get("/admin/reports", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const { status } = req.query as Record<string,string>;
+  let q = db.from("transactions").select("id,user_id,description,status,created_at")
+    .eq("type","report").order("created_at",{ascending:false}).limit(100);
+  if (status && status !== "all") {
+    const dbStatus = status === "pending" ? "open" : status === "reviewed" ? "resolved" : status;
+    q = q.eq("status", dbStatus) as typeof q;
+  }
+  const { data, error } = await q;
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []).map((tx: Record<string, unknown>) => {
+    let m: Record<string,string> = {};
+    try { m = JSON.parse(tx.description as string); } catch { /* ok */ }
+    return {
+      id: tx.id, user_id: tx.user_id,
+      user_name: m.user_name ?? "utilizador",
+      user_email: m.user_email ?? null,
+      accused_name: m.accused_name ?? m.ticket_id ?? "—",
+      category: m.category ?? "Outro",
+      priority: m.priority ?? "Média",
+      description: m.description ?? "",
+      ticket_id: m.ticket_id ?? null,
+      status: tx.status, created_at: tx.created_at,
+    };
+  });
+  res.json(rows);
+}));
+
+router.patch("/admin/reports/:id", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const { id } = req.params;
+  const { action, notes } = req.body as { action?: string; notes?: string };
+  const dbStatus = action === "reviewed" ? "resolved" : "dismissed";
+  const { data: existing } = await db.from("transactions").select("description").eq("id",id).single();
+  let meta: Record<string,string> = {};
+  try { meta = JSON.parse((existing as Record<string,string>)?.description ?? "{}"); } catch { /* ok */ }
+  meta.admin_notes = notes ?? "";
+  const { error } = await db.from("transactions").update({ status: dbStatus, description: JSON.stringify(meta) }).eq("id",id);
+  if (error) throw new Error(error.message);
+  res.json({ ok: true });
+}));
+
+/* ── Anti-fraud ── */
+router.get("/admin/antifraud", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const [{ data: blocked }, { data: reportsTx }, { count: resolved }] = await Promise.all([
+    db.from("blocked_users").select("*").eq("is_active",true).limit(50),
+    db.from("transactions").select("id,user_id,description,status,created_at").eq("type","report").eq("status","open").order("created_at",{ascending:false}).limit(20),
+    db.from("transactions").select("*",{count:"exact",head:true}).eq("type","report").eq("status","resolved"),
+  ]);
+  const parseMeta = (tx: Record<string,unknown>) => { let m: Record<string,string>={};try{m=JSON.parse(tx.description as string);}catch{/* ok */}return m; };
+  const alerts = (blocked??[]).map((b: Record<string,unknown>) => ({
+    id:b.id, playerName:(b.user_name as string)??"utilizador",
+    type:(b.block_type as string)??"account", severity:"high" as const,
+    description:(b.reason as string)??"Conta bloqueada.",createdAt:b.created_at,
+  }));
+  const reportAlerts = (reportsTx??[]).slice(0,Math.max(0,4-alerts.length)).map((tx: Record<string,unknown>) => {
+    const m = parseMeta(tx);
+    return { id:tx.id, playerName:m.user_name??"utilizador", type:m.category??"report",
+      severity:(m.priority==="Urgente"||m.priority==="Alta")?"high" as const:"medium" as const,
+      description:m.description??"", createdAt:tx.created_at };
+  });
+  res.json({
+    flaggedAccounts:(blocked??[]).length, suspiciousBets:resolved??0,
+    unusualPatterns:(reportsTx??[]).filter((tx: Record<string,unknown>) => {
+      const m=parseMeta(tx);return m.priority==="Alta"||m.priority==="Urgente";
+    }).length,
+    resolvedToday:resolved??0,
+    alerts:[...alerts,...reportAlerts].slice(0,4),
+  });
+}));
+
+/* ── Balance Adjust ── */
+router.post("/admin/balance-adjust", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const { userId, amount, type, reason, note } = req.body as {
+    userId: string; amount: number; type: "add"|"subtract"; reason: string; note?: string;
+  };
+  if (!userId || !amount || Number(amount) <= 0) throw Object.assign(new Error("Parâmetros inválidos"),{status:400});
+  const { data: profileData, error: fetchErr } = await db.from("profiles")
+    .select("balance,username,full_name,avatar_url").eq("id",userId).single();
+  if (fetchErr || !profileData) throw new Error("Jogador não encontrado");
+  const p = profileData as Record<string,unknown>;
+  const current = Number(p.balance??0);
+  const delta = type === "add" ? Number(amount) : -Number(amount);
+  const newBal = Math.max(0, current + delta);
+  const playerName = ((p.username ?? p.full_name ?? "utilizador") as string);
+  const { error: upErr } = await db.from("profiles").update({ balance: newBal }).eq("id",userId);
+  if (upErr) throw new Error("Erro ao actualizar saldo: " + upErr.message);
+  const meta = JSON.stringify({ player_name:playerName, avatar_url:p.avatar_url??null, balance_before:current, balance_after:newBal, reason:reason??"manual_adjustment", note:note??null });
+  await db.from("transactions").insert({ user_id:userId, type:"balance_adjustment", amount:delta, description:meta, status:"approved", created_at:new Date().toISOString() });
+  res.json({ ok:true, newBalance:newBal, playerName });
+}));
+
+router.get("/admin/balance-adjustments", ar(async (req, res) => {
+  const { db } = await verifyToken(req.headers.authorization ?? "");
+  const { data, error } = await db.from("transactions")
+    .select("id,user_id,amount,description,created_at")
+    .eq("type","balance_adjustment").order("created_at",{ascending:false}).limit(100);
+  if (error) throw new Error(error.message);
+  res.json((data??[]).map((tx: Record<string,unknown>) => {
+    let m: Record<string,unknown>={};try{m=JSON.parse(tx.description as string);}catch{/* ok */}
+    return { id:tx.id, user_id:tx.user_id, amount:Number(tx.amount??0),
+      balance_before:Number(m.balance_before??0), balance_after:Number(m.balance_after??0),
+      reason:(m.reason as string)??"manual_adjustment", note:m.note??null,
+      created_at:tx.created_at, player_name:(m.player_name as string)??"utilizador", avatar_url:m.avatar_url??null };
+  }));
+}));
+
 export default router;
+

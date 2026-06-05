@@ -38,17 +38,21 @@ export default function Reportar() {
     setSubmitting(true);
     try {
       const tid = "WM-" + Math.random().toString(36).slice(2, 8).toUpperCase();
-      const { error } = await supabase.from("reports").insert({
-        user_id:     user?.id ?? null,
-        user_name:   profile?.full_name ?? profile?.phone ?? user?.email ?? "utilizador",
-        user_email:  user?.email ?? null,
-        category,
-        priority,
-        description: description.trim(),
-        status:      "open",
-        ticket_id:   tid,
+      const base = (import.meta.env.VITE_API_URL as string ?? "").replace(/\/+$/, "");
+      const res = await fetch(`${base}/api/admin/report-submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id:     user?.id ?? null,
+          user_name:   profile?.full_name ?? profile?.phone ?? user?.email ?? "utilizador",
+          user_email:  user?.email ?? null,
+          category,
+          priority,
+          description: description.trim(),
+          ticket_id:   tid,
+        }),
       });
-      if (error) throw error;
+      if (!res.ok) throw new Error("Erro ao enviar");
       setTicketId(tid);
       setScreen("sent");
     } catch {
