@@ -131,6 +131,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveCachedProfile(p);
   };
 
+  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  const startRealtimeProfile = (userId: string, email: string) => {
+    if (realtimeChannelRef.current) supabase.removeChannel(realtimeChannelRef.current);
+    realtimeChannelRef.current = supabase
+      .channel(`profile-realtime-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${userId}` },
+        (payload) => {
+          const updated = payload.new as UserProfile;
+          if (updated) saveAndSet({ ...updated, email });
+        }
+      )
+      .subscribe();
+  };
+
   const startHeartbeat = (userId: string) => {
     if (heartbeatRef.current) clearInterval(heartbeatRef.current);
     updateLastSeen(userId);
@@ -161,6 +178,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     activeUidRef.current = null;
     signedInHandledRef.current = false;
     stopHeartbeat();
+    if (realtimeChannelRef.current) { supabase.removeChannel(realtimeChannelRef.current); realtimeChannelRef.current = null; }
     clearCachedProfile();
     try { await supabase.auth.signOut(); } catch { /* ignore */ }
     setUser(null);
@@ -200,6 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
           setSessionReady(true);
           startHeartbeat(id);
+          startRealtimeProfile(id, email);
           const fresh = await fetchProfile(id);
           if (!cancelled && activeUidRef.current === id && fresh) {
             saveAndSet({ ...fresh, email });
@@ -217,6 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
           setSessionReady(true);
           startHeartbeat(id);
+          startRealtimeProfile(id, email);
         }
       } catch {
         if (!cancelled) { setLoading(false); setSessionReady(true); }
@@ -259,12 +279,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             signedInHandledRef.current = true;
             setLoading(false);
             startHeartbeat(id);
+            startRealtimeProfile(id, email);
           }
 
         } else if (event === "SIGNED_OUT") {
           activeUidRef.current = null;
           signedInHandledRef.current = false;
           stopHeartbeat();
+          if (realtimeChannelRef.current) { supabase.removeChannel(realtimeChannelRef.current); realtimeChannelRef.current = null; }
           clearCachedProfile();
           if (!cancelled) {
             setUser(null);
