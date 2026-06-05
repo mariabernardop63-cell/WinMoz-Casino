@@ -167,6 +167,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   };
 
+  // Keep balance fresh: re-fetch on window focus and every 60 s
+  useEffect(() => {
+    const handler = () => { refreshProfile(); };
+    window.addEventListener("focus", handler);
+    const iv = setInterval(handler, 60_000);
+    return () => { window.removeEventListener("focus", handler); clearInterval(iv); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 

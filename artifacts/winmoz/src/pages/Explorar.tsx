@@ -248,24 +248,24 @@ function SalaTab() {
 
   async function deductBalance(amount: number, desc: string): Promise<boolean> {
     if (!user?.id) return false;
-    const withTimeout = <T,>(p: PromiseLike<T>, ms: number): Promise<T> =>
-      Promise.race([Promise.resolve(p), new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
     try {
-      const res = await withTimeout(
-        supabase.from("profiles").select("balance").eq("id", user.id).single() as unknown as Promise<{ data: { balance: any } | null; error: any }>,
-        12_000
-      );
-      const data = res?.data;
-      const bal = parseFloat(String(data?.balance ?? "0"));
+      // Read fresh balance from Supabase
+      const { data, error } = await supabase
+        .from("profiles").select("balance").eq("id", user.id).single();
+      if (error || !data) {
+        // Supabase read failed — fall back to cached profile to avoid blocking the user
+        const cachedBal = parseFloat(String(profile?.balance ?? "0"));
+        if (cachedBal < amount) return false;
+        // Attempt update using cached value (best effort)
+        await supabase.from("profiles").update({ balance: cachedBal - amount }).eq("id", user.id);
+        await supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" });
+        refreshProfile();
+        return true;
+      }
+      const bal = parseFloat(String(data.balance ?? "0"));
       if (bal < amount) return false;
-      await withTimeout(
-        supabase.from("profiles").update({ balance: bal - amount }).eq("id", user.id) as unknown as Promise<unknown>,
-        12_000
-      );
-      await withTimeout(
-        supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" }) as unknown as Promise<unknown>,
-        12_000
-      );
+      await supabase.from("profiles").update({ balance: bal - amount }).eq("id", user.id);
+      await supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" });
       refreshProfile();
       return true;
     } catch { return false; }

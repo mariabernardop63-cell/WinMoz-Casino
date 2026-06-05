@@ -139,7 +139,10 @@ export default function Levantar() {
           const { data } = await supabase
             .from("profiles").select("balance, phone").eq("id", user.id).single();
           if (active && data) {
-            setFreshBalance(parseFloat(String(data.balance ?? "0")) || 0);
+            const freshBal = parseFloat(String(data.balance ?? "0")) || 0;
+            setFreshBalance(freshBal);
+            // Sync the context cache so all other pages show the real balance
+            await refreshProfile();
           }
         } else {
           // Fallback: refresh context

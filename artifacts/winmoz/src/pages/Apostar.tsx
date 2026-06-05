@@ -390,19 +390,25 @@ function MatchmakingScreen({
 
   useEffect(() => {
     const channelName = `matchmaking_${gameType}_${betAmount}`;
+    // Use Broadcast only — more reliable than Presence across devices/networks
     const channel = supabase.channel(channelName, {
-      config: {
-        presence: { key: userId },
-        broadcast: { self: false },
-      },
+      config: { broadcast: { self: false } },
     });
     channelRef.current = channel;
 
+    const announcePresence = () => {
+      if (matchedRef.current) return;
+      channel.send({ type: "broadcast", event: "looking", payload: { userId, displayName } });
+    };
+
+    // Listen for match_found broadcast sent by the other player (who is alphabetically first)
     channel.on("broadcast", { event: "match_found" }, ({ payload }) => {
       if (matchedRef.current) return;
+      // Only process if I am one of the matched players
+      if (payload.blue !== userId && payload.green !== userId) return;
       matchedRef.current = true;
-      const myColor: string  = payload.blue === userId ? "blue" : "green";
-      const oppName: string  =
+      const myColor: string = payload.blue === userId ? "blue" : "green";
+      const oppName: string =
         myColor === "green"
           ? (payload.blueName  as string) ?? "Adversário"
           : (payload.greenName as string) ?? "Adversário";
@@ -410,41 +416,34 @@ function MatchmakingScreen({
       setTimeout(() => { onMatched(payload.gameId as string, myColor, oppName); supabase.removeChannel(channel); }, 1500);
     });
 
-    const tryMatch = () => {
-      if (matchedRef.current) return;
-      const state = channel.presenceState<{ displayName?: string }>();
-      const presentIds = Object.keys(state).sort();
-      if (presentIds.length < 2) return;
-      if (presentIds[0] !== userId) return;
+    // Listen for other players announcing they are looking
+    channel.on("broadcast", { event: "looking" }, ({ payload }) => {
+      const oppId   = payload.userId   as string;
+      const oppName = payload.displayName as string;
+      if (!oppId || oppId === userId || matchedRef.current) return;
+      // Alphabetically-first ID becomes the host and creates the match
+      const firstId = [userId, oppId].sort()[0];
+      if (firstId !== userId) return; // opponent will host; wait for their match_found
       matchedRef.current = true;
-      const gameId  = `${presentIds[0]}_${presentIds[1]}`;
-      const oppId   = presentIds[1];
-      const oppPres = (state[oppId] as any)?.[0] as { displayName?: string } | undefined;
-      const oppName = oppPres?.displayName ?? "Adversário";
+      const gameId = `${userId}_${oppId}`;
       channel.send({
         type: "broadcast",
         event: "match_found",
-        payload: { gameId, blue: presentIds[0], green: presentIds[1], blueName: displayName, greenName: oppName },
+        payload: { gameId, blue: userId, green: oppId, blueName: displayName, greenName: oppName },
       });
       setFound(true);
       setTimeout(() => { onMatched(gameId, "blue", oppName); supabase.removeChannel(channel); }, 1500);
-    };
-
-    channel.on("presence", { event: "sync" }, tryMatch);
-    channel.on("presence", { event: "join" }, () => {
-      // Small delay to ensure presenceState is updated before checking
-      setTimeout(tryMatch, 150);
     });
-    channel.subscribe(async (status) => {
+
+    channel.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        await channel.track({ userId, displayName });
-        // Initial check in case both users subscribed at similar times
-        setTimeout(tryMatch, 300);
+        // Announce immediately once subscribed
+        setTimeout(announcePresence, 200);
       }
     });
 
-    // Polling fallback: re-check presence every 3 s in case events were missed
-    const poll = setInterval(() => { if (!matchedRef.current) tryMatch(); }, 3000);
+    // Re-announce every 3 s so late joiners can hear us
+    const poll = setInterval(announcePresence, 3000);
 
     return () => { clearInterval(poll); supabase.removeChannel(channel); channelRef.current = null; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
