@@ -70,7 +70,7 @@ export default function Levantar() {
   const [freshBalance, setFreshBalance] = useState<number | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(true);
 
-  const balance = freshBalance ?? parseFloat(String(profile?.balance ?? "0")) || 0;
+  const balance = (freshBalance ?? parseFloat(String(profile?.balance ?? "0"))) || 0;
   const userPhone = profile?.phone ? `+258 ${profile.phone.slice(0, 3)} ${profile.phone.slice(3, 6)} ${profile.phone.slice(6)}` : "";
 
   const [screen, setScreen] = useState<Screen>("amount");
