@@ -6,7 +6,7 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 /* PORT is only needed by the dev/preview server, not during `vite build`.
    Fall back to 3000 so Vercel (and other CI build environments) don't fail. */
-const port = Number(process.env.PORT || 3000);
+const port = Number(process.env.PORT || 5000);
 
 /* BASE_PATH defaults to "/" when not provided (standard for Vercel deployments). */
 const basePath = process.env.BASE_PATH || "/";
