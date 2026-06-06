@@ -750,6 +750,36 @@ router.post("/roleta/spin", async (req, res) => {
   }
 });
 
+/* ── Admin: Update / upsert a platform setting ── */
+router.post("/admin/settings/update", async (req, res) => {
+  try {
+    const { key, value } = req.body as { key?: string; value?: string };
+    if (!key) { res.status(400).json({ error: "key required" }); return; }
+
+    const supabaseUrl = process.env["SUPABASE_URL"];
+    const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+    if (!supabaseUrl || !supabaseServiceKey) {
+      res.status(500).json({ error: "Supabase não configurado" }); return;
+    }
+
+    const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
+    const { error } = await admin
+      .from("platform_settings")
+      .upsert({ key, value: value ?? "" }, { onConflict: "key" });
+
+    if (error) {
+      req.log.error({ error }, "platform_settings upsert failed");
+      res.status(500).json({ error: error.message }); return;
+    }
+
+    req.log.info({ key }, "platform setting updated");
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "settings update error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── Admin: Get a single platform setting (public read) ── */
 router.get("/admin/settings/get", async (req, res) => {
   const key = req.query["key"] as string | undefined;

@@ -1013,15 +1013,10 @@ export function useUpdatePlatformSetting() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const res = await fetch("/api/admin/settings/update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key, value }),
-      });
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(`Erro ${res.status}: ${body}`);
-      }
+      const { error } = await adminSupabase
+        .from("platform_settings")
+        .upsert({ key, value }, { onConflict: "key" });
+      if (error) throw new Error(error.message);
       return { ok: true };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["platform-settings"] }),
