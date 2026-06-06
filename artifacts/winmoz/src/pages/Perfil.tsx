@@ -286,7 +286,7 @@ export default function Perfil() {
                 </div>
               )}
 
-              <div className="mt-5">
+              <div className="mt-5 flex flex-col gap-2.5">
                 <button onClick={() => setFerramentasOpen(true)}
                   className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-100"
                   style={{ background: "#f7f8fa" }}>
@@ -297,6 +297,21 @@ export default function Perfil() {
                     <span className="font-syne font-semibold text-slate-700 text-sm">Ferramentas da conta</span>
                   </div>
                   <ChevronRight className="w-4 h-4 text-slate-300" />
+                </button>
+
+                <button
+                  onClick={async () => { await signOut(); setLocation("/"); }}
+                  className="w-full flex items-center gap-3 p-4 rounded-2xl border border-red-100 transition-all hover:bg-red-50 hover:border-red-200"
+                  style={{ background: "#fff5f5" }}>
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+                    <LogOut style={{ width: 14, height: 14, color: "#dc2626" }} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-syne font-bold text-sm text-red-600">Terminar Sessão</p>
+                    <p className="text-[11px] text-red-400 mt-0.5">Sair da conta actual</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-red-300" />
                 </button>
               </div>
             </div>
