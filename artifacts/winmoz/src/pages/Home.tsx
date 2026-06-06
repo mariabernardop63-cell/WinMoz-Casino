@@ -1014,7 +1014,7 @@ function HeroBanner() {
                   display: "inline-block",
                 }}
               >
-                {slide.cta} →
+                {slide.cta}
               </motion.button>
             </div>
 
@@ -1198,9 +1198,9 @@ export default function Home() {
             </div>
           ) : (
             <Link href="/registar">
-              <button className="bg-blue-700 hover:bg-blue-800 text-white font-semibold text-sm px-5 py-2 rounded-xl transition-all duration-200 shadow-md hover:shadow-blue-200 hover:shadow-lg font-syne tracking-wide">
+              <span className="bg-blue-700 text-white font-semibold text-sm px-5 py-2 rounded-xl shadow-md font-syne tracking-wide cursor-pointer" style={{ display: "inline-block" }}>
                 Registar-se
-              </button>
+              </span>
             </Link>
           )}
         </header>
@@ -1404,10 +1404,6 @@ export default function Home() {
               <circle cx="12" cy="11" r="1.5" fill="#7c3aed" />
               <circle cx="15.5" cy="11" r="1.5" fill="#7c3aed" />
             </svg>
-            {/* 24/7 badge */}
-            <span style={{ position: "absolute", top: -4, right: -4, background: "#00D4B4", borderRadius: 10, padding: "1px 5px", fontSize: 8, fontWeight: 800, color: "#001a16", fontFamily: "'Syne', sans-serif", boxShadow: "0 2px 6px rgba(0,212,180,0.5)", whiteSpace: "nowrap" }}>
-              24/7
-            </span>
           </motion.button>
 
         {/* BOTTOM NAV */}

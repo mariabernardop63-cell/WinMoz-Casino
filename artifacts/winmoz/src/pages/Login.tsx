@@ -214,7 +214,7 @@ export default function Login() {
         <p className="text-center text-[13px] text-slate-500 mt-4">
           Não tem conta?{" "}
           <Link href="/registar">
-            <button className="font-bold text-[#000] hover:underline text-[13px]">Registar-se</button>
+            <span className="font-bold text-[#000] underline text-[13px] cursor-pointer">Registar-se</span>
           </Link>
         </p>
       </div>
