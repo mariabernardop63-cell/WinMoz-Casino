@@ -65,11 +65,10 @@ async function saveMsgToSupabase(
 ) {
   try {
     await supabase.from("support_messages").insert({
-      user_id:       userId,
-      user_name:     userName,
+      user_id:   userId,
+      user_name: userName,
       sender,
       content,
-      read_by_admin: false,
     });
   } catch {
   }

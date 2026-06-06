@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama3-8b-8192";
+const GROQ_MODEL = "llama-3.1-8b-instant";
 
 const SYSTEM_PROMPT = `És o assistente virtual oficial da Poker Winner, uma plataforma de jogos e apostas online em Moçambique. O teu nome é "Assistente Poker Winner".
 

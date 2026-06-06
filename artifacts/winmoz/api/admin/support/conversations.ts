@@ -12,7 +12,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const supabaseUrl = process.env["SUPABASE_URL"];
   const serviceKey  = process.env["SUPABASE_SERVICE_ROLE_KEY"];
   if (!supabaseUrl || !serviceKey) {
-    res.status(500).json({ error: "Servidor não configurado: faltam variáveis SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no Vercel." });
+    res.status(500).json({ error: "Faltam variáveis SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no Vercel." });
     return;
   }
 
@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data, error } = await admin
     .from("support_messages")
-    .select("user_id, user_name, sender, content, created_at, read_by_admin")
+    .select("user_id, user_name, sender, content, created_at")
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -52,7 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         lastSender:      (m.sender as string) ?? "user",
       });
     }
-    if (m.sender === "user" && !m.read_by_admin) {
+    if (m.sender === "user") {
       const conv = convMap.get(uid)!;
       conv.unreadCount++;
       convMap.set(uid, conv);

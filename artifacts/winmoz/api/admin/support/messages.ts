@@ -15,7 +15,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const supabaseUrl = process.env["SUPABASE_URL"];
   const serviceKey  = process.env["SUPABASE_SERVICE_ROLE_KEY"];
   if (!supabaseUrl || !serviceKey) {
-    res.status(500).json({ error: "Servidor não configurado: faltam variáveis SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no Vercel." });
+    res.status(500).json({ error: "Faltam variáveis SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no Vercel." });
     return;
   }
 
@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { data, error } = await admin
     .from("support_messages")
-    .select("*")
+    .select("id, user_id, user_name, sender, content, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
 
@@ -41,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     sender:      (m.sender as "user" | "admin" | "ai") ?? "user",
     content:     (m.content as string) ?? "",
     createdAt:   m.created_at as string,
-    readByAdmin: (m.read_by_admin as boolean) ?? false,
+    readByAdmin: true,
   }));
 
   res.status(200).json({ messages });
