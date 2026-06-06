@@ -2,8 +2,16 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, Flag, Bug, CreditCard, User, HelpCircle, CheckCircle2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
+
+const _url = (import.meta.env.VITE_SUPABASE_URL as string) || "";
+const _key = (import.meta.env.VITE_SUPABASE_SERVICE_ROLE as string)
+  || (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
+  || "";
+const reportSupabase = createClient(_url, _key, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
 
 const CATEGORIES = [
   { icon: Bug,         label: "Problema técnico",     desc: "Erro, crash ou mau funcionamento"  },
@@ -38,7 +46,7 @@ export default function Reportar() {
     setSubmitting(true);
     try {
       const tid = "WM-" + Math.random().toString(36).slice(2, 8).toUpperCase();
-      const { error } = await supabase.from("reports").insert({
+      const { error } = await reportSupabase.from("reports").insert({
         user_id:     user?.id ?? null,
         user_name:   profile?.full_name ?? profile?.phone ?? user?.email ?? "utilizador",
         user_email:  user?.email ?? null,
@@ -46,7 +54,6 @@ export default function Reportar() {
         priority,
         description: description.trim(),
         status:      "open",
-        ticket_id:   tid,
       });
       if (error) throw error;
       setTicketId(tid);

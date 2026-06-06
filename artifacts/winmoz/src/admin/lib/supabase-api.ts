@@ -753,10 +753,10 @@ function mapReport(r: Record<string, unknown>): AdminReport {
   return {
     id:           r.id as string,
     reporterName: (r.user_name as string)    ?? (r.user_email as string) ?? "utilizador",
-    accusedName:  (r.accused_name as string) ?? (r.ticket_id as string)  ?? "—",
+    accusedName:  "—",
     reason:       (r.category as string)     ?? "Outro",
     description:  (r.description as string)  ?? "",
-    matchId:      (r.ticket_id as string)    ?? null,
+    matchId:      null,
     status:       mapReportStatus(r.status as string),
     createdAt:    r.created_at as string,
     category:     (r.category as string)     ?? "Outro",
