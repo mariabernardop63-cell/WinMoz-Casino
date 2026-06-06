@@ -1,0 +1,103 @@
+~/workspace$ git pull origin main --rebase
+From https://github.com/mariabernardop63-cell/WinMoz-Casino
+ * branch            main       -> FETCH_HEAD
+Auto-merging .agents/memory/MEMORY.md
+CONFLICT (add/add): Merge conflict in .agents/memory/MEMORY.md
+Auto-merging .replit
+CONFLICT (add/add): Merge conflict in .replit
+Auto-merging artifacts/api-server/.replit-artifact/artifact.toml
+CONFLICT (add/add): Merge conflict in artifacts/api-server/.replit-artifact/artifact.toml
+Auto-merging artifacts/api-server/package.json
+CONFLICT (add/add): Merge conflict in artifacts/api-server/package.json
+Auto-merging artifacts/api-server/src/app.ts
+CONFLICT (add/add): Merge conflict in artifacts/api-server/src/app.ts
+Auto-merging artifacts/api-server/src/index.ts
+CONFLICT (add/add): Merge conflict in artifacts/api-server/src/index.ts
+Auto-merging artifacts/api-server/src/routes/index.ts
+CONFLICT (add/add): Merge conflict in artifacts/api-server/src/routes/index.ts
+Auto-merging artifacts/api-server/tsconfig.json
+CONFLICT (add/add): Merge conflict in artifacts/api-server/tsconfig.json
+Auto-merging artifacts/mockup-sandbox/tsconfig.json
+CONFLICT (add/add): Merge conflict in artifacts/mockup-sandbox/tsconfig.json
+Auto-merging artifacts/winmoz/.replit-artifact/artifact.toml
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/.replit-artifact/artifact.toml
+Auto-merging artifacts/winmoz/package.json
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/package.json
+warning: Cannot merge binary files: artifacts/winmoz/public/opengraph.jpg (HEAD vs. a543a4d (Improve game security and fix player support functionality))
+Auto-merging artifacts/winmoz/public/opengraph.jpg
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/public/opengraph.jpg
+Auto-merging artifacts/winmoz/src/App.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/App.tsx
+Auto-merging artifacts/winmoz/src/components/BottomNav.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/components/BottomNav.tsx
+Auto-merging artifacts/winmoz/src/components/ProtectedRoute.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/components/ProtectedRoute.tsx
+Auto-merging artifacts/winmoz/src/contexts/AuthContext.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/contexts/AuthContext.tsx
+Auto-merging artifacts/winmoz/src/index.css
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/index.css
+Auto-merging artifacts/winmoz/src/lib/api.ts
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/lib/api.ts
+Auto-merging artifacts/winmoz/src/lib/supabase.ts
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/lib/supabase.ts
+Auto-merging artifacts/winmoz/src/pages/Apostar.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Apostar.tsx
+Auto-merging artifacts/winmoz/src/pages/ChessGame.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/ChessGame.tsx
+Auto-merging artifacts/winmoz/src/pages/DamasGame.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/DamasGame.tsx
+Auto-merging artifacts/winmoz/src/pages/EsqueceuSenha.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/EsqueceuSenha.tsx
+Auto-merging artifacts/winmoz/src/pages/Explorar.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Explorar.tsx
+Auto-merging artifacts/winmoz/src/pages/GrupoChat.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/GrupoChat.tsx
+Auto-merging artifacts/winmoz/src/pages/Home.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Home.tsx
+Auto-merging artifacts/winmoz/src/pages/Levantar.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Levantar.tsx
+Auto-merging artifacts/winmoz/src/pages/Login.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Login.tsx
+Auto-merging artifacts/winmoz/src/pages/LudoGame.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/LudoGame.tsx
+Auto-merging artifacts/winmoz/src/pages/Notificacoes.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Notificacoes.tsx
+Auto-merging artifacts/winmoz/src/pages/OTP.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/OTP.tsx
+Auto-merging artifacts/winmoz/src/pages/Perfil.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Perfil.tsx
+Auto-merging artifacts/winmoz/src/pages/Recarga.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Recarga.tsx
+Auto-merging artifacts/winmoz/src/pages/RedefinirSenha.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/RedefinirSenha.tsx
+Auto-merging artifacts/winmoz/src/pages/Registar.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Registar.tsx
+Auto-merging artifacts/winmoz/src/pages/Reportar.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Reportar.tsx
+Auto-merging artifacts/winmoz/src/pages/Roleta.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Roleta.tsx
+Auto-merging artifacts/winmoz/src/pages/Suporte.tsx
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/src/pages/Suporte.tsx
+Auto-merging artifacts/winmoz/tsconfig.json
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/tsconfig.json
+Auto-merging artifacts/winmoz/vercel.json
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/vercel.json
+Auto-merging artifacts/winmoz/vite.config.ts
+CONFLICT (add/add): Merge conflict in artifacts/winmoz/vite.config.ts
+Auto-merging lib/db/src/schema/index.ts
+CONFLICT (add/add): Merge conflict in lib/db/src/schema/index.ts
+Auto-merging pnpm-lock.yaml
+CONFLICT (add/add): Merge conflict in pnpm-lock.yaml
+Auto-merging replit.md
+CONFLICT (add/add): Merge conflict in replit.md
+Auto-merging tsconfig.base.json
+CONFLICT (add/add): Merge conflict in tsconfig.base.json
+error: could not apply a543a4d... Improve game security and fix player support functionality
+hint: Resolve all conflicts manually, mark them as resolved with
+hint: "git add/rm <conflicted_files>", then run "git rebase --continue".
+hint: You can instead skip this commit: run "git rebase --skip".
+hint: To abort and get back to the state before "git rebase", run "git rebase --abort".
+hint: Disable this message with "git config set advice.mergeConflict false"
+Could not apply a543a4d... # Improve game security and fix player support functionality
+~/workspace$ ^C
+~/workspace$ 
