@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, CheckCheck, X, Bot } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { adminSupabase } from "@/admin/lib/supabase-api";
 import { useAuth } from "@/contexts/AuthContext";
 
 // Chama o endpoint serverless Vercel — a chave Groq fica apenas no servidor, nunca exposta no browser
@@ -76,17 +75,16 @@ async function saveMsgToSupabase(
 
 async function isAiModeEnabled(): Promise<boolean> {
   try {
-    const { data } = await adminSupabase
+    const { data } = await supabase
       .from("platform_settings")
       .select("value")
       .eq("key", "support_ai_mode")
-      .single();
-    // Default to true if not set
+      .maybeSingle();
     const val = (data as { value: string } | null)?.value;
     if (val === undefined || val === null) return true;
     return val !== "false";
   } catch {
-    return true; // default: AI enabled
+    return true;
   }
 }
 

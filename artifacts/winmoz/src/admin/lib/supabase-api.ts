@@ -1000,7 +1000,7 @@ export function useGetPlatformSettings() {
   return useQuery({
     queryKey: ["platform-settings"],
     queryFn: async () => {
-      const { data, error } = await adminSupabase.from("platform_settings").select("*");
+      const { data, error } = await supabase.from("platform_settings").select("*");
       if (error) throw error;
       const map: Record<string, string> = {};
       (data ?? []).forEach((s: { key: string; value: string }) => { map[s.key] = s.value; });
@@ -1015,7 +1015,7 @@ export function useUpdatePlatformSetting() {
   return useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await adminSupabase
+      const { error } = await supabase
         .from("platform_settings")
         .upsert(
           { key, value, updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
@@ -1100,10 +1100,40 @@ export function useListSupportConversations() {
   return useQuery({
     queryKey: ["support-conversations"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/support/conversations");
-      if (!res.ok) throw new Error(`Erro ${res.status} ao carregar conversas`);
-      const json = await res.json() as { conversations: SupportConversation[] };
-      return json.conversations;
+      const { data, error } = await supabase
+        .from("support_messages")
+        .select("user_id, user_name, sender, content, created_at")
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      if (error) throw new Error(`Erro ao carregar conversas: ${error.message}`);
+
+      const convMap = new Map<string, SupportConversation>();
+      const rows = (data ?? []) as Record<string, unknown>[];
+
+      // Process oldest-first to keep last message accurate
+      [...rows].reverse().forEach((m) => {
+        const uid = m.user_id as string;
+        convMap.set(uid, {
+          userId:          uid,
+          userName:        (m.user_name as string) ?? "utilizador",
+          lastMessage:     (m.content as string) ?? "",
+          lastMessageTime: m.created_at as string,
+          unreadCount:     0,
+          lastSender:      (m.sender as "user" | "admin" | "ai"),
+        });
+      });
+
+      // Count unread user messages (no read_by_admin column in DB — count all user msgs)
+      rows.forEach((m) => {
+        const uid = m.user_id as string;
+        const conv = convMap.get(uid);
+        if (conv && m.sender === "user") conv.unreadCount++;
+      });
+
+      return Array.from(convMap.values()).sort(
+        (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
+      );
     },
     refetchInterval: 10000,
     staleTime: 3000,
@@ -1115,10 +1145,23 @@ export function useGetSupportMessages(userId: string | null) {
     queryKey: ["support-messages", userId],
     queryFn: async () => {
       if (!userId) return [];
-      const res = await fetch(`/api/admin/support/messages?userId=${encodeURIComponent(userId)}`);
-      if (!res.ok) throw new Error(`Erro ${res.status} ao carregar mensagens`);
-      const json = await res.json() as { messages: SupportMessage[] };
-      return json.messages;
+      const { data, error } = await supabase
+        .from("support_messages")
+        .select("id, user_id, user_name, sender, content, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true });
+
+      if (error) throw new Error(`Erro ao carregar mensagens: ${error.message}`);
+
+      return (data ?? []).map((m: Record<string, unknown>): SupportMessage => ({
+        id:          m.id as string,
+        userId:      m.user_id as string,
+        userName:    (m.user_name as string) ?? "utilizador",
+        sender:      (m.sender as "user" | "admin" | "ai") ?? "user",
+        content:     (m.content as string) ?? "",
+        createdAt:   m.created_at as string,
+        readByAdmin: true,
+      }));
     },
     enabled: !!userId,
     refetchInterval: 8000,
@@ -1130,12 +1173,15 @@ export function useSendAdminSupportMessage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, userName, content }: { userId: string; userName: string; content: string }) => {
-      const res = await fetch("/api/admin/support/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, userName, content }),
-      });
-      if (!res.ok) throw new Error(`Erro ${res.status} ao enviar mensagem`);
+      const { error } = await supabase
+        .from("support_messages")
+        .insert({
+          user_id:   userId,
+          user_name: userName,
+          sender:    "admin",
+          content:   content.trim(),
+        });
+      if (error) throw new Error(`Erro ao enviar mensagem: ${error.message}`);
       return { ok: true };
     },
     onSuccess: (_d, { userId }) => {
@@ -1149,13 +1195,8 @@ export function useMarkSupportMessagesRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (userId: string) => {
-      const res = await fetch("/api/admin/support/mark-read", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
-      });
-      if (!res.ok) throw new Error(`Erro ${res.status} ao marcar como lidas`);
-      return { ok: true };
+      // support_messages table has no read_by_admin column — just refresh queries
+      return { ok: true, userId };
     },
     onSuccess: (_d, userId) => {
       qc.invalidateQueries({ queryKey: ["support-conversations"] });
