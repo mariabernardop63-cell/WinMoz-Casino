@@ -1100,36 +1100,10 @@ export function useListSupportConversations() {
   return useQuery({
     queryKey: ["support-conversations"],
     queryFn: async () => {
-      const { data, error } = await adminSupabase
-        .from("support_messages")
-        .select("user_id, user_name, sender, content, created_at, read_by_admin")
-        .order("created_at", { ascending: false })
-        .limit(500);
-      if (error) throw error;
-
-      const convMap = new Map<string, SupportConversation>();
-      (data ?? []).forEach((m: Record<string, unknown>) => {
-        const uid = m.user_id as string;
-        if (!convMap.has(uid)) {
-          convMap.set(uid, {
-            userId: uid,
-            userName: (m.user_name as string) ?? "utilizador",
-            lastMessage: (m.content as string) ?? "",
-            lastMessageTime: m.created_at as string,
-            unreadCount: 0,
-            lastSender: (m.sender as "user" | "admin" | "ai") ?? "user",
-          });
-        }
-        if (m.sender === "user" && !m.read_by_admin) {
-          const conv = convMap.get(uid)!;
-          conv.unreadCount++;
-          convMap.set(uid, conv);
-        }
-      });
-
-      return Array.from(convMap.values()).sort(
-        (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
-      );
+      const res = await fetch("/api/admin/support/conversations");
+      if (!res.ok) throw new Error(`Erro ${res.status} ao carregar conversas`);
+      const json = await res.json() as { conversations: SupportConversation[] };
+      return json.conversations;
     },
     refetchInterval: 10000,
     staleTime: 3000,
@@ -1141,21 +1115,10 @@ export function useGetSupportMessages(userId: string | null) {
     queryKey: ["support-messages", userId],
     queryFn: async () => {
       if (!userId) return [];
-      const { data, error } = await adminSupabase
-        .from("support_messages")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((m: Record<string, unknown>) => ({
-        id: m.id as string,
-        userId: m.user_id as string,
-        userName: (m.user_name as string) ?? "utilizador",
-        sender: (m.sender as "user" | "admin" | "ai") ?? "user",
-        content: (m.content as string) ?? "",
-        createdAt: m.created_at as string,
-        readByAdmin: (m.read_by_admin as boolean) ?? false,
-      }));
+      const res = await fetch(`/api/admin/support/messages?userId=${encodeURIComponent(userId)}`);
+      if (!res.ok) throw new Error(`Erro ${res.status} ao carregar mensagens`);
+      const json = await res.json() as { messages: SupportMessage[] };
+      return json.messages;
     },
     enabled: !!userId,
     refetchInterval: 8000,
@@ -1167,14 +1130,12 @@ export function useSendAdminSupportMessage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, userName, content }: { userId: string; userName: string; content: string }) => {
-      const { error } = await adminSupabase.from("support_messages").insert({
-        user_id: userId,
-        user_name: userName,
-        sender: "admin",
-        content,
-        read_by_admin: true,
+      const res = await fetch("/api/admin/support/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, userName, content }),
       });
-      if (error) throw error;
+      if (!res.ok) throw new Error(`Erro ${res.status} ao enviar mensagem`);
       return { ok: true };
     },
     onSuccess: (_d, { userId }) => {
@@ -1188,12 +1149,12 @@ export function useMarkSupportMessagesRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await adminSupabase
-        .from("support_messages")
-        .update({ read_by_admin: true })
-        .eq("user_id", userId)
-        .eq("read_by_admin", false);
-      if (error) throw error;
+      const res = await fetch("/api/admin/support/mark-read", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (!res.ok) throw new Error(`Erro ${res.status} ao marcar como lidas`);
       return { ok: true };
     },
     onSuccess: (_d, userId) => {
