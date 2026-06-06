@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -38,19 +38,24 @@ import NotificationBanner from "@/components/NotificationBanner";
 import MaintenancePage from "@/components/MaintenancePage";
 import { useState, useEffect } from "react";
 import { adminSupabase } from "@/admin/lib/supabase-api";
-import { supabase } from "@/lib/supabase";
 
 const queryClient = new QueryClient();
-
 const ADMIN_EMAIL = "nexialonemz@gmail.com";
 
+/* ── Maintenance gate — wraps only user-facing routes ── */
 function MaintenanceGate({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [location] = useLocation();
   const [maintenance, setMaintenance] = useState(false);
   const [checked, setChecked] = useState(false);
 
+  // Admin panel always bypasses maintenance — check route first
+  const isAdminRoute = location.startsWith("/admin");
+
   useEffect(() => {
-    // Initial fetch
+    if (isAdminRoute) return; // don't even subscribe for admin routes
+
+    // Initial fetch using service-role client (bypasses RLS)
     adminSupabase
       .from("platform_settings")
       .select("value")
@@ -61,9 +66,9 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
         setChecked(true);
       }, () => setChecked(true));
 
-    // Realtime subscription
-    const channel = supabase
-      .channel("maintenance-mode-watch")
+    // Realtime subscription via service-role client
+    const channel = adminSupabase
+      .channel("maintenance-watch-v2")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "platform_settings", filter: "key=eq.maintenance_mode" },
@@ -74,15 +79,19 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+    return () => { adminSupabase.removeChannel(channel); };
+  }, [isAdminRoute]);
 
-  // While checking, show nothing to avoid flash
+  // Admin routes always pass through
+  if (isAdminRoute) return <>{children}</>;
+
+  // Still checking — show nothing to avoid flash, but only briefly
   if (!checked) return null;
 
-  // Admin bypass maintenance mode
-  const isAdmin = user?.email === ADMIN_EMAIL;
+  // Wait for auth to resolve before blocking admin users
+  const isAdmin = !authLoading && user?.email === ADMIN_EMAIL;
 
+  // Block non-admin users when maintenance is on
   if (maintenance && !isAdmin) {
     return <MaintenancePage />;
   }

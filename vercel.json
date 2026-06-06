@@ -1,0 +1,7 @@
+{
+  "buildCommand": "pnpm --filter @workspace/winmoz run build",
+  "outputDirectory": "artifacts/winmoz/dist/public",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
