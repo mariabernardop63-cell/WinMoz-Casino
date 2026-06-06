@@ -12,8 +12,21 @@ async function callGroqAI(messages: Array<{ role: "user" | "assistant"; content:
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages }),
   });
-  if (!res.ok) throw new Error(`API error ${res.status}`);
-  const data = await res.json() as { reply?: string };
+
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    // Vercel served index.html instead of the function — function not deployed or routing issue
+    console.error("[callGroqAI] Resposta não-JSON recebida. Status:", res.status, "Content-Type:", contentType);
+    return "O serviço de IA está temporariamente indisponível. Por favor contacta o suporte: +258 86 338 7488.";
+  }
+
+  const data = await res.json() as { reply?: string; error?: string };
+
+  if (!res.ok) {
+    console.error("[callGroqAI] Erro da API:", res.status, data);
+    return "O serviço de IA está temporariamente indisponível. Por favor tenta novamente ou contacta: +258 86 338 7488.";
+  }
+
   return data.reply ?? "Desculpa, não consegui processar. Tenta novamente.";
 }
 

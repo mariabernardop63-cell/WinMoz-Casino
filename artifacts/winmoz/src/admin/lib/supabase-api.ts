@@ -1100,40 +1100,13 @@ export function useListSupportConversations() {
   return useQuery({
     queryKey: ["support-conversations"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("support_messages")
-        .select("user_id, user_name, sender, content, created_at")
-        .order("created_at", { ascending: false })
-        .limit(500);
-
-      if (error) throw new Error(`Erro ao carregar conversas: ${error.message}`);
-
-      const convMap = new Map<string, SupportConversation>();
-      const rows = (data ?? []) as Record<string, unknown>[];
-
-      // Process oldest-first to keep last message accurate
-      [...rows].reverse().forEach((m) => {
-        const uid = m.user_id as string;
-        convMap.set(uid, {
-          userId:          uid,
-          userName:        (m.user_name as string) ?? "utilizador",
-          lastMessage:     (m.content as string) ?? "",
-          lastMessageTime: m.created_at as string,
-          unreadCount:     0,
-          lastSender:      (m.sender as "user" | "admin" | "ai"),
-        });
-      });
-
-      // Count unread user messages (no read_by_admin column in DB — count all user msgs)
-      rows.forEach((m) => {
-        const uid = m.user_id as string;
-        const conv = convMap.get(uid);
-        if (conv && m.sender === "user") conv.unreadCount++;
-      });
-
-      return Array.from(convMap.values()).sort(
-        (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
-      );
+      const res = await fetch("/api/admin/support/conversations");
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`Erro ${res.status}: ${body}`);
+      }
+      const data = await res.json() as { conversations?: SupportConversation[] };
+      return data.conversations ?? [];
     },
     refetchInterval: 10000,
     staleTime: 3000,
@@ -1145,23 +1118,13 @@ export function useGetSupportMessages(userId: string | null) {
     queryKey: ["support-messages", userId],
     queryFn: async () => {
       if (!userId) return [];
-      const { data, error } = await supabase
-        .from("support_messages")
-        .select("id, user_id, user_name, sender, content, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: true });
-
-      if (error) throw new Error(`Erro ao carregar mensagens: ${error.message}`);
-
-      return (data ?? []).map((m: Record<string, unknown>): SupportMessage => ({
-        id:          m.id as string,
-        userId:      m.user_id as string,
-        userName:    (m.user_name as string) ?? "utilizador",
-        sender:      (m.sender as "user" | "admin" | "ai") ?? "user",
-        content:     (m.content as string) ?? "",
-        createdAt:   m.created_at as string,
-        readByAdmin: true,
-      }));
+      const res = await fetch(`/api/admin/support/messages?userId=${encodeURIComponent(userId)}`);
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`Erro ${res.status}: ${body}`);
+      }
+      const data = await res.json() as { messages?: SupportMessage[] };
+      return data.messages ?? [];
     },
     enabled: !!userId,
     refetchInterval: 8000,
@@ -1173,15 +1136,15 @@ export function useSendAdminSupportMessage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, userName, content }: { userId: string; userName: string; content: string }) => {
-      const { error } = await supabase
-        .from("support_messages")
-        .insert({
-          user_id:   userId,
-          user_name: userName,
-          sender:    "admin",
-          content:   content.trim(),
-        });
-      if (error) throw new Error(`Erro ao enviar mensagem: ${error.message}`);
+      const res = await fetch("/api/admin/support/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, userName, content }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`Erro ao enviar mensagem ${res.status}: ${body}`);
+      }
       return { ok: true };
     },
     onSuccess: (_d, { userId }) => {
