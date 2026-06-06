@@ -113,7 +113,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const groqKey = process.env["GROQ_API_KEY"] ?? "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";
+    const groqKey = process.env["GROQ_API_KEY"];
+    if (!groqKey) {
+      res.status(200).json({ reply: "O serviço de IA não está disponível. Por favor contacta o suporte: +258 86 338 7488 ou suporte@pokerwinner.online." });
+      return;
+    }
 
     const { messages } = req.body as {
       messages?: Array<{ role: "user" | "assistant"; content: string }>;
