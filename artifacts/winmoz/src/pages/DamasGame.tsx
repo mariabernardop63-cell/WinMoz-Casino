@@ -456,6 +456,7 @@ export default function DamasGame() {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const betDeductedRef = useRef(false);
   const winCreditedRef = useRef(false);
+  const lastMoveTimeRef = useRef<number>(0); // rate limit: min 200ms between moves
   const [opponentBal, setOpponentBal] = useState("—");
   const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
   const [rematchRequester, setRematchRequester] = useState("");
@@ -543,14 +544,22 @@ export default function DamasGame() {
   const timerExpiryRef = useRef<() => void>(() => {});
   timerExpiryRef.current = () => {
     const remaining = livesRef.current[myColor] - 1;
+    livesRef.current = { ...livesRef.current, [myColor]: Math.max(0, remaining) };
     if (remaining <= 0) {
       setLives(prev => ({ ...prev, [myColor]: 0 }));
       setWinner(oppColor);
       setWinReason(`${playerName.split(" ")[0]} perdeu todas as vidas`);
       setTimers(prev => ({ ...prev, [myColor]: 0 }));
+      channelRef.current?.send({ type: "broadcast", event: "damas_timer_forfeit", payload: { player: myColor, lives: 0, gameOver: true } });
     } else {
       setLives(prev => ({ ...prev, [myColor]: remaining }));
-      setTimers(prev => ({ ...prev, [myColor]: 30 }));
+      // Pass the turn to the opponent on timer expiry
+      const nextTurn = oppColor;
+      setTurn(nextTurn);
+      setTimers({ w: 30, b: 30 });
+      setSelected(null); setValidDests([]); setValidCapDests([]);
+      setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
+      channelRef.current?.send({ type: "broadcast", event: "damas_timer_forfeit", payload: { player: myColor, lives: remaining, gameOver: false, nextTurn } });
     }
   };
 
@@ -601,15 +610,43 @@ export default function DamasGame() {
 
     ch.on("broadcast", { event: "damas_move" }, ({ payload }) => {
       if (winnerRef.current) return;
+      // ── Security: validate payload shape ──
+      const from = payload.from as Sq;
+      const to   = payload.to as Sq;
+      const nextTurn = payload.nextTurn as PColor;
+      if (!Array.isArray(from) || !Array.isArray(to)) return;
+      if (from[0] < 0 || from[0] > 7 || from[1] < 0 || from[1] > 7) return;
+      if (to[0]   < 0 || to[0]   > 7 || to[1]   < 0 || to[1]   > 7) return;
+      if (nextTurn !== "w" && nextTurn !== "b") return;
       const seq: number = payload.seq ?? 0;
       if (seq && seqRef.current >= seq) return;
       if (seq) seqRef.current = seq;
-      applyRemoteMove(payload.from as Sq, payload.to as Sq, payload.captured as Sq[], payload.nextTurn as PColor);
+      applyRemoteMove(from, to, payload.captured as Sq[], nextTurn);
     });
 
     ch.on("broadcast", { event: "damas_timer" }, ({ payload }) => {
       if ((payload.player as string) !== myColor) {
-        setTimers(prev => ({ ...prev, [payload.player as string]: payload.t as number }));
+        const t = payload.t as number;
+        if (typeof t === "number" && t >= 0 && t <= 30) {
+          setTimers(prev => ({ ...prev, [payload.player as string]: t }));
+        }
+      }
+    });
+
+    ch.on("broadcast", { event: "damas_timer_forfeit" }, ({ payload }) => {
+      if (winnerRef.current) return;
+      const player = payload.player as PColor;
+      if (player === myColor) return; // ignore own events (self: false should catch this)
+      const lives = payload.lives as number;
+      const gameOver = payload.gameOver as boolean;
+      if (gameOver) {
+        setWinner(myColor);
+        setWinReason(`${opponentName} perdeu todas as vidas`);
+      } else {
+        // Opponent's timer expired: update their lives and switch turn to us
+        setLives(prev => ({ ...prev, [player]: Math.max(0, lives) }));
+        setTurn(myColor);
+        setTimers({ w: 30, b: 30 });
       }
     });
 
@@ -741,6 +778,10 @@ export default function DamasGame() {
   // ── Handle square click ───────────────────────────────────────────────────
   function handleSquareClick(r: number, c: number) {
     if (winner || turn !== myColor) return;
+    // Security: rate limit — prevent move flooding (min 200ms between actions)
+    const now = Date.now();
+    if (now - lastMoveTimeRef.current < 200) return;
+    lastMoveTimeRef.current = now;
 
     // In chain capture mode
     if (chainPiece) {

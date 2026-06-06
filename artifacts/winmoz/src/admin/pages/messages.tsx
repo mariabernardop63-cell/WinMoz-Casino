@@ -10,8 +10,8 @@ import {
   useGetSupportMessages,
   useSendAdminSupportMessage,
   useMarkSupportMessagesRead,
-  adminSupabase,
 } from "@/admin/lib/supabase-api";
+import { supabase } from "@/lib/supabase";
 
 const V1 = "#6C5CE7";
 
@@ -64,7 +64,7 @@ export default function Messages() {
 
   // ── True realtime via Supabase subscription ──
   useEffect(() => {
-    const channel = adminSupabase
+    const channel = supabase
       .channel("admin-support-realtime-v2")
       .on(
         "postgres_changes",
@@ -86,7 +86,7 @@ export default function Messages() {
       )
       .subscribe();
 
-    return () => { adminSupabase.removeChannel(channel); };
+    return () => { supabase.removeChannel(channel); };
   }, [selectedUserId, queryClient]);
 
   const filtered = conversations.filter(c =>

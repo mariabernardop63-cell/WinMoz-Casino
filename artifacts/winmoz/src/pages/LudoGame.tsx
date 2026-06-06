@@ -12,8 +12,16 @@ type PieceId = "B0"|"B1"|"B2"|"B3"|"G0"|"G1"|"G2"|"G3";
 type Phase   = "roll"|"select"|"moving"|"done";
 interface GamePiece { id: PieceId; player: Player; pos: number; }
 
+// ─── CSPRNG helper — cryptographically secure random float [0,1) ───────────────
+function secureRandom(): number {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0] / 0x100000000;
+}
+
 // ─── Smart Dice Algorithm ───────────────────────────────────────────────────────
 // Implements 5 fairness/drama rules for betting game integrity
+// Uses CSPRNG (crypto.getRandomValues) — not predictable via Math.random() hacks
 function generateWeightedDice(
   playerPieces: GamePiece[],
   opponentPieces: GamePiece[],
@@ -24,8 +32,8 @@ function generateWeightedDice(
 ): number {
   // ── Rule 4: Block third consecutive 6 in the same turn ──────────────────────
   if (consecutiveSixes >= 2) {
-    // Force a random 1-5, never 6
-    return Math.floor(Math.random() * 5) + 1;
+    // Force a secure random 1-5, never 6
+    return Math.floor(secureRandom() * 5) + 1;
   }
 
   // ── Rule 1: Anti-frustration — force 6 on 10th stuck turn ───────────────────
@@ -34,14 +42,14 @@ function generateWeightedDice(
     return 6;
   }
 
-  // Use timestamp + gameId as entropy salt (Rule 5)
-  const entropy = (Date.now() % 1000) / 1000;
+  // Use CSPRNG + gameId as entropy salt (Rule 5)
+  const entropy = secureRandom();
 
   // ── Rules 2 & 3 only apply to pieces actively on the track ──────────────────
   const myActive  = playerPieces.filter(p => p.pos > 0 && p.pos <= 50);
   const oppActive = opponentPieces.filter(p => p.pos > 0 && p.pos <= 50);
 
-  const playerStart  = player === "blue" ? 0 : 26;
+  const playerStart   = player === "blue" ? 0 : 26;
   const opponentStart = player === "blue" ? 26 : 0;
 
   for (const mine of myActive) {
@@ -52,29 +60,27 @@ function generateWeightedDice(
 
       // ── Rule 2: Combat Drama — 50% chance of exact kill if 1-6 away ─────────
       if (dist >= 1 && dist <= 6) {
-        // Rule 5 anti-pattern: only apply if NOT just given an advantage
-        const salt = (entropy + gameId.charCodeAt(0) / 128) % 1;
+        const salt = (entropy + (gameId.charCodeAt(0) % 128) / 128) % 1;
         if (salt < 0.5) {
           return dist; // exact kill number
         } else {
-          // other 50% distributed among non-kill numbers
           const nonKill = [1, 2, 3, 4, 5, 6].filter(n => n !== dist);
-          return nonKill[Math.floor((Math.random() + entropy * 0.1) % 1 * nonKill.length)];
+          return nonKill[Math.floor(secureRandom() * nonKill.length)];
         }
       }
 
       // ── Rule 3: Chase — 20% chance of high number if 7-15 behind ────────────
       if (dist >= 7 && dist <= 15) {
-        if (Math.random() < 0.20) {
+        if (secureRandom() < 0.20) {
           const highs = [4, 5, 6];
-          return highs[Math.floor(Math.random() * highs.length)];
+          return highs[Math.floor(secureRandom() * highs.length)];
         }
       }
     }
   }
 
   // ── Normal fair roll ─────────────────────────────────────────────────────────
-  return Math.floor(Math.random() * 6) + 1;
+  return Math.floor(secureRandom() * 6) + 1;
 }
 
 // ─── Board geometry ─────────────────────────────────────────────────────────────
@@ -1425,7 +1431,10 @@ export default function LudoGame() {
       if(seq) lastEventSeqRef.current[key] = seq;
       // Only apply if it's actually the opponent's turn and we're in roll phase
       if(phaseRef.current==="done"||winnerRef.current) return;
-      applyRoll(payload.player as Player, payload.value as number);
+      // Security: validate dice value is in expected range
+      const val = payload.value as number;
+      if(typeof val !== "number" || val < 1 || val > 6 || !Number.isInteger(val)) return;
+      applyRoll(payload.player as Player, val);
     });
 
     channel.on("broadcast",{ event:"piece_selected" },({ payload })=>{
@@ -1437,9 +1446,14 @@ export default function LudoGame() {
       if(seq && lastEventSeqRef.current[key] >= seq) return;
       if(seq) lastEventSeqRef.current[key] = seq;
       if(phaseRef.current==="done"||winnerRef.current) return;
+      // Security: validate pieceId format and diceVal range
+      const pieceId = payload.pieceId as string;
+      const diceVal = payload.diceVal as number;
+      if(!/^[BG][0-3]$/.test(pieceId)) return;
+      if(typeof diceVal !== "number" || diceVal < 1 || diceVal > 6 || !Number.isInteger(diceVal)) return;
       doSelectPiece(
-        payload.pieceId as PieceId,
-        payload.diceVal as number,
+        pieceId as PieceId,
+        diceVal,
         payload.player as Player,
         piecesRef.current
       );

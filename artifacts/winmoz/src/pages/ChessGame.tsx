@@ -888,18 +888,18 @@ export default function ChessGame(){
     if(!winner||BET<=0||gameId==="local"||myColor!=="w")return;
     const platformFee=BET*2-Math.floor(BET*2*0.83);
     if(platformFee>0){
-      supabase.from("platform_earnings").insert({
+      void supabase.from("platform_earnings").insert({
         amount:platformFee,source:"game_fee",
         description:`Taxa de jogo (Xadrez) — aposta ${BET} MT`,
         reference_id:gameId,created_at:new Date().toISOString(),
-      }).then(()=>{}).catch(()=>{});
+      });
     }
-    supabase.from("matches").update({
+    void supabase.from("matches").update({
       status:"finished",
       winner_name:winner==="w"?playerName:opponentName,
       winner_id:winner==="w"?profile?.id:null,
       completed_at:new Date().toISOString(),
-    }).eq("id",gameId).then(()=>{}).catch(()=>{});
+    }).eq("id",gameId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[winner]);
 
