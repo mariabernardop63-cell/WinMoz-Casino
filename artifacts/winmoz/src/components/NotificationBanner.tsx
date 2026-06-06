@@ -7,16 +7,10 @@ import { useLocation } from "wouter";
 
 function LogoBars() {
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 3 }}>
-      <div style={{
-        width: 5, height: 14, borderRadius: 3,
-        background: "linear-gradient(to bottom, #a78bfa, #6C5CE7)",
-      }} />
-      <div style={{
-        width: 5, height: 21, borderRadius: 3,
-        background: "linear-gradient(to bottom, #f472b6, #c026d3)",
-      }} />
-    </div>
+    <svg width="14" height="18" viewBox="0 0 18 26" fill="none">
+      <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="#fff" />
+      <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="#fff" opacity="0.38" />
+    </svg>
   );
 }
 
@@ -122,6 +116,7 @@ export default function NotificationBanner() {
         <>
           {/* Backdrop */}
           <motion.div
+            key="backdrop"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -134,109 +129,118 @@ export default function NotificationBanner() {
             }}
           />
 
-          {/* Card */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.88, y: 24 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: 16 }}
-            transition={{ type: "spring", stiffness: 340, damping: 26 }}
+          {/* Centering wrapper — handles position; motion.div handles animation */}
+          <div
             style={{
               position: "fixed",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              width: isAnnouncement ? "min(92vw, 440px)" : "min(88vw, 380px)",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
               zIndex: 9999,
-              borderRadius: 22,
-              overflow: "hidden",
-              background: "linear-gradient(160deg, #1a0840 0%, #2d1065 50%, #1e0a3c 100%)",
-              boxShadow: "0 24px 64px rgba(108,92,231,0.45), 0 4px 20px rgba(0,0,0,0.4)",
+              pointerEvents: "none",
             }}
           >
-            {isAnnouncement ? (
-              /* ── Announcement layout: image left + content right ── */
-              <div style={{ display: "flex", minHeight: 140 }}>
-                {/* Left: image */}
-                {current.imageUrl && (
-                  <div style={{ width: 130, flexShrink: 0, position: "relative", overflow: "hidden" }}>
-                    <img
-                      src={current.imageUrl}
-                      alt=""
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                    />
-                    <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, transparent 60%, rgba(30,8,60,0.6))" }} />
+            <motion.div
+              key="card"
+              initial={{ opacity: 0, scale: 0.88, y: 24 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.92, y: 16 }}
+              transition={{ type: "spring", stiffness: 340, damping: 26 }}
+              style={{
+                width: isAnnouncement ? "min(92vw, 440px)" : "min(88vw, 380px)",
+                pointerEvents: "all",
+                borderRadius: 22,
+                overflow: "hidden",
+                background: "linear-gradient(160deg, #1a0840 0%, #2d1065 50%, #1e0a3c 100%)",
+                boxShadow: "0 24px 64px rgba(108,92,231,0.45), 0 4px 20px rgba(0,0,0,0.4)",
+              }}
+            >
+              {isAnnouncement ? (
+                /* ── Announcement layout: image left + content right ── */
+                <div style={{ display: "flex", minHeight: 140 }}>
+                  {/* Left: image */}
+                  {current.imageUrl && (
+                    <div style={{ width: 130, flexShrink: 0, position: "relative", overflow: "hidden" }}>
+                      <img
+                        src={current.imageUrl}
+                        alt=""
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, transparent 60%, rgba(30,8,60,0.6))" }} />
+                    </div>
+                  )}
+                  {/* Right: content */}
+                  <div style={{ flex: 1, padding: current.imageUrl ? "20px 20px 20px 18px" : "22px 22px 20px 22px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                      <LogoBars />
+                      <span style={{ fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.12em" }}>Anúncio</span>
+                    </div>
+                    <p style={{ fontSize: 15, fontWeight: 800, color: "#fff", lineHeight: 1.3, marginBottom: 4, fontFamily: "'Syne', sans-serif" }}>
+                      {current.title}
+                    </p>
+                    {current.subtitle && (
+                      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.5, marginBottom: 10 }}>
+                        {current.subtitle}
+                      </p>
+                    )}
+                    {current.actionButtonLabel && (
+                      <button
+                        onClick={handleAction}
+                        style={{ padding: "7px 14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #6C5CE7, #4f46e5)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                        {current.actionButtonLabel}
+                        <ExternalLink style={{ width: 11, height: 11 }} />
+                      </button>
+                    )}
+                    <CountdownButton onDismiss={dismiss} />
                   </div>
-                )}
-                {/* Right: content */}
-                <div style={{ flex: 1, padding: current.imageUrl ? "20px 20px 20px 18px" : "22px 22px 20px 22px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                </div>
+              ) : (
+                /* ── Regular notification layout ── */
+                <div style={{ padding: "22px 22px 22px 22px" }}>
+                  {/* Logo bars top-left */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
                     <LogoBars />
-                    <span style={{ fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.12em" }}>Anúncio</span>
+                    <span style={{ fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.12em" }}>Notificação</span>
                   </div>
-                  <p style={{ fontSize: 15, fontWeight: 800, color: "#fff", lineHeight: 1.3, marginBottom: 4, fontFamily: "'Syne', sans-serif" }}>
+
+                  {/* Title + subtitle */}
+                  <p style={{ fontSize: 17, fontWeight: 800, color: "#fff", lineHeight: 1.35, marginBottom: 6, fontFamily: "'Syne', sans-serif" }}>
                     {current.title}
                   </p>
                   {current.subtitle && (
-                    <p style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.5, marginBottom: 10 }}>
+                    <p style={{ fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.6 }}>
                       {current.subtitle}
                     </p>
                   )}
+
+                  {/* Action button */}
                   {current.actionButtonLabel && (
                     <button
                       onClick={handleAction}
-                      style={{ padding: "7px 14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #6C5CE7, #4f46e5)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                      style={{ marginTop: 14, padding: "9px 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
                       {current.actionButtonLabel}
-                      <ExternalLink style={{ width: 11, height: 11 }} />
+                      <ExternalLink style={{ width: 12, height: 12 }} />
                     </button>
                   )}
+
+                  {/* Countdown dismiss button */}
                   <CountdownButton onDismiss={dismiss} />
+
+                  {/* Progress bar */}
+                  <div style={{ marginTop: 14, height: 2, borderRadius: 2, background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
+                    <motion.div
+                      initial={{ width: "100%" }}
+                      animate={{ width: "0%" }}
+                      transition={{ duration: 10, ease: "linear" }}
+                      style={{ height: "100%", background: "linear-gradient(to right, #a78bfa, #6C5CE7)", borderRadius: 2 }}
+                    />
+                  </div>
                 </div>
-              </div>
-            ) : (
-              /* ── Regular notification layout ── */
-              <div style={{ padding: "22px 22px 22px 22px" }}>
-                {/* Logo bars top-left */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                  <LogoBars />
-                  <span style={{ fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.12em" }}>Notificação</span>
-                </div>
-
-                {/* Title + subtitle */}
-                <p style={{ fontSize: 17, fontWeight: 800, color: "#fff", lineHeight: 1.35, marginBottom: 6, fontFamily: "'Syne', sans-serif" }}>
-                  {current.title}
-                </p>
-                {current.subtitle && (
-                  <p style={{ fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.6 }}>
-                    {current.subtitle}
-                  </p>
-                )}
-
-                {/* Action button */}
-                {current.actionButtonLabel && (
-                  <button
-                    onClick={handleAction}
-                    style={{ marginTop: 14, padding: "9px 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-                    {current.actionButtonLabel}
-                    <ExternalLink style={{ width: 12, height: 12 }} />
-                  </button>
-                )}
-
-                {/* Countdown dismiss button */}
-                <CountdownButton onDismiss={dismiss} />
-
-                {/* Progress bar */}
-                <div style={{ marginTop: 14, height: 2, borderRadius: 2, background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
-                  <motion.div
-                    initial={{ width: "100%" }}
-                    animate={{ width: "0%" }}
-                    transition={{ duration: 10, ease: "linear" }}
-                    style={{ height: "100%", background: "linear-gradient(to right, #a78bfa, #6C5CE7)", borderRadius: 2 }}
-                  />
-                </div>
-              </div>
-            )}
-          </motion.div>
+              )}
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>

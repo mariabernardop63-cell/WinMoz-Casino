@@ -13,6 +13,8 @@ export interface UserProfile {
   balance: string | number;
   created_at?: string;
   updated_at?: string;
+  is_blocked?: boolean;
+  block_type?: string | null;
 }
 
 interface AuthContextType {
@@ -20,6 +22,7 @@ interface AuthContextType {
   profile: UserProfile | null;
   loading: boolean;
   sessionReady: boolean;
+  isBlocked: boolean;
   refreshProfile: () => Promise<void>;
   forceRefresh: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -121,12 +124,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(cachedProfile ?? null);
   const [loading, setLoading] = useState(!cachedProfile);
   const [sessionReady, setSessionReady] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
 
   const activeUidRef = useRef<string | null>(cachedProfile?.id ?? null);
   const signedInHandledRef = useRef(false);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const saveAndSet = (p: UserProfile) => {
+    if (p.is_blocked) {
+      clearCachedProfile();
+      setUser(null);
+      setProfile(null);
+      setLoading(false);
+      setIsBlocked(true);
+      activeUidRef.current = null;
+      signedInHandledRef.current = false;
+      supabase.auth.signOut().catch(() => {});
+      return;
+    }
+    setIsBlocked(false);
     setProfile(p);
     saveCachedProfile(p);
   };
@@ -183,6 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { await supabase.auth.signOut(); } catch { /* ignore */ }
     setUser(null);
     setProfile(null);
+    setIsBlocked(false);
   };
 
   // Keep balance fresh: re-fetch on window focus and every 60 s
@@ -319,7 +336,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, sessionReady, refreshProfile, forceRefresh, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, sessionReady, isBlocked, refreshProfile, forceRefresh, signOut }}>
       {children}
     </AuthContext.Provider>
   );
