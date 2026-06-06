@@ -1000,11 +1000,10 @@ export function useGetPlatformSettings() {
   return useQuery({
     queryKey: ["platform-settings"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("platform_settings").select("*");
-      if (error) throw error;
-      const map: Record<string, string> = {};
-      (data ?? []).forEach((s: { key: string; value: string }) => { map[s.key] = s.value; });
-      return map;
+      const res = await fetch("/api/admin/settings/get");
+      if (!res.ok) throw new Error(`Erro ${res.status}`);
+      const data = await res.json() as { settings?: Record<string, string> };
+      return data.settings ?? {};
     },
     staleTime: 30000,
   });
@@ -1014,14 +1013,15 @@ export function useUpdatePlatformSetting() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase
-        .from("platform_settings")
-        .upsert(
-          { key, value, updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
-          { onConflict: "key" }
-        );
-      if (error) throw error;
+      const res = await fetch("/api/admin/settings/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        throw new Error(`Erro ${res.status}: ${body}`);
+      }
       return { ok: true };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["platform-settings"] }),

@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Eye, EyeOff, AlertTriangle, Lock, Clock } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 
 const BAN_KEY = "_wmz_ban";
 const SESSION_KEY = "_wmz_gate";
@@ -54,12 +53,10 @@ function setSessionAuthenticated() {
 
 async function fetchSecurityPassword(): Promise<string> {
   try {
-    const { data } = await supabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "admin_security_password")
-      .maybeSingle();
-    return (data as { value: string } | null)?.value ?? "12345678";
+    const res = await fetch("/api/admin/settings/get?key=admin_security_password");
+    if (!res.ok) return "12345678";
+    const data = await res.json() as { setting?: { value: string } | null };
+    return data?.setting?.value ?? "12345678";
   } catch {
     return "12345678";
   }

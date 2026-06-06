@@ -5,7 +5,6 @@ import {
   Save, Wrench,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { adminSupabase } from "@/admin/lib/supabase-api";
 import { useGetPlatformSettings, useUpdatePlatformSetting } from "@/admin/lib/supabase-api";
 import { toast } from "sonner";
 
@@ -190,14 +189,12 @@ export default function Settings() {
   const [currentSecPw, setCurrentSecPw] = useState<string | null>(null);
 
   useEffect(() => {
-    adminSupabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "admin_security_password")
-      .single()
-      .then(({ data }) => {
-        setCurrentSecPw((data as { value: string } | null)?.value ?? "12345678");
-      });
+    fetch("/api/admin/settings/get?key=admin_security_password")
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { setting?: { value: string } | null } | null) => {
+        setCurrentSecPw(data?.setting?.value ?? "12345678");
+      })
+      .catch(() => setCurrentSecPw("12345678"));
   }, []);
 
   const handleSaveSecPw = async () => {
