@@ -143,7 +143,7 @@ router.post("/recharge", async (req, res) => {
 
 /* ── AI Support Chat (Groq) ── */
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama3-8b-8192";
+const GROQ_MODEL = "llama-3.1-8b-instant";
 
 const SYSTEM_PROMPT = `Tu és o assistente de suporte da WinMoz, uma plataforma de apostas e jogos online em Moçambique.
 Responde SEMPRE em Português de Moçambique.
