@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { createClient } from "@supabase/supabase-js";
 import healthRouter from "./health";
 
 const router: IRouter = Router();
@@ -51,7 +52,7 @@ router.post("/recharge", async (req, res) => {
       return;
     }
 
-    const { createClient } = await import("@supabase/supabase-js");
+    // createClient imported at top
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -156,7 +157,7 @@ Responde SEMPRE em Português de Moçambique. Usa expressões naturais de Moçam
 CONHECIMENTO COMPLETO DA PLATAFORMA:
 
 SOBRE A POKERWINNER:
-A PokerWinner (também conhecida como WinMoz) é a maior plataforma de apostas e jogos online de Moçambique. Podes jogar, apostar, ganhar e levantar o teu dinheiro de forma rápida e segura. Está disponível 24 horas por dia, 7 dias por semana.
+A PokerWinner (também conhecida como WinMoz) é a maior plataforma de apostas e jogos online de Moçambique. Foi fundada por Ossufo Ali, um jovem empresário e empreendedor moçambicano, líder do Grupo Sinhote Investimento. A PokerWinner é uma empresa 100% moçambicana, com orgulho. Podes jogar, apostar, ganhar e levantar o teu dinheiro de forma rápida e segura. Está disponível 24 horas por dia, 7 dias por semana.
 
 JOGOS DISPONÍVEIS:
 1. DAMAS — Jogo de tabuleiro clássico. Apostas de 10 MT a 5.000 MT. Jogas contra outros utilizadores em tempo real. O melhor jogador leva tudo.
@@ -292,7 +293,7 @@ router.post("/withdraw", async (req, res) => {
       res.status(500).json({ error: "Serviço indisponível" }); return;
     }
 
-    const { createClient } = await import("@supabase/supabase-js");
+    // createClient imported at top
     const admin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -363,7 +364,7 @@ router.post("/admin/withdraw/approve", async (req, res) => {
       res.status(500).json({ error: "Serviço indisponível" }); return;
     }
 
-    const { createClient } = await import("@supabase/supabase-js");
+    // createClient imported at top
     const admin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -405,7 +406,7 @@ router.post("/admin/withdraw/reject", async (req, res) => {
       res.status(500).json({ error: "Serviço indisponível" }); return;
     }
 
-    const { createClient } = await import("@supabase/supabase-js");
+    // createClient imported at top
     const admin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
@@ -438,6 +439,190 @@ router.post("/admin/withdraw/reject", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Admin reject withdrawal error");
     res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Roleta ── */
+
+// Mozambique is UTC+2 (CAT, no DST). Returns the UTC ISO timestamp for
+// midnight of the current day in Mozambique time.
+function getMozambiqueStartOfDayUTC(): string {
+  const mzOffsetMs = 2 * 60 * 60 * 1000;
+  const mzNow = new Date(Date.now() + mzOffsetMs);
+  const startOfDayMz = Date.UTC(mzNow.getUTCFullYear(), mzNow.getUTCMonth(), mzNow.getUTCDate(), 0, 0, 0);
+  return new Date(startOfDayMz - mzOffsetMs).toISOString();
+}
+
+// Shared helper: build Supabase admin client and verify JWT
+async function buildAdminAndVerify(authHeader: string): Promise<
+  | { ok: false; status: number; error: string }
+  | { ok: true; supabaseAdmin: any; userId: string }
+> {
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) return { ok: false, status: 401, error: "Unauthorized" };
+
+  const supabaseUrl = process.env["SUPABASE_URL"];
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!supabaseUrl || !supabaseServiceKey) return { ok: false, status: 500, error: "Serviço indisponível" };
+
+  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+  if (userError || !userData?.user) return { ok: false, status: 401, error: "Sessão inválida" };
+
+  return { ok: true, supabaseAdmin, userId: userData.user.id };
+}
+
+// GET /api/roleta/status — check if free spin is available today (Moz time)
+router.get("/roleta/status", async (req, res) => {
+  try {
+    const result = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!result.ok) { res.status(result.status).json({ error: result.error }); return; }
+    const { supabaseAdmin, userId } = result;
+
+    const todayStart = getMozambiqueStartOfDayUTC();
+    const { data: rows } = await supabaseAdmin
+      .from("transactions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("type", "free_spin")
+      .gte("created_at", todayStart);
+
+    res.json({ freeSpinAvailable: !rows || rows.length === 0 });
+  } catch (err) {
+    req.log.error({ err }, "Roleta status error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+// POST /api/roleta/spin — process a roulette spin (server-side RNG)
+router.post("/roleta/spin", async (req, res) => {
+  try {
+    const result = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!result.ok) { res.status(result.status).json({ error: result.error }); return; }
+    const { supabaseAdmin, userId } = result;
+
+    const { isFree } = req.body as { isFree?: boolean };
+
+    // ── FREE SPIN ──
+    if (isFree) {
+      // Validate: not already used today (Moz time)
+      const todayStart = getMozambiqueStartOfDayUTC();
+      const { data: rows } = await supabaseAdmin
+        .from("transactions")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("type", "free_spin")
+        .gte("created_at", todayStart);
+
+      if (rows && rows.length > 0) {
+        res.status(400).json({ error: "Giro grátis já utilizado hoje. Volta amanhã!" });
+        return;
+      }
+
+      // Get current balance for response
+      const { data: profileData } = await supabaseAdmin
+        .from("profiles").select("balance").eq("id", userId).single();
+      const currentBalance = Number(profileData?.balance ?? 0);
+
+      // Record free spin — always "Boa Sorte" (index 8), no prize
+      await supabaseAdmin.from("transactions").insert({
+        user_id: userId,
+        type: "free_spin",
+        amount: 0,
+        description: "Giro grátis diário (Roleta da Sorte)",
+        status: "approved",
+        created_at: new Date().toISOString(),
+      });
+
+      res.json({ sectorIndex: 8, prize: 0, newBalance: currentBalance });
+      return;
+    }
+
+    // ── PAID SPIN ──
+    const COST = 5;
+
+    // Fetch current balance
+    const { data: profileData, error: profileError } = await supabaseAdmin
+      .from("profiles").select("balance").eq("id", userId).single();
+    if (profileError || !profileData) {
+      res.status(500).json({ error: "Erro ao obter perfil" }); return;
+    }
+    const currentBalance = Number(profileData.balance ?? 0);
+
+    if (currentBalance < COST) {
+      res.status(400).json({ error: "Saldo insuficiente para apostar." }); return;
+    }
+
+    // Deduct bet cost immediately
+    const balanceAfterBet = Math.round((currentBalance - COST) * 100) / 100;
+    const { error: deductError } = await supabaseAdmin
+      .from("profiles").update({ balance: balanceAfterBet }).eq("id", userId);
+    if (deductError) { res.status(500).json({ error: "Erro ao processar aposta" }); return; }
+
+    // Record bet transaction
+    await supabaseAdmin.from("transactions").insert({
+      user_id: userId,
+      type: "bet",
+      amount: -COST,
+      description: "Aposta — Roleta da Sorte (5 MT)",
+      status: "approved",
+      created_at: new Date().toISOString(),
+    });
+
+    // Calculate cumulative net P&L to unlock 5 MT prize
+    const { data: txRows } = await supabaseAdmin
+      .from("transactions")
+      .select("amount")
+      .eq("user_id", userId)
+      .in("type", ["bet", "win"]);
+
+    const netPL = txRows
+      ? txRows.reduce((sum: number, r: any) => sum + Number(r.amount ?? 0), 0)
+      : 0;
+
+    // Server-side RNG algorithm:
+    // 80%  → win 1 MT  (sector index 6)
+    // 20%  → win 5 MT IF cumulative net loss > 20 MT, ELSE Boa Sorte (index 8)
+    const rand = Math.random();
+    let sectorIndex: number;
+    let prize = 0;
+
+    if (rand < 0.80) {
+      sectorIndex = 6; // "1 MT"
+      prize = 1;
+    } else {
+      // 20% — only pays out if user has lost significantly
+      if (netPL < -20) {
+        sectorIndex = 5; // "5 MT"
+        prize = 5;
+      } else {
+        sectorIndex = 8; // "Boa Sorte"
+        prize = 0;
+      }
+    }
+
+    // Credit prize if any
+    let finalBalance = balanceAfterBet;
+    if (prize > 0) {
+      finalBalance = Math.round((balanceAfterBet + prize) * 100) / 100;
+      await supabaseAdmin.from("profiles").update({ balance: finalBalance }).eq("id", userId);
+      await supabaseAdmin.from("transactions").insert({
+        user_id: userId,
+        type: "win",
+        amount: prize,
+        description: `Prémio Roleta da Sorte (+${prize} MT)`,
+        status: "approved",
+        created_at: new Date().toISOString(),
+      });
+    }
+
+    res.json({ sectorIndex, prize, newBalance: finalBalance });
+  } catch (err) {
+    req.log.error({ err }, "Roleta spin error");
+    res.status(500).json({ error: "Erro interno ao processar aposta" });
   }
 });
 
