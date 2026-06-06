@@ -1098,7 +1098,7 @@ export function useListSupportConversations() {
   return useQuery({
     queryKey: ["support-conversations"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await adminSupabase
         .from("support_messages")
         .select("user_id, user_name, sender, content, created_at, read_by_admin")
         .order("created_at", { ascending: false })
@@ -1139,7 +1139,7 @@ export function useGetSupportMessages(userId: string | null) {
     queryKey: ["support-messages", userId],
     queryFn: async () => {
       if (!userId) return [];
-      const { data, error } = await supabase
+      const { data, error } = await adminSupabase
         .from("support_messages")
         .select("*")
         .eq("user_id", userId)
@@ -1165,7 +1165,7 @@ export function useSendAdminSupportMessage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, userName, content }: { userId: string; userName: string; content: string }) => {
-      const { error } = await supabase.from("support_messages").insert({
+      const { error } = await adminSupabase.from("support_messages").insert({
         user_id: userId,
         user_name: userName,
         sender: "admin",
@@ -1186,7 +1186,7 @@ export function useMarkSupportMessagesRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (userId: string) => {
-      const { error } = await supabase
+      const { error } = await adminSupabase
         .from("support_messages")
         .update({ read_by_admin: true })
         .eq("user_id", userId)
