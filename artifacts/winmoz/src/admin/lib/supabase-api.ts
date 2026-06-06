@@ -4,7 +4,9 @@ import { createClient } from "@supabase/supabase-js";
 import { useEffect } from "react";
 
 const _adminUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "https://placeholder.supabase.co";
+// Use service role key for admin operations — required to bypass RLS and read all users' data
 const _adminKey = (import.meta.env.VITE_SUPABASE_SERVICE_ROLE as string)
+  || (import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY as string)
   || (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
   || "placeholder";
 export const adminSupabase = createClient(_adminUrl, _adminKey, {

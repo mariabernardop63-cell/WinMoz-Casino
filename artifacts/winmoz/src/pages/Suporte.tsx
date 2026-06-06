@@ -2,10 +2,66 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, CheckCheck, X, Bot } from "lucide-react";
-import { API_BASE } from "@/lib/apiBase";
 import { supabase } from "@/lib/supabase";
 import { adminSupabase } from "@/admin/lib/supabase-api";
 import { useAuth } from "@/contexts/AuthContext";
+
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama3-8b-8192";
+const GROQ_KEY = (import.meta.env.VITE_GROQ_API_KEY as string | undefined) ?? "";
+
+const AI_SYSTEM_PROMPT = `És o assistente virtual oficial da Poker Winner, uma plataforma de jogos e apostas online em Moçambique.
+
+PERSONALIDADE: Tom formal mas humano e acolhedor. Fala sempre em Português de Moçambique. Sê conciso e útil. Não uses asteriscos, markdown nem listas com hífens. Nunca inventes saldos ou dados do utilizador.
+
+JOGOS: Damas (tabuleiro 8x8, peças pretas/brancas), Ludo (dados e estratégia), Xadrez (clássico internacional), Roleta (casino, números/cores/par-ímpar), Bilhar (em breve). Em todos os jogos dois jogadores apostam e o vencedor leva o prémio.
+
+DEPÓSITOS: Via M-Pesa ou e-Mola — o utilizador envia dinheiro e recebe um código de recarga de 15 dígitos. Na app vai a "Recarregar" e introduz o código. Mínimo: 50 MZN. Para obter o número de destino contacta o suporte.
+
+LEVANTAMENTOS: Mínimo 100 MZN, máximo 10.000 MZN/dia. Processado via M-Pesa no número da conta. Prazo até 24 horas úteis após aprovação.
+
+APOSTAS: Mínimo 50 MZN, máximo 5.000 MZN. Precisa de saldo suficiente na carteira.
+
+CONTA: Registo com número moçambicano + OTP. Perfil editável. Palavra-passe redefinível.
+
+CONVITES: Cada utilizador tem código único. Ao convidar amigos ganhas bónus automáticos.
+
+PROBLEMAS COMUNS:
+- Saldo não creditado: verifica se o código tem 15 dígitos, aguarda 10 min, se persistir contacta suporte com comprovativo.
+- Levantamento pendente há muito: pode demorar até 24h úteis.
+- Não consegue entrar: redefine a palavra-passe.
+
+REGRAS: Só maiores de 18 anos. Joga com responsabilidade.
+
+CONTACTO SUPORTE HUMANO (fornece sempre que o utilizador precisar de ajuda humana ou o problema não for resolvido):
+Telefone/WhatsApp: +258 86 338 7488
+Email: suporte@pokerwinner.online
+Disponível 24h/7 dias
+
+Se te perguntarem algo fora do âmbito da plataforma, responde educadamente que só podes ajudar com questões da Poker Winner. Podes cumprimentar e desejar boa sorte.`;
+
+async function callGroqAI(messages: Array<{ role: "user" | "assistant"; content: string }>): Promise<string> {
+  const key = GROQ_KEY;
+  if (!key) {
+    return "O serviço de IA não está disponível. Por favor contacta o suporte: +258 86 338 7488 ou suporte@pokerwinner.online.";
+  }
+  const res = await fetch(GROQ_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${key}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [{ role: "system", content: AI_SYSTEM_PROMPT }, ...messages],
+      max_tokens: 500,
+      temperature: 0.65,
+    }),
+  });
+  if (!res.ok) throw new Error(`Groq error ${res.status}`);
+  const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+  return data.choices?.[0]?.message?.content?.trim() ?? "Desculpa, não consegui processar. Tenta novamente.";
+}
 
 const CYAN = "#00D4B4";
 
@@ -201,20 +257,13 @@ export default function Suporte() {
       return;
     }
 
-    // AI mode is ON — call the AI endpoint
+    // AI mode is ON — call Groq directly from the frontend
     const newHistory: ChatMsg[] = [...history, { role: "user", content: msgText.trim() || "[imagem enviada]" }];
     setHistory(newHistory);
     setTyping(true);
 
     try {
-      const res = await fetch(`${API_BASE}/support/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newHistory }),
-      });
-
-      const data = await res.json();
-      const reply: string = data.reply ?? "Desculpa, ocorreu um erro. Tenta novamente.";
+      const reply = await callGroqAI(newHistory);
 
       setTyping(false);
       const aiMsg: Msg = { id: `${Date.now()}_s`, from: "support", sender: "ai", text: reply, time: nowTime() };
@@ -226,13 +275,15 @@ export default function Suporte() {
       }
     } catch {
       setTyping(false);
-      setMessages(p => [...p, {
+      const errReply = "Tive um problema de ligação. Por favor tenta novamente ou contacta o suporte: +258 86 338 7488.";
+      const errMsg: Msg = {
         id:     `${Date.now()}_err`,
         from:   "support",
         sender: "ai",
-        text:   "Ups, tive um problema de ligação. Por favor tenta novamente em instantes. 🙏",
+        text:   errReply,
         time:   nowTime(),
-      }]);
+      };
+      setMessages(p => [...p, errMsg]);
     }
   };
 
