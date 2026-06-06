@@ -1,107 +1,463 @@
-import { Settings as SettingsIcon, Bell, Shield, Globe, Database } from "lucide-react";
+import { useState, useEffect } from "react";
+import {
+  Settings as SettingsIcon, Bell, Shield, Globe, Database,
+  Bot, Lock, Mail, Key, Eye, EyeOff, CheckCircle, AlertCircle,
+  Save, Wrench,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { adminSupabase } from "@/admin/lib/supabase-api";
+import { useGetPlatformSettings, useUpdatePlatformSetting } from "@/admin/lib/supabase-api";
+import { toast } from "sonner";
 
-function SettingRow({ label, description, children }: { label: string; description: string; children: React.ReactNode }) {
+/* ── Locked toggle (always ON, cannot be disabled) ── */
+function LockedToggle() {
   return (
-    <div className="flex items-center justify-between py-4 border-b border-gray-50 last:border-0">
-      <div>
-        <div className="text-sm font-medium text-gray-800">{label}</div>
-        <div className="text-xs text-gray-400 mt-0.5">{description}</div>
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div style={{
+        width: 44, height: 24, borderRadius: 12,
+        background: "linear-gradient(135deg, #6C5CE7, #4f46e5)",
+        position: "relative", flexShrink: 0,
+        boxShadow: "0 2px 8px rgba(108,92,231,0.35)",
+      }}>
+        <div style={{
+          position: "absolute", top: 2, right: 2, width: 20, height: 20,
+          borderRadius: "50%", background: "#fff",
+          boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+        }} />
+      </div>
+      <Lock style={{ width: 11, height: 11, color: "var(--gz-text-tertiary)", opacity: 0.5 }} />
+    </div>
+  );
+}
+
+/* ── Functional toggle (connected to Supabase) ── */
+function FunctionalToggle({
+  settingKey,
+  value,
+  onChange,
+  loading,
+}: {
+  settingKey: string;
+  value: boolean;
+  onChange: (key: string, val: boolean) => void;
+  loading?: boolean;
+}) {
+  return (
+    <button
+      onClick={() => !loading && onChange(settingKey, !value)}
+      style={{
+        width: 44, height: 24, borderRadius: 12,
+        background: value ? "linear-gradient(135deg, #6C5CE7, #4f46e5)" : "rgba(0,0,0,0.12)",
+        position: "relative", border: "none", cursor: loading ? "wait" : "pointer",
+        transition: "background 0.25s",
+        boxShadow: value ? "0 2px 8px rgba(108,92,231,0.35)" : "none",
+        flexShrink: 0,
+      }}
+    >
+      <div style={{
+        position: "absolute", top: 2, width: 20, height: 20,
+        borderRadius: "50%", background: "#fff",
+        left: value ? "calc(100% - 22px)" : 2,
+        transition: "left 0.25s",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+      }} />
+    </button>
+  );
+}
+
+/* ── Setting row ── */
+function SettingRow({
+  label,
+  description,
+  children,
+  locked,
+}: {
+  label: string;
+  description: string;
+  children: React.ReactNode;
+  locked?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid rgba(108,92,231,0.06)" }}>
+      <div style={{ flex: 1, minWidth: 0, paddingRight: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gz-text-primary)" }}>{label}</span>
+          {locked && (
+            <span style={{
+              fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 100,
+              background: "rgba(108,92,231,0.08)", color: "#6C5CE7",
+              textTransform: "uppercase", letterSpacing: "0.5px",
+            }}>
+              OBRIGATÓRIO
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 11.5, color: "var(--gz-text-muted)", marginTop: 2 }}>{description}</div>
       </div>
       <div>{children}</div>
     </div>
   );
 }
 
-function Toggle({ defaultChecked = false }: { defaultChecked?: boolean }) {
+/* ── Section card ── */
+function SectionCard({
+  title,
+  icon: Icon,
+  color,
+  bg,
+  children,
+}: {
+  title: string;
+  icon: React.ElementType;
+  color: string;
+  bg: string;
+  children: React.ReactNode;
+}) {
   return (
-    <label className="relative inline-flex items-center cursor-pointer">
-      <input type="checkbox" defaultChecked={defaultChecked} className="sr-only peer" />
-      <div className="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-    </label>
+    <div className="gz-card" style={{ padding: "20px 24px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 12, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon style={{ width: 17, height: 17, color }} />
+        </div>
+        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--gz-text-primary)" }}>{title}</span>
+      </div>
+      {children}
+    </div>
   );
 }
 
 export default function Settings() {
+  const { data: platformSettings = {}, isLoading } = useGetPlatformSettings();
+  const updateSetting = useUpdatePlatformSetting();
+
+  // Local state for platform toggles
+  const [settings, setSettings] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setSettings({
+      maintenance_mode: platformSettings["maintenance_mode"] === "true",
+      support_ai_mode: platformSettings["support_ai_mode"] !== "false",
+      allow_new_users: platformSettings["allow_new_users"] !== "false",
+      bets_active: platformSettings["bets_active"] !== "false",
+      backup_auto: platformSettings["backup_auto"] !== "false",
+      query_cache: platformSettings["query_cache"] !== "false",
+      query_logs: platformSettings["query_logs"] === "true",
+    });
+  }, [platformSettings]);
+
+  const handleToggle = async (key: string, val: boolean) => {
+    setSettings(prev => ({ ...prev, [key]: val }));
+    try {
+      await updateSetting.mutateAsync({ key, value: val ? "true" : "false" });
+      toast.success(val ? "Activado com sucesso" : "Desactivado com sucesso");
+    } catch {
+      setSettings(prev => ({ ...prev, [key]: !val }));
+      toast.error("Erro ao guardar definição");
+    }
+  };
+
+  // Admin credentials
+  const [newEmail, setNewEmail] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [savingPw, setSavingPw] = useState(false);
+
+  const handleChangeEmail = async () => {
+    if (!newEmail.trim() || !newEmail.includes("@")) { toast.error("E-mail inválido"); return; }
+    setSavingEmail(true);
+    const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
+    setSavingEmail(false);
+    if (error) { toast.error("Erro: " + error.message); return; }
+    toast.success("E-mail de confirmação enviado para o novo endereço.");
+    setNewEmail("");
+  };
+
+  const handleChangePw = async () => {
+    if (newPw.length < 8) { toast.error("A senha deve ter pelo menos 8 caracteres"); return; }
+    setSavingPw(true);
+    const { error } = await supabase.auth.updateUser({ password: newPw });
+    setSavingPw(false);
+    if (error) { toast.error("Erro: " + error.message); return; }
+    toast.success("Palavra-passe actualizada com sucesso.");
+    setNewPw("");
+  };
+
+  // Security gate password
+  const [secPw, setSecPw] = useState("");
+  const [showSecPw, setShowSecPw] = useState(false);
+  const [savingSecPw, setSavingSecPw] = useState(false);
+  const [currentSecPw, setCurrentSecPw] = useState<string | null>(null);
+
+  useEffect(() => {
+    adminSupabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "admin_security_password")
+      .single()
+      .then(({ data }) => {
+        setCurrentSecPw((data as { value: string } | null)?.value ?? "12345678");
+      });
+  }, []);
+
+  const handleSaveSecPw = async () => {
+    if (secPw.length < 6) { toast.error("A senha de segurança deve ter pelo menos 6 caracteres"); return; }
+    setSavingSecPw(true);
+    try {
+      await updateSetting.mutateAsync({ key: "admin_security_password", value: secPw });
+      // Also update session so admin doesn't get locked out
+      sessionStorage.setItem("_wmz_gate", "1");
+      setCurrentSecPw(secPw);
+      setSecPw("");
+      toast.success("Senha de segurança actualizada");
+    } catch {
+      toast.error("Erro ao guardar senha de segurança");
+    }
+    setSavingSecPw(false);
+  };
+
+  if (isLoading) {
+    return (
+      <div style={{ padding: 24, display: "flex", alignItems: "center", justifyContent: "center", height: 400 }}>
+        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "3px solid rgba(108,92,231,0.2)", borderTopColor: "#6C5CE7", animation: "spin 0.8s linear infinite" }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Configurações</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Administração da plataforma POKER WINNER</p>
+    <div style={{ padding: "24px", maxWidth: 900 }}>
+
+      {/* Header */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+          <div style={{ width: 38, height: 38, borderRadius: 14, background: "linear-gradient(135deg, #6C5CE7, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(108,92,231,0.35)" }}>
+            <SettingsIcon style={{ width: 18, height: 18, color: "#fff" }} />
+          </div>
+          <div>
+            <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--gz-text-primary)", margin: 0 }}>Configurações</h1>
+            <p style={{ fontSize: 12, color: "var(--gz-text-muted)", margin: 0 }}>Administração da plataforma Winmoz</p>
+          </div>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        {[
-          {
-            title: "Notificações",
-            icon: Bell,
-            color: "bg-indigo-100 text-indigo-600",
-            items: [
-              { label: "Alertas de Anti-Fraude", description: "Receber notificações de atividade suspeita", checked: true },
-              { label: "Novos Saques Pendentes", description: "Alertas para aprovação de saques", checked: true },
-              { label: "Denúncias Novas", description: "Notificações para novas denúncias", checked: false },
-            ]
-          },
-          {
-            title: "Segurança",
-            icon: Shield,
-            color: "bg-purple-100 text-purple-600",
-            items: [
-              { label: "Anti-Fraude Automático", description: "Detecção automática de padrões suspeitos", checked: true },
-              { label: "Verificação 2FA Admin", description: "Autenticação de dois fatores para admins", checked: true },
-              { label: "Log de Auditoria", description: "Registrar todas as ações administrativas", checked: false },
-            ]
-          },
-          {
-            title: "Plataforma",
-            icon: Globe,
-            color: "bg-green-100 text-green-600",
-            items: [
-              { label: "Permitir Novos Cadastros", description: "Habilitar registro de novos jogadores", checked: true },
-              { label: "Apostas Ativas", description: "Permitir realização de apostas na plataforma", checked: true },
-              { label: "Modo Manutenção", description: "Colocar plataforma em modo de manutenção", checked: false },
-            ]
-          },
-          {
-            title: "Banco de Dados",
-            icon: Database,
-            color: "bg-amber-100 text-amber-600",
-            items: [
-              { label: "Backup Automático", description: "Backup diário do banco de dados", checked: true },
-              { label: "Cache de Consultas", description: "Habilitar cache de consultas SQL", checked: true },
-              { label: "Logs de Query", description: "Registrar todas as queries do sistema", checked: false },
-            ]
-          },
-        ].map((section) => (
-          <div key={section.title} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`w-9 h-9 rounded-xl ${section.color} flex items-center justify-center`}>
-                <section.icon className="w-4 h-4" />
-              </div>
-              <div className="font-semibold text-gray-800">{section.title}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+
+        {/* Notifications — all locked */}
+        <SectionCard title="Notificações" icon={Bell} color="#6C5CE7" bg="rgba(108,92,231,0.1)">
+          <SettingRow label="Alertas de Anti-Fraude" description="Receber notificações de atividade suspeita" locked>
+            <LockedToggle />
+          </SettingRow>
+          <SettingRow label="Novos Saques Pendentes" description="Alertas para aprovação de saques" locked>
+            <LockedToggle />
+          </SettingRow>
+          <SettingRow label="Denúncias Novas" description="Notificações para novas denúncias" locked>
+            <LockedToggle />
+          </SettingRow>
+        </SectionCard>
+
+        {/* Security — all locked */}
+        <SectionCard title="Segurança" icon={Shield} color="#8b5cf6" bg="rgba(139,92,246,0.1)">
+          <SettingRow label="Anti-Fraude Automático" description="Detecção automática de padrões suspeitos" locked>
+            <LockedToggle />
+          </SettingRow>
+          <SettingRow label="Verificação 2FA Admin" description="Autenticação de dois fatores para admins" locked>
+            <LockedToggle />
+          </SettingRow>
+          <SettingRow label="Log de Auditoria" description="Registrar todas as ações administrativas" locked>
+            <LockedToggle />
+          </SettingRow>
+        </SectionCard>
+
+        {/* Platform — functional */}
+        <SectionCard title="Plataforma" icon={Globe} color="#10b981" bg="rgba(16,185,129,0.1)">
+          <SettingRow label="Permitir Novos Cadastros" description="Habilitar registro de novos jogadores">
+            <FunctionalToggle settingKey="allow_new_users" value={settings.allow_new_users ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+          </SettingRow>
+          <SettingRow label="Apostas Activas" description="Permitir realização de apostas na plataforma">
+            <FunctionalToggle settingKey="bets_active" value={settings.bets_active ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+          </SettingRow>
+          <SettingRow
+            label="Modo Manutenção"
+            description={settings.maintenance_mode ? "⚠️ Plataforma OFFLINE para todos os users" : "Colocar plataforma em modo de manutenção"}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {settings.maintenance_mode && (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#ef4444", textTransform: "uppercase" }}>
+                  ACTIVO
+                </span>
+              )}
+              <FunctionalToggle settingKey="maintenance_mode" value={settings.maintenance_mode ?? false} onChange={handleToggle} loading={updateSetting.isPending} />
             </div>
+          </SettingRow>
+          <SettingRow label="Modo IA no Suporte" description="Respostas automáticas via IA para mensagens de suporte">
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Bot style={{ width: 13, height: 13, color: settings.support_ai_mode ? "#0ea5e9" : "var(--gz-text-tertiary)" }} />
+              <FunctionalToggle settingKey="support_ai_mode" value={settings.support_ai_mode ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+            </div>
+          </SettingRow>
+        </SectionCard>
+
+        {/* Database */}
+        <SectionCard title="Banco de Dados" icon={Database} color="#f59e0b" bg="rgba(245,158,11,0.1)">
+          <SettingRow label="Backup Automático" description="Backup diário do banco de dados">
+            <FunctionalToggle settingKey="backup_auto" value={settings.backup_auto ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+          </SettingRow>
+          <SettingRow label="Cache de Consultas" description="Habilitar cache de consultas SQL">
+            <FunctionalToggle settingKey="query_cache" value={settings.query_cache ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+          </SettingRow>
+          <SettingRow label="Logs de Query" description="Registrar todas as queries do sistema">
+            <FunctionalToggle settingKey="query_logs" value={settings.query_logs ?? false} onChange={handleToggle} loading={updateSetting.isPending} />
+          </SettingRow>
+        </SectionCard>
+
+        {/* Admin Credentials */}
+        <SectionCard title="Credenciais de Acesso" icon={Mail} color="#0ea5e9" bg="rgba(14,165,233,0.1)">
+          <div style={{ paddingTop: 12 }}>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                Alterar E-mail do Admin
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,0.1)" }}>
+                  <Mail style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={e => setNewEmail(e.target.value)}
+                    placeholder="novo@email.com"
+                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
+                  />
+                </div>
+                <button
+                  onClick={handleChangeEmail}
+                  disabled={!newEmail.trim() || savingEmail}
+                  style={{
+                    padding: "10px 14px", borderRadius: 12, border: "none", cursor: newEmail.trim() ? "pointer" : "default",
+                    background: newEmail.trim() ? "linear-gradient(135deg, #6C5CE7, #4f46e5)" : "var(--gz-bg-subtle)",
+                    color: newEmail.trim() ? "#fff" : "var(--gz-text-tertiary)",
+                    fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
+                  }}
+                >
+                  {savingEmail ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                </button>
+              </div>
+            </div>
+
             <div>
-              {section.items.map((item) => (
-                <SettingRow key={item.label} label={item.label} description={item.description}>
-                  <Toggle defaultChecked={item.checked} />
-                </SettingRow>
-              ))}
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                Alterar Palavra-Passe do Admin
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,0.1)" }}>
+                  <Key style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
+                  <input
+                    type={showPw ? "text" : "password"}
+                    value={newPw}
+                    onChange={e => setNewPw(e.target.value)}
+                    placeholder="Nova palavra-passe (mín. 8 chars)"
+                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
+                  />
+                  <button onClick={() => setShowPw(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gz-text-tertiary)", padding: 0 }}>
+                    {showPw ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
+                  </button>
+                </div>
+                <button
+                  onClick={handleChangePw}
+                  disabled={newPw.length < 8 || savingPw}
+                  style={{
+                    padding: "10px 14px", borderRadius: 12, border: "none", cursor: newPw.length >= 8 ? "pointer" : "default",
+                    background: newPw.length >= 8 ? "linear-gradient(135deg, #6C5CE7, #4f46e5)" : "var(--gz-bg-subtle)",
+                    color: newPw.length >= 8 ? "#fff" : "var(--gz-text-tertiary)",
+                    fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
+                  }}
+                >
+                  {savingPw ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                </button>
+              </div>
             </div>
           </div>
-        ))}
+        </SectionCard>
+
+        {/* Security Gate Password */}
+        <SectionCard title="Senha da Porta de Segurança" icon={Lock} color="#8b5cf6" bg="rgba(139,92,246,0.1)">
+          <div style={{ paddingTop: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(108,92,231,0.05)", border: "1px solid rgba(108,92,231,0.1)", marginBottom: 16 }}>
+              <Shield style={{ width: 14, height: 14, color: "#6C5CE7", flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: "var(--gz-text-muted)" }}>
+                Senha actual: <strong style={{ color: "var(--gz-text-primary)", fontFamily: "monospace" }}>{currentSecPw ? "●".repeat(currentSecPw.length) : "..."}</strong>
+              </span>
+            </div>
+
+            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+              Nova Senha de Segurança
+            </label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,0.1)" }}>
+                <Lock style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
+                <input
+                  type={showSecPw ? "text" : "password"}
+                  value={secPw}
+                  onChange={e => setSecPw(e.target.value)}
+                  placeholder="Nova senha (mín. 6 chars)"
+                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
+                />
+                <button onClick={() => setShowSecPw(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gz-text-tertiary)", padding: 0 }}>
+                  {showSecPw ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
+                </button>
+              </div>
+              <button
+                onClick={handleSaveSecPw}
+                disabled={secPw.length < 6 || savingSecPw}
+                style={{
+                  padding: "10px 14px", borderRadius: 12, border: "none", cursor: secPw.length >= 6 ? "pointer" : "default",
+                  background: secPw.length >= 6 ? "linear-gradient(135deg, #8b5cf6, #6C5CE7)" : "var(--gz-bg-subtle)",
+                  color: secPw.length >= 6 ? "#fff" : "var(--gz-text-tertiary)",
+                  fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
+                }}
+              >
+                {savingSecPw ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+              </button>
+            </div>
+            <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 8 }}>
+              ⚠️ Altera imediatamente — a nova senha é exigida no próximo acesso ao painel.
+            </p>
+          </div>
+        </SectionCard>
+
       </div>
 
-      <div className="mt-6 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-2xl p-6 text-white">
-        <div className="flex items-center gap-3 mb-2">
-          <SettingsIcon className="w-5 h-5" />
-          <div className="font-semibold">POKER WINNER Admin v1.0</div>
+      {/* Footer info */}
+      <div style={{
+        marginTop: 24, borderRadius: 20, padding: "20px 24px",
+        background: "linear-gradient(135deg, #1a0533, #2d0f6b)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        flexWrap: "wrap", gap: 12,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Wrench style={{ width: 17, height: 17, color: "#a78bfa" }} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>Winmoz Admin v1.0</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Plataforma de jogos com apostas em tempo real</div>
+          </div>
         </div>
-        <div className="text-sm text-indigo-200">Plataforma multiplayer de Dama e Ludo com apostas em tempo real.</div>
-        <div className="flex items-center gap-4 mt-4 text-xs text-indigo-300">
-          <span>API: Online</span>
-          <span>DB: Conectado</span>
-          <span>Última sync: Agora</span>
+        <div style={{ display: "flex", gap: 16 }}>
+          {[
+            { label: "API", status: "Online", color: "#34d399" },
+            { label: "DB", status: "Conectado", color: "#34d399" },
+            { label: "IA", status: settings.support_ai_mode ? "Activa" : "Desligada", color: settings.support_ai_mode ? "#0ea5e9" : "#6b7280" },
+          ].map(item => (
+            <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, textAlign: "center" }}>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{item.label}</span>
+              <span style={{ fontSize: 10, color: item.color, fontWeight: 700 }}>{item.status}</span>
+            </div>
+          ))}
         </div>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

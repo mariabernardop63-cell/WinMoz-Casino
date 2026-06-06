@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
-import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, CheckCheck, X } from "lucide-react";
+import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, CheckCheck, X, Bot } from "lucide-react";
 import { API_BASE } from "@/lib/apiBase";
 import { supabase } from "@/lib/supabase";
+import { adminSupabase } from "@/admin/lib/supabase-api";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CYAN = "#00D4B4";
@@ -63,6 +64,22 @@ async function saveMsgToSupabase(
   }
 }
 
+async function isAiModeEnabled(): Promise<boolean> {
+  try {
+    const { data } = await adminSupabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "support_ai_mode")
+      .single();
+    // Default to true if not set
+    const val = (data as { value: string } | null)?.value;
+    if (val === undefined || val === null) return true;
+    return val !== "false";
+  } catch {
+    return true; // default: AI enabled
+  }
+}
+
 export default function Suporte() {
   const [, setLocation] = useLocation();
   const { user, profile } = useAuth();
@@ -112,6 +129,7 @@ export default function Suporte() {
       });
   }, [user?.id, loaded]);
 
+  // Realtime: receive admin replies instantly
   useEffect(() => {
     if (!user?.id || !loaded) return;
     const channel = supabase
@@ -155,14 +173,38 @@ export default function Suporte() {
     setMessages(p => [...p, userMsg]);
     setText("");
     setShowQuick(false);
-    setTyping(true);
 
     if (user?.id && msgText.trim()) {
       await saveMsgToSupabase(user.id, userName, "user", msgText.trim());
     }
 
+    // Check if AI mode is enabled
+    const aiEnabled = await isAiModeEnabled();
+
+    if (!aiEnabled) {
+      // AI mode is OFF — admin will respond manually
+      setTyping(true);
+      await new Promise(r => setTimeout(r, 800));
+      setTyping(false);
+      const waitMsg: Msg = {
+        id:     `${Date.now()}_wait`,
+        from:   "support",
+        sender: "ai",
+        text:   "✅ A tua mensagem foi recebida com sucesso. Um agente da nossa equipa irá responder em breve. Agradecemos a paciência! 🙏",
+        time:   nowTime(),
+      };
+      setMessages(p => [...p, waitMsg]);
+
+      if (user?.id) {
+        await saveMsgToSupabase(user.id, userName, "ai", waitMsg.text!);
+      }
+      return;
+    }
+
+    // AI mode is ON — call the AI endpoint
     const newHistory: ChatMsg[] = [...history, { role: "user", content: msgText.trim() || "[imagem enviada]" }];
     setHistory(newHistory);
+    setTyping(true);
 
     try {
       const res = await fetch(`${API_BASE}/support/chat`, {

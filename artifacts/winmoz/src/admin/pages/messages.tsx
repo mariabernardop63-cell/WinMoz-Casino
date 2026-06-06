@@ -10,6 +10,7 @@ import {
   useGetSupportMessages,
   useSendAdminSupportMessage,
   useMarkSupportMessagesRead,
+  adminSupabase,
 } from "@/admin/lib/supabase-api";
 
 const V1 = "#6C5CE7";
@@ -61,6 +62,33 @@ export default function Messages() {
   const sendMsg = useSendAdminSupportMessage();
   const markRead = useMarkSupportMessagesRead();
 
+  // ── True realtime via Supabase subscription ──
+  useEffect(() => {
+    const channel = adminSupabase
+      .channel("admin-support-realtime-v2")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "support_messages" },
+        (payload) => {
+          const newMsg = payload.new as { user_id?: string };
+          queryClient.invalidateQueries({ queryKey: ["support-conversations"] });
+          if (newMsg?.user_id && newMsg.user_id === selectedUserId) {
+            queryClient.invalidateQueries({ queryKey: ["support-messages", selectedUserId] });
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "support_messages" },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["support-conversations"] });
+        }
+      )
+      .subscribe();
+
+    return () => { adminSupabase.removeChannel(channel); };
+  }, [selectedUserId, queryClient]);
+
   const filtered = conversations.filter(c =>
     search === "" ||
     c.userName.toLowerCase().includes(search.toLowerCase()) ||
@@ -103,6 +131,11 @@ export default function Messages() {
           <p className="text-[11px]" style={{ color: "var(--gz-text-muted)" }}>
             Conversas reais do Atendimento 24h · {totalUnread > 0 ? `${totalUnread} não lida${totalUnread !== 1 ? "s" : ""}` : "tudo lido"}
           </p>
+        </div>
+        {/* Realtime indicator */}
+        <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)" }}>
+          <div className="w-2 h-2 rounded-full bg-green-400" style={{ animation: "pulse 2s infinite" }} />
+          <span className="text-[10px] font-semibold" style={{ color: "#16a34a" }}>REALTIME</span>
         </div>
       </div>
 
@@ -292,7 +325,7 @@ export default function Messages() {
                   </button>
                 </div>
                 <p className="text-[10.5px] mt-2 px-1" style={{ color: "var(--gz-text-tertiary)" }}>
-                  A tua resposta será guardada e o utilizador verá na próxima vez que abrir o suporte.
+                  A tua resposta será entregue ao utilizador em tempo real.
                 </p>
               </div>
             </>
@@ -319,6 +352,8 @@ export default function Messages() {
           )}
         </div>
       </div>
+
+      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
     </div>
   );
 }

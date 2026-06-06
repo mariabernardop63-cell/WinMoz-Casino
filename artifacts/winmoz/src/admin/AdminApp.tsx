@@ -3,6 +3,7 @@ import { ErrorBoundary } from "@/admin/components/ErrorBoundary";
 import { AdminThemeProvider } from "@/admin/contexts/AdminThemeContext";
 import { Toaster } from "@/components/ui/sonner";
 import AdminLayout from "@/admin/layout/Layout";
+import AdminSecurityGate from "@/admin/AdminSecurityGate";
 import Dashboard from "@/admin/pages/dashboard";
 import Matches from "@/admin/pages/matches";
 import MatchDetail from "@/admin/pages/matches/detail";
@@ -54,12 +55,14 @@ export default function AdminApp() {
   return (
     <ErrorBoundary>
       <AdminThemeProvider>
-        <WouterRouter base={ADMIN_BASE}>
-          <div className="admin-panel-root">
-            <AdminRouter />
-            <Toaster position="top-right" richColors />
-          </div>
-        </WouterRouter>
+        <AdminSecurityGate>
+          <WouterRouter base={ADMIN_BASE}>
+            <div className="admin-panel-root">
+              <AdminRouter />
+              <Toaster position="top-right" richColors />
+            </div>
+          </WouterRouter>
+        </AdminSecurityGate>
       </AdminThemeProvider>
     </ErrorBoundary>
   );

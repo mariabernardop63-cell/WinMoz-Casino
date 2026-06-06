@@ -2,7 +2,7 @@ import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import NotFound from "@/pages/not-found";
 import AdminApp from "@/admin/AdminApp";
@@ -35,8 +35,60 @@ import DamasGame from "@/pages/DamasGame";
 import Roleta from "@/pages/Roleta";
 import BilharEmBreve from "@/pages/BilharEmBreve";
 import NotificationBanner from "@/components/NotificationBanner";
+import MaintenancePage from "@/components/MaintenancePage";
+import { useState, useEffect } from "react";
+import { adminSupabase } from "@/admin/lib/supabase-api";
+import { supabase } from "@/lib/supabase";
 
 const queryClient = new QueryClient();
+
+const ADMIN_EMAIL = "nexialonemz@gmail.com";
+
+function MaintenanceGate({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const [maintenance, setMaintenance] = useState(false);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    // Initial fetch
+    adminSupabase
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "maintenance_mode")
+      .single()
+      .then(({ data }) => {
+        setMaintenance((data as { value: string } | null)?.value === "true");
+        setChecked(true);
+      }, () => setChecked(true));
+
+    // Realtime subscription
+    const channel = supabase
+      .channel("maintenance-mode-watch")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "platform_settings", filter: "key=eq.maintenance_mode" },
+        (payload) => {
+          const newVal = (payload.new as { value?: string } | undefined)?.value;
+          setMaintenance(newVal === "true");
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
+  // While checking, show nothing to avoid flash
+  if (!checked) return null;
+
+  // Admin bypass maintenance mode
+  const isAdmin = user?.email === ADMIN_EMAIL;
+
+  if (maintenance && !isAdmin) {
+    return <MaintenancePage />;
+  }
+
+  return <>{children}</>;
+}
 
 function Router() {
   return (
@@ -122,14 +174,22 @@ function Router() {
   );
 }
 
+function AppContent() {
+  return (
+    <MaintenanceGate>
+      <Router />
+      <NotificationBanner />
+    </MaintenanceGate>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
-            <NotificationBanner />
+            <AppContent />
           </WouterRouter>
           <Toaster />
         </AuthProvider>

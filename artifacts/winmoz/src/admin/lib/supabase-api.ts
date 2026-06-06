@@ -7,7 +7,7 @@ const _adminUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "https://plac
 const _adminKey = (import.meta.env.VITE_SUPABASE_SERVICE_ROLE as string)
   || (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
   || "placeholder";
-const adminSupabase = createClient(_adminUrl, _adminKey, {
+export const adminSupabase = createClient(_adminUrl, _adminKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
@@ -1015,8 +1015,10 @@ export function useUpdatePlatformSetting() {
       const { data: { user } } = await supabase.auth.getUser();
       const { error } = await adminSupabase
         .from("platform_settings")
-        .update({ value, updated_at: new Date().toISOString(), updated_by: user?.id ?? null })
-        .eq("key", key);
+        .upsert(
+          { key, value, updated_at: new Date().toISOString(), updated_by: user?.id ?? null },
+          { onConflict: "key" }
+        );
       if (error) throw error;
       return { ok: true };
     },
