@@ -2,6 +2,130 @@ import { Router, type IRouter } from "express";
 import { createClient } from "@supabase/supabase-js";
 import healthRouter from "./health";
 
+/* ── SMS Forwarder In-Memory Store ── */
+interface StoredSMS {
+  id: string;
+  body: string;
+  sender: string;
+  receivedAt: number;
+  used: boolean;
+  parsedAmount: number | null;
+  parsedTxId: string | null;
+}
+
+interface PendingVerification {
+  id: string;
+  userId: string;
+  userSmsBody: string;
+  expectedAmount: number;
+  mode: "deposit" | "bet";
+  submittedAt: number;
+  status: "pending" | "approved" | "rejected";
+  resolvedTxId?: string | null;
+}
+
+const smsStore = new Map<string, StoredSMS>();
+const pendingStore = new Map<string, PendingVerification>();
+
+// Clean up expired entries every 30 s
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of smsStore.entries()) {
+    if (now - v.receivedAt > 90_000) smsStore.delete(k);
+  }
+  for (const [k, v] of pendingStore.entries()) {
+    if (now - v.submittedAt > 180_000) pendingStore.delete(k);
+  }
+}, 30_000);
+
+/* ── SMS Parsing Helpers ── */
+function extractAmount(body: string): number | null {
+  const patterns = [
+    /(\d[\d\s]*(?:[.,]\d{1,2})?)\s*MT\b/i,
+    /(\d[\d\s]*(?:[.,]\d{1,2})?)\s*MZN\b/i,
+    /enviou\s+(\d[\d\s]*(?:[.,]\d{1,2})?)/i,
+    /recebeu\s+(\d[\d\s]*(?:[.,]\d{1,2})?)/i,
+    /de\s+(\d[\d\s]*(?:[.,]\d{1,2})?)\s*(?:MT|MZN)/i,
+  ];
+  for (const p of patterns) {
+    const m = body.match(p);
+    if (m) {
+      const raw = m[1].replace(/\s/g, "").replace(",", ".");
+      const val = parseFloat(raw);
+      if (!isNaN(val) && val > 0) return val;
+    }
+  }
+  return null;
+}
+
+function extractTxId(body: string): string | null {
+  const patterns = [
+    /ID\s+trans\.?\s*([A-Z0-9]{4,})/i,
+    /ID\s+de\s+transac[aã]o[:\s]+([A-Z0-9]{4,})/i,
+    /\bID[:\s]+([A-Z0-9]{6,})/i,
+    /Ref\.?[:\s]+([A-Z0-9]{6,})/i,
+    /Transaction\s+ID[:\s]+([A-Z0-9]{6,})/i,
+    /\b([A-Z][A-Z0-9]{7,15})\b/,
+  ];
+  for (const p of patterns) {
+    const m = body.match(p);
+    if (m) return m[1].toUpperCase();
+  }
+  return null;
+}
+
+function amountsMatch(a: number, b: number): boolean {
+  return Math.abs(a - b) < 0.5;
+}
+
+function tryMatchForwarderSms(userBody: string, expectedAmount: number): StoredSMS | null {
+  const userTxId = extractTxId(userBody);
+  const userAmount = extractAmount(userBody);
+
+  for (const sms of smsStore.values()) {
+    if (sms.used) continue;
+
+    // TX ID match takes priority
+    if (userTxId && sms.parsedTxId && userTxId === sms.parsedTxId) return sms;
+
+    // Fall back: both amounts must agree with each other AND the expected amount
+    if (
+      userAmount !== null &&
+      sms.parsedAmount !== null &&
+      amountsMatch(userAmount, sms.parsedAmount) &&
+      amountsMatch(userAmount, expectedAmount)
+    ) return sms;
+  }
+  return null;
+}
+
+async function creditBalance(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  amount: number,
+  txId: string | null | undefined,
+  note: string
+): Promise<boolean> {
+  const { data: profileData } = await admin.from("profiles").select("balance").eq("id", userId).single();
+  if (!profileData) return false;
+  const newBalance = Math.round((Number(profileData.balance ?? 0) + amount) * 100) / 100;
+  const { error } = await admin.from("profiles").update({ balance: newBalance }).eq("id", userId);
+  if (error) return false;
+  await admin.from("transactions").insert({
+    user_id: userId,
+    type: "deposit",
+    amount,
+    description: JSON.stringify({ method: "M-Pesa/e-Mola", txId: txId ?? null, note }),
+    status: "approved",
+    created_at: new Date().toISOString(),
+  });
+  return true;
+}
+
+function buildAdminClient(url: string, key: string) {
+  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+}
+
 const router: IRouter = Router();
 
 router.use(healthRouter);
@@ -623,6 +747,199 @@ router.post("/roleta/spin", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Roleta spin error");
     res.status(500).json({ error: "Erro interno ao processar aposta" });
+  }
+});
+
+/* ── Admin: Get a single platform setting (public read) ── */
+router.get("/admin/settings/get", async (req, res) => {
+  const key = req.query["key"] as string | undefined;
+  if (!key) { res.status(400).json({ error: "key required" }); return; }
+
+  const supabaseUrl = process.env["SUPABASE_URL"];
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!supabaseUrl || !supabaseServiceKey) { res.json({ setting: null }); return; }
+
+  const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
+  const { data } = await admin.from("platform_settings").select("value").eq("key", key).maybeSingle();
+  res.json({ setting: data ? { value: data.value } : null });
+});
+
+/* ── SMS Forwarder Webhook ── */
+router.post("/sms/webhook", async (req, res) => {
+  const supabaseUrl = process.env["SUPABASE_URL"];
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+
+  // Validate webhook token
+  if (supabaseUrl && supabaseServiceKey) {
+    const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
+    const { data: tokenRow } = await admin
+      .from("platform_settings").select("value").eq("key", "sms_webhook_token").maybeSingle();
+    const expectedToken = tokenRow?.value ?? null;
+
+    if (expectedToken) {
+      const authHeader = req.headers.authorization ?? "";
+      const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7)
+        : (req.query["token"] as string | undefined ?? "");
+      if (!provided || provided !== expectedToken) {
+        res.status(401).json({ error: "Unauthorized" });
+        return;
+      }
+    }
+  }
+
+  const { body: smsBody, sender, id: smsId } = req.body as {
+    body?: string; sender?: string; id?: string;
+  };
+  if (!smsBody) { res.status(400).json({ error: "body required" }); return; }
+
+  const id = smsId ?? `sms_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const parsedAmount = extractAmount(smsBody);
+  const parsedTxId = extractTxId(smsBody);
+
+  const stored: StoredSMS = {
+    id, body: smsBody, sender: sender ?? "unknown",
+    receivedAt: Date.now(), used: false, parsedAmount, parsedTxId,
+  };
+  smsStore.set(id, stored);
+  req.log.info({ id, parsedAmount, parsedTxId }, "SMS received from forwarder");
+
+  // Try to auto-resolve any pending verifications
+  if (supabaseUrl && supabaseServiceKey) {
+    const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
+    for (const pending of pendingStore.values()) {
+      if (pending.status !== "pending") continue;
+      const match = tryMatchForwarderSms(pending.userSmsBody, pending.expectedAmount);
+      if (!match) continue;
+      match.used = true;
+      pending.status = "approved";
+      pending.resolvedTxId = match.parsedTxId;
+      req.log.info({ pendingId: pending.id }, "Auto-resolved pending verification");
+
+      if (pending.mode === "deposit") {
+        await creditBalance(admin, pending.userId, pending.expectedAmount, match.parsedTxId, "Depósito via M-Pesa/e-Mola");
+      }
+    }
+  }
+
+  res.json({ success: true, id, parsedAmount, parsedTxId });
+});
+
+/* ── Deposit: Verify SMS ── */
+router.post("/deposit/verify", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const supabaseUrl = process.env["SUPABASE_URL"];
+    const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+    if (!supabaseUrl || !supabaseServiceKey) { res.status(500).json({ error: "Serviço indisponível" }); return; }
+
+    const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
+    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    if (userError || !userData.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
+    const userId = userData.user.id;
+
+    const { smsText, expectedAmount, mode } = req.body as {
+      smsText?: string; expectedAmount?: number; mode?: "deposit" | "bet";
+    };
+    if (!smsText || !expectedAmount || expectedAmount <= 0) {
+      res.status(400).json({ error: "Dados inválidos" }); return;
+    }
+
+    const depositMode: "deposit" | "bet" = mode ?? "deposit";
+
+    // Try to match against a stored forwarder SMS
+    const matchedSms = tryMatchForwarderSms(smsText, expectedAmount);
+    if (matchedSms) {
+      matchedSms.used = true;
+      if (depositMode === "deposit") {
+        await creditBalance(admin, userId, expectedAmount, matchedSms.parsedTxId, "Depósito via M-Pesa/e-Mola");
+      }
+      req.log.info({ userId, expectedAmount, mode: depositMode, txId: matchedSms.parsedTxId }, "Deposit verified immediately");
+      res.json({ status: "approved", amount: expectedAmount, txId: matchedSms.parsedTxId });
+      return;
+    }
+
+    // No forwarder SMS yet — create a pending verification (poll-based)
+    const pendingId = `pv_${userId.slice(0, 8)}_${Date.now()}`;
+    pendingStore.set(pendingId, {
+      id: pendingId, userId, userSmsBody: smsText, expectedAmount,
+      mode: depositMode, submittedAt: Date.now(), status: "pending",
+    });
+    req.log.info({ pendingId, expectedAmount, mode: depositMode }, "Pending verification created");
+    res.json({ status: "pending", pendingId });
+  } catch (err) {
+    req.log.error({ err }, "Deposit verify error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Deposit: Poll Status ── */
+router.get("/deposit/status/:pendingId", (req, res) => {
+  const { pendingId } = req.params;
+  const pending = pendingStore.get(pendingId);
+
+  if (!pending) { res.json({ status: "not_found" }); return; }
+
+  if (pending.status === "approved") {
+    pendingStore.delete(pendingId);
+    res.json({ status: "approved", amount: pending.expectedAmount, txId: pending.resolvedTxId ?? null });
+    return;
+  }
+
+  // Check TTL (90 s)
+  if (Date.now() - pending.submittedAt > 90_000) {
+    pending.status = "rejected";
+    pendingStore.delete(pendingId);
+    res.json({ status: "rejected", reason: "timeout" });
+    return;
+  }
+
+  res.json({ status: "pending" });
+});
+
+/* ── Deposit: Credit after cancelled bet ── */
+router.post("/deposit/credit", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const supabaseUrl = process.env["SUPABASE_URL"];
+    const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+    if (!supabaseUrl || !supabaseServiceKey) { res.status(500).json({ error: "Serviço indisponível" }); return; }
+
+    const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
+    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    if (userError || !userData.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
+    const userId = userData.user.id;
+
+    const { amount, txId } = req.body as { amount?: number; txId?: string };
+    if (!amount || amount <= 0) { res.status(400).json({ error: "Valor inválido" }); return; }
+
+    // Guard against double-credit: check for existing deposit with this txId
+    if (txId) {
+      const { data: existing } = await admin
+        .from("transactions")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("type", "deposit")
+        .ilike("description", `%${txId}%`)
+        .limit(1);
+      if (existing && existing.length > 0) {
+        res.json({ success: true, message: "already_credited" }); return;
+      }
+    }
+
+    const ok = await creditBalance(admin, userId, amount, txId, "Crédito por aposta não encontrada");
+    if (!ok) { res.status(500).json({ error: "Erro ao creditar saldo" }); return; }
+
+    req.log.info({ userId, amount, txId }, "Balance credited after cancelled bet");
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "Deposit credit error");
+    res.status(500).json({ error: "Erro interno" });
   }
 });
 

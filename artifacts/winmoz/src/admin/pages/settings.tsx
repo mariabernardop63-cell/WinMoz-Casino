@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Settings as SettingsIcon, Bell, Shield, Globe, Database,
   Bot, Lock, Mail, Key, Eye, EyeOff, CheckCircle, AlertCircle,
-  Save, Wrench,
+  Save, Wrench, Smartphone, Copy,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useGetPlatformSettings, useUpdatePlatformSetting } from "@/admin/lib/supabase-api";
@@ -180,6 +180,53 @@ export default function Settings() {
     if (error) { toast.error("Erro: " + error.message); return; }
     toast.success("Palavra-passe actualizada com sucesso.");
     setNewPw("");
+  };
+
+  // SMS Forwarder settings
+  const [mpesaNum, setMpesaNum] = useState("");
+  const [emolaNum, setEmolaNum] = useState("");
+  const [webhookToken, setWebhookToken] = useState("");
+  const [showWebhookToken, setShowWebhookToken] = useState(false);
+  const [savingMpesa, setSavingMpesa] = useState(false);
+  const [savingEmola, setSavingEmola] = useState(false);
+  const [savingWebhookToken, setSavingWebhookToken] = useState(false);
+  const [copiedWebhook, setCopiedWebhook] = useState(false);
+
+  useEffect(() => {
+    if (platformSettings["sms_mpesa_number"]) setMpesaNum(platformSettings["sms_mpesa_number"]);
+    if (platformSettings["sms_emola_number"]) setEmolaNum(platformSettings["sms_emola_number"]);
+  }, [platformSettings]);
+
+  const handleSaveMpesa = async () => {
+    if (!mpesaNum.trim()) { toast.error("Insere o número M-Pesa"); return; }
+    setSavingMpesa(true);
+    try { await updateSetting.mutateAsync({ key: "sms_mpesa_number", value: mpesaNum.trim() }); toast.success("Número M-Pesa guardado"); }
+    catch { toast.error("Erro ao guardar"); }
+    setSavingMpesa(false);
+  };
+
+  const handleSaveEmola = async () => {
+    if (!emolaNum.trim()) { toast.error("Insere o número e-Mola"); return; }
+    setSavingEmola(true);
+    try { await updateSetting.mutateAsync({ key: "sms_emola_number", value: emolaNum.trim() }); toast.success("Número e-Mola guardado"); }
+    catch { toast.error("Erro ao guardar"); }
+    setSavingEmola(false);
+  };
+
+  const handleSaveWebhookToken = async () => {
+    if (!webhookToken.trim()) { toast.error("Insere um token"); return; }
+    setSavingWebhookToken(true);
+    try { await updateSetting.mutateAsync({ key: "sms_webhook_token", value: webhookToken.trim() }); toast.success("Token guardado"); setWebhookToken(""); }
+    catch { toast.error("Erro ao guardar token"); }
+    setSavingWebhookToken(false);
+  };
+
+  const webhookUrl = `${window.location.origin}/api/sms/webhook`;
+
+  const copyWebhookUrl = () => {
+    navigator.clipboard.writeText(webhookUrl).catch(() => {});
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 2000);
   };
 
   // Security gate password
@@ -373,6 +420,130 @@ export default function Settings() {
                 </button>
               </div>
             </div>
+          </div>
+        </SectionCard>
+
+        {/* SMS Forwarder Configuration */}
+        <SectionCard title="Pagamentos SMS Forwarder" icon={Smartphone} color="#00D4B4" bg="rgba(0,212,180,0.1)">
+          <div style={{ paddingTop: 12 }}>
+
+            {/* Webhook URL */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                URL do Webhook SMS Forwarder
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(0,212,180,0.05)", border: "1.5px solid rgba(0,212,180,0.2)" }}>
+                <span style={{ flex: 1, fontSize: 11, color: "#00D4B4", fontFamily: "monospace", overflowX: "auto", whiteSpace: "nowrap" }}>
+                  {webhookUrl}
+                </span>
+                <button onClick={copyWebhookUrl}
+                  style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                    background: copiedWebhook ? "rgba(0,212,180,0.2)" : "rgba(0,212,180,0.1)",
+                    color: "#00D4B4", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, fontFamily: "inherit" }}>
+                  {copiedWebhook ? <CheckCircle style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
+                  {copiedWebhook ? "Copiado!" : "Copiar"}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
+                Configura esta URL no app <strong>SMS Forwarder</strong> (Android) para que os SMS de confirmação M-Pesa/e-Mola sejam enviados automaticamente.
+              </p>
+            </div>
+
+            {/* Webhook Token */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                Token de Segurança do Webhook
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,212,180,0.15)" }}>
+                  <Key style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
+                  <input
+                    type={showWebhookToken ? "text" : "password"}
+                    value={webhookToken}
+                    onChange={e => setWebhookToken(e.target.value)}
+                    placeholder="Define um segredo para autenticar o webhook"
+                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
+                  />
+                  <button onClick={() => setShowWebhookToken(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gz-text-tertiary)", padding: 0 }}>
+                    {showWebhookToken ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
+                  </button>
+                </div>
+                <button onClick={handleSaveWebhookToken} disabled={!webhookToken.trim() || savingWebhookToken}
+                  style={{
+                    padding: "10px 14px", borderRadius: 12, border: "none",
+                    cursor: webhookToken.trim() ? "pointer" : "default",
+                    background: webhookToken.trim() ? "linear-gradient(135deg, #00D4B4, #00b89c)" : "var(--gz-bg-subtle)",
+                    color: webhookToken.trim() ? "#000" : "var(--gz-text-tertiary)",
+                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
+                  }}>
+                  {savingWebhookToken ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(0,0,0,0.2)", borderTopColor: "#000", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
+                Envia este token no header <code style={{ background: "rgba(0,212,180,0.1)", padding: "1px 5px", borderRadius: 4, fontFamily: "monospace" }}>Authorization: Bearer &lt;token&gt;</code> do app SMS Forwarder.
+              </p>
+            </div>
+
+            {/* M-Pesa Number */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                Número M-Pesa da Plataforma
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(231,76,60,0.2)" }}>
+                  <Smartphone style={{ width: 14, height: 14, color: "#e74c3c", flexShrink: 0 }} />
+                  <input
+                    type="text"
+                    value={mpesaNum}
+                    onChange={e => setMpesaNum(e.target.value)}
+                    placeholder="84 XXX XXXX (sem prefixo +258)"
+                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
+                  />
+                </div>
+                <button onClick={handleSaveMpesa} disabled={!mpesaNum.trim() || savingMpesa}
+                  style={{
+                    padding: "10px 14px", borderRadius: 12, border: "none",
+                    cursor: mpesaNum.trim() ? "pointer" : "default",
+                    background: mpesaNum.trim() ? "linear-gradient(135deg, #e74c3c, #c0392b)" : "var(--gz-bg-subtle)",
+                    color: mpesaNum.trim() ? "#fff" : "var(--gz-text-tertiary)",
+                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
+                  }}>
+                  {savingMpesa ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>Exemplo: <code style={{ fontFamily: "monospace" }}>84 612 3456</code>. Exibido aos utilizadores na tela de depósito.</p>
+            </div>
+
+            {/* e-Mola Number */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                Número e-Mola da Plataforma
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(52,211,153,0.2)" }}>
+                  <Smartphone style={{ width: 14, height: 14, color: "#34d399", flexShrink: 0 }} />
+                  <input
+                    type="text"
+                    value={emolaNum}
+                    onChange={e => setEmolaNum(e.target.value)}
+                    placeholder="87 XXX XXXX (sem prefixo +258)"
+                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
+                  />
+                </div>
+                <button onClick={handleSaveEmola} disabled={!emolaNum.trim() || savingEmola}
+                  style={{
+                    padding: "10px 14px", borderRadius: 12, border: "none",
+                    cursor: emolaNum.trim() ? "pointer" : "default",
+                    background: emolaNum.trim() ? "linear-gradient(135deg, #34d399, #059669)" : "var(--gz-bg-subtle)",
+                    color: emolaNum.trim() ? "#fff" : "var(--gz-text-tertiary)",
+                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
+                  }}>
+                  {savingEmola ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>Exemplo: <code style={{ fontFamily: "monospace" }}>87 123 4567</code>. Exibido aos utilizadores na tela de depósito.</p>
+            </div>
+
           </div>
         </SectionCard>
 

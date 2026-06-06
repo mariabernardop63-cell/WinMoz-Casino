@@ -4,11 +4,12 @@ import { useRoute, useLocation, Link } from "wouter";
 import {
   ChevronLeft, Star, Wifi, Gamepad2, Zap, Trophy,
   XCircle, RotateCcw, AlertTriangle, Swords, Users,
-  CreditCard, Smartphone, CheckCircle2, Clock, X, Pencil, Phone
+  CreditCard, Smartphone, CheckCircle2, Clock, X, Pencil, Phone, Copy,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getLivePlayerCount, getSalaOnlineCount } from "@/lib/simulation";
+import { API_BASE } from "@/lib/apiBase";
 
 /* ── Theme ── */
 const VIOLET = "#7c3aed";
@@ -162,130 +163,317 @@ function ProcessingScreen() {
   );
 }
 
-/* ── Mobile Wallet PIN Confirmation Screen ── */
-function MobileWalletPINScreen({
-  phone, amount, onCancel, onSuccess,
+/* ── SMS Betting Confirmation Screen ── */
+function SMSBettingScreen({
+  amount, onCancel, onSuccess,
 }: {
-  phone: string; amount: number; onCancel: () => void; onSuccess: () => void;
+  amount: number;
+  onCancel: () => void;
+  onSuccess: (txId: string | null) => void;
 }) {
-  const [dots, setDots] = useState(0);
+  const [step, setStep] = useState<"input" | "verifying" | "rejected">("input");
+  const [smsText, setSmsText] = useState("");
+  const [error, setError] = useState("");
+  const [mpesaNum, setMpesaNum] = useState("84 XXX XXXX");
+  const [emolaNum, setEmolaNum] = useState("87 XXX XXXX");
+  const [copied, setCopied] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    const iv = setInterval(() => setDots(d => (d + 1) % 4), 600);
-    return () => clearInterval(iv);
+    fetch(`${API_BASE}/admin/settings/get?key=sms_mpesa_number`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: any) => { if (d?.setting?.value) setMpesaNum(d.setting.value); })
+      .catch(() => {});
+    fetch(`${API_BASE}/admin/settings/get?key=sms_emola_number`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: any) => { if (d?.setting?.value) setEmolaNum(d.setting.value); })
+      .catch(() => {});
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  /* Simulate successful confirmation after 8 s */
-  useEffect(() => {
-    const t = setTimeout(() => onSuccess(), 8000);
-    return () => clearTimeout(t);
-  }, [onSuccess]);
+  const copyNum = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
+  };
 
-  const dotsStr = ".".repeat(dots);
-  const displayPhone = phone
-    ? phone.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")
-    : "— —";
+  const handleVerify = async () => {
+    if (!smsText.trim()) { setError("Cola a mensagem SMS de confirmação"); return; }
+    setError("");
+    setStep("verifying");
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) { setStep("rejected"); return; }
+
+      const r = await fetch(`${API_BASE}/deposit/verify`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ smsText: smsText.trim(), expectedAmount: amount, mode: "bet" }),
+      });
+      const data = await r.json() as { status: string; pendingId?: string; txId?: string };
+
+      if (data.status === "approved") {
+        if (pollRef.current) clearInterval(pollRef.current);
+        onSuccess(data.txId ?? null);
+        return;
+      }
+
+      if (data.status === "pending" && data.pendingId) {
+        const pid = data.pendingId;
+        let count = 0;
+        pollRef.current = setInterval(async () => {
+          count++;
+          try {
+            const pr = await fetch(`${API_BASE}/deposit/status/${pid}`);
+            const pd = await pr.json() as { status: string; txId?: string };
+            if (pd.status === "approved") {
+              clearInterval(pollRef.current!);
+              onSuccess(pd.txId ?? null);
+            } else if (pd.status === "rejected" || pd.status === "not_found" || count >= 20) {
+              clearInterval(pollRef.current!);
+              setStep("rejected");
+            }
+          } catch {
+            if (count >= 20) { clearInterval(pollRef.current!); setStep("rejected"); }
+          }
+        }, 3000);
+        return;
+      }
+      setStep("rejected");
+    } catch {
+      setStep("rejected");
+    }
+  };
+
+  if (step === "verifying") {
+    return (
+      <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
+        <div className="w-full max-w-[430px] flex flex-col items-center justify-center min-h-screen px-8">
+          <motion.div className="flex flex-col items-center"
+            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.4 }}>
+            <div className="relative flex items-center justify-center mb-10" style={{ width: 120, height: 120 }}>
+              {[1, 0.7, 0.45].map((scale, i) => (
+                <motion.div key={i}
+                  animate={{ scale: [scale, scale + 0.18, scale], opacity: [0.3, 0, 0.3] }}
+                  transition={{ duration: 2.2, repeat: Infinity, delay: i * 0.55, ease: "easeOut" }}
+                  style={{ position: "absolute", width: 120, height: 120, borderRadius: "50%",
+                    border: `1.5px solid ${CYAN}`, transformOrigin: "center" }} />
+              ))}
+              <div style={{ width: 72, height: 72, borderRadius: "50%", background: `rgba(0,212,180,0.08)`,
+                border: `1.5px solid ${CYAN}44`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div style={{ width: 36, height: 36, borderRadius: "50%",
+                  border: `3px solid ${CYAN}33`, borderTopColor: CYAN }} className="animate-spin" />
+              </div>
+            </div>
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: "#fff",
+              marginBottom: 10, textAlign: "center" }}>
+              A verificar pagamento…
+            </p>
+            <p style={{ fontSize: 13, color: "#71717a", textAlign: "center", lineHeight: 1.6, maxWidth: 260 }}>
+              A confirmar a tua mensagem SMS. Aguarda alguns segundos.
+            </p>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "rejected") {
+    return (
+      <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
+        <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
+          <div className="flex items-center justify-between pt-12 pb-6">
+            <button onClick={onCancel} className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ background: "#1c1c1e" }}>
+              <ChevronLeft style={{ width: 20, height: 20, color: "#fff" }} />
+            </button>
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>Verificação Falhou</p>
+            <div className="w-10" />
+          </div>
+          <motion.div className="flex flex-col items-center pt-4 mb-8"
+            initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: "spring", stiffness: 280, damping: 20 }}>
+            <div className="w-24 h-24 rounded-full flex items-center justify-center shadow-2xl mb-6"
+              style={{ background: "linear-gradient(135deg, #c0392b, #e74c3c)" }}>
+              <XCircle className="w-12 h-12 text-white" strokeWidth={2.5} />
+            </div>
+            <p style={{ color: "#fff", fontSize: "1.3rem", fontWeight: 600, textAlign: "center", fontFamily: "'Syne', sans-serif" }}>
+              Não foi possível verificar
+            </p>
+            <p style={{ fontSize: 13, color: "#71717a", textAlign: "center", marginTop: 8, lineHeight: 1.6, maxWidth: 260 }}>
+              Verifica se colaste a mensagem correcta e se o valor corresponde à aposta de {fmtMT(amount)}.
+            </p>
+          </motion.div>
+          <div className="flex flex-col gap-3 mt-auto pb-10">
+            <button onClick={() => { setSmsText(""); setError(""); setStep("input"); }}
+              className="w-full h-14 rounded-full font-bold flex items-center justify-center gap-2"
+              style={{ background: CYAN, color: "#000", fontFamily: "'Syne', sans-serif" }}>
+              <RotateCcw style={{ width: 18, height: 18 }} /> Tentar Novamente
+            </button>
+            <button onClick={onCancel}
+              className="w-full h-14 rounded-full"
+              style={{ background: "#1c1c1e", color: "#8e8e93", fontFamily: "'Syne', sans-serif", cursor: "pointer" }}>
+              Cancelar Aposta
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
-      <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
-
-        {/* Header */}
-        <div className="flex items-center justify-between pt-12 pb-6">
+      <div className="w-full max-w-[430px] flex flex-col min-h-screen">
+        <div className="flex items-center justify-between px-5 pt-12 pb-4">
           <button onClick={onCancel} className="w-10 h-10 rounded-full flex items-center justify-center"
             style={{ background: "#1c1c1e" }}>
             <X style={{ width: 18, height: 18, color: "#fff" }} />
           </button>
-          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>Carteira Móvel</p>
+          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>
+            Carteira Móvel
+          </p>
           <div className="w-10" />
         </div>
 
-        <div className="flex flex-col items-center" style={{ paddingTop: 24 }}>
-
-          {/* Animated phone icon */}
-          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 20 }}
-            style={{ position: "relative", marginBottom: 32 }}>
-            {[1, 0.75, 0.5].map((s, i) => (
-              <motion.div key={i}
-                animate={{ scale: [s, s + 0.2, s], opacity: [0.25, 0, 0.25] }}
-                transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.7, ease: "easeOut" }}
-                style={{ position: "absolute", borderRadius: "50%", border: `1.5px solid ${CYAN}`,
-                  width: 120, height: 120, left: "50%", top: "50%", transform: "translate(-50%,-50%)" }} />
-            ))}
-            <div style={{ width: 88, height: 88, borderRadius: "50%",
-              background: `linear-gradient(135deg, ${CYAN}22, ${CYAN}44)`,
-              border: `2px solid ${CYAN}66`, display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: `0 0 40px ${CYAN}33` }}>
-              <Phone style={{ width: 36, height: 36, color: CYAN }} />
+        <div className="flex-1 px-5 pb-10 overflow-y-auto">
+          {/* Amount badge */}
+          <div className="flex items-center justify-center mb-5">
+            <div className="px-5 py-2 rounded-full" style={{ background: "#1c1c1e", border: `1.5px solid ${CYAN}22` }}>
+              <span style={{ fontSize: 13, color: "#8e8e93" }}>Aposta: </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: CYAN }}>{fmtMT(amount)} MZN</span>
             </div>
-          </motion.div>
+          </div>
 
-          {/* Amount */}
-          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-            style={{ fontFamily: "system-ui", fontWeight: 200, fontSize: "2.8rem", color: "#fff",
-              lineHeight: 1.1, marginBottom: 6 }}>
-            {fmtMT(amount)}<span style={{ fontSize: "1.3rem", color: "rgba(255,255,255,0.35)", marginLeft: 4 }}>MZN</span>
-          </motion.p>
-
-          {/* Card */}
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.4 }}
-            style={{ width: "100%", background: "#1c1c1e", borderRadius: 20, border: "1px solid #2c2c2e",
-              overflow: "hidden", marginBottom: 20, marginTop: 16 }}>
-            <div style={{ padding: "16px 20px", borderBottom: "1px solid #2c2c2e" }}>
-              <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#fff" }}>
-                Confirmar pagamento
-              </p>
+          {/* Notice */}
+          <div className="rounded-2xl p-4 mb-4" style={{ background: "#18180f", border: "1.5px solid #f59e0b44" }}>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                style={{ background: "rgba(245,158,11,0.18)" }}>
+                <AlertTriangle style={{ width: 16, height: 16, color: "#f59e0b" }} />
+              </div>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 700, color: "#f59e0b", marginBottom: 4, fontFamily: "'Syne', sans-serif" }}>
+                  Pagamentos instantâneos indisponíveis
+                </p>
+                <p style={{ fontSize: 12, color: "#71717a", lineHeight: 1.6 }}>
+                  Estarão disponíveis brevemente. Por agora, transfere o valor manualmente para um dos números abaixo e cola a mensagem de confirmação.
+                </p>
+              </div>
             </div>
-            <div style={{ padding: "14px 20px", display: "flex", flexDirection: "column", gap: 12 }}>
-              {[
-                { label: "Número", val: phone ? `+258 ${displayPhone}` : "Não definido" },
-                { label: "Valor",  val: fmtMT(amount) },
-                { label: "Método", val: "Carteira Móvel" },
-              ].map(row => (
-                <div key={row.label} className="flex items-center justify-between">
-                  <span style={{ fontSize: 13, color: "#8e8e93" }}>{row.label}</span>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{row.val}</span>
+          </div>
+
+          {/* M-Pesa */}
+          <div className="rounded-2xl p-4 mb-3" style={{ background: "#1c1c1e" }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ background: "rgba(231,76,60,0.15)" }}>
+                  <Smartphone style={{ width: 18, height: 18, color: "#e74c3c" }} />
                 </div>
-              ))}
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: "#e74c3c", letterSpacing: "0.8px", textTransform: "uppercase" }}>M-Pesa</p>
+                  <p style={{ fontWeight: 700, color: "#fff", fontFamily: "system-ui", fontSize: 16, letterSpacing: "0.4px" }}>
+                    +258 {mpesaNum}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => copyNum(`+258${mpesaNum.replace(/\s/g, "")}`, "mpesa")}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
+                style={{ background: copied === "mpesa" ? "rgba(0,212,180,0.2)" : "#2c2c2e",
+                  color: copied === "mpesa" ? CYAN : "#8e8e93", cursor: "pointer" }}>
+                {copied === "mpesa"
+                  ? <CheckCircle2 style={{ width: 14, height: 14 }} />
+                  : <Copy style={{ width: 14, height: 14 }} />}
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{copied === "mpesa" ? "Copiado!" : "Copiar"}</span>
+              </button>
             </div>
-          </motion.div>
+          </div>
 
-          {/* Status */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-            style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 20px",
-              background: `rgba(0,212,180,0.1)`, borderRadius: 14, border: `1px solid ${CYAN}33`,
-              marginBottom: 16, width: "100%" }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: CYAN, flexShrink: 0 }}
-              className="animate-pulse" />
-            <p style={{ fontSize: 13, color: CYAN, fontWeight: 600 }}>
-              A aguardar confirmação{dotsStr}
+          {/* e-Mola */}
+          <div className="rounded-2xl p-4 mb-5" style={{ background: "#1c1c1e" }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ background: "rgba(52,211,153,0.15)" }}>
+                  <Smartphone style={{ width: 18, height: 18, color: "#34d399" }} />
+                </div>
+                <div>
+                  <p style={{ fontSize: 10, fontWeight: 700, color: "#34d399", letterSpacing: "0.8px", textTransform: "uppercase" }}>e-Mola</p>
+                  <p style={{ fontWeight: 700, color: "#fff", fontFamily: "system-ui", fontSize: 16, letterSpacing: "0.4px" }}>
+                    +258 {emolaNum}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => copyNum(`+258${emolaNum.replace(/\s/g, "")}`, "emola")}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
+                style={{ background: copied === "emola" ? "rgba(0,212,180,0.2)" : "#2c2c2e",
+                  color: copied === "emola" ? CYAN : "#8e8e93", cursor: "pointer" }}>
+                {copied === "emola"
+                  ? <CheckCircle2 style={{ width: 14, height: 14 }} />
+                  : <Copy style={{ width: 14, height: 14 }} />}
+                <span style={{ fontSize: 12, fontWeight: 600 }}>{copied === "emola" ? "Copiado!" : "Copiar"}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* SMS input */}
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#636366", textTransform: "uppercase",
+              letterSpacing: "0.6px", marginBottom: 8, fontFamily: "'Syne', sans-serif" }}>
+              Mensagem de Confirmação
             </p>
-          </motion.div>
-
-          {/* Instructions */}
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
-            style={{ background: "#141418", borderRadius: 14, padding: "14px 16px", width: "100%", marginBottom: 32 }}>
-            <p style={{ fontSize: 12.5, color: "#8e8e93", lineHeight: 1.7, textAlign: "center" }}>
-              Verifica o teu telemóvel e{"\n"}
-              <span style={{ color: "#fff", fontWeight: 600 }}>confirma o PIN</span> para autorizar o pagamento
-              de <span style={{ color: "#fff", fontWeight: 600 }}>{fmtMT(amount)}</span> da tua carteira móvel.
+            <div className="rounded-2xl overflow-hidden" style={{
+              background: "#1c1c1e",
+              border: smsText.trim() ? `1.5px solid ${CYAN}` : "1.5px solid #2c2c2e",
+              transition: "border-color 0.2s",
+            }}>
+              <textarea
+                value={smsText}
+                onChange={e => { setSmsText(e.target.value); setError(""); }}
+                placeholder="Cola aqui a mensagem SMS de confirmação M-Pesa ou e-Mola…"
+                rows={4}
+                style={{ width: "100%", background: "transparent", outline: "none", padding: 16,
+                  fontSize: 13, color: "#fff", caretColor: CYAN, lineHeight: 1.6,
+                  resize: "none", fontFamily: "system-ui" }}
+              />
+              {smsText.trim() && (
+                <div className="flex items-center justify-between px-4 pb-3">
+                  <div className="flex items-center gap-1.5">
+                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: CYAN }} className="animate-pulse" />
+                    <span style={{ fontSize: 11, color: CYAN, fontWeight: 600 }}>Mensagem detectada</span>
+                  </div>
+                  <button onClick={() => setSmsText("")}
+                    style={{ fontSize: 11, color: "#636366", background: "#2c2c2e",
+                      padding: "3px 10px", borderRadius: 8, border: "none", cursor: "pointer" }}>
+                    Limpar
+                  </button>
+                </div>
+              )}
+            </div>
+            {error && <p style={{ fontSize: 12, color: "#e74c3c", marginTop: 6 }}>⚠ {error}</p>}
+            <p style={{ fontSize: 11, color: "#52525b", marginTop: 8, lineHeight: 1.6 }}>
+              O sistema vai extrair o valor e o ID da transacção para validar o teu pagamento.
             </p>
-          </motion.div>
-        </div>
+          </div>
 
-        <div className="flex-1" />
-
-        {/* Cancel */}
-        <div className="pb-10">
-          <button onClick={onCancel}
-            className="w-full h-14 rounded-full flex items-center justify-center gap-2"
-            style={{ background: "#1c1c1e", color: "#8e8e93",
-              fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: 14,
-              border: "1px solid #2c2c2e", cursor: "pointer" }}>
-            <X style={{ width: 16, height: 16 }} /> Cancelar
-          </button>
+          {/* Confirm */}
+          <div style={{ marginTop: 24 }}>
+            <motion.button
+              onClick={handleVerify}
+              disabled={!smsText.trim()}
+              whileTap={smsText.trim() ? { scale: 0.97 } : {}}
+              style={{
+                width: "100%", height: 56, borderRadius: 99, fontWeight: 800, fontSize: 14,
+                background: smsText.trim() ? CYAN : "#1c1c1e",
+                color: smsText.trim() ? "#000" : "#3a3a3c",
+                fontFamily: "'Syne', sans-serif", border: "none", cursor: smsText.trim() ? "pointer" : "default",
+                transition: "background 0.2s",
+              }}>
+              Confirmar e Entrar na Fila
+            </motion.button>
+          </div>
         </div>
       </div>
     </div>
@@ -707,6 +895,9 @@ export default function Apostar() {
     if (profile?.phone) setMobilePhone(profile.phone.replace(/\D/g, ""));
   }, [profile?.phone]);
 
+  /* Verified deposit txId (for crediting back on bet cancel) */
+  const [verifiedDepositTxId, setVerifiedDepositTxId] = useState<string | null>(null);
+
   /* Live player counts */
   const [tick, setTick] = useState(0);
   useEffect(() => {
@@ -758,14 +949,13 @@ export default function Apostar() {
 
   const recommendedGames = ALL_GAMES.filter(g => g.id !== gameId);
 
-  /* ── PIN Confirmation ── */
+  /* ── SMS Wallet Confirmation ── */
   if (screen === "pin-confirmation") {
     return (
-      <MobileWalletPINScreen
-        phone={mobilePhone}
+      <SMSBettingScreen
         amount={selectedBet ?? 0}
-        onCancel={() => setScreen("bet")}
-        onSuccess={() => setScreen("matchmaking")}
+        onCancel={() => { setVerifiedDepositTxId(null); setScreen("bet"); }}
+        onSuccess={(txId) => { setVerifiedDepositTxId(txId ?? null); setScreen("matchmaking"); }}
       />
     );
   }
@@ -789,7 +979,24 @@ export default function Apostar() {
   if (screen === "matchmaking") {
     return (
       <MatchmakingScreen
-        onCancel={() => setScreen("bet")}
+        onCancel={async () => {
+          /* If user paid via carteira móvel and bet wasn't matched, credit balance back */
+          if (payMethod === "carteira" && selectedBet) {
+            try {
+              const { data: sessionData } = await supabase.auth.getSession();
+              const token = sessionData?.session?.access_token;
+              if (token) {
+                fetch(`${API_BASE}/deposit/credit`, {
+                  method: "POST",
+                  headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+                  body: JSON.stringify({ amount: selectedBet, txId: verifiedDepositTxId }),
+                }).catch(() => {});
+              }
+            } catch { /* silent */ }
+          }
+          setVerifiedDepositTxId(null);
+          setScreen("bet");
+        }}
         onMatched={(gId, color, oppName) => {
           setScreen("matched");
           const myEnc  = encodeURIComponent(profile?.full_name ?? "Jogador");
