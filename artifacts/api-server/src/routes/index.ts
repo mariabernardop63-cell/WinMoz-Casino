@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { createClient } from "@supabase/supabase-js";
 import healthRouter from "./health";
+import ws from "ws";
 
 /* ── SMS Forwarder In-Memory Store ── */
 interface StoredSMS {
@@ -123,7 +124,10 @@ async function creditBalance(
 }
 
 function buildAdminClient(url: string, key: string) {
-  return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
+  return createClient(url, key, {
+    auth: { autoRefreshToken: false, persistSession: false },
+    realtime: { transport: ws as any },
+  });
 }
 
 const router: IRouter = Router();
@@ -566,6 +570,37 @@ router.post("/admin/withdraw/reject", async (req, res) => {
   }
 });
 
+/* ── Roleta ── */
+
+// Mozambique is UTC+2 (CAT, no DST). Returns the UTC ISO timestamp for
+// midnight of the current day in Mozambique time.
+function getMozambiqueStartOfDayUTC(): string {
+  const mzOffsetMs = 2 * 60 * 60 * 1000;
+  const mzNow = new Date(Date.now() + mzOffsetMs);
+  const startOfDayMz = Date.UTC(mzNow.getUTCFullYear(), mzNow.getUTCMonth(), mzNow.getUTCDate(), 0, 0, 0);
+  return new Date(startOfDayMz - mzOffsetMs).toISOString();
+}
+
+// Shared helper: build Supabase admin client and verify JWT
+async function buildAdminAndVerify(authHeader: string): Promise<
+  | { ok: false; status: number; error: string }
+  | { ok: true; supabaseAdmin: any; userId: string }
+> {
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) return { ok: false, status: 401, error: "Unauthorized" };
+
+  const supabaseUrl = process.env["SUPABASE_URL"];
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!supabaseUrl || !supabaseServiceKey) return { ok: false, status: 500, error: "Serviço indisponível" };
+
+  const supabaseAdmin = buildAdminClient(supabaseUrl, supabaseServiceKey);
+
+  const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+  if (userError || !userData?.user) return { ok: false, status: 401, error: "Sessão inválida" };
+
+  return { ok: true, supabaseAdmin, userId: userData.user.id };
+}
+
 /* ── Admin: Approve / Reject Manual Deposit or Bet ── */
 router.post("/admin/deposit/approve", async (req, res) => {
   try {
@@ -579,15 +614,15 @@ router.post("/admin/deposit/approve", async (req, res) => {
     const { data: txData, error: txErr } = await supabaseAdmin
       .from("transactions").select("id, amount, user_id, type, status").eq("id", id).single();
     if (txErr || !txData) { res.status(404).json({ error: "Pedido não encontrado" }); return; }
-    if (txData.status !== "pending") { res.status(400).json({ error: "Pedido já processado" }); return; }
+    if ((txData as any).status !== "pending") { res.status(400).json({ error: "Pedido já processado" }); return; }
 
-    if (txData.type === "manual_deposit") {
+    if ((txData as any).type === "manual_deposit") {
       const { data: profile } = await supabaseAdmin
-        .from("profiles").select("balance").eq("id", txData.user_id).single();
+        .from("profiles").select("balance").eq("id", (txData as any).user_id).single();
       const current = Number((profile as any)?.balance ?? 0);
-      const newBalance = Math.round((current + Number(txData.amount)) * 100) / 100;
+      const newBalance = Math.round((current + Number((txData as any).amount)) * 100) / 100;
       const { error: balErr } = await supabaseAdmin
-        .from("profiles").update({ balance: newBalance }).eq("id", txData.user_id);
+        .from("profiles").update({ balance: newBalance }).eq("id", (txData as any).user_id);
       if (balErr) { res.status(500).json({ error: "Erro ao creditar saldo" }); return; }
     }
 
@@ -614,7 +649,7 @@ router.post("/admin/deposit/reject", async (req, res) => {
     const { data: txData, error: txErr } = await supabaseAdmin
       .from("transactions").select("id, status").eq("id", id).single();
     if (txErr || !txData) { res.status(404).json({ error: "Pedido não encontrado" }); return; }
-    if (txData.status !== "pending") { res.status(400).json({ error: "Pedido já processado" }); return; }
+    if ((txData as any).status !== "pending") { res.status(400).json({ error: "Pedido já processado" }); return; }
 
     const { error: upErr } = await supabaseAdmin
       .from("transactions").update({ status: "rejected" }).eq("id", id);
@@ -626,39 +661,6 @@ router.post("/admin/deposit/reject", async (req, res) => {
     res.status(500).json({ error: "Erro interno" });
   }
 });
-
-/* ── Roleta ── */
-
-// Mozambique is UTC+2 (CAT, no DST). Returns the UTC ISO timestamp for
-// midnight of the current day in Mozambique time.
-function getMozambiqueStartOfDayUTC(): string {
-  const mzOffsetMs = 2 * 60 * 60 * 1000;
-  const mzNow = new Date(Date.now() + mzOffsetMs);
-  const startOfDayMz = Date.UTC(mzNow.getUTCFullYear(), mzNow.getUTCMonth(), mzNow.getUTCDate(), 0, 0, 0);
-  return new Date(startOfDayMz - mzOffsetMs).toISOString();
-}
-
-// Shared helper: build Supabase admin client and verify JWT
-async function buildAdminAndVerify(authHeader: string): Promise<
-  | { ok: false; status: number; error: string }
-  | { ok: true; supabaseAdmin: any; userId: string }
-> {
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token) return { ok: false, status: 401, error: "Unauthorized" };
-
-  const supabaseUrl = process.env["SUPABASE_URL"];
-  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
-  if (!supabaseUrl || !supabaseServiceKey) return { ok: false, status: 500, error: "Serviço indisponível" };
-
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
-  if (userError || !userData?.user) return { ok: false, status: 401, error: "Sessão inválida" };
-
-  return { ok: true, supabaseAdmin, userId: userData.user.id };
-}
 
 // GET /api/roleta/status — check if free spin is available today (Moz time)
 router.get("/roleta/status", async (req, res) => {
