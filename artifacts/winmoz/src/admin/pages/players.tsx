@@ -94,10 +94,10 @@ export default function Players() {
                       </div>
                     </td>
                     <td className="px-5 py-3.5"><StatusBadge status={p.status} /></td>
-                    <td className="px-5 py-3.5 font-semibold text-gray-800">R$ {p.balance.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 font-semibold text-gray-800">MT {p.balance.toFixed(2)}</td>
                     <td className="px-5 py-3.5 text-green-600 font-medium">{p.wins}</td>
                     <td className="px-5 py-3.5 text-red-500 font-medium">{p.losses}</td>
-                    <td className="px-5 py-3.5 text-gray-600">R$ {(p.totalBets ?? 0).toFixed(2)}</td>
+                    <td className="px-5 py-3.5 text-gray-600">MT {(p.totalBets ?? 0).toFixed(2)}</td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs">{new Date(p.createdAt).toLocaleDateString("pt-BR")}</td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2">

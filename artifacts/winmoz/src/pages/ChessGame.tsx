@@ -254,87 +254,160 @@ const PIECE_SYMBOLS:Record<PColor,Record<PType,string>>={
 };
 
 function PieceSVG({ t, w }: { t: PType; w: boolean }) {
-  const body    = w ? "#F0EAD8" : "#3C3535";
-  const light   = w ? "#FFFFFF" : "#5A5252";
-  const mid     = w ? "#D0C8B8" : "#2A2525";
-  const dark    = w ? "#A09080" : "#0E0A0A";
-  const base    = w ? "#C8C0A8" : "#221E1E";
-  const shadow  = "rgba(0,0,0,0.35)";
-  const gloss   = w ? "rgba(255,255,255,0.55)" : "rgba(255,255,255,0.18)";
+  const uid = `${w?"w":"b"}${t}`;
+
+  // Color palette — warm ivory (white) / dark anthracite (black)
+  const hi  = w ? "#FDFAF5" : "#706060";
+  const mid = w ? "#E2D8C4" : "#484040";
+  const lo  = w ? "#C6BAA6" : "#302828";
+  const dk  = w ? "#A89888" : "#1C1818";
+  const out = w ? "#8A7860" : "#0C0808";
+  const glow= w ? "rgba(255,255,255,0.70)" : "rgba(255,255,255,0.20)";
+  const ds  = "rgba(0,0,0,0.42)";
 
   return (
-    <svg viewBox="0 0 40 52" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display:"block" }}>
+    <svg viewBox="0 0 44 56" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg" style={{display:"block"}}>
+      <defs>
+        {/* Side-lit body gradient (left=highlight, right=shadow) */}
+        <linearGradient id={`g${uid}`} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%"   stopColor={hi}/>
+          <stop offset="28%"  stopColor={mid}/>
+          <stop offset="68%"  stopColor={lo}/>
+          <stop offset="100%" stopColor={dk}/>
+        </linearGradient>
+        {/* Sphere radial gradient */}
+        <radialGradient id={`s${uid}`} cx="33%" cy="30%" r="65%">
+          <stop offset="0%"   stopColor={hi}/>
+          <stop offset="45%"  stopColor={mid}/>
+          <stop offset="100%" stopColor={lo}/>
+        </radialGradient>
+        {/* Base gradient (top-to-bottom) */}
+        <linearGradient id={`b${uid}`} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%"   stopColor={lo}/>
+          <stop offset="100%" stopColor={dk}/>
+        </linearGradient>
+      </defs>
+
       {/* Drop shadow */}
-      <ellipse cx="20" cy="50" rx="14" ry="2.5" fill={shadow}/>
+      <ellipse cx="22" cy="54.5" rx="13.5" ry="1.8" fill={ds}/>
 
-      {/* Base platform */}
-      <rect x="7" y="44" width="26" height="5.5" rx="2.8" fill={dark}/>
-      <rect x="8" y="43" width="24" height="5.5" rx="2.5" fill={base}/>
-      <rect x="9" y="43" width="22" height="2" rx="1" fill={light} opacity="0.35"/>
+      {/* ── SHARED BASE ── */}
+      <rect x="6"  y="47" width="32" height="7"   rx="3.5" fill={`url(#b${uid})`} stroke={out} strokeWidth="0.6"/>
+      <rect x="7"  y="48" width="30" height="1.5"  rx="0.8" fill={glow} opacity="0.35"/>
 
+      {/* ── PAWN ── */}
       {t === "P" && <>
-        <ellipse cx="20" cy="39" rx="7" ry="2" fill={mid}/>
-        <rect x="17" y="27" width="6" height="13" rx="3" fill={body}/>
-        <circle cx="20" cy="22" r="9" fill={body}/>
-        <circle cx="20" cy="22" r="9" fill="none" stroke={dark} strokeWidth="0.8"/>
-        <ellipse cx="17" cy="17" rx="4.5" ry="3.5" fill={gloss}/>
+        {/* Shoulder collar */}
+        <ellipse cx="22" cy="42" rx="9.5" ry="2.5" fill={lo} stroke={out} strokeWidth="0.5"/>
+        {/* Body */}
+        <path d="M13.5,42 Q12.5,35 16,30.5 L28,30.5 Q31.5,35 30.5,42 Z" fill={`url(#g${uid})`} stroke={out} strokeWidth="0.5"/>
+        {/* Neck stem */}
+        <rect x="19.5" y="26" width="5" height="5.5" rx="2.5" fill={mid} stroke={out} strokeWidth="0.45"/>
+        {/* Head sphere */}
+        <circle cx="22" cy="21" r="9.5" fill={`url(#s${uid})`} stroke={out} strokeWidth="0.7"/>
+        {/* Specular shine */}
+        <ellipse cx="17.5" cy="16.5" rx="4.5" ry="3.5" fill={glow} opacity="0.55"/>
       </>}
 
+      {/* ── ROOK ── */}
       {t === "R" && <>
-        <rect x="14" y="16" width="12" height="27" rx="1.5" fill={body}/>
-        <rect x="12" y="38" width="16" height="5" rx="1.5" fill={mid}/>
-        <rect x="11" y="12" width="5" height="9" rx="1" fill={body}/>
-        <rect x="17.5" y="12" width="5" height="9" rx="1" fill={body}/>
-        <rect x="24" y="12" width="5" height="9" rx="1" fill={body}/>
-        <rect x="11" y="18" width="18" height="3" rx="0" fill={mid}/>
-        <rect x="12" y="38" width="16" height="2" rx="1" fill={light} opacity="0.3"/>
-        <rect x="12" y="16" width="4" height="26" rx="1" fill={light} opacity="0.2"/>
+        {/* Main tower body */}
+        <path d="M14,47 Q13,39 13.5,25 L30.5,25 Q31,39 30,47 Z" fill={`url(#g${uid})`} stroke={out} strokeWidth="0.5"/>
+        {/* Collar ring */}
+        <rect x="11" y="37.5" width="22" height="4.5" rx="2.2" fill={lo} stroke={out} strokeWidth="0.4"/>
+        {/* Top platform */}
+        <rect x="11" y="21" width="22" height="5" rx="1.5" fill={mid} stroke={out} strokeWidth="0.4"/>
+        {/* Three battlements */}
+        <rect x="11"   y="10" width="6.5" height="12" rx="1.5" fill={`url(#g${uid})`} stroke={out} strokeWidth="0.5"/>
+        <rect x="18.8" y="10" width="6.5" height="12" rx="1.5" fill={`url(#g${uid})`} stroke={out} strokeWidth="0.5"/>
+        <rect x="26.5" y="10" width="6.5" height="12" rx="1.5" fill={`url(#g${uid})`} stroke={out} strokeWidth="0.5"/>
+        {/* Body highlight stripe */}
+        <rect x="14.5" y="25" width="3.5" height="22" rx="1.8" fill={glow} opacity="0.18"/>
       </>}
 
+      {/* ── KNIGHT ── */}
       {t === "N" && <>
-        <path d="M14 43 L13 30 Q11 22 14 17 Q17 11 22 9 Q28 8 30 13 Q32 18 27 22 Q32 21 31 27 Q29 32 23 32 L22 43 Z" fill={body}/>
-        <path d="M14 43 L13 30 Q11 22 14 17 Q17 11 22 9 Q28 8 30 13 Q32 18 27 22 Q32 21 31 27 Q29 32 23 32 L22 43 Z" fill="none" stroke={dark} strokeWidth="0.8"/>
-        <ellipse cx="18" cy="14" rx="5" ry="4" fill={gloss}/>
-        <circle cx="26.5" cy="12.5" r="2" fill={dark} opacity="0.5"/>
-        <circle cx="26.5" cy="12.5" r="1" fill={light} opacity="0.4"/>
-        <path d="M17 24 Q15 28 16 32" stroke={mid} strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+        {/* Base collar */}
+        <ellipse cx="21" cy="45" rx="9" ry="2" fill={lo} stroke={out} strokeWidth="0.4"/>
+        {/* Horse body path */}
+        <path d="M13,45 L12,33 Q10,24 13.5,18 Q17,11.5 22.5,10 Q29.5,8.5 31.5,14 Q33.5,19.5 28,23.5 Q34,23 33,29.5 Q31.5,35 24,35.5 L23.5,45 Z"
+          fill={`url(#g${uid})`} stroke={out} strokeWidth="0.65"/>
+        {/* Ear */}
+        <path d="M22.5,10 L19.5,4 L27,8 Z" fill={mid} stroke={out} strokeWidth="0.4"/>
+        {/* Eye */}
+        <circle cx="28.5" cy="14.5" r="2.3" fill="#1A1010"/>
+        <circle cx="29.3" cy="13.7" r="0.85" fill="rgba(255,255,255,0.55)"/>
+        {/* Nostril curve */}
+        <path d="M16,22.5 Q14,26.5 15.5,31" stroke={out} strokeWidth="1.4" strokeLinecap="round" fill="none" opacity="0.55"/>
+        {/* Mane */}
+        <path d="M24,10.5 Q26.5,17 25.5,25" stroke={out} strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.28"/>
+        {/* Shine */}
+        <ellipse cx="18.5" cy="15.5" rx="4.5" ry="3.5" fill={glow} opacity="0.42"/>
       </>}
 
+      {/* ── BISHOP ── */}
       {t === "B" && <>
-        <ellipse cx="20" cy="40" rx="8" ry="2" fill={mid}/>
-        <path d="M15 40 Q11 30 13 20 Q15 11 20 9 Q25 11 27 20 Q29 30 25 40 Z" fill={body}/>
-        <path d="M15 40 Q11 30 13 20 Q15 11 20 9 Q25 11 27 20 Q29 30 25 40 Z" fill="none" stroke={dark} strokeWidth="0.8"/>
-        <circle cx="20" cy="8" r="5" fill={body}/>
-        <circle cx="20" cy="8" r="5" fill="none" stroke={dark} strokeWidth="0.8"/>
-        <circle cx="20" cy="5.5" r="2" fill={dark} opacity="0.4"/>
-        <ellipse cx="17" cy="15" rx="4" ry="3" fill={gloss}/>
+        {/* Body */}
+        <path d="M17.5,47 Q13,35.5 14,22.5 Q15.5,11.5 22,10 Q28.5,11.5 30,22.5 Q31,35.5 26.5,47 Z"
+          fill={`url(#g${uid})`} stroke={out} strokeWidth="0.5"/>
+        {/* Mid collar */}
+        <ellipse cx="22" cy="31.5" rx="9.5" ry="2.5" fill={lo} stroke={out} strokeWidth="0.4"/>
+        {/* Head sphere */}
+        <circle cx="22" cy="11" r="7" fill={`url(#s${uid})`} stroke={out} strokeWidth="0.65"/>
+        {/* Bishop slash */}
+        <line x1="18" y1="11" x2="26" y2="11" stroke={out} strokeWidth="1.6" strokeLinecap="round" opacity="0.45"/>
+        {/* Finial ball */}
+        <circle cx="22" cy="4" r="2.8" fill={`url(#s${uid})`} stroke={out} strokeWidth="0.5"/>
+        {/* Specular shines */}
+        <ellipse cx="18" cy="7.5" rx="3.8" ry="2.8" fill={glow} opacity="0.55"/>
+        <rect x="15" y="14" width="3.5" height="16" rx="1.8" fill={glow} opacity="0.14"/>
       </>}
 
+      {/* ── QUEEN ── */}
       {t === "Q" && <>
-        <ellipse cx="20" cy="41" rx="10" ry="2" fill={mid}/>
-        <path d="M12 41 Q9 32 11 22 Q13 13 20 11 Q27 13 29 22 Q31 32 28 41 Z" fill={body}/>
-        <path d="M12 41 Q9 32 11 22 Q13 13 20 11 Q27 13 29 22 Q31 32 28 41 Z" fill="none" stroke={dark} strokeWidth="0.8"/>
-        <polygon points="13,13 11,3 18,10" fill={body}/>
-        <polygon points="20,11 20,1 24,10 16,10" fill={body}/>
-        <polygon points="27,13 29,3 22,10" fill={body}/>
-        <circle cx="12" cy="3.5" r="3" fill={body}/>
-        <circle cx="12" cy="3.5" r="3" fill="none" stroke={dark} strokeWidth="0.7"/>
-        <circle cx="20" cy="1.5" r="3" fill={body}/>
-        <circle cx="20" cy="1.5" r="3" fill="none" stroke={dark} strokeWidth="0.7"/>
-        <circle cx="28" cy="3.5" r="3" fill={body}/>
-        <circle cx="28" cy="3.5" r="3" fill="none" stroke={dark} strokeWidth="0.7"/>
-        <ellipse cx="16" cy="19" rx="4.5" ry="3.5" fill={gloss}/>
+        {/* Body */}
+        <path d="M14,47 Q10,34.5 11,22 Q12.5,10.5 22,9 Q31.5,10.5 33,22 Q34,34.5 30,47 Z"
+          fill={`url(#g${uid})`} stroke={out} strokeWidth="0.5"/>
+        {/* Collar */}
+        <ellipse cx="22" cy="32" rx="11.5" ry="2.7" fill={lo} stroke={out} strokeWidth="0.4"/>
+        {/* Crown band */}
+        <rect x="13" y="12.5" width="18" height="3.5" rx="1.8" fill={mid} stroke={out} strokeWidth="0.4"/>
+        {/* 5 crown stems + balls */}
+        <line x1="14.5" y1="12.5" x2="10.5" y2="6"   stroke={mid} strokeWidth="2.2" strokeLinecap="round"/>
+        <circle cx="9.5"  cy="4.5"  r="2.9" fill={`url(#s${uid})`} stroke={out} strokeWidth="0.45"/>
+        <line x1="17.5" y1="12.5" x2="16"   y2="7"   stroke={mid} strokeWidth="2"   strokeLinecap="round"/>
+        <circle cx="15.5" cy="5.5"  r="2.5" fill={`url(#s${uid})`} stroke={out} strokeWidth="0.4"/>
+        <line x1="22"   y1="12.5" x2="22"   y2="3"   stroke={mid} strokeWidth="2.5" strokeLinecap="round"/>
+        <circle cx="22"   cy="1.5"  r="3"   fill={`url(#s${uid})`} stroke={out} strokeWidth="0.5"/>
+        <line x1="26.5" y1="12.5" x2="28"   y2="7"   stroke={mid} strokeWidth="2"   strokeLinecap="round"/>
+        <circle cx="28.5" cy="5.5"  r="2.5" fill={`url(#s${uid})`} stroke={out} strokeWidth="0.4"/>
+        <line x1="29.5" y1="12.5" x2="33.5" y2="6"   stroke={mid} strokeWidth="2.2" strokeLinecap="round"/>
+        <circle cx="34.5" cy="4.5"  r="2.9" fill={`url(#s${uid})`} stroke={out} strokeWidth="0.45"/>
+        {/* Body shine */}
+        <rect x="14.5" y="16" width="3.5" height="18" rx="1.8" fill={glow} opacity="0.14"/>
+        <ellipse cx="17.5" cy="21" rx="3.2" ry="2.2" fill={glow} opacity="0.3"/>
       </>}
 
+      {/* ── KING ── */}
       {t === "K" && <>
-        <ellipse cx="20" cy="41" rx="10" ry="2" fill={mid}/>
-        <path d="M12 41 Q9 32 11 22 Q13 13 20 11 Q27 13 29 22 Q31 32 28 41 Z" fill={body}/>
-        <path d="M12 41 Q9 32 11 22 Q13 13 20 11 Q27 13 29 22 Q31 32 28 41 Z" fill="none" stroke={dark} strokeWidth="0.8"/>
-        <rect x="18" y="2" width="4" height="13" rx="2" fill={body}/>
-        <rect x="18" y="2" width="4" height="13" rx="2" fill="none" stroke={dark} strokeWidth="0.7"/>
-        <rect x="14" y="5.5" width="12" height="4" rx="2" fill={body}/>
-        <rect x="14" y="5.5" width="12" height="4" rx="2" fill="none" stroke={dark} strokeWidth="0.7"/>
-        <ellipse cx="16" cy="19" rx="4.5" ry="3.5" fill={gloss}/>
+        {/* Body — slightly taller than queen */}
+        <path d="M14,47 Q10,34.5 11,22 Q12.5,10.5 22,9 Q31.5,10.5 33,22 Q34,34.5 30,47 Z"
+          fill={`url(#g${uid})`} stroke={out} strokeWidth="0.5"/>
+        {/* Collar */}
+        <ellipse cx="22" cy="32" rx="11.5" ry="2.7" fill={lo} stroke={out} strokeWidth="0.4"/>
+        {/* Crown band */}
+        <rect x="13" y="13" width="18" height="3.5" rx="1.8" fill={mid} stroke={out} strokeWidth="0.4"/>
+        {/* Crown 3 prongs */}
+        <rect x="13"   y="8"  width="5.5" height="6.5" rx="1.5" fill={mid} stroke={out} strokeWidth="0.4"/>
+        <rect x="19.5" y="5.5" width="5"   height="9"   rx="1.5" fill={mid} stroke={out} strokeWidth="0.4"/>
+        <rect x="25.5" y="8"  width="5.5" height="6.5" rx="1.5" fill={mid} stroke={out} strokeWidth="0.4"/>
+        {/* Cross vertical */}
+        <rect x="20.5" y="0.5" width="3" height="11" rx="1.5" fill={hi} stroke={out} strokeWidth="0.5"/>
+        {/* Cross horizontal */}
+        <rect x="16.5" y="3.5" width="11" height="3"  rx="1.5" fill={hi} stroke={out} strokeWidth="0.5"/>
+        {/* Body shine */}
+        <rect x="14.5" y="16" width="3.5" height="18" rx="1.8" fill={glow} opacity="0.14"/>
+        <ellipse cx="17.5" cy="21" rx="3.2" ry="2.2" fill={glow} opacity="0.3"/>
       </>}
     </svg>
   );

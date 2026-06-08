@@ -654,21 +654,76 @@ function MatchmakingScreen({
 
   if (found) {
     return (
-      <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
-        <div className="w-full max-w-[430px] flex flex-col items-center justify-center min-h-screen px-8">
-          <motion.div className="flex flex-col items-center"
-            initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 18 }}>
-            <div className="w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-2xl"
-              style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}>
-              <CheckCircle2 className="w-12 h-12 text-white" strokeWidth={2.5} />
-            </div>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 24, color: "#fff", marginBottom: 8 }}>Partida Encontrada!</p>
-            <p style={{ fontSize: 13, color: "#71717a" }}>A iniciar o jogo…</p>
-            <div style={{ marginTop: 24, width: 36, height: 36, borderRadius: "50%",
-              border: "3px solid #22c55e33", borderTopColor: "#22c55e" }} className="animate-spin" />
+      <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "#080810" }}>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.82 }} animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: "spring", stiffness: 240, damping: 20 }}
+          style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 32px", width: "100%", maxWidth: 400 }}>
+
+          {/* Success badge */}
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.1, type: "spring", stiffness: 300, damping: 22 }}
+            style={{ width: 88, height: 88, borderRadius: "50%", marginBottom: 28,
+              background: "linear-gradient(135deg, #22c55e, #16a34a)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 0 0 12px rgba(34,197,94,0.12), 0 8px 32px rgba(34,197,94,0.4)" }}>
+            <CheckCircle2 style={{ width: 44, height: 44, color: "#fff" }} strokeWidth={2.5}/>
           </motion.div>
-        </div>
+
+          {/* Title */}
+          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 26,
+            color: "#fff", marginBottom: 6, textAlign: "center", whiteSpace: "nowrap" }}>
+            Adversário Encontrado!
+          </p>
+          <p style={{ fontSize: 13.5, color: "#71717a", marginBottom: 32, textAlign: "center" }}>
+            A sincronizar os jogadores…
+          </p>
+
+          {/* Players bar */}
+          <div style={{ display: "flex", alignItems: "center", gap: 20, width: "100%",
+            background: "#131320", borderRadius: 20, padding: "18px 24px",
+            border: "1px solid #1e1e3a", marginBottom: 28 }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%",
+                background: `linear-gradient(135deg, ${VIOLET}, #6d28d9)`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: `0 0 18px ${VIOLET}44` }}>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: "#fff" }}>
+                  {displayName.charAt(0).toUpperCase() || "T"}
+                </span>
+              </div>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#a1a1aa", maxWidth: 80,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>
+                Tu
+              </span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 18,
+                color: "#fff", letterSpacing: "2px", textShadow: `0 0 20px ${VIOLET}88` }}>VS</span>
+              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} className="animate-pulse"/>
+            </div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 52, height: 52, borderRadius: "50%",
+                background: "linear-gradient(135deg, #1c1c2e, #2c2c3e)",
+                border: "2px solid #3c3c4e",
+                display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <CheckCircle2 style={{ width: 22, height: 22, color: "#22c55e" }}/>
+              </div>
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#22c55e" }}>
+                Pronto
+              </span>
+            </div>
+          </div>
+
+          {/* Loading indicator */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 20, height: 20, borderRadius: "50%",
+              border: "2.5px solid rgba(34,197,94,0.25)", borderTopColor: "#22c55e" }}
+              className="animate-spin"/>
+            <span style={{ fontSize: 12.5, color: "#52525b" }}>A iniciar o jogo…</span>
+          </div>
+        </motion.div>
       </div>
     );
   }
@@ -1069,18 +1124,49 @@ export default function Apostar() {
   if (screen === "matched") {
     return (
       <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "#080810" }}>
-        <div className="flex flex-col items-center px-8">
-          <motion.div initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 18 }}
-            className="w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-2xl"
-            style={{ background: "linear-gradient(135deg, #22c55e, #16a34a)" }}>
-            <CheckCircle2 className="w-12 h-12 text-white" strokeWidth={2.5} />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.82 }} animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: "spring", stiffness: 240, damping: 20 }}
+          style={{ display: "flex", flexDirection: "column", alignItems: "center",
+            padding: "0 32px", width: "100%", maxWidth: 400 }}>
+
+          {/* Glow ring + check */}
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.08, type: "spring", stiffness: 300, damping: 22 }}
+            style={{ width: 96, height: 96, borderRadius: "50%", marginBottom: 30,
+              background: "linear-gradient(135deg, #22c55e, #16a34a)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 0 0 14px rgba(34,197,94,0.10), 0 10px 40px rgba(34,197,94,0.45)" }}>
+            <CheckCircle2 style={{ width: 48, height: 48, color: "#fff" }} strokeWidth={2.5}/>
           </motion.div>
-          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 24, color: "#fff", marginBottom: 8 }}>
+
+          {/* Heading */}
+          <motion.p
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18 }}
+            style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 26,
+              color: "#fff", marginBottom: 8, textAlign: "center", whiteSpace: "nowrap" }}>
             Partida Encontrada!
-          </p>
-          <p style={{ fontSize: 13, color: "#71717a" }}>A iniciar o jogo…</p>
-        </div>
+          </motion.p>
+          <motion.p
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.28 }}
+            style={{ fontSize: 13.5, color: "#52525b", marginBottom: 36, textAlign: "center" }}>
+            Preparar o tabuleiro…
+          </motion.p>
+
+          {/* Pulsing dots loader */}
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.38 }}
+            style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {[0, 1, 2].map(i => (
+              <motion.div key={i}
+                animate={{ scale: [1, 1.5, 1], opacity: [0.4, 1, 0.4] }}
+                transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.2 }}
+                style={{ width: 8, height: 8, borderRadius: "50%", background: "#22c55e" }}/>
+            ))}
+          </motion.div>
+        </motion.div>
       </div>
     );
   }

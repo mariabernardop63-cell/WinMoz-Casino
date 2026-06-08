@@ -43,8 +43,8 @@ export default function Bets() {
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           { label: "Total de Apostas", value: (bets ?? []).length, color: "text-indigo-600" },
-          { label: "Volume Total", value: `R$ ${totalVolume.toFixed(2)}`, color: "text-purple-600" },
-          { label: "Total Pago", value: `R$ ${totalPayout.toFixed(2)}`, color: "text-green-600" },
+          { label: "Volume Total", value: `MT ${totalVolume.toFixed(2)}`, color: "text-purple-600" },
+          { label: "Total Pago", value: `MT ${totalPayout.toFixed(2)}`, color: "text-green-600" },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
             <div className="text-xs text-gray-400 mb-1 uppercase font-medium tracking-wide">{s.label}</div>
@@ -94,8 +94,8 @@ export default function Bets() {
                     <td className="px-5 py-3.5 font-medium text-gray-800">{b.playerName}</td>
                     <td className="px-5 py-3.5"><GameBadge game={b.game} /></td>
                     <td className="px-5 py-3.5 text-gray-500 text-xs">#{b.matchId}</td>
-                    <td className="px-5 py-3.5 font-semibold text-gray-800">R$ {b.amount.toFixed(2)}</td>
-                    <td className="px-5 py-3.5 text-green-600 font-medium">{b.payout ? `R$ ${b.payout.toFixed(2)}` : <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 font-semibold text-gray-800">MT {b.amount.toFixed(2)}</td>
+                    <td className="px-5 py-3.5 text-green-600 font-medium">{b.payout ? `MT ${b.payout.toFixed(2)}` : <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5"><StatusBadge status={b.status} /></td>
                     <td className="px-5 py-3.5 text-gray-400 text-xs">{new Date(b.createdAt).toLocaleDateString("pt-BR")}</td>
                     <td className="px-5 py-3.5">

@@ -1000,12 +1000,17 @@ export function useGetPlatformSettings() {
   return useQuery({
     queryKey: ["platform-settings"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/settings/get");
-      if (!res.ok) throw new Error(`Erro ${res.status}`);
-      const data = await res.json() as { settings?: Record<string, string> };
-      return data.settings ?? {};
+      const { data, error } = await adminSupabase
+        .from("platform_settings")
+        .select("key, value");
+      if (error) throw new Error(error.message);
+      const map: Record<string, string> = {};
+      (data ?? []).forEach((row: { key: string; value: string }) => {
+        map[row.key] = row.value;
+      });
+      return map;
     },
-    staleTime: 30000,
+    staleTime: 10000,
   });
 }
 

@@ -38,7 +38,7 @@ export default function Ranking() {
                 </div>
                 <div className="font-semibold text-gray-800 text-sm">{entry.username}</div>
                 <div className="text-xs text-gray-400">{entry.wins}V · {entry.winRate}%</div>
-                <div className="text-xs font-bold text-indigo-600 mt-1">R$ {entry.totalEarnings.toFixed(2)}</div>
+                <div className="text-xs font-bold text-indigo-600 mt-1">MT {entry.totalEarnings.toFixed(2)}</div>
               </div>
             );
           })}
@@ -79,7 +79,7 @@ export default function Ranking() {
                   <div className="text-xs text-gray-400">Win Rate</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-green-600">R$ {entry.totalEarnings.toFixed(2)}</div>
+                  <div className="text-sm font-bold text-green-600">MT {entry.totalEarnings.toFixed(2)}</div>
                   <div className="text-xs text-gray-400">Ganhos</div>
                 </div>
               </div>
