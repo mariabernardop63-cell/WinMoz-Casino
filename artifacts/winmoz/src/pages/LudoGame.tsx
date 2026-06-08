@@ -1251,10 +1251,12 @@ export default function LudoGame() {
           const capturerName=mover.player===myColor?playerName.split(" ")[0]:opponentName;
           setMsg(`${capturerName} capturou uma peça! +1 jogada`);
           let pos=p.pos;
+          // Safety: always clear captureAnimRef after at most 900ms so it never blocks dice rolls
+          const safetyTimer = setTimeout(()=>{ captureAnimRef.current=false; }, 900);
           function stepBack(){
             setPieces(prev=>prev.map(x=>x.id!==p.id?x:{...x,pos:Math.max(-1,pos)}));
-            if(pos>-1){pos--;setTimeout(stepBack,70);}
-            else { captureAnimRef.current=false; }
+            if(pos>-1){pos--;setTimeout(stepBack,35);}
+            else { captureAnimRef.current=false; clearTimeout(safetyTimer); }
           }
           stepBack();
         }

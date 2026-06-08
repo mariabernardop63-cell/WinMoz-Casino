@@ -530,15 +530,17 @@ export default function DamasGame() {
 
   // Compute selectable pieces when board/turn changes
   useEffect(() => {
-    if (winner) return;
+    if (winnerRef.current) return;
     const selectable = getSelectablePieces(board, turn);
     const keys = new Set(selectable.map(x => sqKey(x.sq[0], x.sq[1])));
     setSelectableKeys(keys);
-    if (selectable.length === 0 && !winner) {
-      setWinner(opp(turn));
+    if (selectable.length === 0 && !winnerRef.current) {
+      const w = opp(turn);
+      setWinner(w);
+      winnerRef.current = w;
       setWinReason(turn === myColor ? "Ficaste sem movimentos válidos" : `${opponentName} ficou sem movimentos`);
     }
-  }, [board, turn, winner]);
+  }, [board, turn]);
 
   // ── Timer expiry handler ref (always fresh, avoids stale closure) ────────────
   const timerExpiryRef = useRef<() => void>(() => {});
@@ -586,20 +588,25 @@ export default function DamasGame() {
 
   // ── Apply remote move ─────────────────────────────────────────────────────
   const applyRemoteMove = useCallback((from: Sq, to: Sq, captured: Sq[], nextTurn: PColor) => {
-    setBoard(prev => {
-      const nb = applyBoardMove(prev, from, to, captured);
-      const cnt = countPieces(nb, turnRef.current);
-      if (cnt === 0) {
-        setWinner(opp(turnRef.current));
-        setWinReason("Todas as peças foram capturadas");
-      }
-      return nb;
-    });
+    // Compute new board eagerly from ref so boardRef stays in sync for resyncs
+    const nb = applyBoardMove(boardRef.current, from, to, captured);
+    boardRef.current = nb;
+    // nextTurn is who moves next; the player who just moved is opp(nextTurn).
+    // If the just-moved player captured all of nextTurn's pieces → they win.
+    const nextPlayerPieces = countPieces(nb, nextTurn);
+    setBoard(nb);
     setLastMove({ from, to });
     setSelected(null); setValidDests([]); setValidCapDests([]);
     setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
-    setTurn(nextTurn);
-    setTimers(t => ({ ...t, [nextTurn]: 30 }));
+    if (nextPlayerPieces === 0) {
+      const w = opp(nextTurn);
+      setWinner(w);
+      winnerRef.current = w;
+      setWinReason("Todas as peças foram capturadas");
+    } else {
+      setTurn(nextTurn);
+      setTimers(t => ({ ...t, [nextTurn]: 30 }));
+    }
   }, []);
 
   // ── Supabase Realtime ─────────────────────────────────────────────────────
@@ -758,13 +765,15 @@ export default function DamasGame() {
   // ── Execute a complete move (end of chain or non-capture) ─────────────────
   // finalBoard must already have the move applied (piece at `to`, captures removed)
   function finalizeTurn(from: Sq, to: Sq, captured: Sq[], finalBoard: Board) {
-    const cnt = countPieces(finalBoard, turn);
+    // Count opponent's pieces — if 0, I captured them all and win
+    const oppCnt = countPieces(finalBoard, opp(turn));
     setBoard(finalBoard); boardRef.current = finalBoard;
     setLastMove({ from, to });
     setSelected(null); setValidDests([]); setValidCapDests([]);
     setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
-    if (cnt === 0) {
-      setWinner(opp(turn));
+    if (oppCnt === 0) {
+      setWinner(turn);
+      winnerRef.current = turn;
       setWinReason("Todas as peças foram capturadas");
       broadcastMove(from, to, captured, opp(turn));
       return;

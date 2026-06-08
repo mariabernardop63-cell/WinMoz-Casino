@@ -613,7 +613,7 @@ function MatchmakingScreen({
       if (firstId !== userId) return;
       matchedRef.current = true;
       if (poll) { clearInterval(poll); poll = null; }
-      const gameId = `${userId}_${oppId}`;
+      const gameId = `${[userId, oppId].sort().join("_")}_${Date.now()}`;
       channel.send({
         type: "broadcast",
         event: "match_found",
