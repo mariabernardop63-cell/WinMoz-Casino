@@ -20,6 +20,7 @@ import Balance from "@/admin/pages/balance";
 import BlockUsers from "@/admin/pages/block-users";
 import Security from "@/admin/pages/security";
 import ActivityLogs from "@/admin/pages/activity-logs";
+import DepositRequests from "@/admin/pages/deposit-requests";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 const ADMIN_BASE = `${BASE}/admin`;
@@ -44,6 +45,7 @@ function AdminRouter() {
         <Route path="/block-users"  component={BlockUsers}   />
         <Route path="/security"     component={Security}     />
         <Route path="/activity-logs" component={ActivityLogs} />
+        <Route path="/deposit-requests" component={DepositRequests} />
         <Route path="/relatorios"   component={Reports}      />
         <Route component={Dashboard} />
       </Switch>

@@ -929,6 +929,87 @@ router.get("/deposit/status/:pendingId", (req, res) => {
   res.json({ status: "pending" });
 });
 
+/* ── Deposit: Manual Request (Carteira Móvel) ── */
+router.post("/deposit/manual-request", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const supabaseUrl = process.env["SUPABASE_URL"];
+    const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+    if (!supabaseUrl || !supabaseServiceKey) { res.status(500).json({ error: "Serviço indisponível" }); return; }
+
+    const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
+    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    if (userError || !userData.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
+    const userId = userData.user.id;
+
+    const { mode, amount, phone, confirmationMsg } = req.body as {
+      mode?: "deposit" | "bet";
+      amount?: number;
+      phone?: string;
+      confirmationMsg?: string;
+    };
+
+    if (!amount || amount <= 0) { res.status(400).json({ error: "Valor inválido" }); return; }
+    if (!confirmationMsg?.trim()) { res.status(400).json({ error: "Mensagem de confirmação obrigatória" }); return; }
+
+    const depositMode: "deposit" | "bet" = mode ?? "deposit";
+
+    const { data: profileData } = await admin.from("profiles").select("full_name, phone").eq("id", userId).single();
+    const userName = (profileData as any)?.full_name ?? "Utilizador";
+    const userPhone = phone ?? (profileData as any)?.phone ?? "";
+
+    const { data: txRow, error: txError } = await (admin.from("transactions").insert({
+      user_id: userId,
+      type: depositMode === "bet" ? "manual_bet" : "manual_deposit",
+      amount,
+      description: JSON.stringify({
+        phone: userPhone,
+        confirmationMsg: confirmationMsg.trim(),
+        userName,
+        mode: depositMode,
+      }),
+      status: "pending",
+      created_at: new Date().toISOString(),
+    }) as any).select("id").single();
+
+    if (txError || !txRow) {
+      req.log.error({ txError }, "Failed to create manual deposit request");
+      res.status(500).json({ error: "Erro ao criar pedido" }); return;
+    }
+
+    req.log.info({ userId, amount, mode: depositMode, txId: (txRow as any).id }, "Manual deposit request created");
+    res.json({ pendingId: (txRow as any).id });
+  } catch (err) {
+    req.log.error({ err }, "Manual deposit request error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Deposit: Manual Status Check ── */
+router.get("/deposit/manual-status/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!id) { res.status(400).json({ error: "id required" }); return; }
+
+    const supabaseUrl = process.env["SUPABASE_URL"];
+    const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+    if (!supabaseUrl || !supabaseServiceKey) { res.status(500).json({ error: "Serviço indisponível" }); return; }
+
+    const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
+    const { data: txData, error: txError } = await admin
+      .from("transactions").select("id, status, amount, type").eq("id", id).single();
+
+    if (txError || !txData) { res.json({ status: "not_found" }); return; }
+    res.json({ status: (txData as any).status, amount: (txData as any).amount, type: (txData as any).type });
+  } catch (err) {
+    req.log.error({ err }, "Manual status check error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── Deposit: Credit after cancelled bet ── */
 router.post("/deposit/credit", async (req, res) => {
   try {

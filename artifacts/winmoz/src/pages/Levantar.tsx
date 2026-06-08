@@ -74,32 +74,41 @@ export default function Levantar() {
   const userPhone = profile?.phone ? `+258 ${profile.phone.slice(0, 3)} ${profile.phone.slice(3, 6)} ${profile.phone.slice(6)}` : "";
 
   const [screen, setScreen] = useState<Screen>("amount");
-  const [rawCents, setRawCents] = useState(0);
+  const [amountStr, setAmountStr] = useState("");
   const [processingConfirm, setProcessingConfirm] = useState(false);
   const [withdrawalId, setWithdrawalId] = useState<string | null>(null);
   const [txId] = useState(() => "TX" + Date.now().toString(36).toUpperCase());
   const [txDate] = useState(() => new Date().toLocaleString("pt-PT"));
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const amountVal = rawCents / 100;
+  const amountVal = parseFloat(amountStr) || 0;
   const phoneDisplay = userPhone || "+258 8XX XXX XXX";
 
   const MIN_WITHDRAW = 50;
   const MAX_WITHDRAW = balance;
 
   const handleDigit = (d: string) => {
-    if (rawCents >= 999999) return;
-    setRawCents(prev => {
-      const next = parseInt(`${prev}${d}`) || 0;
-      return next > 99999999 ? prev : next;
+    if (d === ".") {
+      if (amountStr.includes(".")) return;
+      setAmountStr(prev => (prev === "" ? "0." : prev + "."));
+      return;
+    }
+    setAmountStr(prev => {
+      const next = prev === "" || prev === "0" ? d : prev + d;
+      if (next.includes(".")) {
+        const [, dec] = next.split(".");
+        if (dec && dec.length > 2) return prev;
+      }
+      if (next.replace(".", "").length > 8) return prev;
+      return next;
     });
   };
 
-  const handleDelete = () => setRawCents(prev => Math.floor(prev / 10));
+  const handleDelete = () => setAmountStr(prev => prev.length <= 1 ? "" : prev.slice(0, -1));
 
   const handleSetPercent = (pct: number) => {
-    const val = Math.floor(balance * pct * 100);
-    setRawCents(Math.min(val, 99999999));
+    const val = Math.round(balance * pct * 100) / 100;
+    setAmountStr(val > 0 ? val.toString() : "");
   };
 
   const canProceed = amountVal >= MIN_WITHDRAW && amountVal <= MAX_WITHDRAW;
@@ -284,7 +293,7 @@ export default function Levantar() {
             <p className="text-white/40 text-xs mb-3 uppercase tracking-widest">Valor a Levantar</p>
             <div className="flex items-end gap-2 mb-1">
               <span className="text-white font-light" style={{ fontSize: "4rem", lineHeight: 1, fontFamily: "system-ui" }}>
-                {fmtMZN(amountVal)}
+                {amountStr || "0"}
               </span>
               <span className="text-white/40 text-xl mb-3">MZN</span>
             </div>
@@ -311,7 +320,7 @@ export default function Levantar() {
             <div className="grid grid-cols-3 gap-2 mb-4">
               {["1","2","3","4","5","6","7","8","9",".","0","⌫"].map(d => (
                 <button key={d}
-                  onClick={() => d === "⌫" ? handleDelete() : d !== "." ? handleDigit(d) : undefined}
+                  onClick={() => d === "⌫" ? handleDelete() : handleDigit(d)}
                   className="h-14 rounded-2xl font-syne font-bold text-xl text-white flex items-center justify-center transition-all active:scale-95"
                   style={{ background: d === "⌫" ? "#1c1c1e" : "#111" }}>
                   {d === "⌫" ? <Delete style={{ width: 20, height: 20 }} /> : d}

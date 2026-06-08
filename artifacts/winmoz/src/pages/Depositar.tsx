@@ -44,45 +44,41 @@ export default function Depositar() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const [screen, setScreen] = useState<Screen>("amount");
-  const [rawCents, setRawCents] = useState(0);
+  const [amountStr, setAmountStr] = useState("");
   const [smsText, setSmsText] = useState("");
   const [verifyError, setVerifyError] = useState("");
   const [pendingId, setPendingId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [mpesaNum, setMpesaNum] = useState("84 XXX XXXX");
-  const [emolaNum, setEmolaNum] = useState("87 XXX XXXX");
+  const MPESA_NUM = "848519858";
+  const EMOLA_NUM = "869189457";
   const [successAmount, setSuccessAmount] = useState(0);
   const txDate = new Date().toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" });
 
   useEffect(() => {
-    fetch(`${API_BASE}/admin/settings/get?key=sms_mpesa_number`)
-      .then(r => r.ok ? r.json() : null)
-      .then((d: any) => { if (d?.setting?.value) setMpesaNum(d.setting.value); })
-      .catch(() => {});
-    fetch(`${API_BASE}/admin/settings/get?key=sms_emola_number`)
-      .then(r => r.ok ? r.json() : null)
-      .then((d: any) => { if (d?.setting?.value) setEmolaNum(d.setting.value); })
-      .catch(() => {});
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
-  const amountVal = rawCents / 100;
-  const isAmountZero = rawCents === 0;
-
-  const displayAmount = (() => {
-    const str = rawCents.toString().padStart(3, "0");
-    const intPart = str.slice(0, -2) || "0";
-    const decPart = str.slice(-2);
-    return `${Number(intPart).toLocaleString("pt-PT")},${decPart}`;
-  })();
+  const amountVal = parseFloat(amountStr) || 0;
+  const isAmountZero = amountVal <= 0;
 
   const handleDigit = (d: string) => {
-    if (d === ".") return;
-    const newCents = parseInt((rawCents.toString() + d).slice(-8), 10);
-    setRawCents(newCents || 0);
+    if (d === ".") {
+      if (amountStr.includes(".")) return;
+      setAmountStr(prev => (prev === "" ? "0." : prev + "."));
+      return;
+    }
+    setAmountStr(prev => {
+      const next = prev === "" || prev === "0" ? d : prev + d;
+      if (next.includes(".")) {
+        const [, dec] = next.split(".");
+        if (dec && dec.length > 2) return prev;
+      }
+      if (next.replace(".", "").length > 8) return prev;
+      return next;
+    });
   };
-  const handleBackspace = () => setRawCents(Math.floor(rawCents / 10));
+  const handleBackspace = () => setAmountStr(prev => prev.length <= 1 ? "" : prev.slice(0, -1));
 
   const copyToClipboard = (text: string, key: string) => {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -95,25 +91,25 @@ export default function Depositar() {
     pollRef.current = setInterval(async () => {
       count++;
       try {
-        const r = await fetch(`${API_BASE}/deposit/status/${pid}`);
+        const r = await fetch(`${API_BASE}/deposit/manual-status/${pid}`);
         if (!r.ok) { clearInterval(pollRef.current!); setScreen("rejected"); return; }
         const data = await r.json() as { status: string };
         if (data.status === "approved") {
           clearInterval(pollRef.current!);
           setSuccessAmount(amt);
           setScreen("success");
-        } else if (data.status === "rejected" || data.status === "not_found" || count >= 20) {
+        } else if (data.status === "rejected" || data.status === "not_found" || count >= 200) {
           clearInterval(pollRef.current!);
           setScreen("rejected");
         }
       } catch {
-        if (count >= 20) { clearInterval(pollRef.current!); setScreen("rejected"); }
+        if (count >= 200) { clearInterval(pollRef.current!); setScreen("rejected"); }
       }
     }, 3000);
   };
 
   const handleVerify = async () => {
-    if (!smsText.trim()) { setVerifyError("Cola a mensagem SMS de confirmação"); return; }
+    if (!smsText.trim()) { setVerifyError("Cola a mensagem de confirmação da transferência"); return; }
     if (!user) { setVerifyError("Sessão inválida"); return; }
     setVerifyError("");
     setScreen("verifying");
@@ -123,17 +119,14 @@ export default function Depositar() {
       const token = sessionData?.session?.access_token;
       if (!token) { setScreen("rejected"); return; }
 
-      const r = await fetch(`${API_BASE}/deposit/verify`, {
+      const r = await fetch(`${API_BASE}/deposit/manual-request`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ smsText: smsText.trim(), expectedAmount: amountVal, mode: "deposit" }),
+        body: JSON.stringify({ mode: "deposit", amount: amountVal, confirmationMsg: smsText.trim() }),
       });
-      const data = await r.json() as { status: string; pendingId?: string };
+      const data = await r.json() as { pendingId?: string; error?: string };
 
-      if (data.status === "approved") {
-        setSuccessAmount(amountVal);
-        setScreen("success");
-      } else if (data.status === "pending" && data.pendingId) {
+      if (data.pendingId) {
         setPendingId(data.pendingId);
         startPolling(data.pendingId, amountVal);
       } else {
@@ -165,7 +158,7 @@ export default function Depositar() {
               <span className="text-white/50 text-xl font-light" style={{ fontFamily: "system-ui" }}>MZN</span>
               <span className="text-white tracking-tight"
                 style={{ fontSize: "3.8rem", fontFamily: "system-ui, -apple-system", fontWeight: 200, lineHeight: 1 }}>
-                {displayAmount}
+                {amountStr || "0"}
                 <span className="animate-pulse" style={{ opacity: 0.6 }}>|</span>
               </span>
             </div>
@@ -188,11 +181,11 @@ export default function Depositar() {
 
           <div className="flex items-center justify-center gap-2 mx-5 mb-5">
             {[100, 500, 1000, 5000].map(q => (
-              <button key={q} onClick={() => setRawCents(q * 100)}
+              <button key={q} onClick={() => setAmountStr(q.toString())}
                 className="flex-1 h-10 rounded-full font-medium text-sm transition-all"
                 style={{
                   background: "#1c1c1e", color: "#fff",
-                  border: rawCents === q * 100 ? `1.5px solid ${CYAN}` : "1.5px solid transparent",
+                  border: amountVal === q ? `1.5px solid ${CYAN}` : "1.5px solid transparent",
                 }}>
                 {q >= 1000 ? `${q / 1000}K` : q}
               </button>
@@ -283,12 +276,13 @@ export default function Depositar() {
                   <div>
                     <p className="text-xs font-bold mb-0.5 uppercase tracking-wider" style={{ color: "#e74c3c" }}>M-Pesa</p>
                     <p className="font-bold text-white text-lg" style={{ fontFamily: "system-ui", letterSpacing: "0.5px" }}>
-                      +258 {mpesaNum}
+                      +258 {MPESA_NUM.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")}
                     </p>
+                    <p className="text-xs mt-0.5" style={{ color: "#71717a" }}>Celso Cristiano</p>
                   </div>
                 </div>
                 <button
-                  onClick={() => copyToClipboard(`+258${mpesaNum.replace(/\s/g, "")}`, "mpesa")}
+                  onClick={() => copyToClipboard(`+258${MPESA_NUM}`, "mpesa")}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all"
                   style={{
                     background: copied === "mpesa" ? "rgba(0,212,180,0.2)" : "#2c2c2e",
@@ -318,12 +312,13 @@ export default function Depositar() {
                   <div>
                     <p className="text-xs font-bold mb-0.5 uppercase tracking-wider" style={{ color: "#34d399" }}>e-Mola</p>
                     <p className="font-bold text-white text-lg" style={{ fontFamily: "system-ui", letterSpacing: "0.5px" }}>
-                      +258 {emolaNum}
+                      +258 {EMOLA_NUM.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")}
                     </p>
+                    <p className="text-xs mt-0.5" style={{ color: "#71717a" }}>Celso Cristiano</p>
                   </div>
                 </div>
                 <button
-                  onClick={() => copyToClipboard(`+258${emolaNum.replace(/\s/g, "")}`, "emola")}
+                  onClick={() => copyToClipboard(`+258${EMOLA_NUM}`, "emola")}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all"
                   style={{
                     background: copied === "emola" ? "rgba(0,212,180,0.2)" : "#2c2c2e",
@@ -430,12 +425,10 @@ export default function Depositar() {
               </div>
             </div>
             <p style={{ fontWeight: 800, fontSize: 20, color: "#fff", marginBottom: 10, textAlign: "center" }}>
-              A verificar pagamento…
+              A processar pedido…
             </p>
             <p style={{ fontSize: 13, color: "#71717a", textAlign: "center", lineHeight: 1.6, maxWidth: 270 }}>
-              {pendingId
-                ? "A aguardar confirmação do servidor SMS. Este processo pode demorar até 60 segundos."
-                : "A confirmar a tua mensagem SMS. Aguarda um momento."}
+              O teu pedido foi enviado à equipa WinMoz. Aguarda a validação da transferência — normalmente demora poucos minutos.
             </p>
             {pendingId && (
               <motion.div
@@ -445,7 +438,7 @@ export default function Depositar() {
                 style={{ background: `rgba(0,212,180,0.08)`, border: `1px solid ${CYAN}33` }}>
                 <Clock style={{ width: 13, height: 13, color: CYAN }} />
                 <span style={{ fontSize: 11, color: CYAN, fontWeight: 600, letterSpacing: "0.3px" }}>
-                  A aguardar SMS do servidor…
+                  A aguardar aprovação da equipa…
                 </span>
               </motion.div>
             )}

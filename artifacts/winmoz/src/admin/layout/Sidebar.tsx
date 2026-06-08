@@ -16,6 +16,7 @@ import {
   BarChart3,
   ChevronUp,
   ChevronDown,
+  InboxIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRef, useState, useEffect } from "react";
@@ -28,6 +29,7 @@ const navItems = [
   { href: "/messages",      icon: MessageCircle,     label: "Mensagem"           },
   { href: "/reports",       icon: Flag,              label: "Denúncias"          },
   { href: "/withdrawals",   icon: Landmark,          label: "Saques"             },
+  { href: "/deposit-requests", icon: InboxIcon,      label: "Gestão de Depósitos" },
   { href: "/notifications", icon: Bell,              label: "Notificações"       },
   { href: "/online-users",  icon: Wifi,              label: "Online Agora"       },
   { href: "/balance",       icon: Wallet,            label: "Gestão de Saldos"   },
