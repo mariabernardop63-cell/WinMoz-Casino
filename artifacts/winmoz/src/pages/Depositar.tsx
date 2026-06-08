@@ -6,7 +6,6 @@ import {
   RotateCcw, Copy, Smartphone, Clock,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { API_BASE } from "@/lib/apiBase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CYAN = "#00D4B4";
@@ -91,19 +90,24 @@ export default function Depositar() {
     pollRef.current = setInterval(async () => {
       count++;
       try {
-        const r = await fetch(`${API_BASE}/deposit/manual-status/${pid}`);
-        if (!r.ok) { clearInterval(pollRef.current!); setScreen("rejected"); return; }
-        const data = await r.json() as { status: string };
-        if (data.status === "approved") {
+        const { data } = await supabase
+          .from("transactions")
+          .select("status")
+          .eq("id", pid)
+          .single();
+        const status = (data as any)?.status as string | undefined;
+        if (status === "approved") {
           clearInterval(pollRef.current!);
           setSuccessAmount(amt);
           setScreen("success");
-        } else if (data.status === "rejected" || data.status === "not_found" || count >= 200) {
+        } else if (status === "rejected") {
           clearInterval(pollRef.current!);
           setScreen("rejected");
         }
+        // "pending" or any transient error → keep polling
+        if (count >= 600) { clearInterval(pollRef.current!); setScreen("rejected"); }
       } catch {
-        if (count >= 200) { clearInterval(pollRef.current!); setScreen("rejected"); }
+        if (count >= 600) { clearInterval(pollRef.current!); setScreen("rejected"); }
       }
     }, 3000);
   };
@@ -116,24 +120,34 @@ export default function Depositar() {
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) { setScreen("rejected"); return; }
+      const userId = sessionData?.session?.user?.id;
+      if (!userId) { setVerifyError("Sessão inválida. Volta a entrar."); setScreen("instructions"); return; }
 
-      const r = await fetch(`${API_BASE}/deposit/manual-request`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "deposit", amount: amountVal, confirmationMsg: smsText.trim() }),
-      });
-      const data = await r.json() as { pendingId?: string; error?: string };
+      const { data: txRow, error: txError } = await supabase
+        .from("transactions")
+        .insert({
+          user_id: userId,
+          type: "manual_deposit",
+          amount: amountVal,
+          description: JSON.stringify({ confirmationMsg: smsText.trim(), mode: "deposit" }),
+          status: "pending",
+          created_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
 
-      if (data.pendingId) {
-        setPendingId(data.pendingId);
-        startPolling(data.pendingId, amountVal);
-      } else {
-        setScreen("rejected");
+      if (txError || !txRow) {
+        setVerifyError("Erro ao enviar pedido. Tenta de novo.");
+        setScreen("instructions");
+        return;
       }
+
+      const pid = (txRow as any).id as string;
+      setPendingId(pid);
+      startPolling(pid, amountVal);
     } catch {
-      setScreen("rejected");
+      setVerifyError("Erro de ligação. Tenta de novo.");
+      setScreen("instructions");
     }
   };
 

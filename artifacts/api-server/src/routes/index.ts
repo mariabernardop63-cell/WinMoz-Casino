@@ -566,6 +566,67 @@ router.post("/admin/withdraw/reject", async (req, res) => {
   }
 });
 
+/* ── Admin: Approve / Reject Manual Deposit or Bet ── */
+router.post("/admin/deposit/approve", async (req, res) => {
+  try {
+    const result = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!result.ok) { res.status(result.status).json({ error: result.error }); return; }
+    const { supabaseAdmin } = result;
+
+    const { id } = req.body as { id?: string };
+    if (!id) { res.status(400).json({ error: "id obrigatório" }); return; }
+
+    const { data: txData, error: txErr } = await supabaseAdmin
+      .from("transactions").select("id, amount, user_id, type, status").eq("id", id).single();
+    if (txErr || !txData) { res.status(404).json({ error: "Pedido não encontrado" }); return; }
+    if (txData.status !== "pending") { res.status(400).json({ error: "Pedido já processado" }); return; }
+
+    if (txData.type === "manual_deposit") {
+      const { data: profile } = await supabaseAdmin
+        .from("profiles").select("balance").eq("id", txData.user_id).single();
+      const current = Number((profile as any)?.balance ?? 0);
+      const newBalance = Math.round((current + Number(txData.amount)) * 100) / 100;
+      const { error: balErr } = await supabaseAdmin
+        .from("profiles").update({ balance: newBalance }).eq("id", txData.user_id);
+      if (balErr) { res.status(500).json({ error: "Erro ao creditar saldo" }); return; }
+    }
+
+    const { error: upErr } = await supabaseAdmin
+      .from("transactions").update({ status: "approved" }).eq("id", id);
+    if (upErr) { res.status(500).json({ error: "Erro ao aprovar" }); return; }
+
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "Admin approve deposit error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+router.post("/admin/deposit/reject", async (req, res) => {
+  try {
+    const result = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!result.ok) { res.status(result.status).json({ error: result.error }); return; }
+    const { supabaseAdmin } = result;
+
+    const { id } = req.body as { id?: string };
+    if (!id) { res.status(400).json({ error: "id obrigatório" }); return; }
+
+    const { data: txData, error: txErr } = await supabaseAdmin
+      .from("transactions").select("id, status").eq("id", id).single();
+    if (txErr || !txData) { res.status(404).json({ error: "Pedido não encontrado" }); return; }
+    if (txData.status !== "pending") { res.status(400).json({ error: "Pedido já processado" }); return; }
+
+    const { error: upErr } = await supabaseAdmin
+      .from("transactions").update({ status: "rejected" }).eq("id", id);
+    if (upErr) { res.status(500).json({ error: "Erro ao rejeitar" }); return; }
+
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error({ err }, "Admin reject deposit error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── Roleta ── */
 
 // Mozambique is UTC+2 (CAT, no DST). Returns the UTC ISO timestamp for

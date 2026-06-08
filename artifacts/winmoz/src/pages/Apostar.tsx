@@ -198,37 +198,59 @@ function SMSBettingScreen({
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      if (!token) { setStep("rejected"); return; }
+      const userId = sessionData?.session?.user?.id;
+      if (!userId) { setError("Sessão inválida. Volta a entrar."); setStep("info"); return; }
 
-      const r = await fetch(`${API_BASE}/deposit/manual-request`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "bet", amount, phone: initialPhone ?? "", confirmationMsg: confirmMsg.trim() }),
-      });
-      const data = await r.json() as { pendingId?: string; error?: string };
-      if (!data.pendingId) { setStep("rejected"); return; }
+      const { data: txRow, error: txError } = await supabase
+        .from("transactions")
+        .insert({
+          user_id: userId,
+          type: "manual_bet",
+          amount,
+          description: JSON.stringify({
+            confirmationMsg: confirmMsg.trim(),
+            phone: initialPhone ?? "",
+            mode: "bet",
+          }),
+          status: "pending",
+          created_at: new Date().toISOString(),
+        })
+        .select("id")
+        .single();
 
-      const pid = data.pendingId;
+      if (txError || !txRow) {
+        setError("Erro ao enviar pedido. Tenta de novo.");
+        setStep("info");
+        return;
+      }
+
+      const pid = (txRow as any).id as string;
       let count = 0;
       pollRef.current = setInterval(async () => {
         count++;
         try {
-          const pr = await fetch(`${API_BASE}/deposit/manual-status/${pid}`);
-          const pd = await pr.json() as { status: string };
-          if (pd.status === "approved") {
+          const { data: pollData } = await supabase
+            .from("transactions")
+            .select("status")
+            .eq("id", pid)
+            .single();
+          const status = (pollData as any)?.status as string | undefined;
+          if (status === "approved") {
             clearInterval(pollRef.current!);
             onSuccess(null);
-          } else if (pd.status === "rejected" || count >= 200) {
+          } else if (status === "rejected") {
             clearInterval(pollRef.current!);
             setStep("rejected");
           }
+          // "pending" → keep polling
+          if (count >= 600) { clearInterval(pollRef.current!); setStep("rejected"); }
         } catch {
-          if (count >= 200) { clearInterval(pollRef.current!); setStep("rejected"); }
+          if (count >= 600) { clearInterval(pollRef.current!); setStep("rejected"); }
         }
       }, 3000);
     } catch {
-      setStep("rejected");
+      setError("Erro de ligação. Tenta de novo.");
+      setStep("info");
     }
   };
 

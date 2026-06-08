@@ -6,6 +6,8 @@ import {
   Clock, Wallet, Gamepad2, RefreshCw, User, Phone, MessageSquare,
 } from "lucide-react";
 import { adminSupabase } from "@/admin/lib/supabase-api";
+import { supabase } from "@/lib/supabase";
+import { API_BASE } from "@/lib/apiBase";
 
 const CYAN = "#00D4B4";
 
@@ -77,36 +79,26 @@ export default function DepositRequests() {
     return () => { adminSupabase.removeChannel(channel); };
   }, [loadRequests]);
 
+  const getAdminToken = async (): Promise<string | null> => {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token ?? null;
+  };
+
   const handleApprove = async (req: DepositRequest) => {
     if (processingId) return;
     setProcessingId(req.id);
 
     try {
-      if (req.type === "manual_deposit") {
-        const { data: profile, error: profileErr } = await adminSupabase
-          .from("profiles")
-          .select("balance")
-          .eq("id", req.user_id)
-          .single();
+      const token = await getAdminToken();
+      if (!token) throw new Error("Sessão inválida");
 
-        if (profileErr || !profile) throw new Error("Perfil não encontrado");
-
-        const newBalance = Math.round((Number((profile as any).balance ?? 0) + Number(req.amount)) * 100) / 100;
-
-        const { error: balErr } = await adminSupabase
-          .from("profiles")
-          .update({ balance: newBalance })
-          .eq("id", req.user_id);
-
-        if (balErr) throw new Error("Erro ao creditar saldo");
-      }
-
-      const { error: txErr } = await adminSupabase
-        .from("transactions")
-        .update({ status: "approved" })
-        .eq("id", req.id);
-
-      if (txErr) throw new Error("Erro ao actualizar transacção");
+      const r = await fetch(`${API_BASE}/admin/deposit/approve`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: req.id }),
+      });
+      const data = await r.json() as { success?: boolean; error?: string };
+      if (!data.success) throw new Error(data.error ?? "Erro ao aprovar");
 
       toast.success(
         req.type === "manual_deposit"
@@ -126,17 +118,21 @@ export default function DepositRequests() {
     setProcessingId(req.id);
 
     try {
-      const { error } = await adminSupabase
-        .from("transactions")
-        .update({ status: "rejected" })
-        .eq("id", req.id);
+      const token = await getAdminToken();
+      if (!token) throw new Error("Sessão inválida");
 
-      if (error) throw error;
+      const r = await fetch(`${API_BASE}/admin/deposit/reject`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ id: req.id }),
+      });
+      const data = await r.json() as { success?: boolean; error?: string };
+      if (!data.success) throw new Error(data.error ?? "Erro ao rejeitar");
 
       toast.success("Pedido rejeitado");
       loadRequests();
-    } catch {
-      toast.error("Erro ao rejeitar pedido");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erro ao rejeitar pedido");
     } finally {
       setProcessingId(null);
     }
