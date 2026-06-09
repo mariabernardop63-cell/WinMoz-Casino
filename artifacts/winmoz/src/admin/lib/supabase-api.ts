@@ -10,7 +10,12 @@ const _adminKey = (import.meta.env.VITE_SUPABASE_SERVICE_ROLE as string)
   || (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
   || "placeholder";
 export const adminSupabase = createClient(_adminUrl, _adminKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false,
+    storageKey: "sb-admin-isolated",
+  },
 });
 
 /* ──────────────────────────────────────────────────────────────
