@@ -66,7 +66,8 @@ function getCaptures(b: Board, r: number, c: number, excl: Set<string> = new Set
       }
     }
   } else {
-    const dirs: [number,number][] = color === "w" ? [[-1,-1],[-1,1]] : [[1,-1],[1,1]];
+    // Em Damas portuguesas, peças normais PODEM comer para trás (todas as 4 diagonais)
+    const dirs: [number,number][] = [[-1,-1],[-1,1],[1,-1],[1,1]];
     for (const [dr, dc] of dirs) {
       const mr = r+dr, mc = c+dc, tr = r+2*dr, tc = c+2*dc;
       if (!inB(mr, mc) || !inB(tr, tc)) continue;
@@ -454,7 +455,12 @@ export default function DamasGame() {
   const turnRef  = useRef(turn);
   const winnerRef = useRef(winner);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const betDeductedRef = useRef(false);
+  // Persiste em sessionStorage para não re-debitar se o utilizador fizer back e retomar
+  const betDeductedRef = useRef(
+    gameId !== "local"
+      ? sessionStorage.getItem(`wm_bet_deducted_damas_${gameId}`) === "1"
+      : false
+  );
   const winCreditedRef = useRef(false);
   const lastMoveTimeRef = useRef<number>(0); // rate limit: min 200ms between moves
   const [opponentBal, setOpponentBal] = useState("—");
@@ -481,7 +487,11 @@ export default function DamasGame() {
 
   useEffect(() => {
     if (winner && gameId !== "local") {
-      try { sessionStorage.removeItem(`wm_damas_${gameId}`); } catch {}
+      try {
+        sessionStorage.removeItem(`wm_damas_${gameId}`);
+        sessionStorage.removeItem(`wm_bet_deducted_damas_${gameId}`);
+        localStorage.removeItem("wm_active_game");
+      } catch {}
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winner]);
@@ -732,6 +742,8 @@ export default function DamasGame() {
             if(data){
               await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
               await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta de jogo (Damas)", status: "approved" });
+              // Persiste flag para não re-debitar se o componente remontar (back + resume)
+              try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch { /* ignore */ }
               await refreshProfile();
             }
           }catch{ betDeductedRef.current = false; }
@@ -884,6 +896,7 @@ export default function DamasGame() {
         localStorage.setItem("wm_active_game", JSON.stringify({
           gameId, gameType:"damas", betAmount:BET,
           opponentName, savedAt:Date.now(), ttlMs:30*60_000,
+          playerColor: myColor, playerName,
         }));
       } catch { /* ignore */ }
     }

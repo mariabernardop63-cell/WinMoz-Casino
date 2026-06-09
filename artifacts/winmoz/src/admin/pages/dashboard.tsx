@@ -5,7 +5,10 @@ import {
   useGetGameBreakdown,
   useListMatches,
   useAdminRealtimeSync,
+  resetPlatformRevenue,
+  resetSaidas,
 } from "@/admin/lib/supabase-api";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -115,10 +118,10 @@ function MoneyCard({
           {onClear && (
             <button
               onClick={onClear}
-              title={cleared ? "Repor valor real" : "Limpar visualização"}
+              title="Repor a zero no banco de dados"
               className="w-6 h-6 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-              style={{ background: cleared ? "rgba(239,68,68,.1)" : "rgba(0,0,0,.04)" }}>
-              <Activity className="w-3 h-3" style={{ color: cleared ? "#ef4444" : "#aaa" }} />
+              style={{ background: "rgba(239,68,68,.08)" }}>
+              <Activity className="w-3 h-3" style={{ color: "#ef4444" }} />
             </button>
           )}
           <button
@@ -290,10 +293,29 @@ function ActionItem({ icon: Icon, title, sub, done }: {
 
 export default function Dashboard() {
   useAdminRealtimeSync();
+  const queryClient = useQueryClient();
 
-  const [clearedRevenue, setClearedRevenue]         = useState(false);
-  const [clearedWithdrawals, setClearedWithdrawals] = useState(false);
   const greeting = useMemo(() => getMozambiqueGreeting(), []);
+
+  async function handleResetRevenue() {
+    if (!window.confirm("Tens a certeza? O Saldo Disponível será reposto a MT 0,00 no banco de dados. Esta acção não apaga os dados históricos.")) return;
+    try {
+      await resetPlatformRevenue();
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    } catch {
+      alert("Erro ao repor o saldo. Tenta novamente.");
+    }
+  }
+
+  async function handleResetSaidas() {
+    if (!window.confirm("Tens a certeza? As Saídas serão repostas a MT 0,00 no banco de dados. Esta acção não apaga os dados históricos.")) return;
+    try {
+      await resetSaidas();
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    } catch {
+      alert("Erro ao repor as saídas. Tenta novamente.");
+    }
+  }
 
   const { data: stats, isLoading: sLoad } = useGetDashboardStats();
   const { data: mTime } = useGetMatchesOverTime();
@@ -309,8 +331,9 @@ export default function Dashboard() {
     roleta: Math.floor(p.ludo * 0.25),
   }));
 
-  const platformRevenue = stats?.platformRevenue ?? 0;
+  const platformRevenue          = stats?.platformRevenue ?? 0;
   const totalApprovedWithdrawals = stats?.totalApprovedWithdrawals ?? 0;
+  // clearedRevenue / clearedWithdrawals removidos — reset é agora feito no DB
 
   const damaM   = breakdown?.damaMatches ?? 0;
   const ludoM   = breakdown?.ludoMatches ?? 0;
@@ -360,19 +383,17 @@ export default function Dashboard() {
         <div className="flex gap-4">
           <MoneyCard
             label="Saldo disponível"
-            value={`MT ${(clearedRevenue ? 0 : platformRevenue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
+            value={`MT ${platformRevenue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
             icon={Wallet}
             suffix="Lucro total da plataforma (apostas + taxas de levantamento)"
-            cleared={clearedRevenue}
-            onClear={() => setClearedRevenue(v => !v)}
+            onClear={handleResetRevenue}
           />
           <MoneyCard
             label="Saídas"
-            value={`MT ${(clearedWithdrawals ? 0 : totalApprovedWithdrawals).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
+            value={`MT ${totalApprovedWithdrawals.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
             icon={ArrowDownLeft}
             suffix="Total de levantamentos aprovados"
-            cleared={clearedWithdrawals}
-            onClear={() => setClearedWithdrawals(v => !v)}
+            onClear={handleResetSaidas}
           />
         </div>
 

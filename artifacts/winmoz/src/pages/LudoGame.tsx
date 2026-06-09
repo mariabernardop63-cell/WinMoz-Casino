@@ -1129,7 +1129,12 @@ export default function LudoGame() {
   const winnerRef    = useRef(winner);
   const channelRef   = useRef<ReturnType<typeof supabase.channel>|null>(null);
   const captureAnimRef = useRef(false);
-  const betDeductedRef = useRef(false);
+  // Persiste em sessionStorage para não re-debitar se o utilizador fizer back e retomar
+  const betDeductedRef = useRef(
+    gameId !== "local"
+      ? sessionStorage.getItem(`wm_bet_deducted_ludo_${gameId}`) === "1"
+      : false
+  );
   const winCreditedRef = useRef(false);
 
   useEffect(()=>{piecesRef.current=pieces;},[pieces]);
@@ -1156,7 +1161,11 @@ export default function LudoGame() {
 
   useEffect(()=>{
     if((winner||phase==="done")&&gameId!=="local"){
-      try{sessionStorage.removeItem(`wm_ludo_${gameId}`);}catch{}
+      try{
+        sessionStorage.removeItem(`wm_ludo_${gameId}`);
+        sessionStorage.removeItem(`wm_bet_deducted_ludo_${gameId}`);
+        localStorage.removeItem("wm_active_game");
+      }catch{}
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[winner,phase]);
@@ -1548,6 +1557,8 @@ export default function LudoGame() {
                 description: "Aposta de jogo (Ludo)",
                 status: "approved",
               });
+              // Persiste flag para não re-debitar se o componente remontar (back + resume)
+              try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`, "1"); } catch { /* ignore */ }
               await refreshProfile();
             }
           } catch { betDeductedRef.current = false; }
@@ -1639,6 +1650,7 @@ export default function LudoGame() {
         localStorage.setItem("wm_active_game", JSON.stringify({
           gameId, gameType:"ludo", betAmount:BET_AMOUNT,
           opponentName, savedAt:Date.now(), ttlMs:30*60_000,
+          playerColor: myColor, playerName,
         }));
       } catch { /* ignore */ }
     }

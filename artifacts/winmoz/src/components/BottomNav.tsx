@@ -108,7 +108,9 @@ function ResumeModal({ activeGame, onClose }: { activeGame: ActiveGameRecord | n
               onClick={() => {
                 const _gt = activeGame.gameType === "chess" ? "xadrez" : activeGame.gameType;
                 const _route = `${_gt}-jogo`;
-                go(`/${_route}?gameId=${activeGame.gameId}&bet=${activeGame.betAmount}&opp=${encodeURIComponent(activeGame.opponentName)}`);
+                const colorParam = activeGame.playerColor ? `&color=${encodeURIComponent(activeGame.playerColor)}` : "";
+                const nameParam  = activeGame.playerName  ? `&myname=${encodeURIComponent(activeGame.playerName)}` : "";
+                go(`/${_route}?gameId=${activeGame.gameId}&bet=${activeGame.betAmount}&opp=${encodeURIComponent(activeGame.opponentName)}${colorParam}${nameParam}`);
               }}
               style={{ width: "100%", background: "#141418", border: "1px solid rgba(124,58,237,0.35)", borderRadius: 18, overflow: "hidden", cursor: "pointer", textAlign: "left", display: "flex", alignItems: "stretch" }}>
               <div style={{ width: 90, flexShrink: 0, position: "relative", overflow: "hidden" }}>

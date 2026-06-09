@@ -318,6 +318,10 @@ export interface ActiveGameRecord {
   savedAt: number;
   /** How long (ms) after savedAt before this record expires */
   ttlMs: number;
+  /** Cor/lado do jogador nesta partida (necessário para retomar sem re-debitar) */
+  playerColor?: string;
+  /** Nome do jogador (para a URL de retomar) */
+  playerName?: string;
 }
 
 export function saveActiveGame(r: ActiveGameRecord): void {

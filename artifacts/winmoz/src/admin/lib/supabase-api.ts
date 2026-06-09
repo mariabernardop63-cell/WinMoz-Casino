@@ -57,6 +57,37 @@ export function useAdminRealtimeSync() {
   }, [qc]);
 }
 
+/* ── Admin DB reset functions ── */
+export async function resetPlatformRevenue() {
+  const { data: { user } } = await supabase.auth.getUser();
+  const userId = user?.id;
+  if (!userId) throw new Error("Não autenticado");
+  const { error } = await adminSupabase.from("transactions").insert({
+    user_id: userId,
+    type: "admin_reset",
+    description: "revenue_reset",
+    amount: 0,
+    status: "approved",
+    created_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+export async function resetSaidas() {
+  const { data: { user } } = await supabase.auth.getUser();
+  const userId = user?.id;
+  if (!userId) throw new Error("Não autenticado");
+  const { error } = await adminSupabase.from("transactions").insert({
+    user_id: userId,
+    type: "admin_reset",
+    description: "withdrawals_reset",
+    amount: 0,
+    status: "approved",
+    created_at: new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
 /* ── Dashboard Stats ── */
 export function useGetDashboardStats() {
   return useQuery({
@@ -72,6 +103,26 @@ export function useGetDashboardStats() {
       const safeData = async <T>(q: Promise<{ data: T[] | null; error: unknown }>) => {
         try { const r = await q; return r.data ?? []; } catch { return [] as T[]; }
       };
+
+      // Verificar se há resets do admin para filtrar dados a partir desse timestamp
+      const [revenueResetRes, withdrawalsResetRes] = await Promise.all([
+        adminSupabase.from("transactions").select("created_at")
+          .eq("type", "admin_reset").eq("description", "revenue_reset")
+          .order("created_at", { ascending: false }).limit(1),
+        adminSupabase.from("transactions").select("created_at")
+          .eq("type", "admin_reset").eq("description", "withdrawals_reset")
+          .order("created_at", { ascending: false }).limit(1),
+      ]);
+      const revenueResetAt: string | null = (revenueResetRes.data as { created_at: string }[] | null)?.[0]?.created_at ?? null;
+      const withdrawalsResetAt: string | null = (withdrawalsResetRes.data as { created_at: string }[] | null)?.[0]?.created_at ?? null;
+
+      // Construir queries com filtro de reset se aplicável
+      const betsQ = adminSupabase.from("transactions").select("amount")
+        .eq("type", "bet").eq("status", "approved");
+      const winsQ = adminSupabase.from("transactions").select("amount")
+        .eq("type", "win").eq("status", "approved");
+      const approvWdQ = adminSupabase.from("transactions").select("amount")
+        .eq("type", "withdrawal").eq("status", "approved");
 
       const [
         totalPlayers,
@@ -91,17 +142,14 @@ export function useGetDashboardStats() {
           .gte("last_seen_at", new Date(Date.now() - 2 * 60 * 1000).toISOString()) as any),
         safeData(adminSupabase.from("transactions").select("id")
           .eq("type", "withdrawal").eq("status", "pending") as any),
-        safeData(adminSupabase.from("transactions").select("amount")
-          .eq("type", "withdrawal").eq("status", "approved") as any),
+        safeData((withdrawalsResetAt ? approvWdQ.gte("created_at", withdrawalsResetAt) : approvWdQ) as any),
         safeData(adminSupabase.from("transactions").select("amount")
           .eq("type", "withdrawal").eq("status", "approved")
           .gte("created_at", todayISO) as any),
         safeData(adminSupabase.from("transactions").select("id")
           .eq("type", "bet").gte("created_at", todayISO) as any),
-        safeData(adminSupabase.from("transactions").select("amount")
-          .eq("type", "bet").eq("status", "approved") as any),
-        safeData(adminSupabase.from("transactions").select("amount")
-          .eq("type", "win").eq("status", "approved") as any),
+        safeData((revenueResetAt ? betsQ.gte("created_at", revenueResetAt) : betsQ) as any),
+        safeData((revenueResetAt ? winsQ.gte("created_at", revenueResetAt) : winsQ) as any),
         safeData(adminSupabase.from("transactions").select("amount")
           .eq("type", "bet").eq("status", "approved")
           .gte("created_at", todayISO) as any),
@@ -393,7 +441,12 @@ export function useListMatches(params?: { status?: string; game?: string }) {
       if (params?.status && params.status !== "all") {
         const fs = params.status;
         if (fs === "live" || fs === "active") {
-          result = result.filter(m => m.status === "active");
+          // Só mostrar partidas "active" com menos de 30 minutos (evita partidas antigas como "em curso")
+          const thirtyMinsAgo = Date.now() - 30 * 60 * 1000;
+          result = result.filter(m =>
+            m.status === "active" &&
+            new Date(m.createdAt).getTime() > thirtyMinsAgo
+          );
         } else if (fs === "finished") {
           result = result.filter(m => m.status === "finished");
         } else if (fs === "pending") {

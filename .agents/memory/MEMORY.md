@@ -1,3 +1,4 @@
 - [Winmoz admin integration](winmoz-admin.md) — admin panel at /admin/* uses nested WouterRouter; sidebar paths are relative to /admin base
 - [Supabase preference](supabase-preference.md) — user explicitly wants Supabase kept as-is, never migrate to Replit DB
 - [Winmoz game fixes](winmoz-game-fixes.md) — payout 90%, rematch transaction records, resume DB check, notification persistence
+- [Winmoz bet deduction bug](winmoz-bet-deduction.md) — betDeductedRef must be persisted in sessionStorage to survive back+resume; active game record must include playerColor+playerName for resume URL
