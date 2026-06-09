@@ -88,7 +88,7 @@ export default function Levantar() {
   const phoneDisplay = userPhone || "+258 8XX XXX XXX";
 
   const MIN_WITHDRAW = 50;
-  const MAX_WITHDRAW = balance;
+  const MAX_WITHDRAW = Math.max(0, balance - 5);
 
   const handleDigit = (d: string) => {
     if (d === ".") {
@@ -215,13 +215,13 @@ export default function Levantar() {
           .from("profiles").select("balance").eq("id", user.id).single();
         const currentBalance = parseFloat(String(profileData?.balance ?? "0")) || 0;
 
-        if (currentBalance < amountVal) {
+        if (currentBalance < amountVal + 5) {
           setProcessingConfirm(false);
           setScreen("rejected");
           return;
         }
 
-        const newBalance = Math.round((currentBalance - amountVal) * 100) / 100;
+        const newBalance = Math.round((currentBalance - amountVal - 5) * 100) / 100;
         const { error: balErr } = await supabase
           .from("profiles").update({ balance: newBalance }).eq("id", user.id);
         if (balErr) { setProcessingConfirm(false); setScreen("rejected"); return; }
@@ -230,7 +230,7 @@ export default function Levantar() {
           .from("transactions").insert({
             user_id: user.id,
             type: "withdrawal",
-            amount: -amountVal,
+            amount: -(amountVal + 5),
             description: JSON.stringify({
               method: "M-Pesa",
               phone: profile?.phone ?? null,
@@ -431,8 +431,9 @@ export default function Levantar() {
                 { label: "De",               val: "Saldo Disponível" },
                 { label: "Método",           val: METHOD_NAME },
                 { label: "Estado Estimado",  val: "Pendente (análise manual)" },
-                { label: "Valor",            val: `${fmtMZN(amountVal)} MZN` },
-                { label: "Taxa",             val: amountVal >= MIN_WITHDRAW ? "5,00 MZN" : "0,00 MZN" },
+                { label: "Valor a Receber",   val: `${fmtMZN(amountVal)} MZN` },
+                { label: "Taxa de Serviço",  val: amountVal >= MIN_WITHDRAW ? "5,00 MZN" : "0,00 MZN" },
+                { label: "Total Debitado",   val: `${fmtMZN(amountVal >= MIN_WITHDRAW ? amountVal + 5 : amountVal)} MZN` },
               ].map(row => (
                 <div key={row.label} className="flex items-center justify-between">
                   <span className="text-sm" style={{ color: "#8e8e93" }}>{row.label}</span>
@@ -443,7 +444,7 @@ export default function Levantar() {
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-white">Você Recebe</span>
                 <span className="text-sm font-bold" style={{ color: CYAN }}>
-                  {fmtMZN(amountVal >= MIN_WITHDRAW ? amountVal - 5 : amountVal)} MZN
+                  {fmtMZN(amountVal)} MZN
                 </span>
               </div>
             </div>
@@ -605,7 +606,7 @@ export default function Levantar() {
           </p>
         </div>
         <div className="flex flex-col gap-3">
-          <button onClick={() => { setRawCents(0); setScreen("amount"); }}
+          <button onClick={() => { setAmountStr(""); setScreen("amount"); }}
             className="w-full h-14 rounded-full font-semibold text-base text-black"
             style={{ background: CYAN }}>
             Tentar Novamente

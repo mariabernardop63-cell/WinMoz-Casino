@@ -206,8 +206,8 @@ function PlayerCard({ color, name, balance, isMe, isActive, piecesLeft, damesLef
             return (
               <div key={i} style={{
                 width: 8, height: 8, borderRadius: "50%",
-                background: alive ? "#EF4444" : "rgba(255,255,255,0.12)",
-                border: alive ? "none" : "1px solid rgba(255,255,255,0.2)",
+                background: alive ? "#EF4444" : "#CBD5E1",
+                border: alive ? "none" : "1px solid #94A3B8",
                 boxShadow: alive ? "0 0 4px rgba(239,68,68,0.6)" : "none",
                 transition: "all 0.3s ease",
               }}/>

@@ -62,7 +62,7 @@ export async function resetPlatformRevenue() {
   const { data: { user } } = await supabase.auth.getUser();
   const userId = user?.id;
   if (!userId) throw new Error("Não autenticado");
-  const { error } = await adminSupabase.from("transactions").insert({
+  const { error } = await supabase.from("transactions").insert({
     user_id: userId,
     type: "admin_reset",
     description: "revenue_reset",
@@ -70,14 +70,24 @@ export async function resetPlatformRevenue() {
     status: "approved",
     created_at: new Date().toISOString(),
   });
-  if (error) throw error;
+  if (error) {
+    const { error: err2 } = await adminSupabase.from("transactions").insert({
+      user_id: userId,
+      type: "admin_reset",
+      description: "revenue_reset",
+      amount: 0,
+      status: "approved",
+      created_at: new Date().toISOString(),
+    });
+    if (err2) throw err2;
+  }
 }
 
 export async function resetSaidas() {
   const { data: { user } } = await supabase.auth.getUser();
   const userId = user?.id;
   if (!userId) throw new Error("Não autenticado");
-  const { error } = await adminSupabase.from("transactions").insert({
+  const { error } = await supabase.from("transactions").insert({
     user_id: userId,
     type: "admin_reset",
     description: "withdrawals_reset",
@@ -85,7 +95,17 @@ export async function resetSaidas() {
     status: "approved",
     created_at: new Date().toISOString(),
   });
-  if (error) throw error;
+  if (error) {
+    const { error: err2 } = await adminSupabase.from("transactions").insert({
+      user_id: userId,
+      type: "admin_reset",
+      description: "withdrawals_reset",
+      amount: 0,
+      status: "approved",
+      created_at: new Date().toISOString(),
+    });
+    if (err2) throw err2;
+  }
 }
 
 /* ── Dashboard Stats ── */

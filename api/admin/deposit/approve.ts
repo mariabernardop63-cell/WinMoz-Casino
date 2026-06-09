@@ -41,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ error: "Pedido já processado" }); return;
     }
 
-    if ((txData as any).type === "manual_deposit") {
+    if ((txData as any).type === "manual_deposit" || (txData as any).type === "manual_bet") {
       const { data: profile } = await admin
         .from("profiles")
         .select("balance")

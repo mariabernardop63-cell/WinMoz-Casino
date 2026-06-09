@@ -1320,7 +1320,7 @@ export default function LudoGame() {
     const plName=pl===myColor?playerName.split(" ")[0]:opponentName;
     if(isExit){
       setMsg(`${plName} coloca peça no tabuleiro!`);
-      movePieceSteps(pid,-1,1,true,()=>handleMoveComplete(pid,diceVal,pl,0));
+      movePieceSteps(pid,-1,1,true,()=>handleMoveComplete(pid,diceVal,pl,-1));
     } else {
       setMsg(`${plName} move ${diceVal} ${diceVal===1?"casa":"casas"}!`);
       movePieceSteps(pid,piece.pos,diceVal,false,()=>handleMoveComplete(pid,diceVal,pl,prevPos));
@@ -1350,16 +1350,9 @@ export default function LudoGame() {
       const mv=calcMovable(piecesRef.current,pl,val);
       const plName=pl===myColor?playerName.split(" ")[0]:opponentName;
 
-      // Rule 4: if this was a forced-non-6 (third six), skip turn automatically
+      // Rule 4: third consecutive roll is forced non-6 — allow player to move normally
       if(val!==6 && consecutiveSixesRef.current>=2){
-        setMsg(`${plName} — terceiro 6 bloqueado! Vez do adversário.`);
         consecutiveSixesRef.current=0;
-        setTimeout(()=>{
-          const next=other(pl); setTurn(next); setPhase("roll");
-          if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
-          setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
-        },1100);
-        return;
       }
 
       if(mv.length===0){
