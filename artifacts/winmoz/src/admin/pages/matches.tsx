@@ -42,7 +42,7 @@ function GameBadge({ game }: { game: string }) {
 }
 
 export default function Matches() {
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("active");
   const [gameFilter, setGameFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const qc = useQueryClient();

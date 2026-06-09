@@ -39,22 +39,34 @@ function mapTxType(dbType: string): string {
   const m: Record<string, string> = {
     deposit: "Depósito", withdrawal: "Levamento", bet: "Aposta",
     win: "Vitória", recharge: "Recarga", referral_bonus: "Bónus",
+    manual_deposit: "Depósito", manual_bet: "Aposta",
   };
   return m[dbType] || "Transação";
 }
 
 function mapTxSign(dbType: string): "+" | "-" {
-  return ["withdrawal", "bet"].includes(dbType) ? "-" : "+";
+  return ["withdrawal", "bet", "manual_bet"].includes(dbType) ? "-" : "+";
 }
 
 function mapTxIcon(dbType: string): { icon: TxIcon; color: string } {
-  if (dbType === "deposit") return { icon: ArrowDownLeft, color: "#22c55e" };
+  if (dbType === "deposit" || dbType === "manual_deposit") return { icon: ArrowDownLeft, color: "#22c55e" };
   if (dbType === "withdrawal") return { icon: ArrowUpRight, color: "#ef4444" };
   if (dbType === "recharge") return { icon: RefreshCw, color: "#00D4B4" };
   if (dbType === "win") return { icon: Gamepad2, color: "#f59e0b" };
-  if (dbType === "bet") return { icon: Gamepad2, color: "#a78bfa" };
+  if (dbType === "bet" || dbType === "manual_bet") return { icon: Gamepad2, color: "#a78bfa" };
   if (dbType === "referral_bonus") return { icon: ArrowDownLeft, color: "#22c55e" };
   return { icon: CreditCard, color: "#94a3b8" };
+}
+
+function parseTxDescription(raw: string | null, type: string): string {
+  if (!raw) return mapTxType(type);
+  try {
+    const p = JSON.parse(raw);
+    if (p.mode === "deposit") return "Depósito via M-Pesa/e-Mola";
+    if (p.mode === "bet")     return "Aposta via Carteira Móvel";
+    if (p.confirmationMsg)   return mapTxType(type) + " manual";
+  } catch { /* not JSON — use raw text */ }
+  return raw;
 }
 
 const FERRAMENTAS = [
@@ -117,7 +129,7 @@ export default function Perfil() {
             const amt = Math.abs(parseFloat(String(t.amount)));
             return {
               id: t.id,
-              name: t.description || mapTxType(t.type),
+              name: parseTxDescription(t.description, t.type),
               type: mapTxType(t.type),
               date: new Date(t.created_at).toLocaleDateString("pt-PT", { day: "2-digit", month: "short" }),
               amount: `${sign}${amt.toLocaleString("pt-PT")} MZN`,

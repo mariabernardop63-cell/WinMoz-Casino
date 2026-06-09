@@ -44,8 +44,8 @@ function fmtTime(iso: string) {
 
 export default function Notificacoes() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
-  const { data: notifications = [], isLoading } = useGetUserNotifications(user?.id ?? null);
+  const { user, profile } = useAuth();
+  const { data: notifications = [], isLoading } = useGetUserNotifications(user?.id ?? null, profile?.created_at ?? null);
   const markRead = useMarkNotificationRead();
   const [cat, setCat]       = useState<FilterCat>("Todos");
   const [search, setSearch] = useState("");

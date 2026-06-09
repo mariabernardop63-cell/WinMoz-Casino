@@ -1186,16 +1186,18 @@ export interface UserNotification {
   isRead: boolean;
 }
 
-export function useGetUserNotifications(userId: string | null) {
+export function useGetUserNotifications(userId: string | null, userCreatedAt?: string | null) {
   return useQuery({
-    queryKey: ["user-notifications", userId],
+    queryKey: ["user-notifications", userId, userCreatedAt],
     queryFn: async () => {
       if (!userId) return [];
-      const { data, error } = await adminSupabase
+      let q = adminSupabase
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100);
+      if (userCreatedAt) q = q.gte("created_at", userCreatedAt);
+      const { data, error } = await q;
       if (error) throw error;
 
       const all = (data ?? []).filter((n: Record<string, unknown>) => {

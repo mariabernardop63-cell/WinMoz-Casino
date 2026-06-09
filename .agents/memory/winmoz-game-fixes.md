@@ -1,0 +1,38 @@
+---
+name: Winmoz game fixes
+description: Key decisions and patterns from major bug-fix session — payout, rematch, notifications, transactions
+---
+
+## Payout percentage
+- Winner payout is `Math.floor(BET * 2 * 0.90)` (10% platform fee) in all 3 games: LudoGame, ChessGame, DamasGame
+- Three places per file: the display label, the payout calculation, and the `winner_payout` field in the matches upsert
+- ChessGame uses compact format without spaces (`BET*2*0.90`), sed needs `*2*` pattern to match
+
+## Rematch transaction records
+- On rematch accept/receive, both sides must: deduct balance AND insert a `transactions` row (type: "bet", amount: -BET)
+- The `betDeductedRef.current` is reset to `false` in `resetGame()` — but the subscription handler doesn't re-fire (channel already subscribed), so rematch deduction is handled exclusively by the rematch broadcast handlers
+
+## Notification banner persistence
+- `shownIds` stored in `sessionStorage` under key `wm_notif_shown` to survive navigation but reset on new browser session
+- Announcements no longer bypass the 10-minute age filter (was: `if (type === "announcement") return true` unconditionally)
+- `useGetUserNotifications` now accepts `userCreatedAt` as second param and filters notifications with `.gte("created_at", userCreatedAt)`
+
+## Transaction description parsing
+- DB field `description` can be JSON (`{"mode":"deposit"}` or `{"mode":"bet"}`) for manual_deposit/manual_bet types
+- `parseTxDescription()` in Perfil.tsx handles this; mapTxType/mapTxSign/mapTxIcon all handle `manual_deposit` and `manual_bet`
+
+## Matchmaking cancel credit-back
+- `Apostar.tsx` no longer calls `/api/deposit/credit` (endpoint doesn't exist at root api/)
+- Instead uses Supabase directly: fetch current balance, add bet amount, update profile, insert deposit transaction with description "Reembolso — sem adversário encontrado"
+
+## Resume modal DB check
+- `handleResumeClick` in BottomNav.tsx now queries `matches` table for the `gameId` from localStorage
+- If status is "finished" or "cancelled" (or row missing), clears `wm_active_game` from localStorage and shows the "no active game" picker
+
+## Support chat
+- Endpoint exists at `api/support/chat.ts` (root-level, Vercel serverless)
+- Requires `GROQ_API_KEY` env var in Vercel; without it returns a graceful fallback message (no crash)
+- **Why:** The endpoint already handles missing key gracefully — no code change needed, only Vercel env var
+
+## Admin matches panel
+- Default `statusFilter` is `"active"` (not `"all"`) to hide finished matches on load

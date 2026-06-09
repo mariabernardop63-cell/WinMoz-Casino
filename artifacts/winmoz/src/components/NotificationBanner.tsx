@@ -63,21 +63,31 @@ export default function NotificationBanner() {
   const markRead = useMarkNotificationRead();
   const [queue, setQueue] = useState<UserNotification[]>([]);
   const [current, setCurrent] = useState<UserNotification | null>(null);
-  const shownIds = useRef<Set<string>>(new Set());
+  const SHOWN_KEY = "wm_notif_shown";
+  const shownIds = useRef<Set<string>>((() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("wm_notif_shown") ?? "[]") as string[];
+      return new Set<string>(saved);
+    } catch {
+      return new Set<string>();
+    }
+  })());
 
   useEffect(() => {
     const unread = notifications.filter(n => !n.isRead && !shownIds.current.has(n.id));
     if (unread.length === 0) return;
 
     const fresh = unread.filter(n => {
-      if (n.type === "announcement") return true;
       const age = Date.now() - new Date(n.createdAt).getTime();
-      return age < 10 * 60 * 1000;
+      return age < 10 * 60 * 1000; // only show notifications from last 10 minutes
     });
 
     if (fresh.length === 0) return;
 
-    fresh.forEach(n => shownIds.current.add(n.id));
+    fresh.forEach(n => {
+      shownIds.current.add(n.id);
+    });
+    try { sessionStorage.setItem(SHOWN_KEY, JSON.stringify([...shownIds.current])); } catch { /* ignore */ }
     setQueue(prev => {
       const existing = new Set(prev.map(p => p.id));
       return [...prev, ...fresh.filter(n => !existing.has(n.id))];

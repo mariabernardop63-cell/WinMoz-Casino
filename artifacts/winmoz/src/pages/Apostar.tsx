@@ -1068,17 +1068,31 @@ export default function Apostar() {
     return (
       <MatchmakingScreen
         onCancel={async () => {
-          /* If user paid via carteira móvel and bet wasn't matched, credit balance back */
+          /* If user paid via carteira móvel and no opponent was found, credit balance back */
           if (payMethod === "carteira" && selectedBet) {
             try {
-              const { data: sessionData } = await supabase.auth.getSession();
-              const token = sessionData?.session?.access_token;
-              if (token) {
-                fetch(`${API_BASE}/deposit/credit`, {
-                  method: "POST",
-                  headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-                  body: JSON.stringify({ amount: selectedBet, txId: verifiedDepositTxId }),
-                }).catch(() => {});
+              const session = await getSessionWithRefresh();
+              if (session) {
+                const { data: prof } = await supabase
+                  .from("profiles")
+                  .select("balance")
+                  .eq("id", session.user.id)
+                  .single();
+                const current = Number((prof as any)?.balance ?? 0);
+                const newBalance = Math.round((current + selectedBet) * 100) / 100;
+                await supabase
+                  .from("profiles")
+                  .update({ balance: newBalance })
+                  .eq("id", session.user.id);
+                await supabase
+                  .from("transactions")
+                  .insert({
+                    user_id: session.user.id,
+                    type: "deposit",
+                    amount: selectedBet,
+                    description: "Reembolso — sem adversário encontrado",
+                    status: "approved",
+                  });
               }
             } catch { /* silent */ }
           }

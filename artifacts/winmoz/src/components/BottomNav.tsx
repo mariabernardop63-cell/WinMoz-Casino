@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, Search, X, LayoutGrid, Play, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 import type { ActiveGameRecord } from "@/lib/simulation";
 
 function HomeIcon({ color }: { color: string }) {
@@ -246,9 +247,27 @@ export default function BottomNav() {
     setQuery("");
   };
 
-  const handleResumeClick = (e: React.MouseEvent) => {
+  const handleResumeClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!user) { setLocation("/login"); return; }
+
+    // Verify match is still active in DB before showing resume modal
+    if (activeGame?.gameId && activeGame.gameId !== "local") {
+      try {
+        const { data } = await supabase
+          .from("matches")
+          .select("status")
+          .eq("id", activeGame.gameId)
+          .single();
+        if (!data || data.status === "finished" || data.status === "cancelled") {
+          localStorage.removeItem("wm_active_game");
+          setActiveGame(null);
+          setShowResume(true); // shows the "no active game" picker
+          return;
+        }
+      } catch { /* ignore — show resume optimistically */ }
+    }
+
     setShowResume(true);
   };
 

@@ -994,7 +994,7 @@ function WinScreen({ winner, winnerName, loserName, betAmount, isWinner, onRepla
                   fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:24,
                   color:"#FFD700", lineHeight:1,
                 }}>
-                  +{Math.floor(betAmount * 2 * 0.83).toLocaleString("pt-MZ")} <span style={{fontSize:13}}>MT</span>
+                  +{Math.floor(betAmount * 2 * 0.90).toLocaleString("pt-MZ")} <span style={{fontSize:13}}>MT</span>
                 </p>
               </div>
               <div style={{
@@ -1165,7 +1165,7 @@ export default function LudoGame() {
   useEffect(()=>{
     if(!winner||!profile?.id||BET_AMOUNT<=0||gameId==="local"||winCreditedRef.current) return;
     winCreditedRef.current = true;
-    const payout = Math.floor(BET_AMOUNT * 2 * 0.83);
+    const payout = Math.floor(BET_AMOUNT * 2 * 0.90);
     const platformFee = BET_AMOUNT * 2 - payout;
     const isWinner = winner === myColor;
     (async()=>{
@@ -1498,7 +1498,9 @@ export default function LudoGame() {
         if(BET_AMOUNT > 0 && profile?.id){
           const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
           if(data){
-            await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET_AMOUNT }).eq("id", profile.id);
+            const newBal=parseFloat(String(data.balance))-BET_AMOUNT;
+            await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
+            await supabase.from("transactions").insert({ user_id:profile.id, type:"bet", amount:-BET_AMOUNT, description:"Aposta de revanche (Ludo)", status:"approved" });
           }
         }
         setRematchPhase("idle");
@@ -1558,7 +1560,7 @@ export default function LudoGame() {
               player1_name: playerName,
               player2_name: opponentName,
               bet_amount: BET_AMOUNT,
-              winner_payout: Math.floor(BET_AMOUNT * 2 * 0.83),
+              winner_payout: Math.floor(BET_AMOUNT * 2 * 0.90),
               status: "active",
               created_at: new Date().toISOString(),
             }, { onConflict: "id" });
@@ -1667,7 +1669,9 @@ export default function LudoGame() {
         setRematchPhase("opp_no_balance"); return;
       }
       if(BET_AMOUNT>0){
-        await supabase.from("profiles").update({ balance: parseFloat(String(data.balance))-BET_AMOUNT }).eq("id",profile.id);
+        const newBal=parseFloat(String(data.balance))-BET_AMOUNT;
+        await supabase.from("profiles").update({ balance: newBal }).eq("id",profile.id);
+        await supabase.from("transactions").insert({ user_id:profile.id, type:"bet", amount:-BET_AMOUNT, description:"Aposta de revanche (Ludo)", status:"approved" });
       }
       channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
       setRematchPhase("idle");

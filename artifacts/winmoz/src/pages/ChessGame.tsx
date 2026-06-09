@@ -711,7 +711,7 @@ function WinScreen({winner,winnerName,loserName,reason,betAmount,isWinner,onRepl
                 <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",
                   color:"rgba(255,255,255,0.4)",marginBottom:4}}>GANHOS</p>
                 <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#FFD700",lineHeight:1}}>
-                  +{Math.floor(betAmount * 2 * 0.83).toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
+                  +{Math.floor(betAmount * 2 * 0.90).toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
               <div style={{width:44,height:44,borderRadius:12,background:"rgba(255,215,0,0.12)",
@@ -942,7 +942,7 @@ export default function ChessGame(){
     if(!winner||!profile?.id||BET<=0||gameId==="local"||winCreditedRef.current)return;
     if(winner!==myColor)return;
     winCreditedRef.current=true;
-    const payout=Math.floor(BET*2*0.83);
+    const payout=Math.floor(BET*2*0.90);
     (async()=>{
       try{
         const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
@@ -959,7 +959,7 @@ export default function ChessGame(){
   // Platform fee (only white's client inserts to avoid duplicates)
   useEffect(()=>{
     if(!winner||BET<=0||gameId==="local"||myColor!=="w")return;
-    const platformFee=BET*2-Math.floor(BET*2*0.83);
+    const platformFee=BET*2-Math.floor(BET*2*0.90);
     if(platformFee>0){
       void supabase.from("platform_earnings").insert({
         amount:platformFee,source:"game_fee",
@@ -1121,7 +1121,11 @@ export default function ChessGame(){
       if(payload.accepted){
         if(BET>0&&profile?.id){
           const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
-          if(data)await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
+          if(data){
+            const newBal=parseFloat(String(data.balance))-BET;
+            await supabase.from("profiles").update({balance:newBal}).eq("id",profile.id);
+            await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de revanche (Xadrez)",status:"approved"});
+          }
         }
         setRematchPhase("idle");
         resetGame();
@@ -1211,7 +1215,11 @@ export default function ChessGame(){
         channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:false,reason:"no_balance"}});
         setRematchPhase("opp_no_balance");return;
       }
-      if(BET>0)await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
+      if(BET>0){
+        const newBal=parseFloat(String(data.balance))-BET;
+        await supabase.from("profiles").update({balance:newBal}).eq("id",profile.id);
+        await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de revanche (Xadrez)",status:"approved"});
+      }
       channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:true}});
       setRematchPhase("idle");
       resetGame();
