@@ -91,7 +91,8 @@ export default function DepositRequests() {
       if (txErr || !txData) throw new Error("Pedido não encontrado");
       if ((txData as any).status !== "pending") throw new Error("Pedido já processado");
 
-      if ((txData as any).type === "manual_deposit") {
+      // Credit balance for both manual deposits AND manual bets (carteira móvel)
+      if ((txData as any).type === "manual_deposit" || (txData as any).type === "manual_bet") {
         const { data: profile, error: profErr } = await adminSupabase
           .from("profiles")
           .select("balance")
@@ -121,7 +122,7 @@ export default function DepositRequests() {
       toast.success(
         req.type === "manual_deposit"
           ? `Depósito de ${fmtMZN(req.amount)} MZN aprovado — saldo creditado`
-          : `Aposta de ${fmtMZN(req.amount)} MZN aprovada`
+          : `Aposta de ${fmtMZN(req.amount)} MZN aprovada — saldo creditado`
       );
       loadRequests();
     } catch (err: any) {

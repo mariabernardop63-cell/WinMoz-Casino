@@ -434,12 +434,14 @@ router.post("/withdraw", async (req, res) => {
       .from("profiles").select("balance, full_name, phone").eq("id", userId).single();
     if (profileError || !profileData) { res.status(500).json({ error: "Erro ao obter perfil" }); return; }
 
+    const WITHDRAWAL_FEE = 5;
     const currentBalance = parseFloat(String(profileData.balance ?? "0"));
-    if (currentBalance < amount) {
-      res.status(400).json({ error: "Saldo insuficiente" }); return;
+    if (currentBalance < amount + WITHDRAWAL_FEE) {
+      res.status(400).json({ error: `Saldo insuficiente. Precisas de ${amount + WITHDRAWAL_FEE} MT (valor + ${WITHDRAWAL_FEE} MT de taxa)` }); return;
     }
 
-    const newBalance = Math.round((currentBalance - amount) * 100) / 100;
+    const totalDeduct = Math.round((amount + WITHDRAWAL_FEE) * 100) / 100;
+    const newBalance = Math.round((currentBalance - totalDeduct) * 100) / 100;
     const { error: balanceError } = await admin
       .from("profiles").update({ balance: newBalance }).eq("id", userId);
     if (balanceError) { res.status(500).json({ error: "Erro ao debitar saldo" }); return; }
@@ -455,7 +457,7 @@ router.post("/withdraw", async (req, res) => {
       .from("transactions").insert({
         user_id: userId,
         type: "withdrawal",
-        amount: -amount,
+        amount: -(amount + WITHDRAWAL_FEE),
         description: withdrawalMeta,
         status: "pending",
         created_at: new Date().toISOString(),
@@ -616,7 +618,8 @@ router.post("/admin/deposit/approve", async (req, res) => {
     if (txErr || !txData) { res.status(404).json({ error: "Pedido não encontrado" }); return; }
     if ((txData as any).status !== "pending") { res.status(400).json({ error: "Pedido já processado" }); return; }
 
-    if ((txData as any).type === "manual_deposit") {
+    // Credit balance for both manual_deposit and manual_bet (carteira móvel)
+    if ((txData as any).type === "manual_deposit" || (txData as any).type === "manual_bet") {
       const { data: profile } = await supabaseAdmin
         .from("profiles").select("balance").eq("id", (txData as any).user_id).single();
       const current = Number((profile as any)?.balance ?? 0);

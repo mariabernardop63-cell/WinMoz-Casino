@@ -505,14 +505,18 @@ export default function DamasGame() {
     const isWinner = winner === myColor;
     (async () => {
       try {
-        // Credit winner's balance
+        // Credit winner's balance — fetch fresh balance to avoid stale read
         if (isWinner) {
-          const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-          if (data) {
-            await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) + payout }).eq("id", profile.id);
-            await supabase.from("transactions").insert({ user_id: profile.id, type: "win", amount: payout, description: `Vitória de jogo (Damas) +${payout} MT`, status: "approved" });
-            await refreshProfile();
-          }
+          const { data: freshData } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+          // Use fetched balance if available, fall back to profile context balance
+          const currentBal = freshData
+            ? parseFloat(String(freshData.balance))
+            : parseFloat(String(profile.balance ?? 0));
+          const { error: creditErr } = await supabase
+            .from("profiles").update({ balance: currentBal + payout }).eq("id", profile.id);
+          if (creditErr) throw creditErr; // triggers retry via catch block
+          await supabase.from("transactions").insert({ user_id: profile.id, type: "win", amount: payout, description: `Vitória de jogo (Damas) +${payout} MT`, status: "approved" });
+          await refreshProfile();
         }
         // Update match record as finished (only player "w" to avoid duplicate updates)
         if (myColor === "w") {
