@@ -18,7 +18,14 @@ import {
   Gamepad2, ArrowUpRight, ArrowDownLeft, ArrowLeftRight,
   Wallet, TrendingUp, Activity,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
+
+function getMozambiqueGreeting(): string {
+  const mozHour = (new Date().getUTCHours() + 2) % 24;
+  if (mozHour < 12) return "Bom dia";
+  if (mozHour < 18) return "Boa tarde";
+  return "Boa noite";
+}
 
 const V1 = "#6C5CE7";
 const V2 = "#a78bfa";
@@ -92,9 +99,10 @@ function MacOSCircles({ delay = 0 }: { delay?: number }) {
 }
 
 function MoneyCard({
-  label, value, icon: Icon, suffix,
+  label, value, icon: Icon, suffix, onClear, cleared,
 }: {
   label: string; value: string; icon: React.ElementType; suffix?: string;
+  onClear?: () => void; cleared?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -103,7 +111,16 @@ function MoneyCard({
         <div className="text-[10.5px] font-black uppercase tracking-[0.1em]" style={{ color: "var(--gz-text-tertiary)" }}>
           {label}
         </div>
-        <div className="relative">
+        <div className="relative flex items-center gap-1">
+          {onClear && (
+            <button
+              onClick={onClear}
+              title={cleared ? "Repor valor real" : "Limpar visualização"}
+              className="w-6 h-6 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+              style={{ background: cleared ? "rgba(239,68,68,.1)" : "rgba(0,0,0,.04)" }}>
+              <Activity className="w-3 h-3" style={{ color: cleared ? "#ef4444" : "#aaa" }} />
+            </button>
+          )}
           <button
             onClick={() => setOpen(o => !o)}
             className="w-6 h-6 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
@@ -133,6 +150,7 @@ function MoneyCard({
         </div>
       </div>
       {suffix && <div className="text-[11px] font-medium mt-1.5" style={{ color: "var(--gz-text-muted)" }}>{suffix}</div>}
+      {cleared && <div className="text-[10px] font-semibold mt-1" style={{ color: "#ef4444" }}>Cache limpa — clique em ↻ para repor</div>}
     </div>
   );
 }
@@ -273,6 +291,10 @@ function ActionItem({ icon: Icon, title, sub, done }: {
 export default function Dashboard() {
   useAdminRealtimeSync();
 
+  const [clearedRevenue, setClearedRevenue]         = useState(false);
+  const [clearedWithdrawals, setClearedWithdrawals] = useState(false);
+  const greeting = useMemo(() => getMozambiqueGreeting(), []);
+
   const { data: stats, isLoading: sLoad } = useGetDashboardStats();
   const { data: mTime } = useGetMatchesOverTime();
   const { data: bTime } = useGetBetsOverTime();
@@ -315,7 +337,7 @@ export default function Dashboard() {
           <div className="flex items-end justify-between mt-4">
             <div>
               <h1 style={{ fontSize: 30, fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1.1, color: "var(--gz-text-primary)" }}>
-                Bom dia,{" "}
+                {greeting},{" "}
                 <span className="gz-gradient-text">Admin!</span>
               </h1>
               <p className="mt-1.5 text-[13px] font-medium" style={{ color: "var(--gz-text-accent)" }}>
@@ -338,15 +360,19 @@ export default function Dashboard() {
         <div className="flex gap-4">
           <MoneyCard
             label="Saldo disponível"
-            value={`MT ${platformRevenue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
+            value={`MT ${(clearedRevenue ? 0 : platformRevenue).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
             icon={Wallet}
-            suffix="Lucro total da plataforma (apostas + taxas)"
+            suffix="Lucro total da plataforma (apostas + taxas de levantamento)"
+            cleared={clearedRevenue}
+            onClear={() => setClearedRevenue(v => !v)}
           />
           <MoneyCard
             label="Saídas"
-            value={`MT ${totalApprovedWithdrawals.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
+            value={`MT ${(clearedWithdrawals ? 0 : totalApprovedWithdrawals).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`}
             icon={ArrowDownLeft}
             suffix="Total de levantamentos aprovados"
+            cleared={clearedWithdrawals}
+            onClear={() => setClearedWithdrawals(v => !v)}
           />
         </div>
 

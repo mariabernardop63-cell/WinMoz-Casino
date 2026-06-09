@@ -1267,7 +1267,9 @@ export default function LudoGame() {
   function handleMoveComplete(pieceId:PieceId,diceVal:number,currentTurn:Player,prevPos:number){
     setPhase("moving");
     const ps=piecesRef.current;
-    const mover=ps.find(p=>p.id===pieceId)!;
+    const finalPos = prevPos === -1 ? 0 : prevPos + diceVal;
+    const baseMover = ps.find(p=>p.id===pieceId);
+    const mover: GamePiece = baseMover ? {...baseMover, pos: finalPos} : {id:pieceId, player:currentTurn, pos:finalPos};
     const captured = captureAtPos(mover);
     if(finishedCount(piecesRef.current,currentTurn)===4){
       setWinner(currentTurn); setPhase("done"); return;

@@ -112,17 +112,19 @@ export function useGetDashboardStats() {
       ]);
 
       const pendingWithdrawals = (pendingWithdrawalsData as unknown[]).length;
+      const approvedWithdrawalCount = (approvedWithdrawalsData as { amount: number }[]).length;
       const totalApprovedWithdrawals = (approvedWithdrawalsData as { amount: number }[])
         .reduce((s, w) => s + Math.abs(Number(w.amount ?? 0)), 0);
       const todaySaidas = (todayWithdrawalsData as { amount: number }[])
         .reduce((s, w) => s + Math.abs(Number(w.amount ?? 0)), 0);
 
-      // Receita da plataforma = total apostado - total pago aos vencedores
+      // Receita da plataforma = total apostado - total pago aos vencedores + taxas de levantamento (5 MT cada)
       const totalBets = (allBetsData as { amount: number }[])
         .reduce((s, t) => s + Math.abs(Number(t.amount ?? 0)), 0);
       const totalWins = (allWinsData as { amount: number }[])
         .reduce((s, t) => s + Math.abs(Number(t.amount ?? 0)), 0);
-      const platformRevenue = Math.max(0, totalBets - totalWins);
+      const totalWithdrawalFees = approvedWithdrawalCount * 5;
+      const platformRevenue = Math.max(0, totalBets - totalWins + totalWithdrawalFees);
 
       const todayBets = (todayBetsData as { amount: number }[])
         .reduce((s, t) => s + Math.abs(Number(t.amount ?? 0)), 0);
@@ -608,6 +610,16 @@ export interface AdminTransaction {
   status: "active" | "settled" | "cancelled" | "pending" | "approved" | "rejected";
   game: string;
   createdAt: string;
+  phone?: string | null;
+}
+
+function parseWithdrawalPhone(description: unknown): string | null {
+  if (!description) return null;
+  try {
+    const desc = typeof description === "string" ? JSON.parse(description) : null;
+    if (desc?.phone) return String(desc.phone);
+  } catch { /* not JSON */ }
+  return null;
 }
 
 function parseTxGame(description: unknown): string {
@@ -689,6 +701,7 @@ export function useListTransactions(params?: { status?: string; type?: string })
           status:     mapTxStatus(tx.status as string, txType),
           game:       parseTxGame(tx.description),
           createdAt:  tx.created_at as string,
+          phone:      txType === "withdrawal" ? parseWithdrawalPhone(tx.description) : null,
         } satisfies AdminTransaction;
       });
     },

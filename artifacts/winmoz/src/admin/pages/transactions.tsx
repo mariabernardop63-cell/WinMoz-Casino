@@ -121,6 +121,7 @@ export default function Transactions() {
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Tipo</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>ID</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Jogador</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Telefone</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Jogo</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Valor (MT)</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Ganho (MT)</th>
@@ -131,10 +132,10 @@ export default function Transactions() {
             <tbody>
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i}><td colSpan={8} className="px-5 py-3"><div className="h-5 rounded animate-pulse" style={{ background: "var(--gz-bg-subtle)" }} /></td></tr>
+                  <tr key={i}><td colSpan={9} className="px-5 py-3"><div className="h-5 rounded animate-pulse" style={{ background: "var(--gz-bg-subtle)" }} /></td></tr>
                 ))
               ) : allTransactions.length === 0 ? (
-                <tr><td colSpan={8} className="px-5 py-10 text-center text-sm" style={{ color: "var(--gz-text-muted)" }}>Nenhuma transação encontrada</td></tr>
+                <tr><td colSpan={9} className="px-5 py-10 text-center text-sm" style={{ color: "var(--gz-text-muted)" }}>Nenhuma transação encontrada</td></tr>
               ) : (
                 allTransactions.map((t) => (
                   <tr key={t.id} className="hover:bg-indigo-50/30 transition-colors" style={{ borderBottom: "1px solid rgba(108,92,231,.04)" }}>
@@ -150,6 +151,9 @@ export default function Transactions() {
                     </td>
                     <td className="px-5 py-3.5 font-mono text-xs" style={{ color: "var(--gz-text-muted)" }}>#{t.id.slice(0, 8)}</td>
                     <td className="px-5 py-3.5 font-medium" style={{ color: "var(--gz-text-primary)" }}>{t.playerName}</td>
+                    <td className="px-5 py-3.5 text-xs font-mono" style={{ color: "var(--gz-text-secondary)" }}>
+                      {t.phone ? `+258 ${t.phone}` : <span style={{ color: "var(--gz-text-tertiary)" }}>—</span>}
+                    </td>
                     <td className="px-5 py-3.5"><GameBadge game={t.game} /></td>
                     <td className="px-5 py-3.5 font-semibold" style={{ color: "var(--gz-text-primary)" }}>MT {t.amount.toFixed(2)}</td>
                     <td className="px-5 py-3.5 font-medium" style={{ color: "#059669" }}>

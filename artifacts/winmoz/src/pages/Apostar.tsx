@@ -1067,35 +1067,7 @@ export default function Apostar() {
   if (screen === "matchmaking") {
     return (
       <MatchmakingScreen
-        onCancel={async () => {
-          /* If user paid via carteira móvel and no opponent was found, credit balance back */
-          if (payMethod === "carteira" && selectedBet) {
-            try {
-              const session = await getSessionWithRefresh();
-              if (session) {
-                const { data: prof } = await supabase
-                  .from("profiles")
-                  .select("balance")
-                  .eq("id", session.user.id)
-                  .single();
-                const current = Number((prof as any)?.balance ?? 0);
-                const newBalance = Math.round((current + selectedBet) * 100) / 100;
-                await supabase
-                  .from("profiles")
-                  .update({ balance: newBalance })
-                  .eq("id", session.user.id);
-                await supabase
-                  .from("transactions")
-                  .insert({
-                    user_id: session.user.id,
-                    type: "deposit",
-                    amount: selectedBet,
-                    description: "Reembolso — sem adversário encontrado",
-                    status: "approved",
-                  });
-              }
-            } catch { /* silent */ }
-          }
+        onCancel={() => {
           setVerifiedDepositTxId(null);
           setScreen("bet");
         }}

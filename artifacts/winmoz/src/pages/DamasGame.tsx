@@ -673,6 +673,7 @@ export default function DamasGame() {
 
     ch.on("broadcast", { event: "damas_resync_state" }, ({ payload }) => {
       const incoming = payload as { board: Board; turn: PColor; seq: number };
+      if (incoming.turn !== "w" && incoming.turn !== "b") return;
       if ((incoming.seq ?? 0) >= seqRef.current) {
         setBoard(incoming.board);
         setTurn(incoming.turn);

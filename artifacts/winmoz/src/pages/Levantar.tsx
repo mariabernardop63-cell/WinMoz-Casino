@@ -80,6 +80,9 @@ export default function Levantar() {
   const [txId] = useState(() => "TX" + Date.now().toString(36).toUpperCase());
   const [txDate] = useState(() => new Date().toLocaleString("pt-PT"));
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [editingPhone, setEditingPhone] = useState(false);
+  const [editPhoneVal, setEditPhoneVal] = useState(profile?.phone ?? "");
+  const [savingPhone, setSavingPhone] = useState(false);
 
   const amountVal = parseFloat(amountStr) || 0;
   const phoneDisplay = userPhone || "+258 8XX XXX XXX";
@@ -278,15 +281,49 @@ export default function Levantar() {
             </button>
           </div>
 
-          <div className="flex items-center justify-between px-5 py-3 rounded-2xl mx-5 mb-4" style={{ background: "#1c1c1e" }}>
-            <div className="flex items-center gap-2">
-              <Smartphone style={{ width: 16, height: 16, color: CYAN }} />
-              <span className="text-white text-sm font-medium">{METHOD_NAME}</span>
+          <div className="flex flex-col gap-2 px-5 mb-4">
+            <div className="flex items-center justify-between px-4 py-3 rounded-2xl" style={{ background: "#1c1c1e" }}>
+              <div className="flex items-center gap-2">
+                <Smartphone style={{ width: 16, height: 16, color: CYAN }} />
+                <span className="text-white text-sm font-medium">{METHOD_NAME}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {!editingPhone && <span className="text-white/50 text-sm">{phoneDisplay}</span>}
+                <button onClick={() => { setEditingPhone(e => !e); setEditPhoneVal(profile?.phone ?? ""); }}
+                  style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
+                  <Pencil style={{ width: 13, height: 13, color: CYAN }} />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-white/50 text-sm">{phoneDisplay}</span>
-              <Pencil style={{ width: 13, height: 13, color: CYAN }} />
-            </div>
+            {editingPhone && (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-2xl" style={{ background: "#1c1c1e" }}>
+                <span className="text-white/50 text-sm flex-shrink-0">+258</span>
+                <input
+                  type="tel" inputMode="numeric" maxLength={9}
+                  value={editPhoneVal}
+                  onChange={e => setEditPhoneVal(e.target.value.replace(/\D/g, ""))}
+                  placeholder="84XXXXXXX"
+                  className="flex-1 bg-transparent text-white text-sm outline-none"
+                  style={{ caretColor: CYAN }}
+                />
+                <button
+                  disabled={savingPhone || editPhoneVal.length < 9}
+                  onClick={async () => {
+                    if (!user?.id || editPhoneVal.length < 9) return;
+                    setSavingPhone(true);
+                    try {
+                      await supabase.from("profiles").update({ phone: editPhoneVal }).eq("id", user.id);
+                      await refreshProfile();
+                      setEditingPhone(false);
+                    } catch { /* silently ignore */ }
+                    setSavingPhone(false);
+                  }}
+                  className="px-3 py-1 rounded-xl text-xs font-bold transition-all"
+                  style={{ background: editPhoneVal.length >= 9 ? CYAN : "#3a3a3c", color: editPhoneVal.length >= 9 ? "#000" : "#666", cursor: editPhoneVal.length >= 9 ? "pointer" : "default" }}>
+                  {savingPhone ? "…" : "Guardar"}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col items-center justify-center px-5 py-6">
@@ -395,7 +432,7 @@ export default function Levantar() {
                 { label: "Método",           val: METHOD_NAME },
                 { label: "Estado Estimado",  val: "Pendente (análise manual)" },
                 { label: "Valor",            val: `${fmtMZN(amountVal)} MZN` },
-                { label: "Taxa",             val: "0,00 MZN" },
+                { label: "Taxa",             val: amountVal >= MIN_WITHDRAW ? "5,00 MZN" : "0,00 MZN" },
               ].map(row => (
                 <div key={row.label} className="flex items-center justify-between">
                   <span className="text-sm" style={{ color: "#8e8e93" }}>{row.label}</span>
@@ -404,8 +441,10 @@ export default function Levantar() {
               ))}
               <div className="border-t" style={{ borderColor: "#3a3a3c" }} />
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-white">Total</span>
-                <span className="text-sm font-bold" style={{ color: CYAN }}>{fmtMZN(amountVal)} MZN</span>
+                <span className="text-sm font-semibold text-white">Você Recebe</span>
+                <span className="text-sm font-bold" style={{ color: CYAN }}>
+                  {fmtMZN(amountVal >= MIN_WITHDRAW ? amountVal - 5 : amountVal)} MZN
+                </span>
               </div>
             </div>
           </div>
