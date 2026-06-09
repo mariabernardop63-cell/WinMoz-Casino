@@ -131,13 +131,14 @@ export default function Depositar() {
           amount: amountVal,
           description: JSON.stringify({ confirmationMsg: smsText.trim(), mode: "deposit" }),
           status: "pending",
-          created_at: new Date().toISOString(),
         })
         .select("id")
         .single();
 
       if (txError || !txRow) {
-        setVerifyError("Erro ao enviar pedido. Tenta de novo.");
+        console.error("[Depositar] Supabase insert error:", txError);
+        const msg = txError?.message ? `Erro: ${txError.message}` : "Erro ao enviar pedido. Tenta de novo.";
+        setVerifyError(msg);
         setScreen("instructions");
         return;
       }

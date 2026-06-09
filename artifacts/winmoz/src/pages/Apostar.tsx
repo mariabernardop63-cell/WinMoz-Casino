@@ -213,13 +213,14 @@ function SMSBettingScreen({
             mode: "bet",
           }),
           status: "pending",
-          created_at: new Date().toISOString(),
         })
         .select("id")
         .single();
 
       if (txError || !txRow) {
-        setError("Erro ao enviar pedido. Tenta de novo.");
+        console.error("[Apostar] Supabase insert error:", txError);
+        const msg = txError?.message ? `Erro: ${txError.message}` : "Erro ao enviar pedido. Tenta de novo.";
+        setError(msg);
         setStep("info");
         return;
       }
