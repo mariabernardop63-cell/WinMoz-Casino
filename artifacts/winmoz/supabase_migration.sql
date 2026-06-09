@@ -43,3 +43,44 @@ ALTER TABLE public.deposit_verifications DISABLE ROW LEVEL SECURITY;
 -- Podes criar um cron job no Supabase para isto:
 -- DELETE FROM sms_logs WHERE received_at < NOW() - INTERVAL '24 hours';
 -- DELETE FROM deposit_verifications WHERE submitted_at < NOW() - INTERVAL '24 hours';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 5. CORRECÇÃO: Adicionar tipos manuais ao CHECK constraint de transactions
+--    O constraint original não incluía 'manual_deposit' nem 'manual_bet',
+--    o que causava erro ao utilizador submeter depósitos/apostas via carteira móvel.
+--
+--    CORRE ESTE BLOCO NO SUPABASE SQL EDITOR:
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE public.transactions
+  DROP CONSTRAINT IF EXISTS transactions_type_check;
+
+ALTER TABLE public.transactions
+  ADD CONSTRAINT transactions_type_check
+  CHECK (type IN (
+    'deposit',
+    'withdrawal',
+    'recharge',
+    'bet',
+    'win',
+    'manual_deposit',
+    'manual_bet'
+  ));
+
+-- Garantir também que utilizadores autenticados podem inserir as suas próprias transacções pendentes
+-- (RLS policy — só cria se não existir uma política equivalente)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'transactions'
+      AND policyname = 'Users can insert own pending transactions'
+  ) THEN
+    EXECUTE $policy$
+      CREATE POLICY "Users can insert own pending transactions"
+      ON public.transactions
+      FOR INSERT
+      TO authenticated
+      WITH CHECK (user_id = auth.uid())
+    $policy$;
+  END IF;
+END $$;
