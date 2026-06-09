@@ -6,7 +6,7 @@ import {
   XCircle, RotateCcw, AlertTriangle, Swords, Users,
   CreditCard, Smartphone, CheckCircle2, Clock, X, Pencil, Phone, Copy,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, getSessionWithRefresh, isSessionExpiredError } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getLivePlayerCount, getSalaOnlineCount } from "@/lib/simulation";
 import { API_BASE } from "@/lib/apiBase";
@@ -197,14 +197,18 @@ function SMSBettingScreen({
     setStep("processing");
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
-      if (!userId) { setError("Sessão inválida. Volta a entrar."); setStep("info"); return; }
+      const session = await getSessionWithRefresh();
+      if (!session) {
+        setError("Sessão expirada. Volta a entrar na tua conta.");
+        setStep("info");
+        setLocation("/login");
+        return;
+      }
 
       const { data: txRow, error: txError } = await supabase
         .from("transactions")
         .insert({
-          user_id: userId,
+          user_id: session.user.id,
           type: "manual_bet",
           amount,
           description: JSON.stringify({
@@ -219,6 +223,13 @@ function SMSBettingScreen({
 
       if (txError || !txRow) {
         console.error("[Apostar] Supabase insert error:", txError);
+        if (isSessionExpiredError(txError)) {
+          await supabase.auth.signOut();
+          setError("Sessão expirada. Volta a entrar na tua conta.");
+          setStep("info");
+          setLocation("/login");
+          return;
+        }
         const msg = txError?.message ? `Erro: ${txError.message}` : "Erro ao enviar pedido. Tenta de novo.";
         setError(msg);
         setStep("info");
@@ -249,8 +260,14 @@ function SMSBettingScreen({
           if (count >= 600) { clearInterval(pollRef.current!); setStep("rejected"); }
         }
       }, 3000);
-    } catch {
-      setError("Erro de ligação. Tenta de novo.");
+    } catch (err: any) {
+      if (isSessionExpiredError(err)) {
+        await supabase.auth.signOut().catch(() => {});
+        setError("Sessão expirada. Volta a entrar na tua conta.");
+        setLocation("/login");
+      } else {
+        setError("Erro de ligação. Tenta de novo.");
+      }
       setStep("info");
     }
   };

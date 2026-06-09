@@ -5,7 +5,7 @@ import {
   ChevronLeft, X, CheckCircle2, XCircle, AlertTriangle,
   RotateCcw, Copy, Smartphone, Clock,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, getSessionWithRefresh, isSessionExpiredError } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
 const CYAN = "#00D4B4";
@@ -119,14 +119,18 @@ export default function Depositar() {
     setScreen("verifying");
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userId = sessionData?.session?.user?.id;
-      if (!userId) { setVerifyError("Sessão inválida. Volta a entrar."); setScreen("instructions"); return; }
+      const session = await getSessionWithRefresh();
+      if (!session) {
+        setVerifyError("Sessão expirada. Volta a entrar na tua conta.");
+        setScreen("instructions");
+        setLocation("/login");
+        return;
+      }
 
       const { data: txRow, error: txError } = await supabase
         .from("transactions")
         .insert({
-          user_id: userId,
+          user_id: session.user.id,
           type: "manual_deposit",
           amount: amountVal,
           description: JSON.stringify({ confirmationMsg: smsText.trim(), mode: "deposit" }),
@@ -137,6 +141,13 @@ export default function Depositar() {
 
       if (txError || !txRow) {
         console.error("[Depositar] Supabase insert error:", txError);
+        if (isSessionExpiredError(txError)) {
+          await supabase.auth.signOut();
+          setVerifyError("Sessão expirada. Volta a entrar na tua conta.");
+          setScreen("instructions");
+          setLocation("/login");
+          return;
+        }
         const msg = txError?.message ? `Erro: ${txError.message}` : "Erro ao enviar pedido. Tenta de novo.";
         setVerifyError(msg);
         setScreen("instructions");
@@ -146,8 +157,14 @@ export default function Depositar() {
       const pid = (txRow as any).id as string;
       setPendingId(pid);
       startPolling(pid, amountVal);
-    } catch {
-      setVerifyError("Erro de ligação. Tenta de novo.");
+    } catch (err: any) {
+      if (isSessionExpiredError(err)) {
+        await supabase.auth.signOut().catch(() => {});
+        setVerifyError("Sessão expirada. Volta a entrar na tua conta.");
+        setLocation("/login");
+      } else {
+        setVerifyError("Erro de ligação. Tenta de novo.");
+      }
       setScreen("instructions");
     }
   };
