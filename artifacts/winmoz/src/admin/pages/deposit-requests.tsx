@@ -6,8 +6,6 @@ import {
   Clock, Wallet, Gamepad2, RefreshCw, User, Phone, MessageSquare,
 } from "lucide-react";
 import { adminSupabase } from "@/admin/lib/supabase-api";
-import { supabase } from "@/lib/supabase";
-import { API_BASE } from "@/lib/apiBase";
 
 const CYAN = "#00D4B4";
 
@@ -79,26 +77,46 @@ export default function DepositRequests() {
     return () => { adminSupabase.removeChannel(channel); };
   }, [loadRequests]);
 
-  const getAdminToken = async (): Promise<string | null> => {
-    const { data } = await supabase.auth.getSession();
-    return data?.session?.access_token ?? null;
-  };
-
   const handleApprove = async (req: DepositRequest) => {
     if (processingId) return;
     setProcessingId(req.id);
 
     try {
-      const token = await getAdminToken();
-      if (!token) throw new Error("Sessão inválida");
+      const { data: txData, error: txErr } = await adminSupabase
+        .from("transactions")
+        .select("id, amount, user_id, type, status")
+        .eq("id", req.id)
+        .single();
 
-      const r = await fetch(`${API_BASE}/admin/deposit/approve`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ id: req.id }),
-      });
-      const data = await r.json() as { success?: boolean; error?: string };
-      if (!data.success) throw new Error(data.error ?? "Erro ao aprovar");
+      if (txErr || !txData) throw new Error("Pedido não encontrado");
+      if ((txData as any).status !== "pending") throw new Error("Pedido já processado");
+
+      if ((txData as any).type === "manual_deposit") {
+        const { data: profile, error: profErr } = await adminSupabase
+          .from("profiles")
+          .select("balance")
+          .eq("id", (txData as any).user_id)
+          .single();
+
+        if (profErr) throw new Error("Erro ao obter saldo do utilizador");
+
+        const current = Number((profile as any)?.balance ?? 0);
+        const newBalance = Math.round((current + Number((txData as any).amount)) * 100) / 100;
+
+        const { error: balErr } = await adminSupabase
+          .from("profiles")
+          .update({ balance: newBalance })
+          .eq("id", (txData as any).user_id);
+
+        if (balErr) throw new Error("Erro ao creditar saldo: " + balErr.message);
+      }
+
+      const { error: upErr } = await adminSupabase
+        .from("transactions")
+        .update({ status: "approved" })
+        .eq("id", req.id);
+
+      if (upErr) throw new Error("Erro ao aprovar: " + upErr.message);
 
       toast.success(
         req.type === "manual_deposit"
@@ -107,6 +125,7 @@ export default function DepositRequests() {
       );
       loadRequests();
     } catch (err: any) {
+      console.error("[Admin] Approve error:", err);
       toast.error(err?.message ?? "Erro ao aprovar pedido");
     } finally {
       setProcessingId(null);
@@ -118,20 +137,26 @@ export default function DepositRequests() {
     setProcessingId(req.id);
 
     try {
-      const token = await getAdminToken();
-      if (!token) throw new Error("Sessão inválida");
+      const { data: txData, error: txErr } = await adminSupabase
+        .from("transactions")
+        .select("id, status")
+        .eq("id", req.id)
+        .single();
 
-      const r = await fetch(`${API_BASE}/admin/deposit/reject`, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ id: req.id }),
-      });
-      const data = await r.json() as { success?: boolean; error?: string };
-      if (!data.success) throw new Error(data.error ?? "Erro ao rejeitar");
+      if (txErr || !txData) throw new Error("Pedido não encontrado");
+      if ((txData as any).status !== "pending") throw new Error("Pedido já processado");
+
+      const { error: upErr } = await adminSupabase
+        .from("transactions")
+        .update({ status: "rejected" })
+        .eq("id", req.id);
+
+      if (upErr) throw new Error("Erro ao rejeitar: " + upErr.message);
 
       toast.success("Pedido rejeitado");
       loadRequests();
     } catch (err: any) {
+      console.error("[Admin] Reject error:", err);
       toast.error(err?.message ?? "Erro ao rejeitar pedido");
     } finally {
       setProcessingId(null);
