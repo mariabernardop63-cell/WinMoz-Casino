@@ -3,6 +3,8 @@ modules = ["nodejs-20", "web", "bash"]
 [deployment]
 router = "application"
 deploymentTarget = "autoscale"
+run = ["bash", "-c", "PORT=8080 node --enable-source-maps ./artifacts/api-server/dist/index.mjs"]
+build = ["bash", "-c", "pnpm install && pnpm --filter @workspace/winmoz build && pnpm --filter @workspace/api-server build"]
 
 [deployment.postBuild]
 args = ["pnpm", "store", "prune"]
@@ -71,6 +73,10 @@ externalPort = 8080
 [[ports]]
 localPort = 8081
 externalPort = 8081
+
+[[ports]]
+localPort = 8090
+externalPort = 3003
 
 [[ports]]
 localPort = 19790
