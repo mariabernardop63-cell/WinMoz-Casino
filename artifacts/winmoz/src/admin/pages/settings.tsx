@@ -156,6 +156,7 @@ export default function Settings() {
   };
 
   // Admin credentials
+  const [adminEmail, setAdminEmail] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPw, setNewPw] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -163,23 +164,43 @@ export default function Settings() {
   const [savingPw, setSavingPw] = useState(false);
 
   const handleChangeEmail = async () => {
-    if (!newEmail.trim() || !newEmail.includes("@")) { toast.error("E-mail inválido"); return; }
+    if (!adminEmail.trim() || !adminEmail.includes("@")) { toast.error("Introduz o teu e-mail actual (para identificação)"); return; }
+    if (!newEmail.trim() || !newEmail.includes("@")) { toast.error("Novo e-mail inválido"); return; }
     setSavingEmail(true);
-    const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
+    try {
+      const res = await fetch("/api/admin/update-admin-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "email", value: newEmail.trim(), adminEmail: adminEmail.trim() }),
+      });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { toast.error("Erro: " + (data.error ?? "Falha ao actualizar")); setSavingEmail(false); return; }
+      toast.success("E-mail actualizado com sucesso.");
+      setNewEmail("");
+    } catch {
+      toast.error("Erro de ligação ao servidor");
+    }
     setSavingEmail(false);
-    if (error) { toast.error("Erro: " + error.message); return; }
-    toast.success("E-mail de confirmação enviado para o novo endereço.");
-    setNewEmail("");
   };
 
   const handleChangePw = async () => {
+    if (!adminEmail.trim() || !adminEmail.includes("@")) { toast.error("Introduz o teu e-mail actual (para identificação)"); return; }
     if (newPw.length < 8) { toast.error("A senha deve ter pelo menos 8 caracteres"); return; }
     setSavingPw(true);
-    const { error } = await supabase.auth.updateUser({ password: newPw });
+    try {
+      const res = await fetch("/api/admin/update-admin-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "password", value: newPw, adminEmail: adminEmail.trim() }),
+      });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) { toast.error("Erro: " + (data.error ?? "Falha ao actualizar")); setSavingPw(false); return; }
+      toast.success("Palavra-passe actualizada com sucesso.");
+      setNewPw("");
+    } catch {
+      toast.error("Erro de ligação ao servidor");
+    }
     setSavingPw(false);
-    if (error) { toast.error("Erro: " + error.message); return; }
-    toast.success("Palavra-passe actualizada com sucesso.");
-    setNewPw("");
   };
 
   // SMS Forwarder settings
@@ -358,6 +379,22 @@ export default function Settings() {
         {/* Admin Credentials */}
         <SectionCard title="Credenciais de Acesso" icon={Mail} color="#0ea5e9" bg="rgba(14,165,233,0.1)">
           <div style={{ paddingTop: 12 }}>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                E-mail Atual (para identificação)
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(14,165,233,0.25)" }}>
+                <Mail style={{ width: 14, height: 14, color: "#0ea5e9", flexShrink: 0 }} />
+                <input
+                  type="email"
+                  value={adminEmail}
+                  onChange={e => setAdminEmail(e.target.value)}
+                  placeholder="teu@email-atual.com"
+                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
+                />
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-muted)", margin: "5px 0 0" }}>Necessário para identificar a conta nos dois campos abaixo</p>
+            </div>
             <div style={{ marginBottom: 20 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
                 Alterar E-mail do Admin

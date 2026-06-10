@@ -22,6 +22,20 @@ try {
   }
 } catch { /* .env.local not present in production – env vars come from host */ }
 
+// Also map VITE_ prefixed env vars already in process.env (set as Replit secrets/env vars)
+if (!process.env["SUPABASE_SERVICE_ROLE_KEY"]) {
+  const srvKey = process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"];
+  if (srvKey) process.env["SUPABASE_SERVICE_ROLE_KEY"] = srvKey;
+}
+if (!process.env["SUPABASE_URL"]) {
+  const url = process.env["VITE_SUPABASE_URL"];
+  if (url) process.env["SUPABASE_URL"] = url;
+}
+if (!process.env["SUPABASE_ANON_KEY"]) {
+  const anon = process.env["VITE_SUPABASE_ANON_KEY"];
+  if (anon) process.env["SUPABASE_ANON_KEY"] = anon;
+}
+
 import app from "./app";
 import { logger } from "./lib/logger";
 
