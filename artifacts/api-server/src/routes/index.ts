@@ -270,8 +270,9 @@ router.post("/recharge", async (req, res) => {
   }
 });
 
-/* ── AI Support Chat (Gemini) ── */
-const GEMINI_MODEL = "gemini-2.0-flash";
+/* ── AI Support Chat (Groq) ── */
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 const SYSTEM_PROMPT = `Tu és a Assistente Virtual da PokerWinner, chamada "Winner". Trabalhas no suporte ao cliente da PokerWinner — a principal plataforma de apostas e jogos online de Moçambique.
 
@@ -338,9 +339,9 @@ Responde em texto simples e natural. Sem asteriscos, sem hífens de lista, sem m
 
 router.post("/support/chat", async (req, res) => {
   try {
-    const geminiKey = process.env["GEMINI_API_KEY"];
+    const groqKey = process.env["GROQ_API_KEY"];
 
-    if (!geminiKey) {
+    if (!groqKey) {
       res.status(200).json({
         reply: "O serviço de suporte IA não está disponível de momento. Contacta-nos pelo WhatsApp: +258 86 338 7488 ou email: support@pokerw.co.mz",
       });
@@ -356,27 +357,23 @@ router.post("/support/chat", async (req, res) => {
       return;
     }
 
-    // Convert OpenAI-style messages to Gemini format (assistant → model)
-    const contents = messages.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
-
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`;
-
-    const response = await fetch(url, {
+    const response = await fetch(GROQ_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${groqKey}`,
+      },
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-        contents,
-        generationConfig: { maxOutputTokens: 400, temperature: 0.7 },
+        model: GROQ_MODEL,
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        max_tokens: 500,
+        temperature: 0.65,
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      req.log.error({ status: response.status, body: errText }, "Gemini API error");
+      req.log.error({ status: response.status, body: errText }, "Groq API error");
       res.status(200).json({
         reply: "Ocorreu um erro ao processar a tua mensagem. Por favor tenta novamente.",
       });
@@ -384,11 +381,11 @@ router.post("/support/chat", async (req, res) => {
     }
 
     const data = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      choices?: Array<{ message?: { content?: string } }>;
     };
 
     const reply =
-      data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ??
+      data.choices?.[0]?.message?.content?.trim() ??
       "Desculpa, não consegui processar a tua pergunta. Tenta novamente.";
 
     res.json({ reply });
