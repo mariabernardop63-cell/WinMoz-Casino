@@ -395,7 +395,6 @@ export default function Roleta() {
       const sectorIndex = data.sectorIndex ?? 8;
       const newBalance = data.newBalance ?? 0;
 
-      setLocalBalance(newBalance);
       if (isFree) setFreeSpinAvailable(false);
 
       setLoading(false);
@@ -404,6 +403,7 @@ export default function Roleta() {
       try {
         animateToSector(sectorIndex, () => {
           setAnimating(false);
+          setLocalBalance(newBalance);
           setWasFreeSpin(isFree);
           setResult(SECTORS[sectorIndex]);
           setShowResult(true);
@@ -412,6 +412,7 @@ export default function Roleta() {
       } catch {
         // Animação falhou mas o spin foi processado — mostra resultado na mesma
         setAnimating(false);
+        setLocalBalance(newBalance);
         setWasFreeSpin(isFree);
         setResult(SECTORS[sectorIndex]);
         setShowResult(true);

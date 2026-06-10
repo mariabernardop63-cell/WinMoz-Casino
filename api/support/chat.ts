@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama-3.1-8b-instant";
+const GEMINI_MODEL = "gemini-2.0-flash";
 
 const SYSTEM_PROMPT = `Tu és a Assistente Virtual da PokerWinner, chamada "Winner". Trabalhas no suporte ao cliente da PokerWinner — a principal plataforma de apostas e jogos online de Moçambique.
 
@@ -20,8 +19,8 @@ JOGOS DISPONÍVEIS:
 1. DAMAS — Jogo de tabuleiro clássico. Apostas de 10 MT a 5.000 MT. Jogas contra outros utilizadores em tempo real. O melhor jogador leva tudo.
 2. LUDO — Jogo de dados estratégico. Apostas de 10 MT a 5.000 MT. Até 4 jogadores. Cheio de emoção e reviravolta.
 3. XADREZ — O jogo de estratégia real. Apostas de 10 MT a 5.000 MT. Para quem pensa antes de agir.
-4. ROLETA — Roleta da sorte. Apostas de 10 MT a 5.000 MT. Escolhe o teu número e torce para ganhar.
-5. BILHAR — Em breve! A aguardar lançamento oficial. Os utilizadores já podem ver a prévia.
+4. ROLETA — Roleta da sorte. Gira e ganha prémios. Giro grátis diário disponível.
+5. BILHAR — Em breve! A aguardar lançamento oficial.
 
 COMO DEPOSITAR (RECARREGAR SALDO):
 Método principal: Código de recarga. O utilizador compra um código de recarga (disponível com os agentes PokerWinner) e insere na secção "Carteira" > "Recarga". O código tem 15 caracteres. Após inserir, o saldo é creditado imediatamente. Também é possível depositar via M-Pesa e e-Mola através dos agentes autorizados da plataforma.
@@ -74,11 +73,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
-  const groqKey = process.env["GROQ_API_KEY"];
+  const geminiKey = process.env["GEMINI_API_KEY"];
 
-  if (!groqKey) {
+  if (!geminiKey) {
     res.status(200).json({
-      reply: "O serviço de suporte IA não está disponível de momento. Contacta-nos pelo WhatsApp ou email listados no menu.",
+      reply: "O serviço de suporte IA não está disponível de momento. Contacta-nos pelo WhatsApp: +258 86 338 7488 ou email: support@pokerw.co.mz",
     });
     return;
   }
@@ -91,24 +90,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // Convert OpenAI-style messages to Gemini format (assistant → model)
+  const contents = messages.map(m => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
+
   try {
-    const response = await fetch(GROQ_API_URL, {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`;
+
+    const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${groqKey}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
-        max_tokens: 400,
-        temperature: 0.7,
+        systemInstruction: {
+          parts: [{ text: SYSTEM_PROMPT }],
+        },
+        contents,
+        generationConfig: {
+          maxOutputTokens: 400,
+          temperature: 0.7,
+        },
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("Groq API error:", response.status, errText);
+      console.error("Gemini API error:", response.status, errText);
       res.status(200).json({
         reply: "Ocorreu um erro ao processar a tua mensagem. Por favor tenta novamente.",
       });
@@ -116,11 +124,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const data = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
     };
 
     const reply =
-      data.choices?.[0]?.message?.content?.trim() ??
+      data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ??
       "Desculpa, não consegui processar a tua pergunta. Tenta novamente.";
 
     res.status(200).json({ reply });
