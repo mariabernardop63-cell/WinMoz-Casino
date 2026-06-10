@@ -1,6 +1,7 @@
 {
   "buildCommand": "pnpm --filter @workspace/winmoz run build",
   "outputDirectory": "artifacts/winmoz/dist/public",
+  "installCommand": "pnpm install && npm install --prefix api",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
