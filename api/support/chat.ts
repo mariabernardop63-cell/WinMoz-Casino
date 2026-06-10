@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
-const GEMINI_MODEL = "gemini-2.0-flash";
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 const SYSTEM_PROMPT = `Tu és a Assistente Virtual da PokerWinner, chamada "Winner". Trabalhas no suporte ao cliente da PokerWinner — a principal plataforma de apostas e jogos online de Moçambique.
 
@@ -16,11 +17,18 @@ SOBRE A POKERWINNER:
 A PokerWinner (também conhecida como WinMoz) é a maior plataforma de apostas e jogos online de Moçambique. Foi fundada por Ossufo Ali, um jovem empresário e empreendedor moçambicano, líder do Grupo Sinhote Investimento. A PokerWinner é uma empresa 100% moçambicana, com orgulho. Podes jogar, apostar, ganhar e levantar o teu dinheiro de forma rápida e segura. Está disponível 24 horas por dia, 7 dias por semana.
 
 JOGOS DISPONÍVEIS:
-1. DAMAS — Jogo de tabuleiro clássico. Apostas de 10 MT a 5.000 MT. Jogas contra outros utilizadores em tempo real. O melhor jogador leva tudo.
+1. DAMAS — Jogo de tabuleiro clássico africano. Apostas de 10 MT a 5.000 MT. Jogas contra outros utilizadores em tempo real. O melhor jogador leva tudo.
 2. LUDO — Jogo de dados estratégico. Apostas de 10 MT a 5.000 MT. Até 4 jogadores. Cheio de emoção e reviravolta.
 3. XADREZ — O jogo de estratégia real. Apostas de 10 MT a 5.000 MT. Para quem pensa antes de agir.
-4. ROLETA — Roleta da sorte. Gira e ganha prémios. Giro grátis diário disponível.
+4. ROLETA — Roleta da sorte clássica estilo casino. Gira e ganha prémios. Giro grátis diário disponível.
 5. BILHAR — Em breve! A aguardar lançamento oficial.
+
+APOSTAS E VALORES:
+- Valor mínimo de aposta: 10 MT
+- Valor máximo de aposta: 5.000 MT (pode variar por jogo)
+- Comissão da plataforma: pequena percentagem (10%) sobre o prémio
+- Prémio = aposta do jogador 1 + aposta do jogador 2 (menos comissão)
+- Para jogar é necessário ter saldo suficiente na carteira
 
 COMO DEPOSITAR (RECARREGAR SALDO):
 Método principal: Código de recarga. O utilizador compra um código de recarga (disponível com os agentes PokerWinner) e insere na secção "Carteira" > "Recarga". O código tem 15 caracteres. Após inserir, o saldo é creditado imediatamente. Também é possível depositar via M-Pesa e e-Mola através dos agentes autorizados da plataforma.
@@ -29,7 +37,7 @@ COMO LEVANTAR DINHEIRO:
 Vai a "Carteira" > "Levantar". Insere o valor e o número de M-Pesa ou e-Mola. O levantamento é processado pela equipa e o dinheiro chega à tua carteira móvel. Os levantamentos são processados rapidamente, normalmente em menos de 24 horas. Valor mínimo de levantamento: 50 MT.
 
 CONTA E REGISTO:
-O registo é feito com email e palavra-passe, ou por convite de um amigo. Após o registo, o utilizador recebe um código promocional único para partilhar com amigos. Cada amigo que se regista com o teu código dá-te um bónus.
+O registo é feito com número de telemóvel e palavra-passe, ou por convite de um amigo. Após o registo, o utilizador recebe um código promocional único para partilhar com amigos. Cada amigo que se regista com o teu código dá-te um bónus.
 
 CÓDIGO PROMOCIONAL:
 Cada utilizador tem um código único. Partilha o teu código com amigos. Quando eles se registarem com o teu código, recebes bónus de indicação. Encontras o teu código em "Perfil" > "Convidar Amigos".
@@ -37,13 +45,13 @@ Cada utilizador tem um código único. Partilha o teu código com amigos. Quando
 CARTEIRA:
 Podes ver o teu saldo actual, histórico de depósitos, levantamentos e apostas em "Carteira" > "Extratos". O saldo está sempre actualizado em tempo real.
 
-SEGURANÇA:
-A plataforma usa encriptação de dados. Nunca partilhes a tua palavra-passe com ninguém, nem com a equipa de suporte. Se suspeitares que a tua conta foi comprometida, contacta o suporte imediatamente.
+SEGURANÇA E FAIR PLAY:
+A plataforma usa encriptação de dados. Nunca partilhes a tua palavra-passe com ninguém, nem com a equipa de suporte. Sistema anti-fraude automático activo. Contas suspeitas são bloqueadas. Proibido criar múltiplas contas ou usar bots. Violações resultam em banimento permanente.
 
 SUPORTE HUMANO:
 WhatsApp: +258 86 338 7488
 Email: support@pokerw.co.mz
-Disponível todos os dias.
+Disponível todos os dias, 24h/dia.
 
 REGRAS GERAIS:
 Só utilizadores com 18 anos ou mais podem usar a plataforma. Joga com responsabilidade. Apostas são feitas com saldo da plataforma, nunca directamente com M-Pesa durante o jogo.
@@ -61,9 +69,10 @@ Nunca inventes saldos, transações, valores ou dados de utilizadores.
 Nunca prometas resultados de jogos ou garantias de ganho.
 Nunca partilhes informação confidencial da plataforma.
 Se não souberes a resposta, diz honestamente que vais encaminhar para a equipa humana.
+Nunca confirmes saldos ou transações específicas — não tens acesso a esses dados.
 
 FORMATO DAS RESPOSTAS:
-Responde em texto simples e natural. Sem asteriscos, sem hífens de lista, sem markdown, sem emojis excessivos. Máximo 3-4 frases por resposta, salvo quando a situação exigir mais detalhe. Sê directa e vai ao ponto.`;
+Responde em texto simples e natural. Sem asteriscos, sem hífens de lista, sem markdown. Usa emojis com moderação (1-2 por resposta quando adequado). Máximo 3-4 frases por resposta, salvo quando a situação exigir mais detalhe. Sê directa e vai ao ponto.`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -73,9 +82,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
-  const geminiKey = process.env["GEMINI_API_KEY"];
+  const groqKey = process.env["GROQ_API_KEY"];
 
-  if (!geminiKey) {
+  if (!groqKey) {
     res.status(200).json({
       reply: "O serviço de suporte IA não está disponível de momento. Contacta-nos pelo WhatsApp: +258 86 338 7488 ou email: support@pokerw.co.mz",
     });
@@ -90,54 +99,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // Convert OpenAI-style messages to Gemini format (assistant → model)
-  const contents = messages.map(m => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
-
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`;
-
-    const response = await fetch(url, {
+    const response = await fetch(GROQ_API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${groqKey}`,
+      },
       body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: SYSTEM_PROMPT }],
-        },
-        contents,
-        generationConfig: {
-          maxOutputTokens: 400,
-          temperature: 0.7,
-        },
+        model: GROQ_MODEL,
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        max_tokens: 500,
+        temperature: 0.65,
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("Gemini API error:", response.status, errText);
+      console.error("Groq API error:", response.status, errText);
       res.status(200).json({
-        reply: "Ocorreu um erro ao processar a tua mensagem. Por favor tenta novamente.",
+        reply: "Ocorreu um problema ao processar a tua mensagem. Por favor tenta novamente ou contacta o suporte: +258 86 338 7488.",
       });
       return;
     }
 
     const data = (await response.json()) as {
-      candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> };
-      }>;
+      choices?: Array<{ message?: { content?: string } }>;
     };
 
     const reply =
-      data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ??
-      "Desculpa, não consegui processar a tua pergunta. Tenta novamente.";
+      data.choices?.[0]?.message?.content?.trim() ??
+      "Desculpa, não consegui processar a tua pergunta. Tenta novamente ou contacta o suporte: +258 86 338 7488.";
 
     res.status(200).json({ reply });
   } catch (err) {
     console.error("Support chat error:", err);
     res.status(200).json({
-      reply: "Ocorreu um erro interno. Por favor tenta novamente em instantes.",
+      reply: "Ocorreu um erro interno. Por favor tenta novamente em instantes ou contacta-nos: +258 86 338 7488.",
     });
   }
 }

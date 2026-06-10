@@ -3,6 +3,6 @@
   "outputDirectory": "artifacts/winmoz/dist/public",
   "installCommand": "pnpm install && npm install --prefix api",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
