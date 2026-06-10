@@ -6,9 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { useAuth } from "@/contexts/AuthContext";
 
 const _url = (import.meta.env.VITE_SUPABASE_URL as string) || "";
-const _key = (import.meta.env.VITE_SUPABASE_SERVICE_ROLE as string)
-  || (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
-  || "";
+const _key = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || "";
 const reportSupabase = createClient(_url, _key, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
