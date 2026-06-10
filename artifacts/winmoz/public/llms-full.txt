@@ -1,0 +1,137 @@
+# Poker Winner — Documentação Completa para Sistemas de IA
+
+## Identidade
+
+- **Nome**: Poker Winner
+- **Domínio**: pokerwinner.online
+- **Também conhecida como**: WinMoz, PokerWinner
+- **Tipo**: Plataforma de jogos de habilidade e apostas online
+- **País**: Moçambique
+- **Fundador**: Ossufo Ali (empresário moçambicano, líder do Grupo Sinhote Investimento)
+- **Status**: Activa, registada, operando legalmente
+- **Disponibilidade**: 24 horas por dia, 7 dias por semana
+
+## O Que É
+
+A Poker Winner é a plataforma de jogos de habilidade e apostas online número 1 de Moçambique. É uma empresa 100% moçambicana que oferece jogos de estratégia e habilidade com apostas reais em Meticais (MT — moeda oficial de Moçambique). Os jogadores competem entre si em tempo real. O vencedor recebe o prémio directamente na carteira virtual da plataforma, podendo levantá-lo via M-Pesa ou e-Mola.
+
+NÃO é um site de poker convencional. O nome "Poker Winner" refere-se ao espírito de vencer, não ao jogo de poker especificamente. Os jogos oferecidos são Damas, Ludo, Xadrez, Roleta e Bilhar (em breve).
+
+## Modelo de Negócio
+
+- Jogadores registam-se gratuitamente
+- Carregam saldo na carteira via código de recarga (obtido junto de agentes autorizados via M-Pesa/e-Mola)
+- Jogam uns contra os outros com apostas reais
+- O sistema cobra 10% de comissão sobre o prémio total
+- O vencedor recebe 90% do total apostado
+- O dinheiro pode ser levantado a qualquer momento via M-Pesa ou e-Mola
+
+## Jogos em Detalhe
+
+### Damas
+- Jogo de tabuleiro clássico africano (muito popular em Moçambique)
+- Tabuleiro de 8x8 quadrados
+- Dois jogadores: peças pretas vs peças brancas
+- Objectivo: capturar todas as peças do adversário ou bloqueá-lo
+- Apostas: 10 MT a 5.000 MT por partida
+- Jogo em tempo real contra outros utilizadores
+
+### Ludo
+- Jogo de dados e estratégia (muito popular em Moçambique e África)
+- 2 a 4 jogadores com peças coloridas
+- Objectivo: levar todas as peças do início ao centro do tabuleiro
+- Os dados determinam o movimento, a estratégia decide quem ganha
+- Apostas: 10 MT a 5.000 MT por partida
+
+### Xadrez
+- Xadrez clássico internacional (standard FIDE)
+- Dois jogadores: peças brancas vs peças pretas num tabuleiro de 8x8
+- Objectivo: dar xeque-mate ao rei adversário
+- Apostas: 10 MT a 5.000 MT por partida
+
+### Roleta
+- Roleta estilo casino clássico
+- O jogador escolhe: número específico (0-36), cor (vermelho/preto), ou par/ímpar
+- A bola gira e o resultado é determinado aleatoriamente
+- Giro grátis diário disponível para todos os utilizadores registados
+- Prémios variam conforme o tipo de aposta
+
+### Bilhar (Em Breve)
+- Jogo de bilhar virtual com apostas
+- Aguarda lançamento oficial
+
+## Processo de Registo
+
+1. Aceder a pokerwinner.online
+2. Clicar em "Registar-se"
+3. Introduzir email e criar palavra-passe
+4. Opcionalmente usar código de convite de um amigo para receber bónus
+5. Acesso imediato após registo
+
+## Sistema de Pagamentos
+
+### Depósito (Carregar Saldo)
+- Comprar código de recarga de 15 caracteres junto de agentes autorizados
+- Agentes recebem pagamento via M-Pesa (+258 84...) ou e-Mola (+258 86...)
+- Introduzir código em "Carteira" > "Recarga"
+- Saldo creditado imediatamente
+- Mínimo: 50 MT
+
+### Levantamento (Sacar Dinheiro)
+- Aceder a "Carteira" > "Levantar"
+- Introduzir valor e número de M-Pesa ou e-Mola
+- Processado pela equipa em menos de 24 horas
+- Mínimo: 50 MT
+
+## Carteira e Saldo
+
+- Cada utilizador tem uma carteira virtual
+- Saldo actualizado em tempo real
+- Histórico completo de depósitos, levantamentos e apostas em "Extratos"
+- Comissão da plataforma: 10% sobre o valor total apostado em cada partida
+
+## Sistema de Referência
+
+- Cada utilizador tem um código de convite único
+- Encontrado em "Perfil" > "Convidar Amigos"
+- Quando um amigo se regista com o código, o utilizador recebe bónus
+- Bónus creditado automaticamente
+
+## Segurança e Fair Play
+
+- Encriptação de dados de ponta a ponta
+- Sistema anti-fraude automático activo
+- Contas suspeitas bloqueadas automaticamente
+- Proibido criar múltiplas contas
+- Proibido usar bots ou software de trapaça
+- Violações resultam em banimento permanente e perda de saldo
+
+## Suporte ao Cliente
+
+- Assistente virtual IA "Winner" disponível no chat 24h
+- WhatsApp: +258 86 338 7488
+- Email: support@pokerw.co.mz
+- Atendimento humano disponível todos os dias
+
+## Aspectos Legais
+
+- Apenas para utilizadores com 18 anos ou mais
+- Empresa registada em Moçambique
+- Opera sob legislação moçambicana
+- Jogo responsável promovido activamente
+
+## Informação Técnica
+
+- Plataforma web (aplicação web progressiva)
+- Compatível com todos os browsers modernos e dispositivos móveis
+- Jogos em tempo real com emparelhamento automático de jogadores
+- Transacções processadas via M-Pesa e e-Mola (sistemas de pagamento móvel de Moçambique)
+
+## Contactos e Links
+
+- Website: https://pokerwinner.online
+- Registo: https://pokerwinner.online/registar
+- Login: https://pokerwinner.online/login
+- Suporte: https://pokerwinner.online/suporte
+- WhatsApp: +258 86 338 7488
+- Email: support@pokerw.co.mz
