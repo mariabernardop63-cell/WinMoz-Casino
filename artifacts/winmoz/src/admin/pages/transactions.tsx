@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useListTransactions, getListTransactionsQueryKey } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftRight, ArrowUpRight, ArrowDownLeft, RefreshCw } from "lucide-react";
+import { ArrowLeftRight, ArrowUpRight, ArrowDownLeft, RefreshCw, RotateCcw } from "lucide-react";
 
 const V1 = "#6C5CE7";
 
@@ -51,16 +51,26 @@ export default function Transactions() {
   const [typeFilter, setTypeFilter]     = useState("all");
   const queryClient = useQueryClient();
 
+  const hasFilters = statusFilter !== "all" || typeFilter !== "all";
+
   const params = {
     status: statusFilter !== "all" ? statusFilter : undefined,
     type:   typeFilter   !== "all" ? typeFilter   : undefined,
   };
   const { data: transactions, isLoading } = useListTransactions(params);
+  const { data: allData } = useListTransactions();
 
   const allTransactions = transactions ?? [];
-  const totalVolume  = allTransactions.reduce((s, t) => s + t.amount, 0);
-  const totalPayout  = allTransactions.reduce((s, t) => s + (t.payout ?? 0), 0);
-  const totalEntries = allTransactions.length;
+  const globalTransactions = allData ?? [];
+
+  const totalVolume  = globalTransactions.reduce((s, t) => s + t.amount, 0);
+  const totalPayout  = globalTransactions.reduce((s, t) => s + (t.payout ?? 0), 0);
+  const totalEntries = globalTransactions.length;
+
+  function resetFilters() {
+    setStatusFilter("all");
+    setTypeFilter("all");
+  }
 
   return (
     <div className="p-6">
@@ -81,8 +91,22 @@ export default function Transactions() {
           { label: "Total Pago",          value: `MT ${totalPayout.toFixed(2)}`,       color: "text-green-600" },
         ].map((s) => (
           <div key={s.label} className="gz-card p-5">
-            <div className="text-xs mb-1 uppercase font-medium tracking-wide" style={{ color: "var(--gz-text-muted)" }}>{s.label}</div>
+            <div className="flex items-center justify-between mb-1">
+              <div className="text-xs uppercase font-medium tracking-wide" style={{ color: "var(--gz-text-muted)" }}>{s.label}</div>
+              <button
+                onClick={() => { resetFilters(); queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() }); }}
+                title="Repor"
+                className="opacity-40 hover:opacity-100 transition-opacity"
+                style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}>
+                <RotateCcw className="w-3 h-3" style={{ color: "var(--gz-text-muted)" }} />
+              </button>
+            </div>
             <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+            {hasFilters && (
+              <div className="text-xs mt-1" style={{ color: "var(--gz-text-muted)" }}>
+                ({allTransactions.length} filtradas)
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -106,12 +130,23 @@ export default function Transactions() {
               </button>
             ))}
           </div>
-          <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() })}
-            className="ml-auto flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100 transition-colors">
-            <RefreshCw className="w-3 h-3" />
-            Actualizar
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            {hasFilters && (
+              <button
+                onClick={resetFilters}
+                className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-colors"
+                style={{ background: "rgba(108,92,231,.08)", color: V1 }}>
+                <RotateCcw className="w-3 h-3" />
+                Repor Filtros
+              </button>
+            )}
+            <button
+              onClick={() => queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() })}
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100 transition-colors">
+              <RefreshCw className="w-3 h-3" />
+              Actualizar
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">

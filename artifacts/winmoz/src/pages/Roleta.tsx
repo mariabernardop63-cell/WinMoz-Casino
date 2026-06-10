@@ -264,11 +264,15 @@ export default function Roleta() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const tickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rotationRef = useRef(0);
+  const pendingBalanceRef = useRef<number | null>(null);
+  const suppressBalanceSyncRef = useRef(false);
 
   const profileBalance = parseFloat(String(profile?.balance ?? "0"));
   const balance = localBalance ?? profileBalance;
 
-  useEffect(() => { setLocalBalance(profileBalance); }, [profile?.balance]);
+  useEffect(() => {
+    if (!suppressBalanceSyncRef.current) setLocalBalance(profileBalance);
+  }, [profile?.balance]);
 
   // Check free spin status from server on mount (uses server Mozambique time)
   useEffect(() => {
@@ -395,6 +399,10 @@ export default function Roleta() {
       const sectorIndex = data.sectorIndex ?? 8;
       const newBalance = data.newBalance ?? 0;
 
+      // Store pending balance — only applied when user dismisses the prize card
+      pendingBalanceRef.current = newBalance;
+      suppressBalanceSyncRef.current = true;
+
       if (isFree) setFreeSpinAvailable(false);
 
       setLoading(false);
@@ -403,20 +411,17 @@ export default function Roleta() {
       try {
         animateToSector(sectorIndex, () => {
           setAnimating(false);
-          setLocalBalance(newBalance);
           setWasFreeSpin(isFree);
           setResult(SECTORS[sectorIndex]);
           setShowResult(true);
-          void refreshProfile();
+          // balance update deferred to onClose of PrizeCard
         });
       } catch {
         // Animação falhou mas o spin foi processado — mostra resultado na mesma
         setAnimating(false);
-        setLocalBalance(newBalance);
         setWasFreeSpin(isFree);
         setResult(SECTORS[sectorIndex]);
         setShowResult(true);
-        void refreshProfile();
       }
 
     } catch {
@@ -619,7 +624,15 @@ export default function Roleta() {
           <PrizeCard
             sector={result}
             isFreeSpin={wasFreeSpin}
-            onClose={() => setShowResult(false)}
+            onClose={() => {
+              suppressBalanceSyncRef.current = false;
+              if (pendingBalanceRef.current !== null) {
+                setLocalBalance(pendingBalanceRef.current);
+                pendingBalanceRef.current = null;
+              }
+              setShowResult(false);
+              void refreshProfile();
+            }}
           />
         )}
       </AnimatePresence>
