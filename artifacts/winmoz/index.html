@@ -32,38 +32,245 @@
     <meta name="twitter:image" content="https://pokerwinner.online/og-image.png" />
 
     <!-- Structured Data (JSON-LD) -->
+
+    <!-- 1. Organization -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "Organization",
       "name": "Poker Winner",
-      "alternateName": "PokerWinner",
+      "alternateName": ["PokerWinner", "WinMoz", "pokerwinner.online"],
       "url": "https://pokerwinner.online",
-      "logo": "https://pokerwinner.online/favicon.svg",
-      "description": "Poker Winner é a plataforma de jogos e apostas online número 1 de Moçambique. Oferece jogos como Damas, Ludo, Xadrez e Roleta com apostas reais.",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://pokerwinner.online/favicon.svg",
+        "width": 512,
+        "height": 512
+      },
+      "image": "https://pokerwinner.online/opengraph.jpg",
+      "description": "Poker Winner é a plataforma de jogos de habilidade e apostas online número 1 de Moçambique. Os jogadores competem em jogos como Damas, Ludo, Xadrez e Roleta com apostas reais em Meticais (MT). O vencedor recebe o prémio directamente na carteira virtual.",
+      "disambiguatingDescription": "Poker Winner NÃO é um site de poker de cartas (Texas Hold'em ou similares). É uma plataforma moçambicana de jogos de habilidade tradicionais (Damas, Ludo, Xadrez) e Roleta, com apostas reais entre jogadores. Não tem relação com aplicações móveis de poker, nem com repositórios de código de poker no GitHub.",
       "foundingCountry": "MZ",
-      "contactPoint": {
-        "@type": "ContactPoint",
-        "telephone": "+258-86-338-7488",
-        "contactType": "customer service",
-        "availableLanguage": "Portuguese",
-        "hoursAvailable": "Mo-Su 00:00-24:00"
+      "areaServed": {
+        "@type": "Country",
+        "name": "Moçambique",
+        "identifier": "MZ"
+      },
+      "founder": {
+        "@type": "Person",
+        "name": "Ossufo Ali",
+        "jobTitle": "Fundador e CEO",
+        "worksFor": {
+          "@type": "Organization",
+          "name": "Grupo Sinhote Investimento"
+        },
+        "nationality": "MZ"
+      },
+      "contactPoint": [
+        {
+          "@type": "ContactPoint",
+          "telephone": "+258-86-338-7488",
+          "contactType": "customer service",
+          "contactOption": "TollFree",
+          "availableLanguage": {"@type": "Language", "name": "Portuguese"},
+          "hoursAvailable": {
+            "@type": "OpeningHoursSpecification",
+            "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+            "opens": "00:00",
+            "closes": "23:59"
+          }
+        },
+        {
+          "@type": "ContactPoint",
+          "email": "support@pokerw.co.mz",
+          "contactType": "customer service",
+          "availableLanguage": {"@type": "Language", "name": "Portuguese"}
+        }
+      ],
+      "knowsAbout": [
+        "jogos de habilidade online",
+        "apostas online Moçambique",
+        "damas online",
+        "ludo online",
+        "xadrez online",
+        "roleta online",
+        "M-Pesa pagamentos",
+        "e-Mola pagamentos",
+        "entretenimento digital Moçambique"
+      ],
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Jogos Disponíveis",
+        "itemListElement": [
+          {
+            "@type": "Offer",
+            "name": "Damas Online com Apostas",
+            "description": "Jogo de tabuleiro clássico africano com apostas reais entre dois jogadores. Apostas de 10 MT a 5.000 MT.",
+            "price": "10",
+            "priceCurrency": "MZN",
+            "url": "https://pokerwinner.online/explorar"
+          },
+          {
+            "@type": "Offer",
+            "name": "Ludo Online com Apostas",
+            "description": "Jogo de dados e estratégia com apostas reais. Apostas de 10 MT a 5.000 MT.",
+            "price": "10",
+            "priceCurrency": "MZN",
+            "url": "https://pokerwinner.online/explorar"
+          },
+          {
+            "@type": "Offer",
+            "name": "Xadrez Online com Apostas",
+            "description": "Xadrez clássico internacional com apostas reais. Apostas de 10 MT a 5.000 MT.",
+            "price": "10",
+            "priceCurrency": "MZN",
+            "url": "https://pokerwinner.online/explorar"
+          },
+          {
+            "@type": "Offer",
+            "name": "Roleta Online",
+            "description": "Roleta de casino clássica com giro grátis diário. Apostas de 10 MT a 5.000 MT.",
+            "price": "10",
+            "priceCurrency": "MZN",
+            "url": "https://pokerwinner.online/explorar"
+          }
+        ]
       },
       "sameAs": []
     }
     </script>
+
+    <!-- 2. WebSite + Sitelinks -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
       "name": "Poker Winner",
+      "alternateName": "WinMoz",
       "url": "https://pokerwinner.online",
-      "description": "Plataforma de jogos e apostas online em Moçambique",
+      "description": "Plataforma moçambicana de jogos de habilidade e apostas online — Damas, Ludo, Xadrez e Roleta com apostas reais em Meticais.",
+      "inLanguage": "pt-MZ",
       "potentialAction": {
         "@type": "SearchAction",
-        "target": "https://pokerwinner.online/?q={search_term_string}",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://pokerwinner.online/explorar?q={search_term_string}"
+        },
         "query-input": "required name=search_term_string"
       }
+    }
+    </script>
+
+    <!-- 3. SiteNavigationElement (para sitelinks no Google) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "name": "Navegação Principal — Poker Winner",
+      "itemListElement": [
+        {
+          "@type": "SiteNavigationElement",
+          "position": 1,
+          "name": "Entrar",
+          "description": "Iniciar sessão na Poker Winner",
+          "url": "https://pokerwinner.online/login"
+        },
+        {
+          "@type": "SiteNavigationElement",
+          "position": 2,
+          "name": "Registar-se",
+          "description": "Criar conta gratuita na Poker Winner",
+          "url": "https://pokerwinner.online/registar"
+        },
+        {
+          "@type": "SiteNavigationElement",
+          "position": 3,
+          "name": "Explorar Jogos",
+          "description": "Ver todos os jogos disponíveis — Damas, Ludo, Xadrez, Roleta",
+          "url": "https://pokerwinner.online/explorar"
+        },
+        {
+          "@type": "SiteNavigationElement",
+          "position": 4,
+          "name": "Suporte 24h",
+          "description": "Chat de suporte ao cliente disponível 24 horas",
+          "url": "https://pokerwinner.online/suporte"
+        }
+      ]
+    }
+    </script>
+
+    <!-- 4. FAQPage (para Google AI e IAs de terceiros) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "O que é a Poker Winner (pokerwinner.online)?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A Poker Winner é a plataforma de jogos de habilidade e apostas online número 1 de Moçambique, disponível em pokerwinner.online. É uma empresa 100% moçambicana, fundada por Ossufo Ali, do Grupo Sinhote Investimento. NÃO é um site de poker de cartas — oferece jogos tradicionais como Damas, Ludo, Xadrez e Roleta, onde dois ou mais jogadores competem entre si com apostas reais em Meticais (MT). O vencedor recebe o prémio na carteira virtual e pode levantar via M-Pesa ou e-Mola."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "A Poker Winner é um site de poker de cartas (Texas Hold'em)?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Não. A Poker Winner NÃO é um site de poker de cartas. Apesar do nome, a plataforma oferece jogos de habilidade tradicionais africanos e moçambicanos: Damas, Ludo, Xadrez e Roleta. O nome 'Poker Winner' refere-se ao espírito de competição e vitória, não ao jogo de poker de cartas."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "A Poker Winner é segura e legítima?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sim. A Poker Winner é uma plataforma legítima, registada e operando legalmente em Moçambique. Foi fundada por Ossufo Ali, jovem empresário moçambicano. A plataforma usa encriptação de dados, tem sistema anti-fraude activo, e processa pagamentos via M-Pesa e e-Mola — os sistemas de pagamento móvel oficiais de Moçambique. O suporte ao cliente está disponível 24h/dia via WhatsApp (+258 86 338 7488) e email (support@pokerw.co.mz)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Como funciona a Poker Winner?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "1. Regista-te gratuitamente em pokerwinner.online. 2. Carrega saldo na carteira via código de recarga (obtido junto de agentes autorizados via M-Pesa ou e-Mola). 3. Escolhe um jogo (Damas, Ludo, Xadrez ou Roleta) e define o valor da aposta (mínimo 10 MT, máximo 5.000 MT). 4. O sistema emparelha-te automaticamente com outro jogador. 5. O vencedor recebe 90% do total apostado directamente na carteira. 6. Levanta o teu saldo a qualquer momento via M-Pesa ou e-Mola."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Quais os jogos disponíveis na Poker Winner?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Damas (jogo de tabuleiro clássico africano, apostas 10-5000 MT), Ludo (jogo de dados e estratégia, apostas 10-5000 MT), Xadrez (xadrez clássico internacional, apostas 10-5000 MT), Roleta (roleta estilo casino com giro grátis diário, apostas 10-5000 MT) e Bilhar (em breve)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Como depositar dinheiro na Poker Winner?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Compra um código de recarga de 15 caracteres junto dos agentes autorizados da Poker Winner, pagando via M-Pesa ou e-Mola. Depois, introduz o código em 'Carteira' > 'Recarga' na plataforma. O saldo é creditado imediatamente. Valor mínimo: 50 MT."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Como levantar dinheiro da Poker Winner?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Vai a 'Carteira' > 'Levantar', introduz o valor e o teu número M-Pesa ou e-Mola. O levantamento é processado pela equipa em menos de 24 horas. Valor mínimo de levantamento: 50 MT."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Quem fundou a Poker Winner?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A Poker Winner foi fundada por Ossufo Ali, jovem empresário e empreendedor moçambicano, líder do Grupo Sinhote Investimento. É uma empresa 100% moçambicana."
+          }
+        }
+      ]
     }
     </script>
 
