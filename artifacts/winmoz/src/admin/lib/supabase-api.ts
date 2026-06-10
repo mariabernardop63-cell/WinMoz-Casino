@@ -59,52 +59,26 @@ export function useAdminRealtimeSync() {
 
 /* ── Admin DB reset functions ── */
 export async function resetPlatformRevenue() {
-  const { data: { user } } = await supabase.auth.getUser();
-  const userId = user?.id;
-  if (!userId) throw new Error("Não autenticado");
-  const { error } = await supabase.from("transactions").insert({
-    user_id: userId,
-    type: "admin_reset",
-    description: "revenue_reset",
-    amount: 0,
-    status: "approved",
-    created_at: new Date().toISOString(),
+  const res = await fetch("/api/admin/settings/set", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key: "revenue_reset_at", value: new Date().toISOString() }),
   });
-  if (error) {
-    const { error: err2 } = await adminSupabase.from("transactions").insert({
-      user_id: userId,
-      type: "admin_reset",
-      description: "revenue_reset",
-      amount: 0,
-      status: "approved",
-      created_at: new Date().toISOString(),
-    });
-    if (err2) throw err2;
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({ error: "Erro desconhecido" })) as { error?: string };
+    throw new Error(d.error ?? "Erro ao repor receita");
   }
 }
 
 export async function resetSaidas() {
-  const { data: { user } } = await supabase.auth.getUser();
-  const userId = user?.id;
-  if (!userId) throw new Error("Não autenticado");
-  const { error } = await supabase.from("transactions").insert({
-    user_id: userId,
-    type: "admin_reset",
-    description: "withdrawals_reset",
-    amount: 0,
-    status: "approved",
-    created_at: new Date().toISOString(),
+  const res = await fetch("/api/admin/settings/set", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ key: "saidas_reset_at", value: new Date().toISOString() }),
   });
-  if (error) {
-    const { error: err2 } = await adminSupabase.from("transactions").insert({
-      user_id: userId,
-      type: "admin_reset",
-      description: "withdrawals_reset",
-      amount: 0,
-      status: "approved",
-      created_at: new Date().toISOString(),
-    });
-    if (err2) throw err2;
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({ error: "Erro desconhecido" })) as { error?: string };
+    throw new Error(d.error ?? "Erro ao repor saídas");
   }
 }
 
@@ -124,17 +98,13 @@ export function useGetDashboardStats() {
         try { const r = await q; return r.data ?? []; } catch { return [] as T[]; }
       };
 
-      // Verificar se há resets do admin para filtrar dados a partir desse timestamp
+      // Verificar se há resets do admin (guardados em platform_settings)
       const [revenueResetRes, withdrawalsResetRes] = await Promise.all([
-        adminSupabase.from("transactions").select("created_at")
-          .eq("type", "admin_reset").eq("description", "revenue_reset")
-          .order("created_at", { ascending: false }).limit(1),
-        adminSupabase.from("transactions").select("created_at")
-          .eq("type", "admin_reset").eq("description", "withdrawals_reset")
-          .order("created_at", { ascending: false }).limit(1),
+        adminSupabase.from("platform_settings").select("value").eq("key", "revenue_reset_at").maybeSingle(),
+        adminSupabase.from("platform_settings").select("value").eq("key", "saidas_reset_at").maybeSingle(),
       ]);
-      const revenueResetAt: string | null = (revenueResetRes.data as { created_at: string }[] | null)?.[0]?.created_at ?? null;
-      const withdrawalsResetAt: string | null = (withdrawalsResetRes.data as { created_at: string }[] | null)?.[0]?.created_at ?? null;
+      const revenueResetAt: string | null = (revenueResetRes.data as { value: string } | null)?.value ?? null;
+      const withdrawalsResetAt: string | null = (withdrawalsResetRes.data as { value: string } | null)?.value ?? null;
 
       // Construir queries com filtro de reset se aplicável
       const betsQ = adminSupabase.from("transactions").select("amount")
@@ -1109,10 +1079,16 @@ export function useUpdatePlatformSetting() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const { error } = await adminSupabase
-        .from("platform_settings")
-        .upsert({ key, value }, { onConflict: "key" });
-      if (error) throw new Error(error.message);
+      // Usa o endpoint do api-server (service role no servidor) para garantir que RLS não bloqueia
+      const res = await fetch("/api/admin/settings/set", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key, value }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: "Erro desconhecido" })) as { error?: string };
+        throw new Error(d.error ?? "Erro ao guardar definição");
+      }
       return { ok: true };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["platform-settings"] }),

@@ -860,6 +860,28 @@ router.get("/admin/settings/get", async (req, res) => {
   res.json({ setting: data ? { value: data.value } : null });
 });
 
+/* ── Admin: Set a platform setting (server-side service role) ── */
+router.post("/admin/settings/set", async (req, res) => {
+  const { key, value } = req.body as { key?: string; value?: string };
+  if (!key) { res.status(400).json({ error: "key required" }); return; }
+  if (value === undefined || value === null) { res.status(400).json({ error: "value required" }); return; }
+
+  const supabaseUrl = process.env["SUPABASE_URL"];
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!supabaseUrl || !supabaseServiceKey) { res.status(503).json({ error: "Serviço indisponível" }); return; }
+
+  try {
+    const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
+    const { error } = await admin.from("platform_settings")
+      .upsert({ key, value }, { onConflict: "key" });
+    if (error) { res.status(500).json({ error: error.message }); return; }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "settings/set error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── SMS Forwarder Webhook ── */
 router.post("/sms/webhook", async (req, res) => {
   const supabaseUrl = process.env["SUPABASE_URL"];

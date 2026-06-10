@@ -294,11 +294,17 @@ export default function Roleta() {
     }
   }
 
-  function getAudioCtx(): AudioContext {
-    if (!audioCtxRef.current) {
-      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+  function getAudioCtx(): AudioContext | null {
+    try {
+      if (!audioCtxRef.current) {
+        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AC) return null;
+        audioCtxRef.current = new AC();
+      }
+      return audioCtxRef.current;
+    } catch {
+      return null;
     }
-    return audioCtxRef.current;
   }
 
   function stopTicking() {
@@ -308,7 +314,7 @@ export default function Roleta() {
   // Animate wheel to a specific sector index, then call onComplete
   const animateToSector = useCallback((targetIdx: number, onComplete: () => void) => {
     const ctx = getAudioCtx();
-    if (ctx.state === "suspended") { void ctx.resume(); }
+    if (ctx && ctx.state === "suspended") { void ctx.resume(); }
 
     const currentAngleMod = ((rotationRef.current % 360) + 360) % 360;
     const rawTarget = ((360 - (targetIdx * SLICE + SLICE / 2)) % 360 + 360) % 360;
@@ -321,22 +327,24 @@ export default function Roleta() {
     setRotation(totalRotation);
     rotationRef.current = totalRotation;
 
-    // Ticking audio
-    const ticksTotal = N * (totalSpins + 1);
-    let tickCount = 0;
-    function scheduleTick() {
-      if (tickCount >= ticksTotal) { stopTicking(); return; }
-      const progress = tickCount / ticksTotal;
-      const interval = 50 + progress * progress * 350;
-      playTick(ctx, Math.max(0.04, 0.18 - progress * 0.14), 800 + (1 - progress) * 400);
-      tickCount++;
-      tickTimerRef.current = setTimeout(scheduleTick, interval);
+    // Ticking audio (only if AudioContext is available)
+    if (ctx) {
+      const ticksTotal = N * (totalSpins + 1);
+      let tickCount = 0;
+      function scheduleTick() {
+        if (tickCount >= ticksTotal) { stopTicking(); return; }
+        const progress = tickCount / ticksTotal;
+        const interval = 50 + progress * progress * 350;
+        playTick(ctx!, Math.max(0.04, 0.18 - progress * 0.14), 800 + (1 - progress) * 400);
+        tickCount++;
+        tickTimerRef.current = setTimeout(scheduleTick, interval);
+      }
+      scheduleTick();
     }
-    scheduleTick();
 
     setTimeout(() => {
       stopTicking();
-      playWin(ctx);
+      if (ctx) playWin(ctx);
       onComplete();
     }, duration);
   }, []);
@@ -369,7 +377,14 @@ export default function Roleta() {
         body: JSON.stringify({ isFree }),
       });
 
-      const data = await res.json();
+      let data: { sectorIndex?: number; prize?: number; newBalance?: number; error?: string };
+      try {
+        data = await res.json();
+      } catch {
+        setError("Resposta inválida do servidor. Tenta novamente.");
+        setLoading(false);
+        return;
+      }
 
       if (!res.ok) {
         setError(data.error ?? "Erro ao processar. Tenta novamente.");
@@ -377,23 +392,31 @@ export default function Roleta() {
         return;
       }
 
-      const { sectorIndex, newBalance } = data as { sectorIndex: number; prize: number; newBalance: number };
+      const sectorIndex = data.sectorIndex ?? 8;
+      const newBalance = data.newBalance ?? 0;
 
-      // Update balance and free spin state immediately
       setLocalBalance(newBalance);
       if (isFree) setFreeSpinAvailable(false);
 
-      // Transition loading → animating
       setLoading(false);
       setAnimating(true);
 
-      animateToSector(sectorIndex, () => {
+      try {
+        animateToSector(sectorIndex, () => {
+          setAnimating(false);
+          setWasFreeSpin(isFree);
+          setResult(SECTORS[sectorIndex]);
+          setShowResult(true);
+          void refreshProfile();
+        });
+      } catch {
+        // Animação falhou mas o spin foi processado — mostra resultado na mesma
         setAnimating(false);
         setWasFreeSpin(isFree);
         setResult(SECTORS[sectorIndex]);
         setShowResult(true);
         void refreshProfile();
-      });
+      }
 
     } catch {
       setError("Erro de rede. Verifica a tua ligação e tenta novamente.");
