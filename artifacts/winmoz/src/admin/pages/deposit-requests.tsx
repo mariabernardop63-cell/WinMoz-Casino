@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -6,6 +6,7 @@ import {
   Clock, Wallet, Gamepad2, RefreshCw, User, Phone, MessageSquare,
 } from "lucide-react";
 import { adminSupabase } from "@/admin/lib/supabase-api";
+import { playAdminNotificationSound } from "@/admin/hooks/useAdminNotificationSound";
 
 const CYAN = "#00D4B4";
 
@@ -38,6 +39,7 @@ export default function DepositRequests() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "deposit" | "bet">("all");
+  const prevCount = useRef<number | null>(null);
 
   const loadRequests = useCallback(async () => {
     try {
@@ -57,6 +59,11 @@ export default function DepositRequests() {
       });
 
       setRequests(enriched);
+
+      if (prevCount.current !== null && enriched.length > prevCount.current) {
+        playAdminNotificationSound("deposit");
+      }
+      prevCount.current = enriched.length;
     } catch (err) {
       console.error("Error loading deposit requests:", err);
     } finally {
@@ -190,22 +197,22 @@ export default function DepositRequests() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         {[
-          { label: "Total Pendentes", val: requests.length, icon: Clock, color: "#f59e0b" },
+          { label: "Pendentes", val: requests.length, icon: Clock, color: "#f59e0b" },
           { label: "Depósitos", val: requests.filter(r => r.type === "manual_deposit").length, icon: Wallet, color: CYAN },
           { label: "Apostas", val: requests.filter(r => r.type === "manual_bet").length, icon: Gamepad2, color: "#a78bfa" },
         ].map(stat => (
           <div key={stat.label}
-            className="rounded-2xl p-4 flex items-center gap-3"
+            className="rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3"
             style={{ background: "#1c1c1e", border: "1px solid #2c2c2e" }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: `${stat.color}18` }}>
-              <stat.icon style={{ width: 18, height: 18, color: stat.color }} />
+              <stat.icon style={{ width: 16, height: 16, color: stat.color }} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white">{stat.val}</p>
-              <p className="text-xs text-white/40">{stat.label}</p>
+              <p className="text-xl sm:text-2xl font-bold text-white">{stat.val}</p>
+              <p className="text-[10px] sm:text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>{stat.label}</p>
             </div>
           </div>
         ))}

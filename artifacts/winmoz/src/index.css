@@ -215,6 +215,13 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    /* Fallback for older Android/Chrome that doesn't support space-separated hsl() */
+    background-color: #070813;
+    color: #f0eff8;
+  }
+
+  html {
+    background-color: #070813;
   }
 }
 
@@ -355,8 +362,11 @@
   --shadow-sidebar:    0 8px 32px rgba(108,92,231,.32), 0 2px 8px rgba(108,92,231,.18);
   --shadow-topbar:     0 1px 0 rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04);
 
-  background: hsl(248 50% 97%);
-  color: hsl(240 20% 16%);
+  /* Fallback hex first, then modern hsl() for supporting browsers */
+  background-color: #f4f3ff;
+  background: hsl(248, 50%, 97%);
+  color: #222235;
+  color: hsl(240, 20%, 16%);
   font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
   min-height: 100vh;
 }
@@ -453,7 +463,8 @@
 
 /* ── GZ Top Bar ── */
 .gz-topbar {
-  background: hsl(248 50% 97%);
+  background-color: #f4f3ff;
+  background: hsl(248, 50%, 97%);
   box-shadow: var(--shadow-topbar, 0 1px 0 rgba(0,0,0,.04), 0 4px 16px rgba(0,0,0,.04));
   border-bottom: 1px solid rgba(108,92,231,.06);
 }
@@ -577,7 +588,7 @@
   --gz-text-tertiary:  #6d28d9;
   --gz-bg-subtle:      rgba(139,92,246,.10);
   --gz-bg-input:       rgba(139,92,246,.10);
-  --gz-bg-card-btn:    hsl(248 30% 14%);
+  --gz-bg-card-btn:    #19172c;
   --gz-border-subtle:  rgba(139,92,246,.20);
 
   --shadow-card:       0 1px 3px rgba(0,0,0,.3),  0 4px 20px rgba(0,0,0,.4);
@@ -586,13 +597,16 @@
   --shadow-row-hover:  0 2px 8px rgba(0,0,0,.3),  0 6px 22px rgba(109,40,217,.2);
   --shadow-topbar:     0 1px 0 rgba(0,0,0,.4),    0 4px 16px rgba(0,0,0,.3);
 
-  background: hsl(248 30% 8%);
-  color: hsl(248 80% 92%);
+  background-color: #0f0e1a;
+  background: hsl(248, 30%, 8%);
+  color: #d6d0f8;
+  color: hsl(248, 80%, 92%);
 }
 
 .dark .gz-card,
 .dark .gz-card-float {
-  background: hsl(248 28% 13%);
+  background-color: #18162a;
+  background: hsl(248, 28%, 13%);
   border: 1px solid rgba(139,92,246,.12);
   box-shadow: var(--shadow-card);
 }
@@ -602,7 +616,8 @@
 }
 
 .dark .gz-row {
-  background: hsl(248 28% 15%);
+  background-color: #1c1a30;
+  background: hsl(248, 28%, 15%);
   border: 1px solid rgba(139,92,246,.1);
   box-shadow: var(--shadow-row);
 }
@@ -611,7 +626,8 @@
 }
 
 .dark .gz-topbar {
-  background: hsl(248 30% 8%);
+  background-color: #0f0e1a;
+  background: hsl(248, 30%, 8%);
   border-bottom: 1px solid rgba(139,92,246,.12);
 }
 
@@ -641,3 +657,79 @@
 .dark .neon-live    { color: #34d399; background: rgba(52,211,153,.12);  border-color: rgba(52,211,153,.22); }
 .dark .neon-warning { color: #fbbf24; background: rgba(251,191,36,.10);  border-color: rgba(251,191,36,.22); }
 .dark .neon-danger  { color: #f87171; background: rgba(248,113,113,.10); border-color: rgba(248,113,113,.22); }
+
+/* ══════════════════════════════════════
+   CROSS-BROWSER COMPATIBILITY FIXES
+   For older Android (OPPO, etc.) & legacy Chrome
+   ══════════════════════════════════════ */
+
+/* Hide scrollbar — webkit + standard */
+.admin-panel-root nav,
+[style*="scrollbarWidth"],
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.admin-panel-root nav::-webkit-scrollbar,
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Smooth touch scrolling on iOS/older Android */
+.overflow-x-auto,
+.overflow-y-auto,
+[style*="overflow"] {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Safe area insets for notch/bottom bar devices (iOS + Android) */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Fix for older Android — ensure transitions work */
+.gz-card,
+.gz-row,
+.gz-nav-item {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+}
+
+/* Fix gap in older flexbox implementations */
+.admin-panel-root .flex {
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+/* Ensure border-box everywhere */
+*, *::before, *::after {
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
+/* Fix for white text on white bg on older OPPO — force text color */
+.admin-panel-root h1,
+.admin-panel-root h2,
+.admin-panel-root h3,
+.admin-panel-root p,
+.admin-panel-root span,
+.admin-panel-root div {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Prevent tap highlight on mobile */
+.admin-panel-root button,
+.admin-panel-root a {
+  -webkit-tap-highlight-color: transparent;
+  tap-highlight-color: transparent;
+}
+
+/* Fix for main app pages on old Android */
+#root {
+  background-color: #070813;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}

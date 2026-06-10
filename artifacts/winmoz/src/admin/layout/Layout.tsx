@@ -1,8 +1,73 @@
 import { useState } from "react";
+import { Link, useLocation } from "wouter";
 import Sidebar from "./Sidebar";
-import { Search, X, Moon, Sun, Menu, LogOut } from "lucide-react";
+import {
+  Search, X, Moon, Sun, Menu, LogOut,
+  LayoutDashboard, Landmark, InboxIcon, Bell, Settings,
+} from "lucide-react";
 import { useAdminTheme } from "@/admin/contexts/AdminThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+
+const MOBILE_NAV = [
+  { href: "/",                  icon: LayoutDashboard, label: "Dashboard"  },
+  { href: "/withdrawals",       icon: Landmark,        label: "Saques"     },
+  { href: "/deposit-requests",  icon: InboxIcon,       label: "Depósitos"  },
+  { href: "/notifications",     icon: Bell,            label: "Alertas"    },
+  { href: "/settings",          icon: Settings,        label: "Config"     },
+];
+
+function MobileBottomNav() {
+  const [location] = useLocation();
+  return (
+    <nav
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-2 pb-safe"
+      style={{
+        background: "linear-gradient(175deg, #7166ee 0%, #6C5CE7 45%, #5e4fdb 100%)",
+        boxShadow: "0 -4px 24px rgba(108,92,231,.35)",
+        height: 60,
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      }}
+    >
+      {MOBILE_NAV.map((item) => {
+        const isActive =
+          location === item.href ||
+          (item.href !== "/" && location.startsWith(item.href));
+        return (
+          <Link key={item.href} href={item.href}>
+            <div
+              className={cn(
+                "flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-all",
+                isActive ? "bg-white/20" : "bg-transparent"
+              )}
+              style={{ minWidth: 52 }}
+            >
+              <item.icon
+                style={{
+                  width: 20,
+                  height: 20,
+                  strokeWidth: isActive ? 2.2 : 1.6,
+                  color: isActive ? "#ffffff" : "rgba(255,255,255,.55)",
+                  filter: isActive ? "drop-shadow(0 0 5px rgba(255,255,255,.5))" : "none",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? "#ffffff" : "rgba(255,255,255,.55)",
+                  letterSpacing: "0.01em",
+                }}
+              >
+                {item.label}
+              </span>
+            </div>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -19,12 +84,12 @@ function TopBar({ onMenuClick }: TopBarProps) {
   };
 
   return (
-    <div className="gz-topbar h-[56px] flex items-center justify-between px-5 gap-3 flex-shrink-0 sticky top-0 z-40">
+    <div className="gz-topbar h-[56px] flex items-center justify-between px-4 gap-3 flex-shrink-0 sticky top-0 z-40">
       <div className="flex items-center gap-2">
         <button
           onClick={onMenuClick}
-          className="lg:hidden w-9 h-9 rounded-2xl flex items-center justify-center transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-95 flex-shrink-0"
-          style={{ background: "var(--gz-bg-card-btn)", boxShadow: "0 1px 3px rgba(0,0,0,.06), 0 2px 10px rgba(0,0,0,.06)" }}
+          className="lg:hidden w-9 h-9 rounded-2xl flex items-center justify-center transition-all active:scale-95 flex-shrink-0"
+          style={{ background: "var(--gz-bg-card-btn)", boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}
           title="Menu"
         >
           <Menu className="w-4 h-4 text-gray-400" strokeWidth={1.8} />
@@ -33,18 +98,18 @@ function TopBar({ onMenuClick }: TopBarProps) {
         {searchOpen ? (
           <div className="flex items-center gap-2">
             <div
-              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl"
+              className="flex items-center gap-2 px-3 py-2 rounded-2xl"
               style={{
                 background: "var(--gz-bg-card-btn)",
                 border: "1.5px solid rgba(108,92,231,.2)",
-                boxShadow: "0 2px 12px rgba(108,92,231,.1)",
               }}
             >
               <Search className="w-3.5 h-3.5 text-indigo-400" strokeWidth={2} />
               <input
                 autoFocus
-                placeholder="Buscar partidas, jogadores..."
-                className="bg-transparent outline-none text-[13px] text-gray-700 placeholder-gray-400 w-40 sm:w-52"
+                placeholder="Buscar..."
+                className="bg-transparent outline-none text-[13px] w-32 sm:w-48"
+                style={{ color: "var(--gz-text-primary)" }}
               />
             </div>
             <button
@@ -57,25 +122,15 @@ function TopBar({ onMenuClick }: TopBarProps) {
         ) : (
           <button
             onClick={() => setSearchOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-2xl text-[12.5px] font-medium transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-95"
+            className="flex items-center gap-2 px-3 py-2 rounded-2xl text-[12.5px] font-medium transition-all active:scale-95"
             style={{
               background: "var(--gz-bg-card-btn)",
               color: "#9ca3af",
-              boxShadow: "0 1px 3px rgba(0,0,0,.05), 0 2px 10px rgba(0,0,0,.06)",
+              boxShadow: "0 1px 3px rgba(0,0,0,.05)",
             }}
           >
             <Search className="w-3.5 h-3.5" strokeWidth={2} />
             <span className="hidden sm:inline">Buscar...</span>
-            <kbd
-              className="ml-1 text-[10px] px-1.5 py-0.5 rounded-lg font-mono hidden sm:inline"
-              style={{
-                background: "var(--gz-bg-subtle)",
-                color: "#a78bfa",
-                border: "1px solid rgba(108,92,231,.1)",
-              }}
-            >
-              ⌘K
-            </kbd>
           </button>
         )}
       </div>
@@ -83,8 +138,8 @@ function TopBar({ onMenuClick }: TopBarProps) {
       <div className="flex items-center gap-2">
         <button
           onClick={toggleTheme}
-          className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-95"
-          style={{ background: "var(--gz-bg-card-btn)", boxShadow: "0 1px 3px rgba(0,0,0,.06), 0 2px 10px rgba(0,0,0,.06)" }}
+          className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all active:scale-95"
+          style={{ background: "var(--gz-bg-card-btn)", boxShadow: "0 1px 3px rgba(0,0,0,.06)" }}
           title={theme === "dark" ? "Modo Claro" : "Modo Escuro"}
         >
           {theme === "dark"
@@ -93,16 +148,13 @@ function TopBar({ onMenuClick }: TopBarProps) {
           }
         </button>
 
-        <div className="w-px h-6 mx-0.5 hidden sm:block" style={{ background: "rgba(108,92,231,.1)" }} />
-
         <button
           onClick={handleLogout}
-          className="flex items-center gap-2 h-9 px-4 rounded-2xl transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-95"
+          className="flex items-center gap-2 h-9 px-3 rounded-2xl transition-all active:scale-95"
           style={{
             background: "rgba(239,68,68,.08)",
             border: "1px solid rgba(239,68,68,.15)",
             color: "#ef4444",
-            boxShadow: "0 1px 3px rgba(0,0,0,.04)",
           }}
           title="Terminar Sessão"
         >
@@ -121,7 +173,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div style={{ minHeight: "100vh" }}>
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 lg:hidden"
+          style={{ background: "rgba(0,0,0,0.5)" }}
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -140,10 +193,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
       >
         <TopBar onMenuClick={() => setSidebarOpen(o => !o)} />
-        <div style={{ flex: 1, overflowX: "auto" }}>
+        <div style={{ flex: 1, overflowX: "hidden", paddingBottom: 70 }} className="lg:pb-0">
           {children}
         </div>
       </div>
+
+      <MobileBottomNav />
     </div>
   );
 }
