@@ -151,32 +151,49 @@ const PAWN_PAL: Record<PawnColor,{s:string;m:string;d:string}> = {
   yellow: { s:"#FDE68A", m:"#EAB308", d:"#713F12" },
 };
 
-// ─── PNG pawn images ────────────────────────────────────────────────────────────
-const PAWN_IMGS: Record<"blue"|"green", string> = {
-  blue:  "/pawn-blue.png",
-  green: "/pawn-green.png",
-};
-
+// ─── Inline SVG pawn — instant render, zero network cost ───────────────────────
 function PinPawn({ color, size=PAWN_SIZE, glow=false }: {
   color:PawnColor; size?:number; glow?:boolean;
 }) {
-  const pinColor = color === "blue" ? "#2563EB" : "#16A34A";
-  const w = size;
-  const h = Math.round(w * 1.5);
-  const src = PAWN_IMGS[color as "blue"|"green"] ?? PAWN_IMGS.blue;
+  const p   = PAWN_PAL[color as PawnColor] ?? PAWN_PAL.blue;
+  const pin = color === "blue" ? "#2563EB" : "#16A34A";
+  const w   = size;
+  const h   = Math.round(w * 1.5);
+  const uid = `psvg_${color}`;
   return (
     <div style={{
       display:"flex", flexShrink:0, width:w, height:h,
       filter: glow
-        ? `drop-shadow(0 0 ${Math.round(w*0.3)}px ${pinColor}CC) drop-shadow(0 1px 3px rgba(0,0,0,0.6))`
+        ? `drop-shadow(0 0 ${Math.round(w*0.3)}px ${pin}CC) drop-shadow(0 1px 3px rgba(0,0,0,0.6))`
         : "drop-shadow(0 1px 3px rgba(0,0,0,0.5))",
     }}>
-      <img
-        src={src}
-        alt={color}
-        style={{ width:w, height:h, objectFit:"contain", display:"block" }}
-        draggable={false}
-      />
+      <svg viewBox="0 0 30 45" width={w} height={h} xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id={uid} cx="35%" cy="28%" r="72%">
+            <stop offset="0%"   stopColor={p.s}/>
+            <stop offset="55%"  stopColor={p.m}/>
+            <stop offset="100%" stopColor={p.d}/>
+          </radialGradient>
+          <radialGradient id={`${uid}b`} cx="50%" cy="30%" r="70%">
+            <stop offset="0%"  stopColor={p.m}/>
+            <stop offset="100%" stopColor={p.d}/>
+          </radialGradient>
+        </defs>
+        {/* Head sphere */}
+        <circle cx="15" cy="9" r="8.5" fill={`url(#${uid})`}/>
+        {/* Specular highlight */}
+        <circle cx="11.5" cy="5.5" r="2.5" fill="rgba(255,255,255,0.40)" style={{mixBlendMode:"screen"}}/>
+        {/* Neck */}
+        <path d="M11.5,17 Q15,15.5 18.5,17 L17.5,21 Q15,20.2 12.5,21 Z" fill={p.m}/>
+        {/* Shoulder / body */}
+        <path d="M8,21 Q15,19 22,21 L23,30 Q15,31.5 7,30 Z" fill={`url(#${uid}b)`}/>
+        {/* Base slab */}
+        <path d="M5,30 Q15,28.5 25,30 L26,36 Q15,37.5 4,36 Z" fill={p.d}/>
+        {/* Base cap */}
+        <ellipse cx="15" cy="36" rx="11" ry="3.5" fill={`url(#${uid}b)`}/>
+        {/* Rim shine */}
+        <ellipse cx="15" cy="36" rx="11" ry="3.5" fill="none" stroke={p.s} strokeWidth="0.7" opacity="0.38"/>
+      </svg>
     </div>
   );
 }

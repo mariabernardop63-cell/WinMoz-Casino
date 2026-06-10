@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import Sidebar from "./Sidebar";
 import {
@@ -8,6 +8,41 @@ import {
 import { useAdminTheme } from "@/admin/contexts/AdminThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+
+/* Warm up the Web Audio API context on first interaction so notification
+   sounds are never blocked by the browser's autoplay policy. */
+function useAudioWarmup() {
+  useEffect(() => {
+    let done = false;
+    const warmup = () => {
+      if (done) return;
+      done = true;
+      try {
+        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AC) return;
+        const ctx = new AC();
+        // Create and immediately stop a silent buffer to unlock the context
+        const buf = ctx.createBuffer(1, 1, 22050);
+        const src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.connect(ctx.destination);
+        src.start(0);
+        src.stop(0.001);
+        if (ctx.state === "suspended") ctx.resume().catch(() => {});
+        // Store globally so the notification hook reuses this context
+        (window as any).__adminAudioCtx = ctx;
+      } catch { /* noop */ }
+    };
+    document.addEventListener("click",      warmup, { once: true, passive: true });
+    document.addEventListener("touchstart",  warmup, { once: true, passive: true });
+    document.addEventListener("keydown",     warmup, { once: true, passive: true });
+    return () => {
+      document.removeEventListener("click",     warmup);
+      document.removeEventListener("touchstart", warmup);
+      document.removeEventListener("keydown",    warmup);
+    };
+  }, []);
+}
 
 const MOBILE_NAV = [
   { href: "/",                  icon: LayoutDashboard, label: "Dashboard"  },
@@ -168,6 +203,7 @@ function TopBar({ onMenuClick }: TopBarProps) {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  useAudioWarmup();
 
   return (
     <div style={{ minHeight: "100vh" }}>
