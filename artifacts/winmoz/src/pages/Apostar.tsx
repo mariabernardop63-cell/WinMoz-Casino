@@ -657,7 +657,7 @@ function MatchmakingScreen({
   const [botInfo, setBotInfo] = useState<{ name: string; balance: number } | null>(null);
   const matchedRef = useRef(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const BOT_ELIGIBLE = gameType === "damas" && [10, 20, 50].includes(betAmount);
+  const BOT_ELIGIBLE = (gameType === "damas" || gameType === "xadrez") && [10, 20, 50].includes(betAmount);
 
   useEffect(() => {
     const channelName = `matchmaking_${gameType}_${betAmount}`;
@@ -1204,7 +1204,12 @@ export default function Apostar() {
           const myEnc  = encodeURIComponent(profile?.full_name ?? "Jogador");
           const oppEnc = encodeURIComponent(botName);
           const botGameId = `bot_${Date.now()}`;
-          const dest = `/damas-jogo?gameId=${botGameId}&color=w&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}&bot=1&botbalance=${botBalance}`;
+          let dest: string;
+          if (gameId === "xadrez") {
+            dest = `/xadrez-jogo?gameId=${botGameId}&color=white&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}&bot=1&botbalance=${botBalance}`;
+          } else {
+            dest = `/damas-jogo?gameId=${botGameId}&color=w&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}&bot=1&botbalance=${botBalance}`;
+          }
           setTimeout(() => setLocation(dest), 2200);
         }}
         userId={user?.id ?? ""}

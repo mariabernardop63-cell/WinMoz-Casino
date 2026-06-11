@@ -231,6 +231,83 @@ function getStatus(b: Board, turn: PColor, ep: Sq|null): GameStatus {
   return"playing";
 }
 
+// ─── Chess AI Engine (Ultra-Hard — Minimax + Alpha-Beta + PST) ──────────────
+
+const _AI_PVAL: Record<PType,number> = { P:100, N:320, B:330, R:500, Q:900, K:20000 };
+
+const _AI_PST: Record<PType, number[][]> = {
+  P:[[0,0,0,0,0,0,0,0],[50,50,50,50,50,50,50,50],[10,10,20,30,30,20,10,10],[5,5,10,25,25,10,5,5],[0,0,0,20,20,0,0,0],[5,-5,-10,0,0,-10,-5,5],[5,10,10,-20,-20,10,10,5],[0,0,0,0,0,0,0,0]],
+  N:[[-50,-40,-30,-30,-30,-30,-40,-50],[-40,-20,0,0,0,0,-20,-40],[-30,0,10,15,15,10,0,-30],[-30,5,15,20,20,15,5,-30],[-30,0,15,20,20,15,0,-30],[-30,5,10,15,15,10,5,-30],[-40,-20,0,5,5,0,-20,-40],[-50,-40,-30,-30,-30,-30,-40,-50]],
+  B:[[-20,-10,-10,-10,-10,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,10,10,5,0,-10],[-10,5,5,10,10,5,5,-10],[-10,0,10,10,10,10,0,-10],[-10,10,10,10,10,10,10,-10],[-10,5,0,0,0,0,5,-10],[-20,-10,-10,-10,-10,-10,-10,-20]],
+  R:[[0,0,0,0,0,0,0,0],[5,10,10,10,10,10,10,5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[-5,0,0,0,0,0,0,-5],[0,0,0,5,5,0,0,0]],
+  Q:[[-20,-10,-10,-5,-5,-10,-10,-20],[-10,0,0,0,0,0,0,-10],[-10,0,5,5,5,5,0,-10],[-5,0,5,5,5,5,0,-5],[0,0,5,5,5,5,0,-5],[-10,5,5,5,5,5,0,-10],[-10,0,5,0,0,0,0,-10],[-20,-10,-10,-5,-5,-10,-10,-20]],
+  K:[[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-30,-40,-40,-50,-50,-40,-40,-30],[-20,-30,-30,-40,-40,-30,-30,-20],[-10,-20,-20,-20,-20,-20,-20,-10],[20,20,0,0,0,0,20,20],[20,30,10,0,0,10,30,20]],
+};
+
+function _aiPST(p: Piece, r: number, c: number): number {
+  return _AI_PST[p.t][p.c==="w"?7-r:r][c];
+}
+
+function _aiEval(b: Board, forColor: PColor): number {
+  let score=0;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=b[r][c]; if(!p) continue;
+    score += (p.c===forColor?1:-1)*(_AI_PVAL[p.t]+_aiPST(p,r,c));
+  }
+  return score;
+}
+
+function _aiOrder(b: Board, moves: [Sq,Sq][]): [Sq,Sq][] {
+  return [...moves].sort((a,z)=>{
+    const av=b[a[1][0]][a[1][1]]?_AI_PVAL[b[a[1][0]][a[1][1]]!.t]:0;
+    const zv=b[z[1][0]][z[1][1]]?_AI_PVAL[b[z[1][0]][z[1][1]]!.t]:0;
+    return zv-av;
+  });
+}
+
+const CHESS_BOT_DEPTH=4;
+
+function _chessAB(b:Board,depth:number,alpha:number,beta:number,maximizing:boolean,botColor:PColor,ep:Sq|null):number{
+  const cur:PColor=maximizing?botColor:(botColor==="w"?"b":"w");
+  const st=getStatus(b,cur,ep);
+  if(st==="checkmate") return maximizing?-99000+depth:99000-depth;
+  if(st==="stalemate"||st==="draw") return 0;
+  if(depth===0) return _aiEval(b,botColor);
+  const moves=_aiOrder(b,getAllLegalMoves(b,cur,ep));
+  if(maximizing){
+    let best=-Infinity;
+    for(const[from,to]of moves){
+      const res=applyMove(b,from,to);
+      best=Math.max(best,_chessAB(res.board,depth-1,alpha,beta,false,botColor,res.ep));
+      alpha=Math.max(alpha,best);
+      if(alpha>=beta)break;
+    }
+    return best;
+  } else {
+    let best=Infinity;
+    for(const[from,to]of moves){
+      const res=applyMove(b,from,to);
+      best=Math.min(best,_chessAB(res.board,depth-1,alpha,beta,true,botColor,res.ep));
+      beta=Math.min(beta,best);
+      if(alpha>=beta)break;
+    }
+    return best;
+  }
+}
+
+function getBestChessBotMove(b:Board,botColor:PColor,ep:Sq|null):{from:Sq;to:Sq}|null{
+  const raw=getAllLegalMoves(b,botColor,ep);
+  if(!raw.length) return null;
+  const moves=_aiOrder(b,raw);
+  let bestMove=moves[0]; let bestVal=-Infinity;
+  for(const[from,to]of moves){
+    const res=applyMove(b,from,to);
+    const val=_chessAB(res.board,CHESS_BOT_DEPTH-1,-Infinity,Infinity,false,botColor,res.ep);
+    if(val>bestVal){bestVal=val;bestMove=[from,to];}
+  }
+  return{from:bestMove[0],to:bestMove[1]};
+}
+
 // ─── Algebraic Notation ────────────────────────────────────────────────────────
 const FILE_LETTERS="abcdefgh";
 function sqLabel(r:number,c:number){return`${FILE_LETTERS[c]}${8-r}`;}
@@ -445,9 +522,9 @@ function CapturedPieces({pieces,color}:{pieces:PType[];color:PColor}){
 }
 
 // ─── Player Panel ───────────────────────────────────────────────────────────────
-function PlayerPanel({name,isMe,isActive,color,timer,captured,isCheck}:{
+function PlayerPanel({name,isMe,isActive,color,timer,captured,isCheck,balance,thinking}:{
   name:string;isMe:boolean;isActive:boolean;color:PColor;
-  timer:number;captured:PType[];isCheck:boolean;
+  timer:number;captured:PType[];isCheck:boolean;balance?:string;thinking?:boolean;
 }){
   const accent=color==="w"?"#F5C842":"#6B7280";
   const mins=String(Math.floor(timer/60)).padStart(2,"0");
@@ -486,7 +563,13 @@ function PlayerPanel({name,isMe,isActive,color,timer,captured,isCheck}:{
               border:"1px solid #FCA5A5",borderRadius:4,padding:"2px 5px",flexShrink:0}}>
             XEQUE!
           </motion.span>}
+          {thinking&&<motion.span animate={{opacity:[1,0.3,1]}} transition={{duration:0.7,repeat:Infinity}}
+            style={{fontSize:9,fontWeight:700,color:"#7C3AED",background:"rgba(124,58,237,0.1)",
+              border:"1px solid rgba(124,58,237,0.3)",borderRadius:4,padding:"2px 5px",flexShrink:0}}>
+            A pensar…
+          </motion.span>}
         </div>
+        {balance&&<div style={{fontSize:10,color:"rgba(0,0,0,0.35)",fontWeight:600,marginBottom:2}}>{balance}</div>}
         <CapturedPieces pieces={captured} color={color==="w"?"b":"w"}/>
       </div>
       <div style={{
@@ -876,6 +959,8 @@ export default function ChessGame(){
   const oppFromUrl=sp.get("opp")??"";
 
   const opponentColor:PColor=myColor==="w"?"b":"w";
+  const isBot=sp.get("bot")==="1";
+  const botBal=parseInt(sp.get("botbalance")??"0");
   const myNameUrl=sp.get("myname")??"";
   const playerName=myNameUrl?decodeURIComponent(myNameUrl):(profile?.full_name??"Jogador");
   const opponentName=oppFromUrl?decodeURIComponent(oppFromUrl):"Adversário";
@@ -913,15 +998,62 @@ export default function ChessGame(){
   const winCreditedRef=useRef(false);
   const[rematchPhase,setRematchPhase]=useState<RematchPhase>("idle");
   const[rematchRequester,setRematchRequester]=useState("");
+  const[botThinking,setBotThinking]=useState(false);
+  const opponentBal=isBot&&botBal?`${botBal} MT`:"—";
 
   useEffect(()=>{boardRef.current=board;},[board]);
   useEffect(()=>{turnRef.current=turn;},[turn]);
   useEffect(()=>{epRef.current=ep;},[ep]);
   useEffect(()=>{statusRef.current=status;},[status]);
 
+  // ── Bot: deduct bet once on mount ────────────────────────────────────────────
+  useEffect(()=>{
+    if(!isBot||!profile?.id||BET<=0||betDeductedRef.current)return;
+    betDeductedRef.current=true;
+    (async()=>{
+      try{
+        const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
+        if(data){
+          await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
+          await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta vs IA (Xadrez)",status:"approved"});
+          try{sessionStorage.setItem(`wm_bet_deducted_chess_${gameId}`,"1");}catch{}
+          await supabase.from("matches").upsert({
+            id:gameId,game_type:"xadrez",
+            player1_id:profile.id,player1_name:playerName,
+            player2_name:opponentName+" (IA)",
+            bet_amount:BET,winner_payout:Math.floor(BET*2*0.90),
+            status:"active",created_at:new Date().toISOString(),
+          },{onConflict:"id"});
+          await refreshProfile();
+        }
+      }catch{betDeductedRef.current=false;}
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[isBot]);
+
+  // ── Bot AI turn trigger ────────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!isBot||turn!==opponentColor||!!winner||status==="checkmate"||status==="stalemate"||status==="draw")return;
+    setBotThinking(true);
+    const delay=1200+Math.random()*900;
+    const t=setTimeout(()=>{
+      setBotThinking(false);
+      const move=getBestChessBotMove(boardRef.current,opponentColor,epRef.current);
+      if(!move){
+        const st=getStatus(boardRef.current,opponentColor,epRef.current);
+        if(st==="checkmate"){setWinner(myColor);setWinReason("Xeque-Mate!");}
+        else{setWinReason("Afogamento — Empate!");}
+        return;
+      }
+      applyMoveToState(boardRef.current,move.from,move.to,"Q",epRef.current,turnRef.current);
+    },delay);
+    return()=>{clearTimeout(t);setBotThinking(false);};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[turn,winner,status,isBot]);
+
   // Persist game state for reconnection
   useEffect(()=>{
-    if(gameId==="local"||winner||status==="checkmate"||status==="stalemate")return;
+    if(gameId==="local"||isBot||winner||status==="checkmate"||status==="stalemate")return;
     try{
       sessionStorage.setItem(`wm_chess_${gameId}`,JSON.stringify({
         board:boardRef.current,turn,ep:epRef.current,history,captured,status,
@@ -979,6 +1111,7 @@ export default function ChessGame(){
   // ── Timer countdown ───────────────────────────────────────────────────────────
   useEffect(()=>{
     if(status!=="playing"&&status!=="check")return;
+    if(isBot&&turn===opponentColor)return;
     const tick=setInterval(()=>{
       setTimers(prev=>{
         const nb={...prev,[turn]:prev[turn]-1};
@@ -992,7 +1125,7 @@ export default function ChessGame(){
       });
     },1000);
     return()=>clearInterval(tick);
-  },[turn,status]);
+  },[turn,status,isBot]);
 
   // ── Check king square ─────────────────────────────────────────────────────────
   const checkSquare:Sq|null=(status==="check"||status==="checkmate")?findKing(board,turn):null;
@@ -1079,7 +1212,7 @@ export default function ChessGame(){
 
   // ── Supabase Realtime ─────────────────────────────────────────────────────────
   useEffect(()=>{
-    if(gameId==="local")return;
+    if(gameId==="local"||isBot)return;
     const ch=supabase.channel(`chess_${gameId}`,{config:{broadcast:{self:false}}});
     channelRef.current=ch;
     ch.on("broadcast",{event:"chess_move"},({payload})=>{
@@ -1191,6 +1324,7 @@ export default function ChessGame(){
   }
 
   async function handleReplay(){
+    if(isBot){setLocation("/apostar/xadrez");return;}
     if(gameId==="local"||BET===0){resetGame();return;}
     setRematchPhase("checking");
     try {
@@ -1287,6 +1421,7 @@ export default function ChessGame(){
             name={opponentName} isMe={false} isActive={turn===opponentColor}
             color={opponentColor} timer={oppTimer}
             captured={captured[opponentColor]} isCheck={oppCheck}
+            balance={isBot?opponentBal:undefined} thinking={isBot&&botThinking}
           />
         </div>
 
