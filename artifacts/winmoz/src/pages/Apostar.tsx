@@ -172,14 +172,36 @@ function SMSBettingScreen({
   onSuccess: (txId: string | null) => void;
   userPhone?: string;
 }) {
+  const [, setLocation] = useLocation();
   const [step, setStep] = useState<"info" | "processing" | "rejected">("info");
   const [confirmMsg, setConfirmMsg] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const MPESA_NUM = "848519858";
-  const EMOLA_NUM = "869189457";
+  const [mpesaNum, setMpesaNum] = useState("848519858");
+  const [emolaNum, setEmolaNum] = useState("869189457");
+  const [mpesaName, setMpesaName] = useState("Celso Cristiano");
+  const [emolaName, setEmolaName] = useState("Celso Cristiano");
+
+  useEffect(() => {
+    const fetchPaySettings = async () => {
+      try {
+        const [r1, r2, r3, r4] = await Promise.all([
+          fetch("/api/admin/settings/get?key=sms_mpesa_number"),
+          fetch("/api/admin/settings/get?key=sms_emola_number"),
+          fetch("/api/admin/settings/get?key=sms_mpesa_name"),
+          fetch("/api/admin/settings/get?key=sms_emola_name"),
+        ]);
+        const [d1, d2, d3, d4] = await Promise.all([r1.json(), r2.json(), r3.json(), r4.json()]);
+        if (d1?.setting?.value) setMpesaNum(d1.setting.value);
+        if (d2?.setting?.value) setEmolaNum(d2.setting.value);
+        if (d3?.setting?.value) setMpesaName(d3.setting.value);
+        if (d4?.setting?.value) setEmolaName(d4.setting.value);
+      } catch { /* use defaults */ }
+    };
+    fetchPaySettings();
+  }, []);
 
   useEffect(() => {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
@@ -412,12 +434,12 @@ function SMSBettingScreen({
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 700, color: "#e74c3c", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 2 }}>M-Pesa</p>
                   <p style={{ fontWeight: 800, color: "#fff", fontFamily: "system-ui", fontSize: 17, letterSpacing: "0.5px" }}>
-                    +258 {MPESA_NUM.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")}
+                    +258 {mpesaNum.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")}
                   </p>
-                  <p style={{ fontSize: 11, color: "#71717a", marginTop: 2 }}>Celso Cristiano</p>
+                  <p style={{ fontSize: 11, color: "#71717a", marginTop: 2 }}>{mpesaName}</p>
                 </div>
               </div>
-              <button onClick={() => copyNum(`+258${MPESA_NUM}`, "mpesa")}
+              <button onClick={() => copyNum(`+258${mpesaNum}`, "mpesa")}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
                 style={{ background: copied === "mpesa" ? "rgba(0,212,180,0.2)" : "#2c2c2e",
                   color: copied === "mpesa" ? CYAN : "#8e8e93", cursor: "pointer" }}>
@@ -438,12 +460,12 @@ function SMSBettingScreen({
                 <div>
                   <p style={{ fontSize: 10, fontWeight: 700, color: "#34d399", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 2 }}>e-Mola</p>
                   <p style={{ fontWeight: 800, color: "#fff", fontFamily: "system-ui", fontSize: 17, letterSpacing: "0.5px" }}>
-                    +258 {EMOLA_NUM.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")}
+                    +258 {emolaNum.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")}
                   </p>
-                  <p style={{ fontSize: 11, color: "#71717a", marginTop: 2 }}>Celso Cristiano</p>
+                  <p style={{ fontSize: 11, color: "#71717a", marginTop: 2 }}>{emolaName}</p>
                 </div>
               </div>
-              <button onClick={() => copyNum(`+258${EMOLA_NUM}`, "emola")}
+              <button onClick={() => copyNum(`+258${emolaNum}`, "emola")}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl"
                 style={{ background: copied === "emola" ? "rgba(0,212,180,0.2)" : "#2c2c2e",
                   color: copied === "emola" ? CYAN : "#8e8e93", cursor: "pointer" }}>
@@ -591,12 +613,38 @@ function RejectedScreen({
   );
 }
 
+/* ── Bot names pool ── */
+const BOT_NAMES_POOL = [
+  "Anita Joaquim","Eduardo Viegas","Fátima Cossa","Manuel Sitoe",
+  "Isabel Nhantumbo","Carlos Tembe","Rosa Mucavel","António Bila",
+  "Conceição Machava","Hélder Muianga","Lurdes Maluana","Pedro Tivane",
+  "Sofia Cuna","Domingos Chissano","Graça Macuácua","Filipe Zunguze",
+  "Beatriz Munguambe","Tomás Guambe","Adélia Nhatave","Augusto Chabane",
+  "Celeste Baloi","Ernesto Macuácua","Maria Mondlane","Vítor Sitoe",
+  "Amélia Zitha","Jacinto Cumbe","Felicidade Ubisse","Olívia Tembe",
+  "Renato Mabunda","Noémia Inguane",
+];
+
+function pickBotInfo(): { name: string; balance: number } {
+  try {
+    const used = JSON.parse(sessionStorage.getItem("_wmz_bot_names") ?? "[]") as string[];
+    const pool = BOT_NAMES_POOL.filter(n => !used.includes(n));
+    const src  = pool.length > 0 ? pool : BOT_NAMES_POOL;
+    const name = src[Math.floor(Math.random() * src.length)];
+    sessionStorage.setItem("_wmz_bot_names", JSON.stringify([...used.slice(-9), name]));
+    return { name, balance: Math.floor(Math.random() * 400) + 100 };
+  } catch {
+    return { name: BOT_NAMES_POOL[0], balance: 200 };
+  }
+}
+
 /* ── Matchmaking Screen ── */
 function MatchmakingScreen({
-  onCancel, onMatched, userId, displayName, betAmount, gameType,
+  onCancel, onMatched, onBotMatch, userId, displayName, betAmount, gameType,
 }: {
   onCancel: () => void;
   onMatched: (gameId: string, color: string, oppName: string) => void;
+  onBotMatch?: (botName: string, botBalance: number) => void;
   userId: string;
   displayName: string;
   betAmount: number;
@@ -605,8 +653,11 @@ function MatchmakingScreen({
   const TOTAL = 180;
   const [remaining, setRemaining] = useState(TOTAL);
   const [found, setFound] = useState(false);
+  const [botOffered, setBotOffered] = useState(false);
+  const [botInfo, setBotInfo] = useState<{ name: string; balance: number } | null>(null);
   const matchedRef = useRef(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const BOT_ELIGIBLE = gameType === "damas" && [10, 20, 50].includes(betAmount);
 
   useEffect(() => {
     const channelName = `matchmaking_${gameType}_${betAmount}`;
@@ -676,6 +727,11 @@ function MatchmakingScreen({
   useEffect(() => {
     if (found) return;
     if (remaining <= 0) { onCancel(); return; }
+    if (BOT_ELIGIBLE && !botOffered && (TOTAL - remaining) >= 45) {
+      const info = pickBotInfo();
+      setBotInfo(info);
+      setBotOffered(true);
+    }
     const t = setInterval(() => setRemaining(r => r - 1), 1000);
     return () => clearInterval(t);
   }, [remaining, found]);
@@ -844,6 +900,62 @@ function MatchmakingScreen({
             Se nenhum adversário for encontrado em {mins}:{secs}, o teu valor será devolvido automaticamente.
           </p>
         </motion.div>
+
+        {/* Bot offer — shown after 45s for eligible damas bets */}
+        {botOffered && botInfo && !found && (
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 22 }}
+            style={{ margin: "8px 20px 0",
+              background: "linear-gradient(135deg, rgba(124,58,237,0.18), rgba(109,40,217,0.12))",
+              borderRadius: 20, border: `1.5px solid ${VIOLET}44`, padding: "18px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <div style={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+                background: `linear-gradient(135deg, ${VIOLET}, #6d28d9)`,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
+                🤖
+              </div>
+              <div>
+                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13.5, color: "#fff", marginBottom: 2 }}>
+                  Sem adversário após 45s
+                </p>
+                <p style={{ fontSize: 11.5, color: "#71717a" }}>Queres jogar contra a IA?</p>
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.04)",
+              borderRadius: 13, padding: "10px 12px", border: "1px solid rgba(255,255,255,0.07)", marginBottom: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
+                background: "linear-gradient(135deg, #2c1810, #4a1a05)",
+                border: "2px solid rgba(255,200,50,0.35)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 15, color: "#FFD700" }}>
+                {botInfo.name.charAt(0)}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontWeight: 700, fontSize: 13, color: "#fff", marginBottom: 2,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {botInfo.name}
+                </p>
+                <p style={{ fontSize: 11, color: "#71717a" }}>
+                  {botInfo.balance} MT · <span style={{ color: "#ef4444", fontWeight: 700 }}>Nível Ultra Difícil</span>
+                </p>
+              </div>
+              <div style={{ background: "rgba(239,68,68,0.15)", borderRadius: 7, padding: "3px 8px",
+                border: "1px solid rgba(239,68,68,0.3)", flexShrink: 0 }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: "#ef4444" }}>IA</span>
+              </div>
+            </div>
+            <button
+              onClick={() => onBotMatch && onBotMatch(botInfo.name, botInfo.balance)}
+              style={{ width: "100%", height: 44, borderRadius: 13, border: "none", cursor: "pointer",
+                background: `linear-gradient(135deg, ${VIOLET}, #6d28d9)`, color: "#fff",
+                fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              🎮 Jogar contra a IA
+            </button>
+          </motion.div>
+        )}
 
         <div className="flex-1" />
 
@@ -1085,6 +1197,14 @@ export default function Apostar() {
             const damasColor = color === "blue" ? "w" : "b";
             dest = `/damas-jogo?gameId=${gId}&color=${damasColor}&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}`;
           }
+          setTimeout(() => setLocation(dest), 2200);
+        }}
+        onBotMatch={(botName, botBalance) => {
+          setScreen("matched");
+          const myEnc  = encodeURIComponent(profile?.full_name ?? "Jogador");
+          const oppEnc = encodeURIComponent(botName);
+          const botGameId = `bot_${Date.now()}`;
+          const dest = `/damas-jogo?gameId=${botGameId}&color=w&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}&bot=1&botbalance=${botBalance}`;
           setTimeout(() => setLocation(dest), 2200);
         }}
         userId={user?.id ?? ""}

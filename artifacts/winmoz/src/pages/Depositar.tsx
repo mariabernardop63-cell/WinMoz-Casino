@@ -49,9 +49,30 @@ export default function Depositar() {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const MPESA_NUM = "848519858";
-  const EMOLA_NUM = "869189457";
+  const [mpesaNum, setMpesaNum] = useState("848519858");
+  const [emolaNum, setEmolaNum] = useState("869189457");
+  const [mpesaName, setMpesaName] = useState("Celso Cristiano");
+  const [emolaName, setEmolaName] = useState("Celso Cristiano");
   const [successAmount, setSuccessAmount] = useState(0);
+
+  useEffect(() => {
+    const fetchPaySettings = async () => {
+      try {
+        const [r1, r2, r3, r4] = await Promise.all([
+          fetch("/api/admin/settings/get?key=sms_mpesa_number"),
+          fetch("/api/admin/settings/get?key=sms_emola_number"),
+          fetch("/api/admin/settings/get?key=sms_mpesa_name"),
+          fetch("/api/admin/settings/get?key=sms_emola_name"),
+        ]);
+        const [d1, d2, d3, d4] = await Promise.all([r1.json(), r2.json(), r3.json(), r4.json()]);
+        if (d1?.setting?.value) setMpesaNum(d1.setting.value);
+        if (d2?.setting?.value) setEmolaNum(d2.setting.value);
+        if (d3?.setting?.value) setMpesaName(d3.setting.value);
+        if (d4?.setting?.value) setEmolaName(d4.setting.value);
+      } catch { /* use defaults */ }
+    };
+    fetchPaySettings();
+  }, []);
   const txDate = new Date().toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" });
 
   useEffect(() => {
@@ -308,13 +329,13 @@ export default function Depositar() {
                   <div>
                     <p className="text-xs font-bold mb-0.5 uppercase tracking-wider" style={{ color: "#e74c3c" }}>M-Pesa</p>
                     <p className="font-bold text-white text-lg" style={{ fontFamily: "system-ui", letterSpacing: "0.5px" }}>
-                      +258 {MPESA_NUM.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")}
+                      +258 {mpesaNum.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")}
                     </p>
-                    <p className="text-xs mt-0.5" style={{ color: "#71717a" }}>Celso Cristiano</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#71717a" }}>{mpesaName}</p>
                   </div>
                 </div>
                 <button
-                  onClick={() => copyToClipboard(`+258${MPESA_NUM}`, "mpesa")}
+                  onClick={() => copyToClipboard(`+258${mpesaNum}`, "mpesa")}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all"
                   style={{
                     background: copied === "mpesa" ? "rgba(0,212,180,0.2)" : "#2c2c2e",
@@ -344,13 +365,13 @@ export default function Depositar() {
                   <div>
                     <p className="text-xs font-bold mb-0.5 uppercase tracking-wider" style={{ color: "#34d399" }}>e-Mola</p>
                     <p className="font-bold text-white text-lg" style={{ fontFamily: "system-ui", letterSpacing: "0.5px" }}>
-                      +258 {EMOLA_NUM.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")}
+                      +258 {emolaNum.replace(/(\d{3})(\d{3})(\d{3})/, "$1 $2 $3")}
                     </p>
-                    <p className="text-xs mt-0.5" style={{ color: "#71717a" }}>Celso Cristiano</p>
+                    <p className="text-xs mt-0.5" style={{ color: "#71717a" }}>{emolaName}</p>
                   </div>
                 </div>
                 <button
-                  onClick={() => copyToClipboard(`+258${EMOLA_NUM}`, "emola")}
+                  onClick={() => copyToClipboard(`+258${emolaNum}`, "emola")}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all"
                   style={{
                     background: copied === "emola" ? "rgba(0,212,180,0.2)" : "#2c2c2e",

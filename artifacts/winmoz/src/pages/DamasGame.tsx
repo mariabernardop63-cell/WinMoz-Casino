@@ -133,6 +133,108 @@ function getSelectablePieces(b: Board, color: PColor): { sq: Sq; depth: number }
   return nonCap;
 }
 
+// ─── Bot AI Engine ────────────────────────────────────────────────────────────
+
+interface AIMove { from: Sq; to: Sq; captured: Sq[]; }
+
+function _expandAIMoves(
+  board: Board, orig: Sq, cur: Sq,
+  caps: Sq[], excl: Set<string>, out: AIMove[]
+): void {
+  const nextCaps = getCaptures(board, cur[0], cur[1], excl);
+  if (nextCaps.length === 0) {
+    if (caps.length > 0) out.push({ from: orig, to: cur, captured: caps });
+    return;
+  }
+  for (const { to, cap } of nextCaps) {
+    const nb = cloneBoard(board);
+    nb[to[0]][to[1]] = nb[cur[0]][cur[1]];
+    nb[cur[0]][cur[1]] = null;
+    nb[cap[0]][cap[1]] = null;
+    const piece = nb[to[0]][to[1]]!;
+    if (!piece.isDame) {
+      if (piece.color === "w" && to[0] === 0) nb[to[0]][to[1]] = { ...piece, isDame: true };
+      if (piece.color === "b" && to[0] === 7) nb[to[0]][to[1]] = { ...piece, isDame: true };
+    }
+    const ne = new Set(excl); ne.add(sqKey(cap[0], cap[1]));
+    _expandAIMoves(nb, orig, to, [...caps, cap], ne, out);
+  }
+}
+
+function aiGetAllMoves(b: Board, color: PColor): AIMove[] {
+  const captures: AIMove[] = [];
+  for (let r = 0; r < 8; r++)
+    for (let c = 0; c < 8; c++)
+      if (b[r][c]?.color === color)
+        _expandAIMoves(b, [r, c], [r, c], [], new Set(), captures);
+  if (captures.length > 0) return captures;
+  const moves: AIMove[] = [];
+  for (let r = 0; r < 8; r++)
+    for (let c = 0; c < 8; c++)
+      if (b[r][c]?.color === color)
+        for (const to of getNonCaptures(b, r, c))
+          moves.push({ from: [r, c], to, captured: [] });
+  return moves;
+}
+
+function aiEval(b: Board, forColor: PColor): number {
+  let score = 0;
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const p = b[r][c]; if (!p) continue;
+      const sign = p.color === forColor ? 1 : -1;
+      const pieceVal = p.isDame ? 300 : 100;
+      const adv = p.isDame ? 0 : (p.color === "w" ? (7 - r) * 6 : r * 6);
+      const back = !p.isDame && ((p.color === "w" && r === 7) || (p.color === "b" && r === 0)) ? 15 : 0;
+      const center = (r >= 2 && r <= 5 && c >= 1 && c <= 6) ? 8 : 0;
+      score += sign * (pieceVal + adv + back + center);
+    }
+  }
+  return score;
+}
+
+function _minimax(b: Board, depth: number, alpha: number, beta: number, maximizing: boolean, botColor: PColor): number {
+  const curColor: PColor = maximizing ? botColor : opp(botColor);
+  const moves = aiGetAllMoves(b, curColor);
+  if (depth === 0 || moves.length === 0) return aiEval(b, botColor);
+  if (maximizing) {
+    let best = -Infinity;
+    for (const mv of moves) {
+      const nb = applyBoardMove(b, mv.from, mv.to, mv.captured);
+      best = Math.max(best, _minimax(nb, depth - 1, alpha, beta, false, botColor));
+      alpha = Math.max(alpha, best);
+      if (alpha >= beta) break;
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (const mv of moves) {
+      const nb = applyBoardMove(b, mv.from, mv.to, mv.captured);
+      best = Math.min(best, _minimax(nb, depth - 1, alpha, beta, true, botColor));
+      beta = Math.min(beta, best);
+      if (alpha >= beta) break;
+    }
+    return best;
+  }
+}
+
+const AI_DEPTH = 7;
+
+function getBestBotMove(b: Board, botColor: PColor): AIMove | null {
+  const moves = aiGetAllMoves(b, botColor);
+  if (moves.length === 0) return null;
+  // Move ordering: captures first → better alpha-beta pruning
+  moves.sort((a, z) => z.captured.length - a.captured.length);
+  let bestMove: AIMove = moves[0];
+  let bestVal = -Infinity;
+  for (const mv of moves) {
+    const nb = applyBoardMove(b, mv.from, mv.to, mv.captured);
+    const val = _minimax(nb, AI_DEPTH - 1, -Infinity, Infinity, false, botColor);
+    if (val > bestVal) { bestVal = val; bestMove = mv; }
+  }
+  return bestMove;
+}
+
 // ─── Timer Arc ────────────────────────────────────────────────────────────────
 function TimerArc({ val, total=30, size=28 }: { val: number; total?: number; size?: number }) {
   const r = (size - 4) / 2, circ = 2 * Math.PI * r;
@@ -419,6 +521,8 @@ export default function DamasGame() {
   const oppUrl   = sp.get("opp") ?? "";
 
   const oppColor: PColor = myColor === "w" ? "b" : "w";
+  const isBot    = sp.get("bot") === "1";
+  const botBal   = parseInt(sp.get("botbalance") ?? "0");
   const myNameUrl = sp.get("myname") ?? "";
   const playerName = myNameUrl ? decodeURIComponent(myNameUrl) : (profile?.full_name ?? "Jogador");
   const playerBal    = profile?.balance ? `${Number(profile.balance).toLocaleString("pt-MZ")} MT` : "0 MT";
@@ -463,7 +567,8 @@ export default function DamasGame() {
   );
   const winCreditedRef = useRef(false);
   const lastMoveTimeRef = useRef<number>(0); // rate limit: min 200ms between moves
-  const [opponentBal, setOpponentBal] = useState("—");
+  const [opponentBal, setOpponentBal] = useState(isBot && botBal ? `${botBal} MT` : "—");
+  const [botThinking, setBotThinking] = useState(false);
   const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
   const [rematchRequester, setRematchRequester] = useState("");
   const [wrongClickSq, setWrongClickSq] = useState<string | null>(null);
@@ -496,9 +601,66 @@ export default function DamasGame() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winner]);
 
+  // ── Bot: deduct bet once on mount (no channel subscription for bot games) ─────
+  useEffect(() => {
+    if (!isBot || !profile?.id || BET <= 0 || betDeductedRef.current) return;
+    betDeductedRef.current = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+        if (data) {
+          await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
+          await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta vs IA (Damas)", status: "approved" });
+          try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch {}
+          await supabase.from("matches").upsert({
+            id: gameId, game_type: "dama",
+            player1_id: profile.id, player1_name: playerName,
+            player2_name: opponentName + " (IA)",
+            bet_amount: BET, winner_payout: Math.floor(BET * 2 * 0.90),
+            status: "active", created_at: new Date().toISOString(),
+          }, { onConflict: "id" });
+          await refreshProfile();
+        }
+      } catch { betDeductedRef.current = false; }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBot]);
+
+  // ── Bot AI turn trigger ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isBot || turn !== oppColor || !!winner) return;
+    setBotThinking(true);
+    const delay = 900 + Math.random() * 700;
+    const t = setTimeout(() => {
+      setBotThinking(false);
+      const move = getBestBotMove(boardRef.current, oppColor);
+      if (!move) {
+        setWinner(myColor); winnerRef.current = myColor;
+        setWinReason(`${opponentName} ficou sem movimentos`);
+        return;
+      }
+      const nb = applyBoardMove(boardRef.current, move.from, move.to, move.captured);
+      boardRef.current = nb;
+      setBoard(nb);
+      setLastMove({ from: move.from, to: move.to });
+      setSelected(null); setValidDests([]); setValidCapDests([]);
+      setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
+      const myCnt = countPieces(nb, myColor);
+      if (myCnt === 0) {
+        setWinner(oppColor); winnerRef.current = oppColor;
+        setWinReason("Todas as peças foram capturadas pelo bot");
+      } else {
+        setTurn(myColor);
+        setTimers(t => ({ ...t, [myColor]: 30 }));
+      }
+    }, delay);
+    return () => { clearTimeout(t); setBotThinking(false); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turn, winner, isBot]);
+
   // Credit winner + register match result when game ends
   useEffect(() => {
-    if (!winner || !profile?.id || BET <= 0 || gameId === "local" || winCreditedRef.current) return;
+    if (!winner || !profile?.id || BET <= 0 || (gameId === "local" && !isBot) || winCreditedRef.current) return;
     winCreditedRef.current = true;
     const payout = Math.floor(BET * 2 * 0.90);
     const platformFee = BET * 2 - payout;
@@ -625,7 +787,7 @@ export default function DamasGame() {
 
   // ── Supabase Realtime ─────────────────────────────────────────────────────
   useEffect(() => {
-    if (gameId === "local") return;
+    if (gameId === "local" || isBot) return;
     const ch = supabase.channel(`damas_${gameId}`, { config: { broadcast: { self: false } } });
     channelRef.current = ch;
 
@@ -908,7 +1070,7 @@ export default function DamasGame() {
   }
 
   async function handleReplay() {
-    if (gameId === "local" || BET === 0) { resetGame(); return; }
+    if (gameId === "local" || BET === 0 || isBot) { resetGame(); return; }
     setRematchPhase("checking");
     try {
       const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000));
@@ -1027,6 +1189,25 @@ export default function DamasGame() {
             piecesLeft={oppPieces} damesLeft={oppDames}
             timeLeft={timers[oppColor]} lives={lives[oppColor]}
           />
+          {isBot && botThinking && (
+            <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:6,
+              padding:"5px 10px", borderRadius:10,
+              background:"rgba(124,58,237,0.12)", border:"1px solid rgba(124,58,237,0.25)" }}>
+              <span style={{ fontSize:12 }}>🤖</span>
+              <span style={{ fontSize:11, fontWeight:700, color:"#7c3aed", letterSpacing:0.3 }}>
+                IA a calcular jogada…
+              </span>
+              <span style={{ marginLeft:"auto", display:"flex", gap:3 }}>
+                {[0,1,2].map(i => (
+                  <span key={i} style={{
+                    width:4, height:4, borderRadius:"50%", background:"#7c3aed",
+                    display:"inline-block",
+                    animation:`pulse 1.2s ease-in-out ${i*0.2}s infinite`
+                  }}/>
+                ))}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Board */}

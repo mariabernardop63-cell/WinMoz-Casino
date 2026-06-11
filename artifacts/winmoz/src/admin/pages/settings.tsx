@@ -206,16 +206,22 @@ export default function Settings() {
   // SMS Forwarder settings
   const [mpesaNum, setMpesaNum] = useState("");
   const [emolaNum, setEmolaNum] = useState("");
+  const [mpesaName, setMpesaName] = useState("");
+  const [emolaName, setEmolaName] = useState("");
   const [webhookToken, setWebhookToken] = useState("");
   const [showWebhookToken, setShowWebhookToken] = useState(false);
   const [savingMpesa, setSavingMpesa] = useState(false);
   const [savingEmola, setSavingEmola] = useState(false);
+  const [savingMpesaName, setSavingMpesaName] = useState(false);
+  const [savingEmolaName, setSavingEmolaName] = useState(false);
   const [savingWebhookToken, setSavingWebhookToken] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
 
   useEffect(() => {
     if (platformSettings["sms_mpesa_number"]) setMpesaNum(platformSettings["sms_mpesa_number"]);
     if (platformSettings["sms_emola_number"]) setEmolaNum(platformSettings["sms_emola_number"]);
+    if (platformSettings["sms_mpesa_name"])   setMpesaName(platformSettings["sms_mpesa_name"]);
+    if (platformSettings["sms_emola_name"])   setEmolaName(platformSettings["sms_emola_name"]);
   }, [platformSettings]);
 
   const handleSaveMpesa = async () => {
@@ -226,12 +232,28 @@ export default function Settings() {
     setSavingMpesa(false);
   };
 
+  const handleSaveMpesaName = async () => {
+    if (!mpesaName.trim()) { toast.error("Insere o nome do titular M-Pesa"); return; }
+    setSavingMpesaName(true);
+    try { await updateSetting.mutateAsync({ key: "sms_mpesa_name", value: mpesaName.trim() }); toast.success("Nome M-Pesa guardado"); }
+    catch { toast.error("Erro ao guardar"); }
+    setSavingMpesaName(false);
+  };
+
   const handleSaveEmola = async () => {
     if (!emolaNum.trim()) { toast.error("Insere o número e-Mola"); return; }
     setSavingEmola(true);
     try { await updateSetting.mutateAsync({ key: "sms_emola_number", value: emolaNum.trim() }); toast.success("Número e-Mola guardado"); }
     catch { toast.error("Erro ao guardar"); }
     setSavingEmola(false);
+  };
+
+  const handleSaveEmolaName = async () => {
+    if (!emolaName.trim()) { toast.error("Insere o nome do titular e-Mola"); return; }
+    setSavingEmolaName(true);
+    try { await updateSetting.mutateAsync({ key: "sms_emola_name", value: emolaName.trim() }); toast.success("Nome e-Mola guardado"); }
+    catch { toast.error("Erro ao guardar"); }
+    setSavingEmolaName(false);
   };
 
   const handleSaveWebhookToken = async () => {
@@ -551,8 +573,38 @@ export default function Settings() {
               <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>Exemplo: <code style={{ fontFamily: "monospace" }}>84 612 3456</code>. Exibido aos utilizadores na tela de depósito.</p>
             </div>
 
+            {/* M-Pesa Name */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                Nome do Titular M-Pesa
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(231,76,60,0.2)" }}>
+                  <span style={{ fontSize: 13, color: "#e74c3c", flexShrink: 0 }}>👤</span>
+                  <input
+                    type="text"
+                    value={mpesaName}
+                    onChange={e => setMpesaName(e.target.value)}
+                    placeholder="Ex: Celso Cristiano"
+                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
+                  />
+                </div>
+                <button onClick={handleSaveMpesaName} disabled={!mpesaName.trim() || savingMpesaName}
+                  style={{
+                    padding: "10px 14px", borderRadius: 12, border: "none",
+                    cursor: mpesaName.trim() ? "pointer" : "default",
+                    background: mpesaName.trim() ? "linear-gradient(135deg, #e74c3c, #c0392b)" : "var(--gz-bg-subtle)",
+                    color: mpesaName.trim() ? "#fff" : "var(--gz-text-tertiary)",
+                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
+                  }}>
+                  {savingMpesaName ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>Nome exibido por baixo do número M-Pesa na tela de depósito/aposta.</p>
+            </div>
+
             {/* e-Mola Number */}
-            <div>
+            <div style={{ marginBottom: 20 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
                 Número e-Mola da Plataforma
               </label>
@@ -579,6 +631,36 @@ export default function Settings() {
                 </button>
               </div>
               <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>Exemplo: <code style={{ fontFamily: "monospace" }}>87 123 4567</code>. Exibido aos utilizadores na tela de depósito.</p>
+            </div>
+
+            {/* e-Mola Name */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                Nome do Titular e-Mola
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(52,211,153,0.2)" }}>
+                  <span style={{ fontSize: 13, color: "#34d399", flexShrink: 0 }}>👤</span>
+                  <input
+                    type="text"
+                    value={emolaName}
+                    onChange={e => setEmolaName(e.target.value)}
+                    placeholder="Ex: Celso Cristiano"
+                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
+                  />
+                </div>
+                <button onClick={handleSaveEmolaName} disabled={!emolaName.trim() || savingEmolaName}
+                  style={{
+                    padding: "10px 14px", borderRadius: 12, border: "none",
+                    cursor: emolaName.trim() ? "pointer" : "default",
+                    background: emolaName.trim() ? "linear-gradient(135deg, #34d399, #059669)" : "var(--gz-bg-subtle)",
+                    color: emolaName.trim() ? "#fff" : "var(--gz-text-tertiary)",
+                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
+                  }}>
+                  {savingEmolaName ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>Nome exibido por baixo do número e-Mola na tela de depósito/aposta.</p>
             </div>
 
           </div>
