@@ -657,7 +657,8 @@ function MatchmakingScreen({
   const matchedRef = useRef(false);
   const botMatchRef = useRef(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const BOT_ELIGIBLE = (gameType === "damas" || gameType === "xadrez") && [10, 20, 50].includes(betAmount);
+  const BOT_ELIGIBLE = (gameType === "damas" || gameType === "xadrez" || gameType === "ludo" || gameType === "ludo-classic") && [10, 20, 50].includes(betAmount);
+  const botThresholdRef = useRef(Math.floor(Math.random() * (45 - 18 + 1)) + 18);
 
   useEffect(() => {
     const channelName = `matchmaking_${gameType}_${betAmount}`;
@@ -727,7 +728,7 @@ function MatchmakingScreen({
   useEffect(() => {
     if (found) return;
     if (remaining <= 0) { onCancel(); return; }
-    if (BOT_ELIGIBLE && !botMatchRef.current && (TOTAL - remaining) >= 45) {
+    if (BOT_ELIGIBLE && !botMatchRef.current && (TOTAL - remaining) >= botThresholdRef.current) {
       const botsDisabled = localStorage.getItem("wm_bots_disabled") === "true";
       if (!botsDisabled) {
         botMatchRef.current = true;
@@ -1161,6 +1162,8 @@ export default function Apostar() {
           let dest: string;
           if (gameId === "xadrez") {
             dest = `/xadrez-jogo?gameId=${botGameId}&color=white&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}&bot=1&botbalance=${botBalance}`;
+          } else if (gameId === "ludo" || gameId === "ludo-classic") {
+            dest = `/ludo-jogo?gameId=${botGameId}&color=blue&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}&bot=1&botbalance=${botBalance}`;
           } else {
             dest = `/damas-jogo?gameId=${botGameId}&color=w&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}&bot=1&botbalance=${botBalance}`;
           }

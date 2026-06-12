@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type PColor = "w" | "b";
@@ -223,16 +224,20 @@ function _minimax(b: Board, depth: number, alpha: number, beta: number, maximizi
 
 const AI_DEPTH = 7;
 
-function getBestBotMove(b: Board, botColor: PColor): AIMove | null {
+function getBestBotMove(b: Board, botColor: PColor, depth: number = AI_DEPTH): AIMove | null {
   const moves = aiGetAllMoves(b, botColor);
   if (moves.length === 0) return null;
   // Move ordering: captures first → better alpha-beta pruning
   moves.sort((a, z) => z.captured.length - a.captured.length);
+  // Easy mode: occasionally return a random legal move (opaque — not every time)
+  if (depth < 4 && Math.random() < 0.45) {
+    return moves[Math.floor(Math.random() * Math.min(moves.length, 4))];
+  }
   let bestMove: AIMove = moves[0];
   let bestVal = -Infinity;
   for (const mv of moves) {
     const nb = applyBoardMove(b, mv.from, mv.to, mv.captured);
-    const val = _minimax(nb, AI_DEPTH - 1, -Infinity, Infinity, false, botColor);
+    const val = _minimax(nb, depth - 1, -Infinity, Infinity, false, botColor);
     if (val > bestVal) { bestVal = val; bestMove = mv; }
   }
   return bestMove;
@@ -662,6 +667,7 @@ export default function DamasGame() {
             status: "active", created_at: new Date().toISOString(),
           }, { onConflict: "id" });
           await refreshProfile();
+          if (profile?.id) evaluateBotDifficulty(profile.id).catch(() => {});
         }
       } catch { betDeductedRef.current = false; }
     })();
@@ -675,7 +681,9 @@ export default function DamasGame() {
     const delay = 900 + Math.random() * 700;
     const t = setTimeout(() => {
       setBotThinking(false);
-      const move = getBestBotMove(boardRef.current, oppColor);
+      const _diff = getBotDifficultySync(profile?.id ?? "");
+      const _depth = _diff === "easy" ? (Math.random() < 0.5 ? 2 : 3) : AI_DEPTH;
+      const move = getBestBotMove(boardRef.current, oppColor, _depth);
       if (!move) {
         setWinner(myColor); winnerRef.current = myColor;
         setWinReason(`${opponentName} ficou sem movimentos`);

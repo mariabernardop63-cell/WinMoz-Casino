@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
 import bgImg from "@assets/Gemini_Generated_Image_grc2w7grc2w7grc2_1780220609974.png";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -1081,6 +1082,8 @@ export default function LudoGame() {
   const BET_AMOUNT  = parseInt(searchParams.get("bet") ?? "0");
   const oppFromUrl  = searchParams.get("opp") ?? "";
   const opponentColor: Player = myColor === "blue" ? "green" : "blue";
+  const isBot  = searchParams.get("bot") === "1";
+  const botBal = searchParams.get("botbalance") ?? "";
 
   const myNameUrl   = searchParams.get("myname") ?? "";
   const playerName  = myNameUrl ? decodeURIComponent(myNameUrl) : (profile?.full_name ?? "Jogador");
@@ -1098,7 +1101,7 @@ export default function LudoGame() {
     }catch{return null;}
   })();
 
-  const [opponentBal, setOpponentBal] = useState("—");
+  const [opponentBal, setOpponentBal] = useState(isBot && botBal ? `${botBal} MT` : "—");
   const [opponentTimeLeft, setOpponentTimeLeft] = useState(30);
   const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
   const [rematchRequester, setRematchRequester] = useState("");
@@ -1441,8 +1444,111 @@ export default function LudoGame() {
   }
 
   // ── Supabase Realtime channel ──────────────────────────────────────────────
+  // ── Bot: deduct bet + create match on mount ──────────────────────────────────
   useEffect(()=>{
-    if(gameId==="local") return;
+    if(!isBot||!profile?.id||BET_AMOUNT<=0||betDeductedRef.current) return;
+    betDeductedRef.current=true;
+    (async()=>{
+      try{
+        const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
+        if(data){
+          await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET_AMOUNT}).eq("id",profile.id);
+          await supabase.from("transactions").insert({
+            user_id:profile.id,type:"bet",amount:-BET_AMOUNT,
+            description:`Aposta (Ludo) vs ${opponentName}`,status:"approved",
+          });
+          try{sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`,"1");}catch{}
+          await supabase.from("matches").upsert({
+            id:gameId,game_type:"ludo",
+            player1_id:profile.id,player1_name:playerName,
+            player2_name:opponentName,
+            bet_amount:BET_AMOUNT,winner_payout:Math.floor(BET_AMOUNT*2*0.90),
+            status:"active",created_at:new Date().toISOString(),
+          },{onConflict:"id"});
+          await refreshProfile();
+          if(profile?.id) evaluateBotDifficulty(profile.id).catch(()=>{});
+        }
+      }catch{betDeductedRef.current=false;}
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[isBot]);
+
+  // ── Bot AI — strategic piece selection ────────────────────────────────────────
+  function selectBotPiece(ps:GamePiece[],movable:PieceId[],diceVal:number):PieceId{
+    if(movable.length===1) return movable[0];
+    const diff=getBotDifficultySync(profile?.id??"");
+    // Easy mode: random selection ~55% of time (opaque — not always)
+    if(diff==="easy"&&Math.random()<0.55){
+      return movable[Math.floor(Math.random()*movable.length)];
+    }
+    // Hard mode: strategic scoring
+    let best=movable[0];
+    let bestScore=-Infinity;
+    const botStart=PLAYER_START[opponentColor];
+    const userStart=PLAYER_START[myColor];
+    for(const pid of movable){
+      const piece=ps.find(p=>p.id===pid)!;
+      const newPos=piece.pos===-1?0:piece.pos+diceVal;
+      let score=0;
+      // Finish: highest priority
+      if(newPos===57){score+=3000;}
+      // Exit from base
+      else if(piece.pos===-1){score+=600;}
+      else{
+        // Capture check: see if landing on opponent piece
+        const absNew=(botStart+newPos)%52;
+        if(absNew<TRACK.length){
+          const coord=TRACK[absNew];
+          const ck=`${coord[0]},${coord[1]}`;
+          if(!SAFE_COORDS.has(ck)){
+            for(const opp of ps.filter(p=>p.player===myColor&&p.pos>0&&p.pos<=50)){
+              const absOpp=(userStart+opp.pos)%52;
+              if(absOpp===absNew){score+=1200;}
+            }
+          }
+        }
+        // Progress: further is better (don't retreat)
+        score+=newPos*4;
+        // Prefer piece that is furthest back to bring it forward
+        score-=piece.pos*0.5;
+      }
+      if(score>bestScore){bestScore=score;best=pid;}
+    }
+    return best;
+  }
+
+  // ── Bot AI turn trigger ────────────────────────────────────────────────────────
+  useEffect(()=>{
+    if(!isBot||winner||phase==="done") return;
+    if(turn!==opponentColor) return;
+    if(phase!=="roll"&&phase!=="select") return;
+    const delay=600+Math.random()*1000;
+    const t=setTimeout(()=>{
+      if(phase==="roll"){
+        const botPieces=piecesRef.current.filter(p=>p.player===opponentColor);
+        const allInBase=botPieces.every(p=>p.pos===-1);
+        const stk=stuckTurnsRef.current[opponentColor];
+        let val:number;
+        if(allInBase&&stk>=9){
+          val=6; // anti-frustration
+        } else {
+          val=Math.floor(Math.random()*6)+1;
+        }
+        applyRoll(opponentColor,val);
+      } else if(phase==="select"){
+        const mv=movableRef.current;
+        if(mv.length===0) return;
+        const dv=diceGreenRef.current??1;
+        const pid=selectBotPiece(piecesRef.current,mv,dv);
+        doSelectPiece(pid,dv,opponentColor,piecesRef.current);
+      }
+    },delay);
+    return()=>clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[turn,phase,winner,isBot]);
+
+  useEffect(()=>{
+    if(gameId==="local"||isBot) return;
     const channel=supabase.channel(`ludo_game_${gameId}`,{
       config:{ broadcast:{ self:false } },
     });
@@ -1653,7 +1759,7 @@ export default function LudoGame() {
   function handleForfeit(){
     if(winner||phase==="done")return;
     if(!window.confirm("Tens a certeza que queres desistir? Irás perder a partida."))return;
-    channelRef.current?.send({type:"broadcast",event:"ludo_forfeit",payload:{player:myColor}});
+    if(!isBot) channelRef.current?.send({type:"broadcast",event:"ludo_forfeit",payload:{player:myColor}});
     setWinner(opponentColor); setPhase("done");
     setMsg("Desististe da partida.");
   }
@@ -1673,6 +1779,19 @@ export default function LudoGame() {
 
   async function handleReplay(){
     if(gameId==="local"||BET_AMOUNT===0){ resetGame(); return; }
+    // Bot rematch: just deduct + reset immediately
+    if(isBot){
+      if(!profile?.id) return;
+      try{
+        const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
+        if(!data||parseFloat(String(data.balance))<BET_AMOUNT){ setRematchPhase("no_balance"); return; }
+        await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET_AMOUNT}).eq("id",profile.id);
+        await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET_AMOUNT,description:"Aposta de revanche (Ludo) vs bot",status:"approved"});
+        await refreshProfile();
+        resetGame();
+      }catch{ setRematchPhase("no_balance"); }
+      return;
+    }
     setRematchPhase("checking");
     try {
       const timeout = new Promise<never>((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000));

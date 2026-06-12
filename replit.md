@@ -1,4 +1,4 @@
-# Winmoz
+# mozbet
 
 App de jogos e apostas online com painel de administração integrado.
 
