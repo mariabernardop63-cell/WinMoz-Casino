@@ -563,11 +563,6 @@ function PlayerPanel({name,isMe,isActive,color,timer,captured,isCheck,balance,th
               border:"1px solid #FCA5A5",borderRadius:4,padding:"2px 5px",flexShrink:0}}>
             XEQUE!
           </motion.span>}
-          {thinking&&<motion.span animate={{opacity:[1,0.3,1]}} transition={{duration:0.7,repeat:Infinity}}
-            style={{fontSize:9,fontWeight:700,color:"#7C3AED",background:"rgba(124,58,237,0.1)",
-              border:"1px solid rgba(124,58,237,0.3)",borderRadius:4,padding:"2px 5px",flexShrink:0}}>
-            A pensar…
-          </motion.span>}
         </div>
         {balance&&<div style={{fontSize:10,color:"rgba(0,0,0,0.35)",fontWeight:600,marginBottom:2}}>{balance}</div>}
         <CapturedPieces pieces={captured} color={color==="w"?"b":"w"}/>
@@ -1015,12 +1010,12 @@ export default function ChessGame(){
         const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
         if(data){
           await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
-          await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta vs IA (Xadrez)",status:"approved"});
+          await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:`Aposta (Xadrez) vs ${opponentName}`,status:"approved"});
           try{sessionStorage.setItem(`wm_bet_deducted_chess_${gameId}`,"1");}catch{}
           await supabase.from("matches").upsert({
             id:gameId,game_type:"xadrez",
             player1_id:profile.id,player1_name:playerName,
-            player2_name:opponentName+" (IA)",
+            player2_name:opponentName,
             bet_amount:BET,winner_payout:Math.floor(BET*2*0.90),
             status:"active",created_at:new Date().toISOString(),
           },{onConflict:"id"});

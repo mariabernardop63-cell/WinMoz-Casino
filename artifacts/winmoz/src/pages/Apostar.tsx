@@ -653,9 +653,9 @@ function MatchmakingScreen({
   const TOTAL = 180;
   const [remaining, setRemaining] = useState(TOTAL);
   const [found, setFound] = useState(false);
-  const [botOffered, setBotOffered] = useState(false);
   const [botInfo, setBotInfo] = useState<{ name: string; balance: number } | null>(null);
   const matchedRef = useRef(false);
+  const botMatchRef = useRef(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const BOT_ELIGIBLE = (gameType === "damas" || gameType === "xadrez") && [10, 20, 50].includes(betAmount);
 
@@ -727,10 +727,13 @@ function MatchmakingScreen({
   useEffect(() => {
     if (found) return;
     if (remaining <= 0) { onCancel(); return; }
-    if (BOT_ELIGIBLE && !botOffered && (TOTAL - remaining) >= 45) {
+    if (BOT_ELIGIBLE && !botMatchRef.current && (TOTAL - remaining) >= 45) {
+      botMatchRef.current = true;
+      matchedRef.current = true;
       const info = pickBotInfo();
       setBotInfo(info);
-      setBotOffered(true);
+      setFound(true);
+      setTimeout(() => { onBotMatch && onBotMatch(info.name, info.balance); }, 2000);
     }
     const t = setInterval(() => setRemaining(r => r - 1), 1000);
     return () => clearInterval(t);
@@ -783,7 +786,7 @@ function MatchmakingScreen({
               </div>
               <span style={{ fontSize: 11.5, fontWeight: 600, color: "#a1a1aa", maxWidth: 80,
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>
-                Tu
+                {displayName}
               </span>
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
@@ -793,13 +796,16 @@ function MatchmakingScreen({
             </div>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
               <div style={{ width: 52, height: 52, borderRadius: "50%",
-                background: "linear-gradient(135deg, #1c1c2e, #2c2c3e)",
-                border: "2px solid #3c3c4e",
+                background: "linear-gradient(135deg, #2c1810, #4a2010)",
+                border: "2px solid rgba(255,200,50,0.3)",
                 display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <CheckCircle2 style={{ width: 22, height: 22, color: "#22c55e" }}/>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: "#FFD700" }}>
+                  {botInfo ? botInfo.name.charAt(0) : <CheckCircle2 style={{ width: 22, height: 22, color: "#22c55e" }}/>}
+                </span>
               </div>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#22c55e" }}>
-                Pronto
+              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#22c55e", maxWidth: 80,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>
+                {botInfo ? botInfo.name.split(" ")[0] : "Pronto"}
               </span>
             </div>
           </div>
@@ -901,61 +907,6 @@ function MatchmakingScreen({
           </p>
         </motion.div>
 
-        {/* Bot offer — shown after 45s for eligible damas bets */}
-        {botOffered && botInfo && !found && (
-          <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 22 }}
-            style={{ margin: "8px 20px 0",
-              background: "linear-gradient(135deg, rgba(124,58,237,0.18), rgba(109,40,217,0.12))",
-              borderRadius: 20, border: `1.5px solid ${VIOLET}44`, padding: "18px 16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <div style={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
-                background: `linear-gradient(135deg, ${VIOLET}, #6d28d9)`,
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
-                🤖
-              </div>
-              <div>
-                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13.5, color: "#fff", marginBottom: 2 }}>
-                  Sem adversário após 45s
-                </p>
-                <p style={{ fontSize: 11.5, color: "#71717a" }}>Queres jogar contra a IA?</p>
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, background: "rgba(255,255,255,0.04)",
-              borderRadius: 13, padding: "10px 12px", border: "1px solid rgba(255,255,255,0.07)", marginBottom: 12 }}>
-              <div style={{ width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
-                background: "linear-gradient(135deg, #2c1810, #4a1a05)",
-                border: "2px solid rgba(255,200,50,0.35)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 15, color: "#FFD700" }}>
-                {botInfo.name.charAt(0)}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontWeight: 700, fontSize: 13, color: "#fff", marginBottom: 2,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {botInfo.name}
-                </p>
-                <p style={{ fontSize: 11, color: "#71717a" }}>
-                  {botInfo.balance} MT · <span style={{ color: "#ef4444", fontWeight: 700 }}>Nível Ultra Difícil</span>
-                </p>
-              </div>
-              <div style={{ background: "rgba(239,68,68,0.15)", borderRadius: 7, padding: "3px 8px",
-                border: "1px solid rgba(239,68,68,0.3)", flexShrink: 0 }}>
-                <span style={{ fontSize: 10, fontWeight: 800, color: "#ef4444" }}>IA</span>
-              </div>
-            </div>
-            <button
-              onClick={() => onBotMatch && onBotMatch(botInfo.name, botInfo.balance)}
-              style={{ width: "100%", height: 44, borderRadius: 13, border: "none", cursor: "pointer",
-                background: `linear-gradient(135deg, ${VIOLET}, #6d28d9)`, color: "#fff",
-                fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 13,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              🎮 Jogar contra a IA
-            </button>
-          </motion.div>
-        )}
 
         <div className="flex-1" />
 

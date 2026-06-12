@@ -610,12 +610,12 @@ export default function DamasGame() {
         const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
         if (data) {
           await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
-          await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta vs IA (Damas)", status: "approved" });
+          await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: `Aposta (Damas) vs ${opponentName}`, status: "approved" });
           try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch {}
           await supabase.from("matches").upsert({
             id: gameId, game_type: "dama",
             player1_id: profile.id, player1_name: playerName,
-            player2_name: opponentName + " (IA)",
+            player2_name: opponentName,
             bet_amount: BET, winner_payout: Math.floor(BET * 2 * 0.90),
             status: "active", created_at: new Date().toISOString(),
           }, { onConflict: "id" });
@@ -1189,25 +1189,6 @@ export default function DamasGame() {
             piecesLeft={oppPieces} damesLeft={oppDames}
             timeLeft={timers[oppColor]} lives={lives[oppColor]}
           />
-          {isBot && botThinking && (
-            <div style={{ display:"flex", alignItems:"center", gap:6, marginTop:6,
-              padding:"5px 10px", borderRadius:10,
-              background:"rgba(124,58,237,0.12)", border:"1px solid rgba(124,58,237,0.25)" }}>
-              <span style={{ fontSize:12 }}>🤖</span>
-              <span style={{ fontSize:11, fontWeight:700, color:"#7c3aed", letterSpacing:0.3 }}>
-                IA a calcular jogada…
-              </span>
-              <span style={{ marginLeft:"auto", display:"flex", gap:3 }}>
-                {[0,1,2].map(i => (
-                  <span key={i} style={{
-                    width:4, height:4, borderRadius:"50%", background:"#7c3aed",
-                    display:"inline-block",
-                    animation:`pulse 1.2s ease-in-out ${i*0.2}s infinite`
-                  }}/>
-                ))}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Board */}
