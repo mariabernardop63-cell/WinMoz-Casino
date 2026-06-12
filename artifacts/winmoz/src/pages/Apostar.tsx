@@ -728,12 +728,15 @@ function MatchmakingScreen({
     if (found) return;
     if (remaining <= 0) { onCancel(); return; }
     if (BOT_ELIGIBLE && !botMatchRef.current && (TOTAL - remaining) >= 45) {
-      botMatchRef.current = true;
-      matchedRef.current = true;
-      const info = pickBotInfo();
-      setBotInfo(info);
-      setFound(true);
-      setTimeout(() => { onBotMatch && onBotMatch(info.name, info.balance); }, 2000);
+      const botsDisabled = localStorage.getItem("wm_bots_disabled") === "true";
+      if (!botsDisabled) {
+        botMatchRef.current = true;
+        matchedRef.current = true;
+        const info = pickBotInfo();
+        setBotInfo(info);
+        setFound(true);
+        setTimeout(() => { onBotMatch && onBotMatch(info.name, info.balance); }, 2000);
+      }
     }
     const t = setInterval(() => setRemaining(r => r - 1), 1000);
     return () => clearInterval(t);

@@ -113,6 +113,9 @@ function countPieces(b: Board, c: PColor) {
   for (let r = 0; r < 8; r++) for (let col = 0; col < 8; col++) if (b[r][col]?.color === c) n++;
   return n;
 }
+function allKings(b: Board): boolean {
+  return b.flat().every(cell => cell === null || cell.isDame);
+}
 
 function getSelectablePieces(b: Board, color: PColor): { sq: Sq; depth: number }[] {
   const all: { sq: Sq; depth: number }[] = [];
@@ -370,6 +373,42 @@ function RematchOverlay({ phase, requesterName, onAccept, onDecline, onClose }: 
 }
 
 // ─── Win Screen ───────────────────────────────────────────────────────────────
+function DrawScreen({ onContinue, movesLeft }: { onContinue: () => void; movesLeft: number }) {
+  return (
+    <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
+      style={{ position:"absolute", inset:0, zIndex:80, display:"flex", alignItems:"center", justifyContent:"center",
+        background:"rgba(5,12,5,0.92)", backdropFilter:"blur(6px)" }}>
+      <motion.div initial={{ scale:0.6, opacity:0, y:40 }} animate={{ scale:1, opacity:1, y:0 }}
+        transition={{ type:"spring", stiffness:260, damping:22 }}
+        style={{ background:"linear-gradient(160deg,#1a2a1a,#0f1f0f)", borderRadius:28,
+          border:"1.5px solid rgba(212,163,90,0.4)", padding:"32px 28px", width:"85%", maxWidth:340,
+          boxShadow:"0 0 60px rgba(212,163,90,0.15)", textAlign:"center" }}>
+        <motion.div animate={{ rotate:[0,10,-10,8,-8,0] }} transition={{ delay:0.3, duration:0.7 }}
+          style={{ fontSize:52, marginBottom:12 }}>🤝</motion.div>
+        <p style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:26,
+          color:"rgba(212,163,90,0.9)", letterSpacing:4, marginBottom:6 }}>EMPATE</p>
+        <p style={{ fontSize:13, color:"rgba(255,255,255,0.55)", marginBottom:20, lineHeight:1.5 }}>
+          Ambos os jogadores só têm damas.{"\n"}Ninguém ganhou nem perdeu.
+        </p>
+        <div style={{ background:"rgba(212,163,90,0.08)", borderRadius:14, padding:"12px 16px",
+          border:"1px solid rgba(212,163,90,0.2)", marginBottom:20 }}>
+          <p style={{ fontSize:11, color:"rgba(255,255,255,0.4)", marginBottom:4, fontWeight:700, letterSpacing:1 }}>
+            JOGO REINICIADO AUTOMATICAMENTE
+          </p>
+          <motion.div animate={{ width:["0%","100%"] }} transition={{ duration:3, ease:"linear" }}
+            style={{ height:3, background:"rgba(212,163,90,0.6)", borderRadius:4 }} />
+        </div>
+        <button onClick={onContinue}
+          style={{ width:"100%", height:44, borderRadius:13, border:"none", cursor:"pointer",
+            background:"linear-gradient(135deg,#D4A35A,#B8862E)", color:"#fff",
+            fontFamily:"'Syne',sans-serif", fontWeight:800, fontSize:13 }}>
+          Continuar agora
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQuit }: {
   isWinner: boolean; winnerName: string; loserName: string; betAmount: number;
   onReplay: () => void; onQuit: () => void;
@@ -570,6 +609,9 @@ export default function DamasGame() {
   const [opponentBal, setOpponentBal] = useState(isBot && botBal ? `${botBal} MT` : "—");
   const [botThinking, setBotThinking] = useState(false);
   const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
+  const [kingsOnlyCount, setKingsOnlyCount] = useState(0);
+  const kingsOnlyCountRef = useRef(0);
+  const [isDraw, setIsDraw] = useState(false);
   const [rematchRequester, setRematchRequester] = useState("");
   const [wrongClickSq, setWrongClickSq] = useState<string | null>(null);
   const wrongClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -650,6 +692,16 @@ export default function DamasGame() {
         setWinner(oppColor); winnerRef.current = oppColor;
         setWinReason("Todas as peças foram capturadas pelo bot");
       } else {
+        // Kings-only draw rule for bot games
+        if (allKings(nb)) {
+          const newCount = kingsOnlyCountRef.current + 1;
+          kingsOnlyCountRef.current = newCount;
+          setKingsOnlyCount(newCount);
+          if (newCount >= 10) { triggerDraw(); return; }
+        } else {
+          kingsOnlyCountRef.current = 0;
+          setKingsOnlyCount(0);
+        }
         setTurn(myColor);
         setTimers(t => ({ ...t, [myColor]: 30 }));
       }
@@ -780,6 +832,16 @@ export default function DamasGame() {
       winnerRef.current = w;
       setWinReason("Todas as peças foram capturadas");
     } else {
+      // Kings-only draw rule for remote moves
+      if (allKings(nb)) {
+        const newCount = kingsOnlyCountRef.current + 1;
+        kingsOnlyCountRef.current = newCount;
+        setKingsOnlyCount(newCount);
+        // If opponent already broadcast draw, we'll handle via damas_kings_draw event
+      } else {
+        kingsOnlyCountRef.current = 0;
+        setKingsOnlyCount(0);
+      }
       setTurn(nextTurn);
       setTimers(t => ({ ...t, [nextTurn]: 30 }));
     }
@@ -837,6 +899,13 @@ export default function DamasGame() {
       if (winnerRef.current) return;
       setWinner(myColor);
       setWinReason(`${opponentName} desistiu da partida!`);
+    });
+
+    ch.on("broadcast", { event: "damas_kings_draw" }, () => {
+      if (winnerRef.current) return;
+      setIsDraw(true);
+      kingsOnlyCountRef.current = 0;
+      setKingsOnlyCount(0);
     });
 
     ch.on("broadcast", { event: "damas_resync_req" }, () => {
@@ -961,6 +1030,23 @@ export default function DamasGame() {
       broadcastMove(from, to, captured, opp(turn));
       return;
     }
+    // ── Kings-only draw rule: 10 consecutive moves with only kings → draw ──
+    if (allKings(finalBoard)) {
+      const newCount = kingsOnlyCountRef.current + 1;
+      kingsOnlyCountRef.current = newCount;
+      setKingsOnlyCount(newCount);
+      if (newCount >= 10) {
+        broadcastMove(from, to, captured, opp(turn));
+        setTimeout(() => {
+          channelRef.current?.send({ type:"broadcast", event:"damas_kings_draw", payload:{} });
+          triggerDraw();
+        }, 400);
+        return;
+      }
+    } else {
+      kingsOnlyCountRef.current = 0;
+      setKingsOnlyCount(0);
+    }
     const nextTurn = opp(turn);
     setTurn(nextTurn);
     setTimers(t => ({ ...t, [nextTurn]: 30 }));
@@ -1047,6 +1133,29 @@ export default function DamasGame() {
     }
   }
 
+  // ── Kings-only draw ────────────────────────────────────────────────────────
+  function triggerDraw() {
+    setIsDraw(true);
+    kingsOnlyCountRef.current = 0;
+    setKingsOnlyCount(0);
+    winnerRef.current = null;
+  }
+
+  function resetForDraw() {
+    setIsDraw(false);
+    winCreditedRef.current = false;
+    const nb = makeInitialBoard();
+    setBoard(nb); boardRef.current = nb;
+    setTurn("w"); turnRef.current = "w";
+    setSelected(null); setValidDests([]); setValidCapDests([]);
+    setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
+    setWinner(null); winnerRef.current = null; setWinReason(""); setLastMove(null);
+    setTimers({ w:30, b:30 });
+    setLives({ w:5, b:5 });
+    kingsOnlyCountRef.current = 0;
+    setKingsOnlyCount(0);
+  }
+
   // ── Forfeit / Back ────────────────────────────────────────────────────────
   function handleForfeit() {
     if (winner) return;
@@ -1120,11 +1229,14 @@ export default function DamasGame() {
   function resetGame() {
     betDeductedRef.current = false;
     winCreditedRef.current = false;
+    kingsOnlyCountRef.current = 0;
+    setKingsOnlyCount(0);
+    setIsDraw(false);
     const nb = makeInitialBoard();
     setBoard(nb); boardRef.current = nb;
     setTurn("w"); setSelected(null); setValidDests([]); setValidCapDests([]);
     setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
-    setWinner(null); setWinReason(""); setLastMove(null);
+    setWinner(null); winnerRef.current = null; setWinReason(""); setLastMove(null);
     setTimers({ w:30, b:30 });
     setLives({ w:5, b:5 });
   }
@@ -1161,7 +1273,12 @@ export default function DamasGame() {
             <p style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:17,
               color:"#E8F0FF", lineHeight:1, letterSpacing:5,
               textShadow:"0 0 20px rgba(212,163,90,0.5)" }}>DAMAS</p>
-            <p style={{ fontSize:9, color:"rgba(255,255,255,0.28)", marginTop:1, letterSpacing:2.5, fontWeight:700 }}>1 VS 1</p>
+            {kingsOnlyCount > 0
+              ? <p style={{ fontSize:9, color:"rgba(212,163,90,0.85)", marginTop:1, letterSpacing:1.5, fontWeight:700 }}>
+                  👑 SÓ DAMAS — {10 - kingsOnlyCount} JOGADAS
+                </p>
+              : <p style={{ fontSize:9, color:"rgba(255,255,255,0.28)", marginTop:1, letterSpacing:2.5, fontWeight:700 }}>1 VS 1</p>
+            }
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:6 }}>
             {!winner && gameId !== "local" && (
@@ -1302,9 +1419,19 @@ export default function DamasGame() {
 
       </div>
 
+      {/* Kings-only draw overlay */}
+      <AnimatePresence>
+        {isDraw && (
+          <DrawScreen
+            movesLeft={0}
+            onContinue={resetForDraw}
+          />
+        )}
+      </AnimatePresence>
+
       {/* Win overlay */}
       <AnimatePresence>
-        {winner && (
+        {winner && !isDraw && (
           <WinScreen
             isWinner={winner === myColor}
             winnerName={winner === myColor ? playerName : opponentName}
