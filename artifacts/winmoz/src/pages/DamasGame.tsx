@@ -978,26 +978,65 @@ export default function DamasGame() {
     }
   };
 
+  // ── Timer expiry for bot (deducts bot life or forces turn back to user) ──────
+  const botTimerExpiryRef = useRef<() => void>(() => {});
+  botTimerExpiryRef.current = () => {
+    if (!isBot) return;
+    const remaining = livesRef.current[oppColor] - 1;
+    livesRef.current = { ...livesRef.current, [oppColor]: Math.max(0, remaining) };
+    if (remaining <= 0) {
+      setLives(prev => ({ ...prev, [oppColor]: 0 }));
+      setWinner(myColor);
+      setWinReason(`${opponentName} perdeu todas as vidas (tempo esgotado)`);
+      setTimers(prev => ({ ...prev, [oppColor]: 0 }));
+    } else {
+      setLives(prev => ({ ...prev, [oppColor]: remaining }));
+      setTurn(myColor);
+      setTimers({ w: 30, b: 30 });
+      setSelected(null); setValidDests([]); setValidCapDests([]);
+      setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]); setChainForbiddenDir(null);
+    }
+  };
+
   // ── Timers ────────────────────────────────────────────────────────────────
+  // My turn timer
   useEffect(() => {
     if (winner || turn !== myColor || chainPiece) return;
     // Broadcast timer reset to opponent
     channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:30 } });
+    const timerStart = Date.now();
     const tick = setInterval(() => {
-      setTimers(prev => {
-        const nv = prev[myColor] - 1;
-        if (nv <= 0) {
-          setTimeout(() => timerExpiryRef.current(), 0);
-          channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:0 } });
-          return { ...prev, [myColor]: 0 };
-        }
-        channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:nv } });
-        return { ...prev, [myColor]: nv };
-      });
-    }, 1000);
+      const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+      const nv = Math.max(0, 30 - elapsed);
+      setTimers(prev => ({ ...prev, [myColor]: nv }));
+      if (nv <= 0) {
+        clearInterval(tick);
+        channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:0 } });
+        setTimeout(() => timerExpiryRef.current(), 0);
+        return;
+      }
+      channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:nv } });
+    }, 500);
     return () => clearInterval(tick);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turn, winner, chainPiece]);
+
+  // Bot turn timer (visual countdown + safety auto-forfeit if bot hangs)
+  useEffect(() => {
+    if (!isBot || winner || turn !== oppColor) return;
+    const timerStart = Date.now();
+    const tick = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+      const nv = Math.max(0, 30 - elapsed);
+      setTimers(prev => ({ ...prev, [oppColor]: nv }));
+      if (nv <= 0) {
+        clearInterval(tick);
+        setTimeout(() => botTimerExpiryRef.current(), 0);
+      }
+    }, 500);
+    return () => clearInterval(tick);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turn, winner, isBot]);
 
   // ── Apply remote move ─────────────────────────────────────────────────────
   const applyRemoteMove = useCallback((from: Sq, to: Sq, captured: Sq[], nextTurn: PColor) => {

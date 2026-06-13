@@ -123,9 +123,9 @@ const SAFE_COORDS = new Set<string>([
   "13,6", "1,8",
 ]);
 
-// ─── Sizing — pawn size (increased for visibility) ─────────────────────────────
-const PIECE_BOX  = 38;  // px
-const PAWN_SIZE  = 30;  // px
+// ─── Sizing — GPS pin pawn size ────────────────────────────────────────────────
+const PIECE_BOX  = 30;  // px
+const PAWN_SIZE  = 22;  // px
 
 // ─── getPieceCoord: stretch entered after pos 50 (arrow cell) ──────────────────
 function getPieceCoord(p: GamePiece): [number,number] {
@@ -152,48 +152,87 @@ const PAWN_PAL: Record<PawnColor,{s:string;m:string;d:string}> = {
   yellow: { s:"#FDE68A", m:"#EAB308", d:"#713F12" },
 };
 
-// ─── Inline SVG pawn — instant render, zero network cost ───────────────────────
+// ─── 3D GPS-pin pawn (map-pin style, professional & 3D) ────────────────────────
 function PinPawn({ color, size=PAWN_SIZE, glow=false }: {
   color:PawnColor; size?:number; glow?:boolean;
 }) {
-  const p   = PAWN_PAL[color as PawnColor] ?? PAWN_PAL.blue;
-  const pin = color === "blue" ? "#2563EB" : "#16A34A";
+  const pal: Record<PawnColor,{main:string;light:string;dark:string;xlight:string}> = {
+    blue:   { main:"#2563EB", light:"#93C5FD", dark:"#1E3A8A", xlight:"#DBEAFE" },
+    green:  { main:"#16A34A", light:"#86EFAC", dark:"#14532D", xlight:"#DCFCE7" },
+    red:    { main:"#DC2626", light:"#FCA5A5", dark:"#7F1D1D", xlight:"#FEE2E2" },
+    yellow: { main:"#CA8A04", light:"#FDE68A", dark:"#78350F", xlight:"#FEF9C3" },
+  };
+  const c   = pal[color] ?? pal.blue;
   const w   = size;
-  const h   = Math.round(w * 1.5);
-  const uid = `psvg_${color}`;
+  const h   = Math.round(w * 1.4);
+  const uid = `gps_${color}`;
   return (
     <div style={{
       display:"flex", flexShrink:0, width:w, height:h,
       filter: glow
-        ? `drop-shadow(0 0 ${Math.round(w*0.3)}px ${pin}CC) drop-shadow(0 1px 3px rgba(0,0,0,0.6))`
-        : "drop-shadow(0 1px 3px rgba(0,0,0,0.5))",
+        ? `drop-shadow(0 0 ${Math.round(w*0.32)}px ${c.main}CC) drop-shadow(0 2px 5px rgba(0,0,0,0.75))`
+        : "drop-shadow(0 2px 5px rgba(0,0,0,0.65)) drop-shadow(0 1px 2px rgba(0,0,0,0.4))",
     }}>
-      <svg viewBox="0 0 30 45" width={w} height={h} xmlns="http://www.w3.org/2000/svg">
+      <svg viewBox="0 0 28 38" width={w} height={h} xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <radialGradient id={uid} cx="35%" cy="28%" r="72%">
-            <stop offset="0%"   stopColor={p.s}/>
-            <stop offset="55%"  stopColor={p.m}/>
-            <stop offset="100%" stopColor={p.d}/>
+          {/* Inner circle — 3D sphere gradient */}
+          <radialGradient id={`${uid}_inner`} cx="36%" cy="28%" r="72%">
+            <stop offset="0%"   stopColor={c.xlight}/>
+            <stop offset="38%"  stopColor={c.light}/>
+            <stop offset="72%"  stopColor={c.main}/>
+            <stop offset="100%" stopColor={c.dark}/>
           </radialGradient>
-          <radialGradient id={`${uid}b`} cx="50%" cy="30%" r="70%">
-            <stop offset="0%"  stopColor={p.m}/>
-            <stop offset="100%" stopColor={p.d}/>
+          {/* Outer body — white pearl gradient */}
+          <radialGradient id={`${uid}_body`} cx="32%" cy="22%" r="82%">
+            <stop offset="0%"   stopColor="#FFFFFF"/>
+            <stop offset="55%"  stopColor="#E8EEF4"/>
+            <stop offset="100%" stopColor="#C8D5E3"/>
+          </radialGradient>
+          {/* Base ring gradient */}
+          <radialGradient id={`${uid}_ring`} cx="50%" cy="35%" r="65%">
+            <stop offset="0%"   stopColor={c.light}/>
+            <stop offset="100%" stopColor={c.main}/>
           </radialGradient>
         </defs>
-        {/* Head sphere */}
-        <circle cx="15" cy="9" r="8.5" fill={`url(#${uid})`}/>
-        {/* Specular highlight */}
-        <circle cx="11.5" cy="5.5" r="2.5" fill="rgba(255,255,255,0.40)" style={{mixBlendMode:"screen"}}/>
-        {/* Neck */}
-        <path d="M11.5,17 Q15,15.5 18.5,17 L17.5,21 Q15,20.2 12.5,21 Z" fill={p.m}/>
-        {/* Shoulder / body */}
-        <path d="M8,21 Q15,19 22,21 L23,30 Q15,31.5 7,30 Z" fill={`url(#${uid}b)`}/>
-        {/* Base slab */}
-        <path d="M5,30 Q15,28.5 25,30 L26,36 Q15,37.5 4,36 Z" fill={p.d}/>
-        {/* Base cap */}
-        <ellipse cx="15" cy="36" rx="11" ry="3.5" fill={`url(#${uid}b)`}/>
-        {/* Rim shine */}
-        <ellipse cx="15" cy="36" rx="11" ry="3.5" fill="none" stroke={p.s} strokeWidth="0.7" opacity="0.38"/>
+
+        {/* ── Drop shadow under base ── */}
+        <ellipse cx="14" cy="36.5" rx="5.8" ry="1.4" fill="rgba(0,0,0,0.32)"/>
+
+        {/* ── Base colored platform ring ── */}
+        <ellipse cx="14" cy="34.8" rx="6.2" ry="2.1" fill={c.main} opacity="0.90"/>
+        <ellipse cx="14" cy="34.3" rx="5.0" ry="1.5" fill={`url(#${uid}_ring)`} opacity="0.55"/>
+        <ellipse cx="14" cy="33.8" rx="3.2" ry="0.9" fill="rgba(255,255,255,0.38)"/>
+
+        {/* ── Outer white pin body (teardrop) ── */}
+        <path
+          d="M14,33 C9.5,27 2.2,20.5 2.2,11.5 A11.8,11.8 0 0,1 25.8,11.5 C25.8,20.5 18.5,27 14,33 Z"
+          fill={`url(#${uid}_body)`}
+          stroke={c.dark}
+          strokeWidth="0.9"
+          strokeLinejoin="round"
+        />
+        {/* Left body highlight */}
+        <path
+          d="M7,7 C6,11 5,16 6.5,21"
+          fill="none"
+          stroke="rgba(255,255,255,0.55)"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+
+        {/* ── Inner colored circle (3D sphere) ── */}
+        <circle cx="14" cy="11.5" r="8.2" fill={`url(#${uid}_inner)`}/>
+        {/* Rim depth ring */}
+        <circle cx="14" cy="11.5" r="8.2" fill="none" stroke={c.dark} strokeWidth="0.5" opacity="0.45"/>
+
+        {/* ── Specular highlight on sphere ── */}
+        <ellipse
+          cx="11" cy="8.8" rx="2.6" ry="1.7"
+          fill="rgba(255,255,255,0.62)"
+          transform="rotate(-25 11 8.8)"
+        />
+        {/* Tiny secondary glint */}
+        <circle cx="10.2" cy="7.6" r="0.9" fill="rgba(255,255,255,0.40)"/>
       </svg>
     </div>
   );
@@ -1706,43 +1745,66 @@ export default function LudoGame() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[gameId,myColor]);
 
-  // ── Timer — only counts down when it's MY turn ─────────────────────────────
-  const autoPlayRef=useRef<(()=>void)|null>(null);
-  autoPlayRef.current=()=>{
-    setLives(l=>{
-      const nb=l[myColor]-1;
-      if(nb<=0){
+  // ── Timer — counts down when it's MY turn; wall-clock based to survive tab-switches ──
+  const autoPlayRef    = useRef<(()=>void)|null>(null);
+  const timerStartRef  = useRef<number>(0);
+  autoPlayRef.current  = () => {
+    setLives(l => {
+      const nb = l[myColor] - 1;
+      if (nb <= 0) {
         setWinner(opponentColor); setPhase("done");
         setMsg(`${opponentName} venceu! ${playerName.split(" ")[0]} perdeu todas as vidas.`);
-        return {...l,[myColor]:0};
+        return { ...l, [myColor]: 0 };
       }
       setMsg(`Tempo esgotado! ${playerName.split(" ")[0]} perde 1 vida (${nb} restante${nb===1?"":"s"}).`);
-      const cur=phaseRef.current;
-      const mv=movableRef.current;
-      const dv=myColor==="blue"?diceBlueRef.current:diceGreenRef.current;
-      if(cur==="roll") setTimeout(()=>doRoll(),200);
-      else if(cur==="select"&&mv.length>0&&dv!==null)
-        setTimeout(()=>doSelectPiece(mv[Math.floor(Math.random()*mv.length)],dv,myColor,piecesRef.current),200);
-      return {...l,[myColor]:nb};
+      const cur = phaseRef.current;
+      const mv  = movableRef.current;
+      const dv  = myColor === "blue" ? diceBlueRef.current : diceGreenRef.current;
+      if (cur === "roll") setTimeout(() => doRoll(), 200);
+      else if (cur === "select" && mv.length > 0 && dv !== null)
+        setTimeout(() => doSelectPiece(mv[Math.floor(Math.random() * mv.length)], dv, myColor, piecesRef.current), 200);
+      return { ...l, [myColor]: nb };
     });
   };
 
-  useEffect(()=>{
+  useEffect(() => {
     setTimeLeft(30);
-    if(winner||(phase!=="roll"&&phase!=="select")||turn!==myColor) return;
-    // Broadcast timer reset to opponent
-    channelRef.current?.send({type:"broadcast",event:"ludo_timer",payload:{player:myColor,t:30}});
-    const tick=setInterval(()=>{
-      setTimeLeft(prev=>{
-        const newT=prev<=1?30:prev-1;
-        if(prev<=1){ clearInterval(tick); setTimeout(()=>autoPlayRef.current?.(),0); }
-        channelRef.current?.send({type:"broadcast",event:"ludo_timer",payload:{player:myColor,t:newT}});
-        return newT;
-      });
-    },1000);
-    return()=>clearInterval(tick);
+    if (winner || (phase !== "roll" && phase !== "select") || turn !== myColor) return;
+    timerStartRef.current = Date.now();
+    channelRef.current?.send({ type:"broadcast", event:"ludo_timer", payload:{ player:myColor, t:30 } });
+
+    let firedExpiry = false;
+    const fireExpiry = () => {
+      if (firedExpiry) return;
+      firedExpiry = true;
+      setTimeout(() => autoPlayRef.current?.(), 0);
+    };
+
+    const tick = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - timerStartRef.current) / 1000);
+      const newT    = Math.max(0, 30 - elapsed);
+      setTimeLeft(newT);
+      channelRef.current?.send({ type:"broadcast", event:"ludo_timer", payload:{ player:myColor, t:newT } });
+      if (newT <= 0) { clearInterval(tick); fireExpiry(); }
+    }, 400); // check every 400ms — stays accurate even when throttled
+
+    // Catch-up on visibility-change: recalculate immediately when tab is refocused
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const elapsed = Math.floor((Date.now() - timerStartRef.current) / 1000);
+      const newT    = Math.max(0, 30 - elapsed);
+      setTimeLeft(newT);
+      channelRef.current?.send({ type:"broadcast", event:"ludo_timer", payload:{ player:myColor, t:newT } });
+      if (newT <= 0) { clearInterval(tick); fireExpiry(); }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      clearInterval(tick);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[turn,phase,winner,myColor]);
+  }, [turn, phase, winner, myColor]);
 
   function resetGame(){
     betDeductedRef.current=false;

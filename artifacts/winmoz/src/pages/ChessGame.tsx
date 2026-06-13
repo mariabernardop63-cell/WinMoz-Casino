@@ -1110,7 +1110,7 @@ export default function ChessGame(){
   // ── Timer countdown ───────────────────────────────────────────────────────────
   useEffect(()=>{
     if(status!=="playing"&&status!=="check")return;
-    if(isBot&&turn===opponentColor)return;
+    // Timer counts for both player and bot — bot must also finish within time limit
     const tick=setInterval(()=>{
       setTimers(prev=>{
         const nb={...prev,[turn]:prev[turn]-1};
