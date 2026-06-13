@@ -45,7 +45,12 @@ function applyBoardMove(b: Board, from: Sq, to: Sq, captured: Sq[]): Board {
 }
 
 // ─── Move Logic ───────────────────────────────────────────────────────────────
-function getCaptures(b: Board, r: number, c: number, excl: Set<string> = new Set()): { to: Sq; cap: Sq }[] {
+// forbiddenDir: direction the king just came FROM — prevents reversing along the same diagonal
+function getCaptures(
+  b: Board, r: number, c: number,
+  excl: Set<string> = new Set(),
+  forbiddenDir?: [number, number]
+): { to: Sq; cap: Sq }[] {
   const piece = b[r][c];
   if (!piece) return [];
   const color = piece.color;
@@ -53,6 +58,8 @@ function getCaptures(b: Board, r: number, c: number, excl: Set<string> = new Set
 
   if (piece.isDame) {
     for (const [dr, dc] of [[-1,-1],[-1,1],[1,-1],[1,1]] as [number,number][]) {
+      // Kings cannot reverse direction along the same diagonal in a chain capture
+      if (forbiddenDir && dr === forbiddenDir[0] && dc === forbiddenDir[1]) continue;
       let nr = r+dr, nc = c+dc, found: Sq | null = null;
       while (inB(nr, nc)) {
         const cell = b[nr][nc]; const k = sqKey(nr, nc);
@@ -80,15 +87,23 @@ function getCaptures(b: Board, r: number, c: number, excl: Set<string> = new Set
   return res;
 }
 
-function maxDepth(b: Board, r: number, c: number, excl: Set<string> = new Set()): number {
-  const caps = getCaptures(b, r, c, excl);
+function maxDepth(
+  b: Board, r: number, c: number,
+  excl: Set<string> = new Set(),
+  forbiddenDir?: [number, number]
+): number {
+  const caps = getCaptures(b, r, c, excl, forbiddenDir);
   if (!caps.length) return 0;
   let mx = 0;
   for (const { to, cap } of caps) {
     const ne = new Set(excl); ne.add(sqKey(cap[0], cap[1]));
     const tb = cloneBoard(b);
     tb[to[0]][to[1]] = tb[r][c]; tb[r][c] = null; tb[cap[0]][cap[1]] = null;
-    const d = 1 + maxDepth(tb, to[0], to[1], ne);
+    // Propagate forbidden direction: next step cannot reverse what we just did
+    const piece = tb[to[0]][to[1]];
+    const mdr = Math.sign(to[0] - r), mdc = Math.sign(to[1] - c);
+    const nextForbidden: [number,number] | undefined = piece?.isDame ? [-mdr as -1|1, -mdc as -1|1] : undefined;
+    const d = 1 + maxDepth(tb, to[0], to[1], ne, nextForbidden);
     if (d > mx) mx = d;
   }
   return mx;
@@ -128,14 +143,21 @@ function computeChainPath(board: Board, move: { from: Sq; to: Sq; captured: Sq[]
 }
 
 // Returns only captures that are on maximum-depth paths (mandatory maximum capture rule)
-function filterMaxCaptures(b: Board, r: number, c: number, excl: Set<string> = new Set()): { to: Sq; cap: Sq }[] {
-  const all = getCaptures(b, r, c, excl);
+function filterMaxCaptures(
+  b: Board, r: number, c: number,
+  excl: Set<string> = new Set(),
+  forbiddenDir?: [number, number]
+): { to: Sq; cap: Sq }[] {
+  const all = getCaptures(b, r, c, excl, forbiddenDir);
   if (all.length <= 1) return all;
   const withDepth = all.map(({ to, cap }) => {
     const ne = new Set(excl); ne.add(sqKey(cap[0], cap[1]));
     const nb = cloneBoard(b);
     nb[to[0]][to[1]] = nb[r][c]; nb[r][c] = null; nb[cap[0]][cap[1]] = null;
-    return { to, cap, total: 1 + maxDepth(nb, to[0], to[1], ne) };
+    const piece = nb[to[0]][to[1]];
+    const mdr = Math.sign(to[0] - r), mdc = Math.sign(to[1] - c);
+    const nextForbidden: [number,number] | undefined = piece?.isDame ? [-mdr as -1|1, -mdc as -1|1] : undefined;
+    return { to, cap, total: 1 + maxDepth(nb, to[0], to[1], ne, nextForbidden) };
   });
   const mx = Math.max(...withDepth.map(x => x.total));
   return withDepth.filter(x => x.total === mx).map(({ to, cap }) => ({ to, cap }));
@@ -190,9 +212,10 @@ interface AIMove { from: Sq; to: Sq; captured: Sq[]; }
 
 function _expandAIMoves(
   board: Board, orig: Sq, cur: Sq,
-  caps: Sq[], excl: Set<string>, out: AIMove[]
+  caps: Sq[], excl: Set<string>, out: AIMove[],
+  forbiddenDir?: [number, number]
 ): void {
-  const nextCaps = getCaptures(board, cur[0], cur[1], excl);
+  const nextCaps = getCaptures(board, cur[0], cur[1], excl, forbiddenDir);
   if (nextCaps.length === 0) {
     if (caps.length > 0) out.push({ from: orig, to: cur, captured: caps });
     return;
@@ -208,7 +231,10 @@ function _expandAIMoves(
       if (piece.color === "b" && to[0] === 7) nb[to[0]][to[1]] = { ...piece, isDame: true };
     }
     const ne = new Set(excl); ne.add(sqKey(cap[0], cap[1]));
-    _expandAIMoves(nb, orig, to, [...caps, cap], ne, out);
+    // King: after moving in direction (dr,dc), the reverse direction is forbidden next
+    const mdr = Math.sign(to[0] - cur[0]), mdc = Math.sign(to[1] - cur[1]);
+    const nextForbidden: [number,number] | undefined = piece.isDame ? [-mdr as -1|1, -mdc as -1|1] : undefined;
+    _expandAIMoves(nb, orig, to, [...caps, cap], ne, out, nextForbidden);
   }
 }
 
@@ -698,6 +724,8 @@ export default function DamasGame() {
   const [chainExcl, setChainExcl]   = useState<Set<string>>(new Set());
   const [chainFrom, setChainFrom]   = useState<Sq | null>(null);
   const [allCaptured, setAllCaptured] = useState<Sq[]>([]);
+  // Forbidden direction for king chain captures: prevents reversing along the same diagonal
+  const [chainForbiddenDir, setChainForbiddenDir] = useState<[number,number] | null>(null);
   const [winner, setWinner]         = useState<PColor | null>(null);
   const [winReason, setWinReason]   = useState("");
   const [timers, setTimers]         = useState<Record<PColor, number>>({ w:30, b:30 });
@@ -802,7 +830,7 @@ export default function DamasGame() {
       // Called after the last animation step to resolve game state
       const finalizeBotMove = (finalBoard: Board) => {
         setSelected(null); setValidDests([]); setValidCapDests([]);
-        setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
+        setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]); setChainForbiddenDir(null);
         const myCnt = countPieces(finalBoard, myColor);
         if (myCnt === 0) {
           setWinner(oppColor); winnerRef.current = oppColor;
@@ -945,7 +973,7 @@ export default function DamasGame() {
       setTurn(nextTurn);
       setTimers({ w: 30, b: 30 });
       setSelected(null); setValidDests([]); setValidCapDests([]);
-      setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
+      setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]); setChainForbiddenDir(null);
       channelRef.current?.send({ type: "broadcast", event: "damas_timer_forfeit", payload: { player: myColor, lives: remaining, gameOver: false, nextTurn } });
     }
   };
@@ -982,7 +1010,7 @@ export default function DamasGame() {
     setBoard(nb);
     setLastMove({ from, to });
     setSelected(null); setValidDests([]); setValidCapDests([]);
-    setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
+    setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]); setChainForbiddenDir(null);
     if (nextPlayerPieces === 0) {
       const w = opp(nextTurn);
       setWinner(w);
@@ -1179,7 +1207,7 @@ export default function DamasGame() {
     setBoard(finalBoard); boardRef.current = finalBoard;
     setLastMove({ from, to });
     setSelected(null); setValidDests([]); setValidCapDests([]);
-    setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
+    setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]); setChainForbiddenDir(null);
     if (oppCnt === 0) {
       setWinner(turn);
       winnerRef.current = turn;
@@ -1228,11 +1256,15 @@ export default function DamasGame() {
       const newExcl = new Set(chainExcl); newExcl.add(sqKey(dest.cap[0], dest.cap[1]));
       const newAllCaptured = [...allCaptured, dest.cap];
       const origFrom = chainFrom ?? chainPiece;
+      // Compute forbidden direction for king: cannot reverse the direction just moved
+      const movedPiece = newBoard[dest.to[0]][dest.to[1]];
+      const mdr = Math.sign(dest.to[0] - chainPiece[0]), mdc = Math.sign(dest.to[1] - chainPiece[1]);
+      const newForbidden: [number,number] | null = movedPiece?.isDame ? [-mdr as -1|1, -mdc as -1|1] : null;
       // Check for more captures — only show captures on the maximum-depth path
-      const nextCaps = filterMaxCaptures(newBoard, dest.to[0], dest.to[1], newExcl);
+      const nextCaps = filterMaxCaptures(newBoard, dest.to[0], dest.to[1], newExcl, newForbidden ?? undefined);
       if (nextCaps.length > 0) {
         setChainPiece(dest.to); setChainExcl(newExcl); setAllCaptured(newAllCaptured);
-        setChainFrom(origFrom);
+        setChainFrom(origFrom); setChainForbiddenDir(newForbidden);
         setValidCapDests(nextCaps);
         setSelected(dest.to);
         setValidDests(nextCaps.map(x => x.to));
@@ -1255,11 +1287,16 @@ export default function DamasGame() {
         const newBoard = applyBoardMove(boardRef.current, selected, capDest.to, [capDest.cap]);
         setBoard(newBoard); boardRef.current = newBoard;
         const newExcl = new Set(chainExcl); newExcl.add(sqKey(capDest.cap[0], capDest.cap[1]));
+        // Forbidden direction for first chain step (king only)
+        const firstPiece = newBoard[capDest.to[0]][capDest.to[1]];
+        const fdr = Math.sign(capDest.to[0] - selected[0]), fdc = Math.sign(capDest.to[1] - selected[1]);
+        const firstForbidden: [number,number] | null = firstPiece?.isDame ? [-fdr as -1|1, -fdc as -1|1] : null;
         // Only show captures on the maximum-depth path (mandatory maximum capture rule)
-        const nextCaps = filterMaxCaptures(newBoard, capDest.to[0], capDest.to[1], newExcl);
+        const nextCaps = filterMaxCaptures(newBoard, capDest.to[0], capDest.to[1], newExcl, firstForbidden ?? undefined);
         if (nextCaps.length > 0) {
           setChainPiece(capDest.to); setChainExcl(newExcl);
           setAllCaptured([capDest.cap]); setChainFrom(selected);
+          setChainForbiddenDir(firstForbidden);
           setValidCapDests(nextCaps); setSelected(capDest.to);
           setValidDests(nextCaps.map(x => x.to));
         } else {
@@ -1306,7 +1343,7 @@ export default function DamasGame() {
     setBoard(nb); boardRef.current = nb;
     setTurn("w"); turnRef.current = "w";
     setSelected(null); setValidDests([]); setValidCapDests([]);
-    setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
+    setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]); setChainForbiddenDir(null);
     setWinner(null); winnerRef.current = null; setWinReason(""); setLastMove(null);
     setTimers({ w:30, b:30 });
     setLives({ w:5, b:5 });
@@ -1393,7 +1430,7 @@ export default function DamasGame() {
     const nb = makeInitialBoard();
     setBoard(nb); boardRef.current = nb;
     setTurn("w"); setSelected(null); setValidDests([]); setValidCapDests([]);
-    setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
+    setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]); setChainForbiddenDir(null);
     setWinner(null); winnerRef.current = null; setWinReason(""); setLastMove(null);
     setTimers({ w:30, b:30 });
     setLives({ w:5, b:5 });
