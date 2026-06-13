@@ -94,6 +94,20 @@ function maxDepth(b: Board, r: number, c: number, excl: Set<string> = new Set())
   return mx;
 }
 
+// Returns only captures that are on maximum-depth paths (mandatory maximum capture rule)
+function filterMaxCaptures(b: Board, r: number, c: number, excl: Set<string> = new Set()): { to: Sq; cap: Sq }[] {
+  const all = getCaptures(b, r, c, excl);
+  if (all.length <= 1) return all;
+  const withDepth = all.map(({ to, cap }) => {
+    const ne = new Set(excl); ne.add(sqKey(cap[0], cap[1]));
+    const nb = cloneBoard(b);
+    nb[to[0]][to[1]] = nb[r][c]; nb[r][c] = null; nb[cap[0]][cap[1]] = null;
+    return { to, cap, total: 1 + maxDepth(nb, to[0], to[1], ne) };
+  });
+  const mx = Math.max(...withDepth.map(x => x.total));
+  return withDepth.filter(x => x.total === mx).map(({ to, cap }) => ({ to, cap }));
+}
+
 function getNonCaptures(b: Board, r: number, c: number): Sq[] {
   const piece = b[r][c]; if (!piece) return [];
   const res: Sq[] = [];
@@ -171,7 +185,11 @@ function aiGetAllMoves(b: Board, color: PColor): AIMove[] {
     for (let c = 0; c < 8; c++)
       if (b[r][c]?.color === color)
         _expandAIMoves(b, [r, c], [r, c], [], new Set(), captures);
-  if (captures.length > 0) return captures;
+  if (captures.length > 0) {
+    // Enforce mandatory maximum capture rule: only return chains with most captures
+    const maxCaps = Math.max(...captures.map(m => m.captured.length));
+    return captures.filter(m => m.captured.length === maxCaps);
+  }
   const moves: AIMove[] = [];
   for (let r = 0; r < 8; r++)
     for (let c = 0; c < 8; c++)
@@ -181,8 +199,22 @@ function aiGetAllMoves(b: Board, color: PColor): AIMove[] {
   return moves;
 }
 
+function getMobility(b: Board, color: PColor): number {
+  let count = 0;
+  for (let r = 0; r < 8; r++)
+    for (let c = 0; c < 8; c++) {
+      if (b[r][c]?.color !== color) continue;
+      count += getCaptures(b, r, c).length + getNonCaptures(b, r, c).length;
+    }
+  return count;
+}
+
 function aiEval(b: Board, forColor: PColor): number {
+  const oppColor = opp(forColor);
   let score = 0;
+  const forPieces: Array<{ r: number; c: number; isDame: boolean }> = [];
+  const oppPieces: Array<{ r: number; c: number; isDame: boolean }> = [];
+
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
       const p = b[r][c]; if (!p) continue;
@@ -192,8 +224,44 @@ function aiEval(b: Board, forColor: PColor): number {
       const back = !p.isDame && ((p.color === "w" && r === 7) || (p.color === "b" && r === 0)) ? 15 : 0;
       const center = (r >= 2 && r <= 5 && c >= 1 && c <= 6) ? 8 : 0;
       score += sign * (pieceVal + adv + back + center);
+      if (p.color === forColor) forPieces.push({ r, c, isDame: p.isDame });
+      else oppPieces.push({ r, c, isDame: p.isDame });
     }
   }
+
+  const forKings = forPieces.filter(p => p.isDame);
+  const oppKings = oppPieces.filter(p => p.isDame);
+
+  // ── King endgame: we have kings + opponent has only 1 king left ──────────
+  if (oppPieces.length === 1 && oppKings.length === 1 && forPieces.length >= 2 && forKings.length >= 1) {
+    const ok = oppKings[0];
+    // Push opponent king to corners/edges (centre distance = escaping space)
+    const centerDist = Math.abs(ok.r - 3.5) + Math.abs(ok.c - 3.5);
+    score += centerDist * 35; // opponent near corner = much better for us
+
+    // Bring ALL our kings as close as possible to opponent king
+    for (const fk of forKings) {
+      const dist = Math.abs(fk.r - ok.r) + Math.abs(fk.c - ok.c);
+      score -= dist * 22;
+    }
+
+    // Restrict opponent mobility heavily
+    const oppMob = getMobility(b, oppColor);
+    score -= oppMob * 40;
+
+    // Triangulation bonus: multiple kings surrounding opponent
+    if (forKings.length >= 2) {
+      const dists = forKings.map(fk => Math.abs(fk.r - ok.r) + Math.abs(fk.c - ok.c)).sort((a, b) => a - b);
+      if (dists[0] <= 3) score += 60;
+      if (dists.length >= 2 && dists[1] <= 5) score += 45;
+    }
+  } else if (forKings.length >= 1 || oppKings.length >= 1) {
+    // General king/endgame mobility advantage
+    const forMob = getMobility(b, forColor);
+    const oppMob = getMobility(b, oppColor);
+    score += (forMob - oppMob) * 5;
+  }
+
   return score;
 }
 
@@ -233,11 +301,17 @@ function getBestBotMove(b: Board, botColor: PColor, depth: number = AI_DEPTH): A
   if (depth < 4 && Math.random() < 0.45) {
     return moves[Math.floor(Math.random() * Math.min(moves.length, 4))];
   }
+  // Increase depth for king endgame (opponent has single king, we must corner it)
+  const oppColor = opp(botColor);
+  const oppPieces = b.flat().filter(p => p?.color === oppColor);
+  const allKingsOnly = b.flat().every(p => p === null || p.isDame);
+  const endgameDepth = (oppPieces.length <= 2 && allKingsOnly) ? Math.max(depth, 10) : depth;
+
   let bestMove: AIMove = moves[0];
   let bestVal = -Infinity;
   for (const mv of moves) {
     const nb = applyBoardMove(b, mv.from, mv.to, mv.captured);
-    const val = _minimax(nb, depth - 1, -Infinity, Infinity, false, botColor);
+    const val = _minimax(nb, endgameDepth - 1, -Infinity, Infinity, false, botColor);
     if (val > bestVal) { bestVal = val; bestMove = mv; }
   }
   return bestMove;
@@ -700,12 +774,12 @@ export default function DamasGame() {
         setWinner(oppColor); winnerRef.current = oppColor;
         setWinReason("Todas as peças foram capturadas pelo bot");
       } else {
-        // Kings-only draw rule for bot games
+        // Kings-only draw rule for bot games (30 moves to give bot time to corner)
         if (allKings(nb)) {
           const newCount = kingsOnlyCountRef.current + 1;
           kingsOnlyCountRef.current = newCount;
           setKingsOnlyCount(newCount);
-          if (newCount >= 10) { triggerDraw(); return; }
+          if (newCount >= 30) { triggerDraw(); return; }
         } else {
           kingsOnlyCountRef.current = 0;
           setKingsOnlyCount(0);
@@ -1038,12 +1112,12 @@ export default function DamasGame() {
       broadcastMove(from, to, captured, opp(turn));
       return;
     }
-    // ── Kings-only draw rule: 10 consecutive moves with only kings → draw ──
+    // ── Kings-only draw rule: 30 consecutive moves with only kings → draw ──
     if (allKings(finalBoard)) {
       const newCount = kingsOnlyCountRef.current + 1;
       kingsOnlyCountRef.current = newCount;
       setKingsOnlyCount(newCount);
-      if (newCount >= 10) {
+      if (newCount >= 30) {
         broadcastMove(from, to, captured, opp(turn));
         setTimeout(() => {
           channelRef.current?.send({ type:"broadcast", event:"damas_kings_draw", payload:{} });
@@ -1073,15 +1147,14 @@ export default function DamasGame() {
     if (chainPiece) {
       const dest = validCapDests.find(d => d.to[0] === r && d.to[1] === c);
       if (!dest) return;
-      const [pr, pc] = chainPiece;
       const newBoard = applyBoardMove(boardRef.current, chainPiece, dest.to, [dest.cap]);
       setBoard(newBoard);
       boardRef.current = newBoard;
       const newExcl = new Set(chainExcl); newExcl.add(sqKey(dest.cap[0], dest.cap[1]));
       const newAllCaptured = [...allCaptured, dest.cap];
       const origFrom = chainFrom ?? chainPiece;
-      // Check for more captures
-      const nextCaps = getCaptures(newBoard, dest.to[0], dest.to[1], newExcl);
+      // Check for more captures — only show captures on the maximum-depth path
+      const nextCaps = filterMaxCaptures(newBoard, dest.to[0], dest.to[1], newExcl);
       if (nextCaps.length > 0) {
         setChainPiece(dest.to); setChainExcl(newExcl); setAllCaptured(newAllCaptured);
         setChainFrom(origFrom);
@@ -1107,7 +1180,8 @@ export default function DamasGame() {
         const newBoard = applyBoardMove(boardRef.current, selected, capDest.to, [capDest.cap]);
         setBoard(newBoard); boardRef.current = newBoard;
         const newExcl = new Set(chainExcl); newExcl.add(sqKey(capDest.cap[0], capDest.cap[1]));
-        const nextCaps = getCaptures(newBoard, capDest.to[0], capDest.to[1], newExcl);
+        // Only show captures on the maximum-depth path (mandatory maximum capture rule)
+        const nextCaps = filterMaxCaptures(newBoard, capDest.to[0], capDest.to[1], newExcl);
         if (nextCaps.length > 0) {
           setChainPiece(capDest.to); setChainExcl(newExcl);
           setAllCaptured([capDest.cap]); setChainFrom(selected);
@@ -1128,7 +1202,8 @@ export default function DamasGame() {
     // Select a new piece
     if (clickedPiece?.color === myColor && selectableKeys.has(sqKey(r, c))) {
       setSelected([r, c]);
-      const caps = getCaptures(boardRef.current, r, c);
+      // Use filterMaxCaptures to only show captures on maximum-depth paths
+      const caps = filterMaxCaptures(boardRef.current, r, c);
       if (caps.length > 0) {
         setValidCapDests(caps); setValidDests(caps.map(x => x.to));
       } else {
@@ -1283,7 +1358,7 @@ export default function DamasGame() {
               textShadow:"0 0 20px rgba(212,163,90,0.5)" }}>DAMAS</p>
             {kingsOnlyCount > 0
               ? <p style={{ fontSize:9, color:"rgba(212,163,90,0.85)", marginTop:1, letterSpacing:1.5, fontWeight:700 }}>
-                  👑 SÓ DAMAS — {10 - kingsOnlyCount} JOGADAS
+                  👑 SÓ DAMAS — {30 - kingsOnlyCount} JOGADAS
                 </p>
               : <p style={{ fontSize:9, color:"rgba(255,255,255,0.28)", marginTop:1, letterSpacing:2.5, fontWeight:700 }}>1 VS 1</p>
             }

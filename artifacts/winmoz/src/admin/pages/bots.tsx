@@ -30,7 +30,7 @@ async function fetchBotData() {
     adminSupabase
       .from("matches")
       .select("id,game_type,status,bet_amount,winner_payout,winner_id,player1_id,player1_name,player2_name,created_at")
-      .is("player2_id", null),
+      .like("id", "bot_%"),
     adminSupabase.from("matches").select("id", { count: "exact", head: true }).eq("status", "active"),
     adminSupabase.from("matches").select("id", { count: "exact", head: true }),
   ]);
