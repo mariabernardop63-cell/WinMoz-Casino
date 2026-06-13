@@ -201,8 +201,11 @@ async function fetchBotData() {
   const totalBotGanhou = botWins.reduce((s, m)  => s + Math.abs(m.amount ?? 0), 0);
   const totalBotPerdeu = userWins.reduce((s, m) => s + Math.floor(Math.abs(m.amount) * 2 * 0.90), 0);
   const saldoLiquido   = totalBotGanhou - totalBotPerdeu;
-  const surplus        = botWins.length - userWins.length;
-  const autoDisable    = surplus > 3;
+  // surplus > 0 = bot ganha mais (BOM para a plataforma)
+  // surplus < 0 = users ganham mais (RISCO para a plataforma)
+  const surplus     = botWins.length - userWins.length;
+  // Auto-disable apenas quando users ganham muito mais do que o bot (≥ 3 vitórias a mais)
+  const autoDisable = surplus < -3;
 
   // Build 7-day sparkline for saldo
   const sparklDays = 14;
@@ -464,7 +467,8 @@ export default function BotManagement() {
 
   // ── Derived display values ────────────────────────────────────────────────
   const winRatePct = data?.winRate ?? 0;
-  const winRateColor = winRatePct > 68 ? T.red : winRatePct > 50 ? T.amber : T.teal;
+  // Alta taxa de vitória do bot = BOM; baixa = risco para a plataforma
+  const winRateColor = winRatePct >= 60 ? T.teal : winRatePct >= 40 ? T.amber : T.red;
 
   return (
     <div style={{
@@ -567,9 +571,9 @@ export default function BotManagement() {
               <p style={{ margin: 0, fontSize: 12, fontWeight: 700,
                 color: isAutoDisabled ? T.amber : T.red }}>
                 {limitTriggered
-                  ? "Auto-desactivado — limite de perda atingido"
+                  ? "Auto-desactivado — limite de perda financeira atingido"
                   : isAutoDisabled
-                    ? "Auto-desactivado — excesso de vitórias de bots detectado"
+                    ? "Auto-desactivado — users estão a ganhar demasiado ao bot"
                     : "Bots desactivados manualmente"
                 }
               </p>
@@ -577,7 +581,7 @@ export default function BotManagement() {
                 <p style={{ margin: "3px 0 0", fontSize: 11, color: T.sub }}>
                   {limitTriggered
                     ? `Perda acumulada ultrapassou ${lossLimit.toLocaleString()} MT. Reativa e revê os dados.`
-                    : `Excedente: bot ganhou ${data.surplus} jogos a mais.`
+                    : `Users ganharam ${Math.abs(data.surplus)} jogos a mais do que o bot. Reativa manualmente.`
                   }
                 </p>
               )}
@@ -770,7 +774,7 @@ export default function BotManagement() {
               </div>
               <div style={{ marginTop: 12, textAlign: "center" }}>
                 <p style={{ margin: 0, fontSize: 11, color: winRateColor, fontWeight: 700 }}>
-                  {winRatePct > 68 ? "⚠ Alto risco" : winRatePct > 50 ? "Equilibrado" : "Favorável ao user"}
+                  {winRatePct >= 60 ? "✓ Bot dominante" : winRatePct >= 40 ? "Equilibrado" : "⚠ Bot em risco"}
                 </p>
                 <p style={{ margin: "2px 0 0", fontSize: 10, color: T.muted }}>
                   {data.finished} jogos finais
@@ -829,10 +833,10 @@ export default function BotManagement() {
                 borderRadius: 22, padding: "22px",
                 background: data.autoDisable
                   ? "rgba(244,63,94,0.08)"
-                  : data.surplus > 2
+                  : data.surplus < -2
                     ? "rgba(245,158,11,0.08)"
                     : T.surface,
-                border: `1px solid ${data.autoDisable ? T.red + "44" : data.surplus > 2 ? T.amber + "44" : T.border}`,
+                border: `1px solid ${data.autoDisable ? T.red + "44" : data.surplus < -2 ? T.amber + "44" : T.border}`,
               }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                 <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.1, textTransform: "uppercase", color: T.sub }}>
@@ -850,24 +854,27 @@ export default function BotManagement() {
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                 {data.autoDisable
                   ? <AlertTriangle style={{ width: 18, height: 18, color: T.red }} />
-                  : data.surplus > 2
+                  : data.surplus < -2
                     ? <Zap style={{ width: 18, height: 18, color: T.amber }} />
                     : <CheckCircle2 style={{ width: 18, height: 18, color: T.teal }} />
                 }
                 <span style={{
                   fontSize: 14, fontWeight: 800,
-                  color: data.autoDisable ? T.red : data.surplus > 2 ? T.amber : T.teal,
+                  color: data.autoDisable ? T.red : data.surplus < -2 ? T.amber : T.teal,
                   fontFamily: "'Syne', sans-serif",
                 }}>
-                  {data.autoDisable ? "ACTIVO" : data.surplus > 2 ? "RISCO" : "SEGURO"}
+                  {data.autoDisable ? "DESLIGADO" : data.surplus < -2 ? "ATENÇÃO" : "SEGURO"}
                 </span>
               </div>
               <p style={{ margin: 0, fontSize: 11, color: T.sub }}>
-                Excedente: <strong style={{ color: data.surplus > 0 ? T.red : T.teal }}>
-                  {data.surplus > 0 ? "+" : ""}{data.surplus}
-                </strong> jogos
+                {data.surplus >= 0
+                  ? <>Bot lidera: <strong style={{ color: T.teal }}>+{data.surplus}</strong> vitórias extra</>
+                  : <>Users lideram: <strong style={{ color: T.red }}>{data.surplus}</strong> vitórias extra</>
+                }
               </p>
-              <p style={{ margin: "3px 0 0", fontSize: 10, color: T.muted }}>gatilho: +3 vitórias bot</p>
+              <p style={{ margin: "3px 0 0", fontSize: 10, color: T.muted }}>
+                desliga quando users ganham +3 jogos a mais
+              </p>
             </motion.div>
           </div>
 
