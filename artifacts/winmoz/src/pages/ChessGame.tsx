@@ -1067,16 +1067,20 @@ export default function ChessGame(){
   // Credit winner 83% of total pot when game ends
   useEffect(()=>{
     if(!winner||!profile?.id||BET<=0||gameId==="local"||winCreditedRef.current)return;
-    if(winner!==myColor)return;
     winCreditedRef.current=true;
     const payout=Math.floor(BET*2*0.90);
     (async()=>{
       try{
-        const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
-        if(data){
-          await supabase.from("profiles").update({balance:parseFloat(String(data.balance))+payout}).eq("id",profile.id);
-          await supabase.from("transactions").insert({user_id:profile.id,type:"win",amount:payout,description:`Vitória de jogo (Xadrez) +${payout} MT`,status:"approved"});
-          await refreshProfile();
+        if(winner===myColor){
+          const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
+          if(data){
+            await supabase.from("profiles").update({balance:parseFloat(String(data.balance))+payout}).eq("id",profile.id);
+            await supabase.from("transactions").insert({user_id:profile.id,type:"win",amount:payout,description:`Vitória de jogo (Xadrez) +${payout} MT`,status:"approved"});
+            await refreshProfile();
+          }
+        } else if(isBot){
+          // Bot won — insert zero-amount marker so admin panel can detect game ended
+          await supabase.from("transactions").insert({user_id:profile.id,type:"win",amount:0,description:`Fim de jogo (Xadrez) [bot] [bot-fim]`,status:"approved"});
         }
       }catch{winCreditedRef.current=false;}
     })();

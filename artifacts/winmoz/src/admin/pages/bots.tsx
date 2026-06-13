@@ -108,9 +108,12 @@ async function fetchBotData() {
     const win = winIdx >= 0 ? allWins[winIdx] : null;
     if (winIdx >= 0) usedWinIndices.add(winIdx);
 
-    const isActive = !win && ageMs < TWO_HOURS_MS;
-    const userWon  = !!win;
-    const botWon   = !win && !isActive;
+    // win.amount > 0  → user collected payout (user won)
+    // win.amount === 0 → zero-amount marker inserted when bot wins ([bot-fim])
+    const gameEnded = !!win;
+    const isActive  = !gameEnded && ageMs < TWO_HOURS_MS;
+    const userWon   = gameEnded && (win!.amount ?? 0) > 0;
+    const botWon    = (!gameEnded && !isActive) || (gameEnded && (win!.amount ?? 0) === 0);
     const gameType = parseGame(bet.description);
 
     return { ...bet, isActive, userWon, botWon, gameType };
@@ -578,7 +581,7 @@ function BigStat({ icon, label, value, color, sub, pulse }:{
           display: "flex", alignItems: "center", justifyContent: "center",
           color, position: "relative",
         }}>
-          {React.cloneElement(icon as React.ReactElement, { style:{ width:14, height:14 } })}
+          {React.cloneElement(icon as React.ReactElement<{ style?: React.CSSProperties }>, { style:{ width:14, height:14 } })}
           {pulse && (
             <span style={{
               position: "absolute", top: -2, right: -2, width: 7, height: 7,

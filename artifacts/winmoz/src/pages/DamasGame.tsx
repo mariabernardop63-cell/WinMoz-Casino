@@ -94,6 +94,39 @@ function maxDepth(b: Board, r: number, c: number, excl: Set<string> = new Set())
   return mx;
 }
 
+// Reconstruct intermediate positions for chain capture animation
+function computeChainPath(board: Board, move: { from: Sq; to: Sq; captured: Sq[] }): Array<{ from: Sq; to: Sq; cap: Sq }> {
+  if (move.captured.length <= 1)
+    return move.captured.length === 1
+      ? [{ from: move.from, to: move.to, cap: move.captured[0] }]
+      : [];
+  const steps: Array<{ from: Sq; to: Sq; cap: Sq }> = [];
+  let cur: Sq = move.from;
+  let curBoard = cloneBoard(board);
+  for (let i = 0; i < move.captured.length; i++) {
+    const cap = move.captured[i];
+    const isLast = i === move.captured.length - 1;
+    const dr = Math.sign(cap[0] - cur[0]);
+    const dc = Math.sign(cap[1] - cur[1]);
+    let landing: Sq;
+    if (isLast) {
+      landing = move.to;
+    } else {
+      // Find first empty square past the captured piece in capture direction
+      let tr = cap[0] + dr, tc = cap[1] + dc;
+      while (inB(tr, tc) && curBoard[tr][tc] !== null) { tr += dr; tc += dc; }
+      landing = inB(tr, tc) ? [tr, tc] : move.to;
+    }
+    steps.push({ from: cur, to: landing, cap });
+    // Update temp board (no promotion) for next step
+    const nb = cloneBoard(curBoard);
+    nb[landing[0]][landing[1]] = nb[cur[0]][cur[1]]; nb[cur[0]][cur[1]] = null; nb[cap[0]][cap[1]] = null;
+    curBoard = nb;
+    cur = landing;
+  }
+  return steps;
+}
+
 // Returns only captures that are on maximum-depth paths (mandatory maximum capture rule)
 function filterMaxCaptures(b: Board, r: number, c: number, excl: Set<string> = new Set()): { to: Sq; cap: Sq }[] {
   const all = getCaptures(b, r, c, excl);
@@ -753,7 +786,9 @@ export default function DamasGame() {
     if (!isBot || turn !== oppColor || !!winner) return;
     setBotThinking(true);
     const delay = 900 + Math.random() * 700;
-    const t = setTimeout(() => {
+    const pendingTimers: ReturnType<typeof setTimeout>[] = [];
+
+    const mainTimer = setTimeout(() => {
       setBotThinking(false);
       const _diff = getBotDifficultySync(profile?.id ?? "");
       const _depth = _diff === "easy" ? (Math.random() < 0.5 ? 2 : 3) : AI_DEPTH;
@@ -763,32 +798,69 @@ export default function DamasGame() {
         setWinReason(`${opponentName} ficou sem movimentos`);
         return;
       }
-      const nb = applyBoardMove(boardRef.current, move.from, move.to, move.captured);
-      boardRef.current = nb;
-      setBoard(nb);
-      setLastMove({ from: move.from, to: move.to });
-      setSelected(null); setValidDests([]); setValidCapDests([]);
-      setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
-      const myCnt = countPieces(nb, myColor);
-      if (myCnt === 0) {
-        setWinner(oppColor); winnerRef.current = oppColor;
-        setWinReason("Todas as peças foram capturadas pelo bot");
-      } else {
-        // Kings-only draw rule for bot games (30 moves to give bot time to corner)
-        if (allKings(nb)) {
-          const newCount = kingsOnlyCountRef.current + 1;
-          kingsOnlyCountRef.current = newCount;
-          setKingsOnlyCount(newCount);
-          if (newCount >= 30) { triggerDraw(); return; }
+
+      // Called after the last animation step to resolve game state
+      const finalizeBotMove = (finalBoard: Board) => {
+        setSelected(null); setValidDests([]); setValidCapDests([]);
+        setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]);
+        const myCnt = countPieces(finalBoard, myColor);
+        if (myCnt === 0) {
+          setWinner(oppColor); winnerRef.current = oppColor;
+          setWinReason("Todas as peças foram capturadas pelo bot");
         } else {
-          kingsOnlyCountRef.current = 0;
-          setKingsOnlyCount(0);
+          if (allKings(finalBoard)) {
+            const newCount = kingsOnlyCountRef.current + 1;
+            kingsOnlyCountRef.current = newCount;
+            setKingsOnlyCount(newCount);
+            if (newCount >= 30) { triggerDraw(); return; }
+          } else {
+            kingsOnlyCountRef.current = 0; setKingsOnlyCount(0);
+          }
+          setTurn(myColor);
+          setTimers(t => ({ ...t, [myColor]: 30 }));
         }
-        setTurn(myColor);
-        setTimers(t => ({ ...t, [myColor]: 30 }));
+      };
+
+      if (move.captured.length <= 1) {
+        // Single move or single capture — apply immediately
+        const nb = applyBoardMove(boardRef.current, move.from, move.to, move.captured);
+        boardRef.current = nb; setBoard(nb);
+        setLastMove({ from: move.from, to: move.to });
+        finalizeBotMove(nb);
+      } else {
+        // Chain capture — animate each step separately (380ms per step)
+        const steps = computeChainPath(boardRef.current, move);
+        let animBoard = boardRef.current;
+
+        steps.forEach(({ from, to, cap }, i) => {
+          const isLastStep = i === steps.length - 1;
+          const stepTimer = setTimeout(() => {
+            if (isLastStep) {
+              // Final step: use applyBoardMove (handles promotion correctly)
+              const finalBoard = applyBoardMove(animBoard, from, to, [cap]);
+              boardRef.current = finalBoard;
+              setBoard(finalBoard);
+              setLastMove({ from, to });
+              finalizeBotMove(finalBoard);
+            } else {
+              // Intermediate step: move without promotion
+              const nb = cloneBoard(animBoard);
+              nb[to[0]][to[1]] = nb[from[0]][from[1]];
+              nb[from[0]][from[1]] = null;
+              nb[cap[0]][cap[1]] = null;
+              animBoard = nb;
+              boardRef.current = nb;
+              setBoard(nb);
+              setLastMove({ from, to });
+            }
+          }, i * 380);
+          pendingTimers.push(stepTimer);
+        });
       }
     }, delay);
-    return () => { clearTimeout(t); setBotThinking(false); };
+
+    pendingTimers.push(mainTimer);
+    return () => { pendingTimers.forEach(clearTimeout); setBotThinking(false); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turn, winner, isBot]);
 
@@ -813,6 +885,9 @@ export default function DamasGame() {
           if (creditErr) throw creditErr; // triggers retry via catch block
           await supabase.from("transactions").insert({ user_id: profile.id, type: "win", amount: payout, description: `Vitória de jogo (Damas) +${payout} MT`, status: "approved" });
           await refreshProfile();
+        } else if (isBot) {
+          // Bot won — insert zero-amount marker so admin panel can detect game ended
+          await supabase.from("transactions").insert({ user_id: profile.id, type: "win", amount: 0, description: `Fim de jogo (Damas) [bot] [bot-fim]`, status: "approved" });
         }
         // Update match record as finished (only player "w" to avoid duplicate updates)
         if (myColor === "w") {
