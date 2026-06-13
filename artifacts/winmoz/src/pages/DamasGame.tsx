@@ -731,7 +731,7 @@ export default function DamasGame() {
         const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
         if (data) {
           await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
-          await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: `Aposta (Damas) vs ${opponentName}`, status: "approved" });
+          await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: `Aposta (Damas) [bot] vs ${opponentName}`, status: "approved" });
           try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch {}
           await supabase.from("matches").upsert({
             id: gameId, game_type: "dama",

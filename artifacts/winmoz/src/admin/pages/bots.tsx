@@ -25,64 +25,154 @@ const C = {
 };
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
+// Bot games are identified by "[bot]" marker in the bet transaction description.
+// This avoids relying on the `matches` table (may not exist / has RLS issues).
 async function fetchBotData() {
-  const [botRes, activeRes, totalRes] = await Promise.all([
+  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+  const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+
+  const [betRes, winRes, profileRes, totalBetsRes] = await Promise.all([
+    // Bot bets — identified by [bot] marker written by DamasGame + ChessGame
     adminSupabase
-      .from("matches")
-      .select("id,game_type,status,bet_amount,winner_payout,winner_id,player1_id,player1_name,player2_name,created_at")
-      .like("id", "bot_%"),
-    adminSupabase.from("matches").select("id", { count: "exact", head: true }).eq("status", "active"),
-    adminSupabase.from("matches").select("id", { count: "exact", head: true }),
+      .from("transactions")
+      .select("id,user_id,amount,description,created_at")
+      .eq("type", "bet")
+      .eq("status", "approved")
+      .ilike("description", "%[bot]%")
+      .order("created_at", { ascending: false })
+      .limit(500),
+    // All win transactions — to match against bot bets and determine outcome
+    adminSupabase
+      .from("transactions")
+      .select("user_id,amount,created_at")
+      .eq("type", "win")
+      .eq("status", "approved")
+      .order("created_at", { ascending: true }),
+    // Profiles — for player display names in recent list
+    adminSupabase
+      .from("profiles")
+      .select("id,full_name,phone"),
+    // Platform total: all approved bet transactions
+    adminSupabase
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("type", "bet")
+      .eq("status", "approved"),
   ]);
 
-  const all = (botRes.data ?? []) as Array<{
-    id: string; game_type: string; status: string;
-    bet_amount: number; winner_payout: number;
-    winner_id: string | null; player1_id: string;
-    player1_name: string; player2_name: string; created_at: string;
-  }>;
+  type BetRow = { id: string; user_id: string; amount: number; description: string; created_at: string };
+  type WinRow = { user_id: string; amount: number; created_at: string };
 
-  const finished = all.filter(m => m.status === "finished");
-  const botWins  = finished.filter(m => !m.winner_id || m.winner_id !== m.player1_id);
-  const userWins = finished.filter(m =>  m.winner_id && m.winner_id === m.player1_id);
+  const botBets = (betRes.data ?? []) as BetRow[];
+  const allWins = (winRes.data ?? []) as WinRow[];
+
+  // Profile name lookup
+  const profileMap = new Map(
+    ((profileRes.data ?? []) as Array<{ id: string; full_name?: string; phone?: string }>)
+      .map(p => [p.id, p.full_name || p.phone || "—"])
+  );
+
+  // Sort bets oldest-first for correct win pairing
+  const sortedBets = [...botBets].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  const now = Date.now();
+  const usedWinIndices = new Set<number>();
+
+  // Parse game type from description ("Aposta (Damas) [bot] vs ..." → "dama")
+  const parseGame = (desc: string): string => {
+    const d = desc.toLowerCase();
+    if (d.includes("xadrez")) return "xadrez";
+    if (d.includes("ludo"))   return "ludo";
+    return "dama";
+  };
+
+  // Extract bot name from description ("Aposta (Damas) [bot] vs Manuel Sitoe" → "Manuel Sitoe")
+  const extractBot = (desc: string): string => {
+    const m = desc.match(/vs (.+)$/i);
+    return m ? m[1].trim() : "Bot";
+  };
+
+  // Match each bot bet to a win transaction (same user, after bet, within 4h, not reused)
+  const classified = sortedBets.map(bet => {
+    const betTime = new Date(bet.created_at).getTime();
+    const ageMs   = now - betTime;
+
+    const winIdx = allWins.findIndex((w, i) => {
+      if (usedWinIndices.has(i)) return false;
+      const wt = new Date(w.created_at).getTime();
+      return w.user_id === bet.user_id && wt >= betTime && wt <= betTime + FOUR_HOURS_MS;
+    });
+
+    const win = winIdx >= 0 ? allWins[winIdx] : null;
+    if (winIdx >= 0) usedWinIndices.add(winIdx);
+
+    const isActive = !win && ageMs < TWO_HOURS_MS;
+    const userWon  = !!win;
+    const botWon   = !win && !isActive;
+    const gameType = parseGame(bet.description);
+
+    return { ...bet, isActive, userWon, botWon, gameType };
+  });
+
+  // Sort back to newest-first for display
+  const classifiedDesc = [...classified].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+
+  const active   = classified.filter(m => m.isActive);
+  const finished = classified.filter(m => !m.isActive);
+  const botWins  = finished.filter(m => m.botWon);
+  const userWins = finished.filter(m => m.userWon);
+
+  const winRate = finished.length > 0
+    ? Math.round((botWins.length / finished.length) * 100) : 0;
+
+  const totalBotCollected = botWins.reduce((s, m)  => s + Math.abs(m.amount ?? 0), 0);
+  const totalUserPaid      = userWins.reduce((s, m) => s + Math.floor(Math.abs(m.amount) * 2 * 0.90), 0);
+  const surplus    = botWins.length - userWins.length;
+  const autoDisable = surplus > 3;
 
   const byGame = (type: string) => {
-    const g = all.filter(m => m.game_type === type);
-    const gf = g.filter(m => m.status === "finished");
+    const g  = classified.filter(m => m.gameType === type);
+    const gf = g.filter(m => !m.isActive);
     return {
-      total: g.length,
-      active: g.filter(m => m.status === "active").length,
-      botWins:  gf.filter(m => !m.winner_id || m.winner_id !== m.player1_id).length,
-      userWins: gf.filter(m =>  m.winner_id && m.winner_id === m.player1_id).length,
+      total:    g.length,
+      active:   g.filter(m => m.isActive).length,
+      botWins:  gf.filter(m => m.botWon).length,
+      userWins: gf.filter(m => m.userWon).length,
     };
   };
 
-  const totalBotCollected = botWins.reduce((s, m)  => s + (m.bet_amount ?? 0), 0);
-  const totalUserPaid      = userWins.reduce((s, m) => s + (m.winner_payout ?? 0), 0);
-  const winRate = finished.length > 0 ? Math.round((botWins.length / finished.length) * 100) : 0;
-
-  const surplus = botWins.length - userWins.length;
-  const autoDisable = surplus > 3;
-
   return {
-    total: all.length,
+    total:    botBets.length,
     finished: finished.length,
-    active: all.filter(m => m.status === "active").length,
-    botWins: botWins.length,
+    active:   active.length,
+    botWins:  botWins.length,
     userWins: userWins.length,
     winRate,
     totalBotCollected,
     totalUserPaid,
     surplus,
     autoDisable,
-    allActive: activeRes.count ?? 0,
-    allTotal:  totalRes.count  ?? 0,
+    allActive: active.length,
+    allTotal:  totalBetsRes.count ?? 0,
     dama:   byGame("dama"),
     xadrez: byGame("xadrez"),
     ludo:   byGame("ludo"),
-    recent: [...all]
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 12),
+    recent: classifiedDesc.slice(0, 12).map(m => ({
+      id:            m.id,
+      game_type:     m.gameType,
+      status:        m.isActive ? "active" : "finished",
+      bet_amount:    Math.abs(m.amount),
+      winner_payout: m.userWon ? Math.floor(Math.abs(m.amount) * 2 * 0.90) : 0,
+      winner_id:     m.userWon ? m.user_id : null,
+      player1_id:    m.user_id,
+      player1_name:  profileMap.get(m.user_id) ?? "—",
+      player2_name:  extractBot(m.description),
+      created_at:    m.created_at,
+    })),
   };
 }
 
