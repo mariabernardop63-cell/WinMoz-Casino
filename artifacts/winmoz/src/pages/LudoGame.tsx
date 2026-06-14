@@ -114,14 +114,15 @@ const HOME_SVG_PX: Record<Player,[number,number][]> = {
   green: [[440,80],[520,80],[440,160],[520,160]],
 };
 
-// ─── Safe squares — ORIGINAL star positions + starting squares ─────────────────
+// ─── Safe squares — ONLY starting squares (colored entry) + star squares ────────
+// TRACK indices for safe squares:
+//   0=[13,6] blue start, 8=[8,2] star, 13=[6,1] red start, 21=[2,6] star,
+//   26=[1,8] green start, 34=[6,12] star, 39=[8,13] yellow start, 47=[12,8] star
 const STAR_DISPLAY: [number,number][] = [[8,2],[2,6],[6,12],[12,8]];
-const SAFE_IDX = [0,9,13,18,26,35,39,44];
-const SAFE_COORDS = new Set<string>([
-  ...SAFE_IDX.map(i=>`${TRACK[i][0]},${TRACK[i][1]}`),
-  ...STAR_DISPLAY.map(([r,c])=>`${r},${c}`),
-  "13,6", "1,8",
-]);
+const SAFE_IDX = [0,8,13,21,26,34,39,47];
+const SAFE_COORDS = new Set<string>(
+  SAFE_IDX.map(i=>`${TRACK[i][0]},${TRACK[i][1]}`)
+);
 
 // ─── Sizing — GPS pin pawn size ────────────────────────────────────────────────
 const PIECE_BOX  = 30;  // px
@@ -503,13 +504,29 @@ function Board({ pieces, movable, onSelectPiece }:{
         const [r,c]=getPieceCoord(p);
         const here=cellMap.get(`${r},${c}`) || [];
         const idx=here.findIndex(x=>x.id===p.id);
-        const OFFSETS:[number,number][] = [[0,0],[-5,-4],[5,-4],[-5,4],[5,4]];
-        const [offX,offY]=here.length>1?(OFFSETS[idx]??[0,0]):[0,0];
+        const count = here.length;
+
+        // Compact stacking layout — keeps all pieces within the cell boundary
+        let pawnSize = PAWN_SIZE;
+        let offX = 0, offY = 0;
+        if (count === 2) {
+          pawnSize = 13;
+          const off2: [number,number][] = [[-7,0],[7,0]];
+          [offX,offY] = off2[idx] ?? [0,0];
+        } else if (count === 3) {
+          pawnSize = 11;
+          const off3: [number,number][] = [[0,-7],[-7,5],[7,5]];
+          [offX,offY] = off3[idx] ?? [0,0];
+        } else if (count >= 4) {
+          pawnSize = 10;
+          const off4: [number,number][] = [[-6,-5],[6,-5],[-6,5],[6,5]];
+          [offX,offY] = off4[idx] ?? [0,0];
+        }
 
         return (
           <motion.div key={p.id}
             onClick={selectable?()=>onSelectPiece(p.id):undefined}
-            animate={showEffect ? { y:[0,-5,0] } : { y:0 }}
+            animate={showEffect ? { y:[0,-4,0] } : { y:0 }}
             transition={showEffect ? { duration:0.65, repeat:Infinity, ease:"easeInOut" } : {}}
             style={{
               position:"absolute",
@@ -527,7 +544,7 @@ function Board({ pieces, movable, onSelectPiece }:{
               display:"flex", alignItems:"center", justifyContent:"center",
               zIndex:2,
             }}>
-              <PinPawn color={color} size={PAWN_SIZE} glow={showEffect}/>
+              <PinPawn color={color} size={pawnSize} glow={showEffect}/>
             </div>
           </motion.div>
         );
@@ -1385,8 +1402,12 @@ export default function LudoGame() {
       setMsg(`${plName} coloca peça no tabuleiro!`);
       movePieceSteps(pid,-1,1,true,()=>handleMoveComplete(pid,diceVal,pl,-1));
     } else {
+      // Auto-enter stretch: if the piece would land exactly on the arrow cell (pos 50),
+      // add 1 bonus step so it enters the home stretch immediately (no extra roll needed)
+      const willLandOnArrow = piece.pos + diceVal === 50;
+      const effectiveSteps = willLandOnArrow ? diceVal + 1 : diceVal;
       setMsg(`${plName} move ${diceVal} ${diceVal===1?"casa":"casas"}!`);
-      movePieceSteps(pid,piece.pos,diceVal,false,()=>handleMoveComplete(pid,diceVal,pl,prevPos));
+      movePieceSteps(pid,piece.pos,effectiveSteps,false,()=>handleMoveComplete(pid,effectiveSteps,pl,prevPos));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[playerName,opponentName,myColor]);
