@@ -5,6 +5,30 @@ import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
+import captureSoundUrl from "@assets/som_para_quando_o_peao_é_matado_1781479683373.mp3";
+
+// ─── Sound helpers ────────────────────────────────────────────────────────────
+function playDamasCapture() {
+  try { const a = new Audio(captureSoundUrl); a.volume = 0.65; a.play().catch(()=>{}); } catch {}
+}
+function playDamasMove() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
+    // Short percussive wood-on-wood "clack" — two layered tones
+    const freqs = [280, 420];
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.018;
+      gain.gain.setValueAtTime(0.28, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+      osc.start(t); osc.stop(t + 0.2);
+    });
+  } catch {}
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type PColor = "w" | "b";
@@ -828,7 +852,8 @@ export default function DamasGame() {
       }
 
       // Called after the last animation step to resolve game state
-      const finalizeBotMove = (finalBoard: Board) => {
+      const finalizeBotMove = (finalBoard: Board, hadCapture: boolean) => {
+        if (hadCapture) playDamasCapture(); else playDamasMove();
         setSelected(null); setValidDests([]); setValidCapDests([]);
         setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]); setChainForbiddenDir(null);
         const myCnt = countPieces(finalBoard, myColor);
@@ -854,7 +879,7 @@ export default function DamasGame() {
         const nb = applyBoardMove(boardRef.current, move.from, move.to, move.captured);
         boardRef.current = nb; setBoard(nb);
         setLastMove({ from: move.from, to: move.to });
-        finalizeBotMove(nb);
+        finalizeBotMove(nb, move.captured.length > 0);
       } else {
         // Chain capture — animate each step separately (380ms per step)
         const steps = computeChainPath(boardRef.current, move);
@@ -869,7 +894,7 @@ export default function DamasGame() {
               boardRef.current = finalBoard;
               setBoard(finalBoard);
               setLastMove({ from, to });
-              finalizeBotMove(finalBoard);
+              finalizeBotMove(finalBoard, true);
             } else {
               // Intermediate step: move without promotion
               const nb = cloneBoard(animBoard);
@@ -1241,6 +1266,7 @@ export default function DamasGame() {
   // ── Execute a complete move (end of chain or non-capture) ─────────────────
   // finalBoard must already have the move applied (piece at `to`, captures removed)
   function finalizeTurn(from: Sq, to: Sq, captured: Sq[], finalBoard: Board) {
+    if (captured.length > 0) playDamasCapture(); else playDamasMove();
     // Count opponent's pieces — if 0, I captured them all and win
     const oppCnt = countPieces(finalBoard, opp(turn));
     setBoard(finalBoard); boardRef.current = finalBoard;

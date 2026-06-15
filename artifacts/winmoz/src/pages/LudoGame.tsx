@@ -6,6 +6,32 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
 import bgImg from "@assets/Gemini_Generated_Image_grc2w7grc2w7grc2_1780220609974.png";
+import rollSoundUrl from "@assets/som_para_quando_o_user_girar_no_dado__1781479690378.mp3";
+import captureSoundUrl from "@assets/som_para_quando_o_peao_é_matado_1781479683373.mp3";
+
+// ─── Sound helpers ────────────────────────────────────────────────────────────
+function playAudio(url: string, volume = 0.65) {
+  try { const a = new Audio(url); a.volume = volume; a.play().catch(()=>{}); } catch {}
+}
+function playVictoryChime() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
+    // Ascending C-E-G-C arpeggio — classic "goal reached" fanfare
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.13;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.38, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+      osc.start(t); osc.stop(t + 0.6);
+    });
+  } catch {}
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type Player  = "blue" | "green";
@@ -125,8 +151,9 @@ const SAFE_COORDS = new Set<string>(
 );
 
 // ─── Sizing — GPS pin pawn size ────────────────────────────────────────────────
-const PIECE_BOX  = 30;  // px
-const PAWN_SIZE  = 22;  // px
+// Reduced so the pin fits within its cell (cell ≈ 27px, pin height = size×1.4)
+const PIECE_BOX  = 26;  // px — click/hit area
+const PAWN_SIZE  = 16;  // px — single-piece size (height ≈ 22px, fits in 27px cell)
 
 // ─── getPieceCoord: stretch entered after pos 50 (arrow cell) ──────────────────
 function getPieceCoord(p: GamePiece): [number,number] {
@@ -507,19 +534,20 @@ function Board({ pieces, movable, onSelectPiece }:{
         const count = here.length;
 
         // Compact stacking layout — keeps all pieces within the cell boundary
+        // Offsets and sizes are tuned for PAWN_SIZE=16 (cell ≈ 27px)
         let pawnSize = PAWN_SIZE;
         let offX = 0, offY = 0;
         if (count === 2) {
-          pawnSize = 13;
-          const off2: [number,number][] = [[-7,0],[7,0]];
+          pawnSize = 12;
+          const off2: [number,number][] = [[-6,0],[6,0]];
           [offX,offY] = off2[idx] ?? [0,0];
         } else if (count === 3) {
-          pawnSize = 11;
-          const off3: [number,number][] = [[0,-7],[-7,5],[7,5]];
+          pawnSize = 10;
+          const off3: [number,number][] = [[0,-6],[-6,4],[6,4]];
           [offX,offY] = off3[idx] ?? [0,0];
         } else if (count >= 4) {
-          pawnSize = 10;
-          const off4: [number,number][] = [[-6,-5],[6,-5],[-6,5],[6,5]];
+          pawnSize = 9;
+          const off4: [number,number][] = [[-5,-4],[5,-4],[-5,4],[5,4]];
           [offX,offY] = off4[idx] ?? [0,0];
         }
 
@@ -1302,6 +1330,8 @@ export default function LudoGame() {
     return ps.filter(p=>p.player===pl).filter(p=>{
       if(p.pos===57) return false;
       if(p.pos===-1) return d===6;
+      // In the home stretch (pos 51-56), any dice value is allowed — overshoot caps at 57
+      if(p.pos>=51) return true;
       return p.pos+d<=57;
     }).map(p=>p.id) as PieceId[];
   }
@@ -1337,6 +1367,7 @@ export default function LudoGame() {
         if(pr===mr&&pc===mc && !SAFE_COORDS.has(`${pr},${pc}`)){
           captured = true;
           captureAnimRef.current = true;
+          playAudio(captureSoundUrl);
           const capturerName=mover.player===myColor?playerName.split(" ")[0]:opponentName;
           setMsg(`${capturerName} capturou uma peça! +1 jogada`);
           let pos=p.pos;
@@ -1364,6 +1395,7 @@ export default function LudoGame() {
       setWinner(currentTurn); setPhase("done"); return;
     }
     const enteredHome = mover.pos===57 && prevPos<57;
+    if(enteredHome) playVictoryChime();
     const extraTurn = diceVal===6 || captured || enteredHome;
     if(extraTurn){
       const reason = diceVal===6?"tirou 6":captured?"capturou uma peça":"chegou ao centro!";
@@ -1402,10 +1434,13 @@ export default function LudoGame() {
       setMsg(`${plName} coloca peça no tabuleiro!`);
       movePieceSteps(pid,-1,1,true,()=>handleMoveComplete(pid,diceVal,pl,-1));
     } else {
-      // Auto-enter stretch: if the piece would land exactly on the arrow cell (pos 50),
-      // add 1 bonus step so it enters the home stretch immediately (no extra roll needed)
+      // Auto-enter stretch: if piece would land exactly on arrow cell (pos 50), push it to pos 51
       const willLandOnArrow = piece.pos + diceVal === 50;
-      const effectiveSteps = willLandOnArrow ? diceVal + 1 : diceVal;
+      // Stretch overshoot: pieces at pos 51-56 cap their move at 57
+      const inStretch = piece.pos >= 51;
+      let effectiveSteps = diceVal;
+      if (willLandOnArrow) effectiveSteps = diceVal + 1;
+      if (inStretch) effectiveSteps = Math.min(diceVal, 57 - piece.pos);
       setMsg(`${plName} move ${diceVal} ${diceVal===1?"casa":"casas"}!`);
       movePieceSteps(pid,piece.pos,effectiveSteps,false,()=>handleMoveComplete(pid,effectiveSteps,pl,prevPos));
     }
@@ -1464,6 +1499,7 @@ export default function LudoGame() {
   // ── Roll my color dice — uses weighted algorithm + broadcasts ───────────────
   const doRoll=useCallback(()=>{
     if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current||captureAnimRef.current) return;
+    playAudio(rollSoundUrl, 0.55);
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
     const oppPieces = piecesRef.current.filter(p=>p.player!==myColor);
