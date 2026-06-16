@@ -17,8 +17,20 @@ function fmtMZN(val: number) {
   return `MT ${Number(val.toFixed(2)).toLocaleString("pt-PT")}`;
 }
 
-/* ─── Avatar (same logic as dashboard) ─── */
-function Avatar({ seed, size = 32 }: { seed: string; size?: number }) {
+/* ─── Avatar (real photo first, DiceBear fallback) ─── */
+function Avatar({ seed, avatarUrl, size = 32 }: { seed: string; avatarUrl?: string | null; size?: number }) {
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={seed}
+        style={{
+          width: size, height: size, borderRadius: "50%", flexShrink: 0,
+          objectFit: "cover", border: "1.5px solid rgba(108,92,231,.14)",
+        }}
+      />
+    );
+  }
   const palette = ["6C5CE7", "7c3aed", "4f46e5", "0ea5e9", "10b981", "f59e0b", "ec4899"];
   const color = palette[seed.charCodeAt(0) % palette.length];
   return (
@@ -102,6 +114,7 @@ interface UserRow {
   id: string;
   full_name: string | null;
   phone: string | null;
+  avatar_url: string | null;
   my_invite_code: string | null;
   is_affiliate: boolean;
   affiliate_pending_earnings: number;
@@ -139,10 +152,10 @@ export default function AffiliatesPage() {
        * to the minimal SELECT that we know always works.
        */
       const FULL_SELECT =
-        "id, full_name, phone, my_invite_code, is_affiliate, " +
+        "id, full_name, phone, avatar_url, my_invite_code, is_affiliate, " +
         "affiliate_pending_earnings, affiliate_milestone_500_claimed, " +
         "affiliate_milestone_2000_claimed";
-      const BASE_SELECT = "id, full_name, phone, my_invite_code, is_affiliate";
+      const BASE_SELECT = "id, full_name, phone, avatar_url, my_invite_code, is_affiliate";
 
       /* Build query — use let so we can chain .eq() and reassign */
       const buildQuery = (select: string) => {
@@ -207,6 +220,7 @@ export default function AffiliatesPage() {
             id:                               p.id,
             full_name:                        p.full_name ?? null,
             phone:                            p.phone ?? null,
+            avatar_url:                       (p.avatar_url as string | null) ?? null,
             my_invite_code:                   p.my_invite_code ?? null,
             is_affiliate:                     !!p.is_affiliate,
             affiliate_pending_earnings:       Number(p.affiliate_pending_earnings ?? 0),
@@ -466,7 +480,7 @@ function UserCard({ user: u, toggling, onToggle, delay }: {
       {/* Row 1: avatar + name + badges + action */}
       <div className="flex items-center gap-3">
         <div className="relative flex-shrink-0">
-          <Avatar seed={u.full_name ?? u.id} size={40} />
+          <Avatar seed={u.full_name ?? u.id} avatarUrl={u.avatar_url} size={40} />
           {u.is_affiliate && (
             <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
               style={{ background: V4, border: "2px solid white" }}>

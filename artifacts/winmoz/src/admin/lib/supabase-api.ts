@@ -1147,6 +1147,7 @@ export function useGetNotificationHistory() {
 export interface SupportConversation {
   userId: string;
   userName: string;
+  avatarUrl: string | null;
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
@@ -1191,6 +1192,7 @@ export function useListSupportConversations() {
           convMap.set(uid, {
             userId:          uid,
             userName:        (m.user_name as string) ?? "utilizador",
+            avatarUrl:       null,
             lastMessage:     (m.content as string) ?? "",
             lastMessageTime: m.created_at as string,
             unreadCount:     0,
@@ -1207,6 +1209,19 @@ export function useListSupportConversations() {
           }
         }
       });
+
+      // Enrich with real avatar_url from profiles
+      const userIds = Array.from(convMap.keys());
+      if (userIds.length > 0) {
+        const { data: profiles } = await adminSupabase
+          .from("profiles")
+          .select("id, avatar_url")
+          .in("id", userIds);
+        (profiles ?? []).forEach((p: Record<string, unknown>) => {
+          const conv = convMap.get(p.id as string);
+          if (conv && p.avatar_url) conv.avatarUrl = p.avatar_url as string;
+        });
+      }
 
       return Array.from(convMap.values()).sort(
         (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()

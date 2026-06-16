@@ -14,16 +14,16 @@ import {
   ArrowUpRight, ArrowDownRight, Gamepad2,
 } from "lucide-react";
 
-// ── Design tokens ─────────────────────────────────────────────────────────────
+// ── Design tokens — alinhados com o tema claro do painel admin ────────────────
 const T = {
-  bg:      "#0b0d14",
-  surface: "rgba(255,255,255,0.042)",
-  surf2:   "rgba(255,255,255,0.07)",
-  border:  "rgba(255,255,255,0.08)",
-  border2: "rgba(255,255,255,0.13)",
-  text:    "#f1f5f9",
-  sub:     "#94a3b8",
-  muted:   "rgba(255,255,255,0.3)",
+  bg:      "transparent",
+  surface: "rgba(108,92,231,0.04)",
+  surf2:   "rgba(108,92,231,0.08)",
+  border:  "rgba(108,92,231,0.1)",
+  border2: "rgba(108,92,231,0.18)",
+  text:    "var(--gz-text-primary, #1a1a2e)",
+  sub:     "var(--gz-text-muted, #64748b)",
+  muted:   "rgba(0,0,0,0.35)",
   teal:    "#14b8a6",
   green:   "#22c55e",
   red:     "#f43f5e",

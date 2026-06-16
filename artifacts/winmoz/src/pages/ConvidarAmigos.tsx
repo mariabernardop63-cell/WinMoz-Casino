@@ -31,7 +31,7 @@ export default function ConvidarAmigos() {
     }
   }, [profile]);
 
-  const earned = referralCount * 5;
+  const earned = referralCount * 2.5;
 
   const shareLink = `https://mozbet.site/${code}`;
   const shareText = `🎮 Junta-te ao MozBet e ganha bónus! Regista-te com o meu link: ${shareLink}`;
@@ -64,7 +64,7 @@ export default function ConvidarAmigos() {
     { icon: Share2,     label: "Convida um amigo",   desc: "Partilha o teu código único" },
     { icon: Users,      label: "O amigo regista-se", desc: "Com o teu código de convite" },
     { icon: TrendingUp, label: "Ele faz uma aposta", desc: "Qualquer valor, qualquer jogo" },
-    { icon: Gift,       label: "Tu ganhas 5 MT",     desc: "Creditado automaticamente" },
+    { icon: Gift,       label: "Tu ganhas 2,50 MT",  desc: "Creditado automaticamente" },
   ];
 
   return (
@@ -89,7 +89,7 @@ export default function ConvidarAmigos() {
             </h1>
             <div className="flex items-center gap-2 mt-3">
               <div className="bg-white/20 backdrop-blur rounded-full px-4 py-2">
-                <span className="text-white font-bold text-lg">1 Convite = 5 MT</span>
+                <span className="text-white font-bold text-lg">1 Convite = 2,50 MT</span>
               </div>
             </div>
           </motion.div>
@@ -99,7 +99,7 @@ export default function ConvidarAmigos() {
           {[
             { label: "Amigos convidados", val: referralCount.toString() },
             { label: "Total ganho",       val: fmtMZN(earned) },
-            { label: "Por convite",       val: "5 MT" },
+            { label: "Por convite",       val: "2,50 MT" },
           ].map(({ label, val }, i) => (
             <div key={label} className={`flex-1 flex flex-col items-center py-3 ${i < 2 ? "border-r border-white/10" : ""}`}>
               <p className="text-white font-bold text-lg font-syne">{val}</p>
@@ -163,7 +163,7 @@ export default function ConvidarAmigos() {
                   </motion.button>
                 </div>
                 <div className="px-5 pb-3">
-                  <p className="text-white/30 text-xs">Partilha este código com os teus amigos para ganhar 5 MT por cada aposta que eles fizerem</p>
+                  <p className="text-white/30 text-xs">Partilha este código com os teus amigos para ganhar 2,50 MT por cada aposta que eles fizerem</p>
                 </div>
               </div>
             ) : (
@@ -177,9 +177,9 @@ export default function ConvidarAmigos() {
             style={{ background: "rgba(231,76,60,0.08)", border: "1px solid rgba(231,76,60,0.2)" }}>
             <Gift style={{ width: 16, height: 16, color: "#e74c3c", flexShrink: 0, marginTop: 2 }} />
             <div>
-              <p className="text-white font-semibold text-sm mb-1">Como ganhas 5 MT</p>
+              <p className="text-white font-semibold text-sm mb-1">Como ganhas 2,50 MT</p>
               <p className="text-white/50 text-xs leading-relaxed">
-                O teu amigo regista-se com o teu código e faz pelo menos uma aposta. Os 5 MT são creditados automaticamente na tua carteira.
+                O teu amigo regista-se com o teu código e faz pelo menos uma aposta. Os 2,50 MT são creditados automaticamente na tua carteira.
               </p>
             </div>
           </div>

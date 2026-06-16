@@ -15,7 +15,8 @@ import { supabase } from "@/lib/supabase";
 
 const V1 = "#6C5CE7";
 
-function getAvatarUrl(seed: string) {
+function getAvatarUrl(seed: string, avatarUrl?: string | null) {
+  if (avatarUrl) return avatarUrl;
   const palette = ["6C5CE7", "7c3aed", "4f46e5", "0ea5e9", "10b981", "f59e0b"];
   const color = palette[seed.charCodeAt(0) % palette.length];
   return `https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(seed)}&backgroundColor=${color}`;
@@ -180,8 +181,8 @@ export default function Messages() {
                 style={{ background: selectedUserId === c.userId ? "rgba(108,92,231,.06)" : "transparent" }}>
                 <div className="flex items-center gap-3 px-4 py-3.5 border-b" style={{ borderColor: "rgba(108,92,231,.04)" }}>
                   <div className="relative flex-shrink-0">
-                    <img src={getAvatarUrl(c.userName)} alt={c.userName}
-                      style={{ width: 40, height: 40, borderRadius: "50%", background: "white", border: "2px solid rgba(108,92,231,.12)" }} />
+                    <img src={getAvatarUrl(c.userName, c.avatarUrl)} alt={c.userName}
+                      style={{ width: 40, height: 40, borderRadius: "50%", background: "white", border: "2px solid rgba(108,92,231,.12)", objectFit: "cover" }} />
                     {c.lastSender === "user" && c.unreadCount > 0 && (
                       <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-red-400 border-2 border-white" />
                     )}
@@ -217,8 +218,8 @@ export default function Messages() {
                 <button className="md:hidden mr-1" onClick={() => setShowList(true)}>
                   <ChevronLeft style={{ width: 20, height: 20, color: "var(--gz-text-muted)" }} />
                 </button>
-                <img src={getAvatarUrl(selectedConv.userName)} alt={selectedConv.userName}
-                  style={{ width: 38, height: 38, borderRadius: "50%", background: "white", border: "2px solid rgba(108,92,231,.15)" }} />
+                <img src={getAvatarUrl(selectedConv.userName, selectedConv.avatarUrl)} alt={selectedConv.userName}
+                  style={{ width: 38, height: 38, borderRadius: "50%", background: "white", border: "2px solid rgba(108,92,231,.15)", objectFit: "cover" }} />
                 <div className="flex-1 min-w-0">
                   <div className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{selectedConv.userName}</div>
                   <div className="text-[11px]" style={{ color: "var(--gz-text-muted)" }}>
@@ -256,8 +257,8 @@ export default function Messages() {
                     {messages.map(msg => (
                       <div key={msg.id} className={`flex ${msg.sender !== "user" ? "justify-end" : "justify-start"}`}>
                         {msg.sender === "user" && (
-                          <img src={getAvatarUrl(msg.userName)} alt=""
-                            style={{ width: 28, height: 28, borderRadius: "50%", background: "white", flexShrink: 0, marginRight: 8, marginTop: 4, border: "1.5px solid rgba(108,92,231,.12)" }} />
+                          <img src={getAvatarUrl(msg.userName, selectedConv.avatarUrl)} alt=""
+                            style={{ width: 28, height: 28, borderRadius: "50%", background: "white", flexShrink: 0, marginRight: 8, marginTop: 4, border: "1.5px solid rgba(108,92,231,.12)", objectFit: "cover" }} />
                         )}
                         <div style={{ maxWidth: "72%" }}>
                           <div className="flex items-center gap-1.5 mb-1" style={{ justifyContent: msg.sender !== "user" ? "flex-end" : "flex-start" }}>
