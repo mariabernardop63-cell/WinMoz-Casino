@@ -1167,13 +1167,50 @@ export function useListSupportConversations() {
   return useQuery({
     queryKey: ["support-conversations"],
     queryFn: async () => {
-      const res = await fetch("/api/admin/support/conversations");
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(`Erro ${res.status}: ${body}`);
-      }
-      const data = await res.json() as { conversations?: SupportConversation[] };
-      return data.conversations ?? [];
+      const { data, error } = await adminSupabase
+        .from("support_messages")
+        .select("user_id, user_name, sender, content, created_at")
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      if (error) throw new Error(error.message);
+
+      // Find when each conversation last had an admin/ai reply
+      const lastAdminReplyTime = new Map<string, string>();
+      (data ?? []).forEach((m: Record<string, unknown>) => {
+        const uid = m.user_id as string;
+        if ((m.sender === "admin" || m.sender === "ai") && !lastAdminReplyTime.has(uid)) {
+          lastAdminReplyTime.set(uid, m.created_at as string);
+        }
+      });
+
+      const convMap = new Map<string, SupportConversation>();
+      (data ?? []).forEach((m: Record<string, unknown>) => {
+        const uid = m.user_id as string;
+        if (!convMap.has(uid)) {
+          convMap.set(uid, {
+            userId:          uid,
+            userName:        (m.user_name as string) ?? "utilizador",
+            lastMessage:     (m.content as string) ?? "",
+            lastMessageTime: m.created_at as string,
+            unreadCount:     0,
+            lastSender:      (m.sender as "user" | "admin" | "ai") ?? "user",
+          });
+        }
+        if (m.sender === "user") {
+          const lastReply = lastAdminReplyTime.get(uid);
+          const isUnread = !lastReply || new Date(m.created_at as string) > new Date(lastReply);
+          if (isUnread) {
+            const conv = convMap.get(uid)!;
+            conv.unreadCount++;
+            convMap.set(uid, conv);
+          }
+        }
+      });
+
+      return Array.from(convMap.values()).sort(
+        (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
+      );
     },
     refetchInterval: 10000,
     staleTime: 3000,
@@ -1185,13 +1222,23 @@ export function useGetSupportMessages(userId: string | null) {
     queryKey: ["support-messages", userId],
     queryFn: async () => {
       if (!userId) return [];
-      const res = await fetch(`/api/admin/support/messages?userId=${encodeURIComponent(userId)}`);
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(`Erro ${res.status}: ${body}`);
-      }
-      const data = await res.json() as { messages?: SupportMessage[] };
-      return data.messages ?? [];
+      const { data, error } = await adminSupabase
+        .from("support_messages")
+        .select("id, user_id, user_name, sender, content, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true });
+
+      if (error) throw new Error(error.message);
+
+      return (data ?? []).map((m: Record<string, unknown>): SupportMessage => ({
+        id:          m.id as string,
+        userId:      m.user_id as string,
+        userName:    (m.user_name as string) ?? "utilizador",
+        sender:      (m.sender as "user" | "admin" | "ai") ?? "user",
+        content:     (m.content as string) ?? "",
+        createdAt:   m.created_at as string,
+        readByAdmin: true,
+      }));
     },
     enabled: !!userId,
     refetchInterval: 8000,
@@ -1203,15 +1250,13 @@ export function useSendAdminSupportMessage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, userName, content }: { userId: string; userName: string; content: string }) => {
-      const res = await fetch("/api/admin/support/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, userName, content }),
+      const { error } = await adminSupabase.from("support_messages").insert({
+        user_id:   userId,
+        user_name: userName,
+        sender:    "admin",
+        content:   content.trim(),
       });
-      if (!res.ok) {
-        const body = await res.text().catch(() => "");
-        throw new Error(`Erro ao enviar mensagem ${res.status}: ${body}`);
-      }
+      if (error) throw new Error(error.message);
       return { ok: true };
     },
     onSuccess: (_d, { userId }) => {
@@ -1225,7 +1270,6 @@ export function useMarkSupportMessagesRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (userId: string) => {
-      // support_messages table has no read_by_admin column — just refresh queries
       return { ok: true, userId };
     },
     onSuccess: (_d, userId) => {
