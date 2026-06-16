@@ -35,7 +35,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "PORT=5000 pnpm --filter @workspace/winmoz run dev"
+args = "cd artifacts/winmoz && PORT=5000 ./node_modules/.bin/vite --config vite.config.ts --host 0.0.0.0"
 waitForPort = 5000
 
 [[workflows.workflow]]
@@ -64,11 +64,7 @@ externalPort = 3000
 
 [[ports]]
 localPort = 5000
-externalPort = 5000
-
-[[ports]]
-localPort = 8080
-externalPort = 8080
+externalPort = 80
 
 [[ports]]
 localPort = 8081

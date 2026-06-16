@@ -10,8 +10,14 @@ import rollSoundUrl from "@assets/som_para_quando_o_user_girar_no_dado__17814796
 import captureSoundUrl from "@assets/som_para_quando_o_peao_é_matado_1781479683373.mp3";
 
 // ─── Sound helpers ────────────────────────────────────────────────────────────
-function playAudio(url: string, volume = 0.65) {
-  try { const a = new Audio(url); a.volume = volume; a.play().catch(()=>{}); } catch {}
+// Pre-load audio so it plays instantly with zero network delay
+const _rollAudio = new Audio(rollSoundUrl);
+const _captureAudio = new Audio(captureSoundUrl);
+_rollAudio.load();
+_captureAudio.load();
+
+function playAudio(audio: HTMLAudioElement, volume = 0.65) {
+  try { audio.currentTime = 0; audio.volume = volume; audio.play().catch(()=>{}); } catch {}
 }
 function playVictoryChime() {
   try {
@@ -1330,8 +1336,8 @@ export default function LudoGame() {
     return ps.filter(p=>p.player===pl).filter(p=>{
       if(p.pos===57) return false;
       if(p.pos===-1) return d===6;
-      // In the home stretch (pos 51-56), any dice value is allowed — overshoot caps at 57
-      if(p.pos>=51) return true;
+      // In the home stretch (pos 51-56), piece must land exactly on or before 57 — no overshooting
+      if(p.pos>=51) return p.pos+d<=57;
       return p.pos+d<=57;
     }).map(p=>p.id) as PieceId[];
   }
@@ -1367,7 +1373,7 @@ export default function LudoGame() {
         if(pr===mr&&pc===mc && !SAFE_COORDS.has(`${pr},${pc}`)){
           captured = true;
           captureAnimRef.current = true;
-          playAudio(captureSoundUrl);
+          playAudio(_captureAudio);
           const capturerName=mover.player===myColor?playerName.split(" ")[0]:opponentName;
           setMsg(`${capturerName} capturou uma peça! +1 jogada`);
           let pos=p.pos;
@@ -1391,7 +1397,10 @@ export default function LudoGame() {
     const baseMover = ps.find(p=>p.id===pieceId);
     const mover: GamePiece = baseMover ? {...baseMover, pos: finalPos} : {id:pieceId, player:currentTurn, pos:finalPos};
     const captured = captureAtPos(mover);
-    if(finishedCount(piecesRef.current,currentTurn)===4){
+    // Build updated snapshot that includes this piece at its new position
+    // (piecesRef.current may still be stale due to async state updates)
+    const updatedPs = ps.map(p => p.id===pieceId ? mover : p);
+    if(finishedCount(updatedPs,currentTurn)===4){
       setWinner(currentTurn); setPhase("done"); return;
     }
     const enteredHome = mover.pos===57 && prevPos<57;
@@ -1499,7 +1508,7 @@ export default function LudoGame() {
   // ── Roll my color dice — uses weighted algorithm + broadcasts ───────────────
   const doRoll=useCallback(()=>{
     if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current||captureAnimRef.current) return;
-    playAudio(rollSoundUrl, 0.55);
+    playAudio(_rollAudio, 0.55);
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
     const oppPieces = piecesRef.current.filter(p=>p.player!==myColor);
@@ -1724,14 +1733,18 @@ export default function LudoGame() {
       if(payload.accepted){
         if(BET_AMOUNT > 0 && profile?.id){
           const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-          if(data){
-            const newBal=parseFloat(String(data.balance))-BET_AMOUNT;
-            await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
-            await supabase.from("transactions").insert({ user_id:profile.id, type:"bet", amount:-BET_AMOUNT, description:"Aposta de revanche (Ludo)", status:"approved" });
+          if(!data || parseFloat(String(data.balance)) < BET_AMOUNT){
+            setRematchPhase("no_balance"); return;
           }
+          const newBal=parseFloat(String(data.balance))-BET_AMOUNT;
+          await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
+          await supabase.from("transactions").insert({ user_id:profile.id, type:"bet", amount:-BET_AMOUNT, description:"Aposta de revanche (Ludo)", status:"approved" });
+          await refreshProfile();
         }
         setRematchPhase("idle");
         resetGame();
+        // Prevent channel re-subscribe from deducting the bet a second time
+        betDeductedRef.current = true;
       } else if((payload.reason as string)==="no_balance"){
         setRematchPhase("opp_no_balance");
       } else {
@@ -1938,10 +1951,13 @@ export default function LudoGame() {
         const newBal=parseFloat(String(data.balance))-BET_AMOUNT;
         await supabase.from("profiles").update({ balance: newBal }).eq("id",profile.id);
         await supabase.from("transactions").insert({ user_id:profile.id, type:"bet", amount:-BET_AMOUNT, description:"Aposta de revanche (Ludo)", status:"approved" });
+        await refreshProfile();
       }
       channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
       setRematchPhase("idle");
       resetGame();
+      // Prevent channel re-subscribe from deducting the bet a second time
+      betDeductedRef.current = true;
     } catch {
       channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } });
       setRematchPhase("no_balance");
