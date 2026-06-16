@@ -18,6 +18,7 @@ import {
   ChevronDown,
   InboxIcon,
   Bot,
+  Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRef, useState, useEffect } from "react";
@@ -38,6 +39,7 @@ const navItems = [
   { href: "/security",      icon: ShieldCheck,       label: "Segurança"          },
   { href: "/relatorios",    icon: BarChart3,         label: "Relatórios"         },
   { href: "/bots",          icon: Bot,               label: "Gestão de Bots"     },
+  { href: "/affiliates",    icon: Star,              label: "Afiliados"           },
 ];
 
 function Tooltip({ label }: { label: string }) {

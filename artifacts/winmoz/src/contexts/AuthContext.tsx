@@ -15,6 +15,10 @@ export interface UserProfile {
   updated_at?: string;
   is_blocked?: boolean;
   block_type?: string | null;
+  is_affiliate?: boolean;
+  affiliate_pending_earnings?: number;
+  affiliate_milestone_500_claimed?: boolean;
+  affiliate_milestone_2000_claimed?: boolean;
 }
 
 interface AuthContextType {

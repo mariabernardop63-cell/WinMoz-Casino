@@ -22,6 +22,7 @@ import Security from "@/admin/pages/security";
 import ActivityLogs from "@/admin/pages/activity-logs";
 import DepositRequests from "@/admin/pages/deposit-requests";
 import BotManagement from "@/admin/pages/bots";
+import AffiliatesPage from "@/admin/pages/affiliates";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 const ADMIN_BASE = `${BASE}/admin`;
@@ -49,6 +50,7 @@ function AdminRouter() {
         <Route path="/deposit-requests" component={DepositRequests} />
         <Route path="/relatorios"   component={Reports}      />
         <Route path="/bots"         component={BotManagement} />
+        <Route path="/affiliates"   component={AffiliatesPage} />
         <Route component={Dashboard} />
       </Switch>
     </AdminLayout>

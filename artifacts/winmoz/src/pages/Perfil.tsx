@@ -5,8 +5,23 @@ import {
   ArrowDownToLine, Plus, RefreshCw, MoreHorizontal,
   ArrowUpRight, ArrowDownLeft,
   X, UserCog, UserPlus, FileText, Flag, Lock, HelpCircle, Settings, LogOut, ChevronRight, Shield, ScanLine,
-  Gamepad2, CreditCard,
+  Gamepad2, CreditCard, Star,
 } from "lucide-react";
+
+function AffiliateBadge() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: "inline-block", verticalAlign: "middle", flexShrink: 0 }}>
+      <defs>
+        <linearGradient id="ab-bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#f59e0b"/>
+          <stop offset="100%" stopColor="#d97706"/>
+        </linearGradient>
+      </defs>
+      <path d="M32 4L38.5 14.5L51 11L48.5 23.5L59 30L48.5 36.5L51 49L38.5 45.5L32 56L25.5 45.5L13 49L15.5 36.5L5 30L15.5 23.5L13 11L25.5 14.5Z" fill="url(#ab-bg)"/>
+      <text x="32" y="35" textAnchor="middle" fontFamily="sans-serif" fontWeight="800" fontSize="18" fill="#fff">A</text>
+    </svg>
+  );
+}
 import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
@@ -69,7 +84,7 @@ function parseTxDescription(raw: string | null, type: string): string {
   return raw;
 }
 
-const FERRAMENTAS = [
+const FERRAMENTAS_BASE = [
   { icon: UserCog,    label: "Editar Perfil",    desc: "Altera o teu nome, foto e dados",   route: "/editar-perfil"   },
   { icon: UserPlus,   label: "Convidar Amigos",  desc: "Convida e ganha bónus especiais",   route: "/convidar-amigos" },
   { icon: FileText,   label: "Extratos",         desc: "Histórico completo de transações",  route: "/extratos"        },
@@ -85,6 +100,12 @@ export default function Perfil() {
   const [ferramentasOpen, setFerramentasOpen] = useState(false);
   const [, setLocation] = useLocation();
   const { profile, signOut, user, sessionReady } = useAuth();
+
+  const FERRAMENTAS = [
+    ...FERRAMENTAS_BASE.slice(0, 1),
+    ...(profile?.is_affiliate ? [{ icon: Star, label: "Programa de Afiliados", desc: "Painel oficial de afiliado MozBet", route: "/afiliados", affiliate: true }] : []),
+    ...FERRAMENTAS_BASE.slice(1),
+  ];
 
   const [transactions, setTransactions] = useState<Tx[]>([]);
   const [txLoading, setTxLoading] = useState(true);
@@ -209,8 +230,9 @@ export default function Perfil() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, alignItems: "flex-start" }}>
               <span className="text-white font-syne font-bold group-hover:opacity-80 transition-opacity"
-                style={{ fontSize: 15, letterSpacing: "0.3px", lineHeight: 1, display: "block" }}>
+                style={{ fontSize: 15, letterSpacing: "0.3px", lineHeight: 1, display: "flex", alignItems: "center", gap: 6 }}>
                 {displayName.toUpperCase()}
+                {profile?.is_affiliate && <AffiliateBadge />}
               </span>
               <span style={{ fontSize: 12, color: "#71717a", fontWeight: 400, lineHeight: 1, display: "block" }}>
                 {displayPhone ? `+258 ${formatPhone(displayPhone)}` : "Telemóvel não definido"}
@@ -341,25 +363,33 @@ export default function Perfil() {
               </div>
 
               <div className="flex flex-col gap-2">
-                {FERRAMENTAS.map(({ icon: Icon, label, desc, route, danger }) => (
+                {FERRAMENTAS.map(({ icon: Icon, label, desc, route, danger, ...rest }) => {
+                  const isAffiliate = (rest as any).affiliate;
+                  return (
                   <button key={label}
                     onClick={() => handleFerramentaClick(label, route ?? null)}
                     className={`flex items-center gap-3.5 p-3.5 rounded-2xl border transition-all duration-200 text-left w-full group ${
                       danger
                         ? "border-red-100 bg-red-50/50 hover:bg-red-50 hover:border-red-200"
-                        : "border-slate-100 bg-white hover:bg-slate-50"
+                        : isAffiliate
+                          ? "border-amber-100 bg-amber-50/40 hover:bg-amber-50"
+                          : "border-slate-100 bg-white hover:bg-slate-50"
                     }`}>
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: danger ? "#fef2f2" : "#f7f8fa", border: danger ? "1px solid #fecaca" : "1px solid #e2e8f0" }}>
-                      <Icon style={{ width: 18, height: 18, color: danger ? "#dc2626" : "#111" }} />
+                      style={{
+                        background: danger ? "#fef2f2" : isAffiliate ? "rgba(245,158,11,0.12)" : "#f7f8fa",
+                        border: danger ? "1px solid #fecaca" : isAffiliate ? "1px solid rgba(245,158,11,0.35)" : "1px solid #e2e8f0",
+                      }}>
+                      <Icon style={{ width: 18, height: 18, color: danger ? "#dc2626" : isAffiliate ? "#d97706" : "#111" }} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`font-syne font-bold text-sm ${danger ? "text-red-600" : "text-slate-800"}`}>{label}</p>
+                      <p className={`font-syne font-bold text-sm ${danger ? "text-red-600" : isAffiliate ? "text-amber-700" : "text-slate-800"}`}>{label}</p>
                       <p className="text-slate-400 text-[11px] mt-0.5">{desc}</p>
                     </div>
-                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${danger ? "text-red-300" : "text-slate-300"}`} />
+                    <ChevronRight className={`w-4 h-4 flex-shrink-0 ${danger ? "text-red-300" : isAffiliate ? "text-amber-300" : "text-slate-300"}`} />
                   </button>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="flex items-center gap-2 mt-4 p-3 bg-slate-50 rounded-2xl border border-slate-100">

@@ -24,6 +24,19 @@ const slideVariants = {
 const slideTransition = { duration: 0.28, ease: [0.22, 1, 0.36, 1] as const };
 const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+function getInitialInviteCode(): string {
+  try {
+    const stored = sessionStorage.getItem("pendingInviteCode");
+    if (stored && /^[A-Z0-9]{4,8}$/.test(stored)) return stored;
+  } catch { /* ignore */ }
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const ref = (params.get("ref") ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+    if (/^[A-Z0-9]{4,8}$/.test(ref)) return ref;
+  } catch { /* ignore */ }
+  return "";
+}
+
 export default function Registar() {
   const [, setLocation] = useLocation();
 
@@ -33,7 +46,7 @@ export default function Registar() {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [invite, setInvite] = useState("");
+  const [invite, setInvite] = useState(() => getInitialInviteCode());
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
 

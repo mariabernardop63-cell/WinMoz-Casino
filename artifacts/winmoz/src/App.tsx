@@ -29,6 +29,7 @@ import Notificacoes from "@/pages/Notificacoes";
 import GrupoChat from "@/pages/GrupoChat";
 import ScannerQR from "@/pages/ScannerQR";
 import Apostar from "@/pages/Apostar";
+import ProgramaAfiliados from "@/pages/ProgramaAfiliados";
 import LudoGame from "@/pages/LudoGame";
 import ChessGame from "@/pages/ChessGame";
 import DamasGame from "@/pages/DamasGame";
@@ -173,10 +174,26 @@ function Router() {
         <ProtectedRoute><Roleta /></ProtectedRoute>
       </Route>
       <Route path="/bilhar-em-breve" component={BilharEmBreve} />
+      <Route path="/afiliados">
+        <ProtectedRoute><ProgramaAfiliados /></ProtectedRoute>
+      </Route>
 
       {/* Admin panel — accessible at /admin and all sub-paths */}
       <Route path="/admin" component={AdminApp} />
       <Route path="/admin/:rest*" component={AdminApp} />
+
+      {/* Invite link redirect — catches /:code AFTER all named routes */}
+      <Route path="/:code">
+        {(params) => {
+          const code = (params.code ?? "").toUpperCase();
+          if (/^[A-Z0-9]{4,8}$/.test(code)) {
+            try { sessionStorage.setItem("pendingInviteCode", code); } catch { /* ignore */ }
+            window.location.replace(`/registar?ref=${code}`);
+            return null;
+          }
+          return <NotFound />;
+        }}
+      </Route>
 
       <Route component={NotFound} />
     </Switch>

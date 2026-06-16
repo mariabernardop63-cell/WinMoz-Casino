@@ -33,12 +33,16 @@ export default function ConvidarAmigos() {
 
   const earned = referralCount * 5;
 
+  const shareLink = `https://mozbet.site/${code}`;
+  const shareText = `🎮 Junta-te ao MozBet e ganha bónus! Regista-te com o meu link: ${shareLink}`;
+
   const handleCopy = async () => {
+    const toCopy = shareLink || code;
     try {
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(toCopy);
     } catch {
       const ta = document.createElement("textarea");
-      ta.value = code;
+      ta.value = toCopy;
       document.body.appendChild(ta);
       ta.select();
       document.execCommand("copy");
@@ -48,11 +52,9 @@ export default function ConvidarAmigos() {
     setTimeout(() => setCopied(false), 2500);
   };
 
-  const shareText = `Junta-te ao WinMoz e ganha bónus! Usa o meu código: ${code} — https://winmoz.app`;
-
   const handleShare = async () => {
     if (navigator.share) {
-      try { await navigator.share({ title: "WinMoz — Convite", text: shareText }); } catch {}
+      try { await navigator.share({ title: "MozBet — Convite", text: shareText, url: shareLink }); } catch {}
     } else {
       handleCopy();
     }
