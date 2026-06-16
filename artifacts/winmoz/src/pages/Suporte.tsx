@@ -75,14 +75,14 @@ async function saveMsgToSupabase(
   sender: "user" | "admin" | "ai",
   content: string
 ) {
-  try {
-    await supabase.from("support_messages").insert({
-      user_id:   userId,
-      user_name: userName,
-      sender,
-      content,
-    });
-  } catch {
+  const { error } = await supabase.from("support_messages").insert({
+    user_id:   userId,
+    user_name: userName,
+    sender,
+    content,
+  });
+  if (error) {
+    console.error("[saveMsgToSupabase] Falha ao gravar mensagem:", error.message, error.code);
   }
 }
 

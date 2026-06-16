@@ -31,6 +31,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // Track last-message info and unread count (user messages after the last admin/ai reply)
   const convMap = new Map<string, {
     userId: string;
     userName: string;
@@ -39,6 +40,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     unreadCount: number;
     lastSender: string;
   }>();
+
+  // Find when each conversation last had an admin/ai reply (most recent, data is DESC)
+  const lastAdminReplyTime = new Map<string, string>();
+  (data ?? []).forEach((m: Record<string, unknown>) => {
+    const uid = m.user_id as string;
+    if ((m.sender === "admin" || m.sender === "ai") && !lastAdminReplyTime.has(uid)) {
+      lastAdminReplyTime.set(uid, m.created_at as string);
+    }
+  });
 
   (data ?? []).forEach((m: Record<string, unknown>) => {
     const uid = m.user_id as string;
@@ -52,10 +62,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         lastSender:      (m.sender as string) ?? "user",
       });
     }
+    // Count as unread only user messages that arrived after the last admin/ai reply
     if (m.sender === "user") {
-      const conv = convMap.get(uid)!;
-      conv.unreadCount++;
-      convMap.set(uid, conv);
+      const lastReply = lastAdminReplyTime.get(uid);
+      const isUnread = !lastReply || new Date(m.created_at as string) > new Date(lastReply);
+      if (isUnread) {
+        const conv = convMap.get(uid)!;
+        conv.unreadCount++;
+        convMap.set(uid, conv);
+      }
     }
   });
 
