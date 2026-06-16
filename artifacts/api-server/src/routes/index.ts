@@ -148,8 +148,85 @@ router.post("/complete-registration", async (req, res) => {
       return;
     }
 
-    res.json({ success: true, user_id, full_name, phone, invite_code_used });
+    const supabaseUrl     = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "";
+    const supabaseService = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"] ?? "";
+
+    if (!supabaseUrl || !supabaseService) {
+      // Env vars missing — still respond ok so OTP flow isn't blocked, but log the issue
+      console.error("[complete-registration] Missing Supabase env vars — profile not updated");
+      res.json({ success: true, warning: "env_missing" });
+      return;
+    }
+
+    const admin = buildAdminClient(supabaseUrl, supabaseService);
+
+    /* ── 1. Generate a unique invite code for this user (if they don't already have one) ── */
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars (0,O,1,I)
+    const makeCode = () => Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+
+    // Check if user already has a code
+    const { data: existing } = await admin
+      .from("profiles")
+      .select("my_invite_code")
+      .eq("id", user_id)
+      .single();
+
+    let myCode = existing?.my_invite_code as string | null | undefined;
+    if (!myCode) {
+      // Generate one that doesn't clash
+      let attempts = 0;
+      do {
+        myCode = makeCode();
+        const { data: clash } = await admin.from("profiles").select("id").eq("my_invite_code", myCode).maybeSingle();
+        if (!clash) break;
+        attempts++;
+      } while (attempts < 10);
+    }
+
+    /* ── 2. Update the user profile ── */
+    const profileUpdate: Record<string, unknown> = { my_invite_code: myCode };
+    if (full_name)        profileUpdate.full_name        = full_name;
+    if (phone)            profileUpdate.phone             = phone;
+    if (invite_code_used) profileUpdate.invite_code_used = invite_code_used.toUpperCase().trim();
+
+    const { error: profileErr } = await admin
+      .from("profiles")
+      .update(profileUpdate)
+      .eq("id", user_id);
+
+    if (profileErr) {
+      console.error("[complete-registration] profile update error:", profileErr.message);
+    }
+
+    /* ── 3. Record referral if an invite code was used ── */
+    if (invite_code_used && invite_code_used.trim().length >= 4) {
+      const code = invite_code_used.toUpperCase().trim();
+
+      // Find the referrer by their invite code
+      const { data: referrerProfile } = await admin
+        .from("profiles")
+        .select("id, is_affiliate")
+        .eq("my_invite_code", code)
+        .maybeSingle();
+
+      if (referrerProfile && referrerProfile.id !== user_id) {
+        // Insert referral record — ON CONFLICT DO NOTHING so no duplicates
+        const { error: refErr } = await admin.from("referrals").insert({
+          referrer_id: referrerProfile.id,
+          referred_id: user_id,
+        });
+
+        if (refErr && !refErr.message.includes("duplicate") && !refErr.message.includes("unique")) {
+          console.error("[complete-registration] referral insert error:", refErr.message);
+        } else {
+          console.log(`[complete-registration] referral recorded: ${referrerProfile.id} → ${user_id}`);
+        }
+      }
+    }
+
+    res.json({ success: true, user_id, my_invite_code: myCode });
   } catch (err) {
+    console.error("[complete-registration] unexpected error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
