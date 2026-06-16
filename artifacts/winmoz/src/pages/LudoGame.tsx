@@ -1400,10 +1400,35 @@ export default function LudoGame() {
     const mover: GamePiece = baseMover ? {...baseMover, pos: finalPos} : {id:pieceId, player:currentTurn, pos:finalPos};
     const captured = captureAtPos(mover);
     // Build updated snapshot that includes this piece at its new position
-    // (piecesRef.current may still be stale due to async state updates)
     const updatedPs = ps.map(p => p.id===pieceId ? mover : p);
+
+    // Compute authoritative final state with captures resolved (for broadcast)
+    const [mr,mc]=getPieceCoord(mover);
+    const captureKey=`${mr},${mc}`;
+    const authPieces:GamePiece[]=captured?updatedPs.map(p=>{
+      if(p.player!==currentTurn&&p.pos>=0&&p.pos<=50&&!SAFE_COORDS.has(captureKey)){
+        const[pr,pc]=getPieceCoord(p);
+        if(pr===mr&&pc===mc) return{...p,pos:-1};
+      }
+      return p;
+    }):updatedPs;
+
+    // Helper: broadcast authoritative state to opponent (only moving player sends this)
+    const broadcastSync=(syncTurn:Player,syncPhase:Phase,delay:number,syncWinner?:Player)=>{
+      if(isBot||currentTurn!==myColor||!channelRef.current) return;
+      setTimeout(()=>{
+        channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
+          pieces:authPieces, turn:syncTurn, phase:syncPhase,
+          diceBlue:null, diceGreen:null,
+          ...(syncWinner?{winner:syncWinner}:{}),
+        }});
+      },delay);
+    };
+
     if(finishedCount(updatedPs,currentTurn)===4){
-      setWinner(currentTurn); setPhase("done"); return;
+      setWinner(currentTurn); setPhase("done");
+      broadcastSync(currentTurn,"done",100,currentTurn);
+      return;
     }
     const enteredHome = mover.pos>=56 && prevPos<56;
     if(enteredHome) playVictoryChime();
@@ -1415,23 +1440,21 @@ export default function LudoGame() {
       setMovable([]);
       // Keep consecutiveSixes for this extra turn (don't reset, it accumulates)
       setTimeout(()=>{setPhase("roll");if(currentTurn==="blue")setDiceBlue(null);else setDiceGreen(null);},400);
+      broadcastSync(currentTurn,"roll",500);
     } else {
       const next=other(currentTurn);
-      // Update stuckTurns: if the current player had all pieces in base and rolled but didn't get 6
-      // we track it; if they successfully moved, reset to 0
       const justMoved = prevPos !== mover.pos;
       if(justMoved){
-        // A piece successfully moved — reset stuck counter for this player
         setStuckTurns(prev=>({...prev,[currentTurn]:0}));
       }
       setMovable([]);
-      // Reset consecutiveSixes when turn changes
       consecutiveSixesRef.current=0;
       setTimeout(()=>{
         setTurn(next); setPhase("roll");
         if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
         setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
       },500);
+      broadcastSync(next,"roll",600);
     }
   }
 
@@ -1457,6 +1480,32 @@ export default function LudoGame() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[playerName,opponentName,myColor]);
+
+  // ── Opponent animation only (no handleMoveComplete — state comes via ludo_state_sync) ──
+  function doOpponentMove(pid:PieceId,diceVal:number,_pl:Player,ps:GamePiece[]){
+    setMovable([]); setPhase("moving");
+    const piece=ps.find(p=>p.id===pid);
+    if(!piece) return;
+    const prevPos=piece.pos;
+    const plName=opponentName;
+    if(piece.pos===-1){
+      setMsg(`${plName} coloca peça no tabuleiro!`);
+      movePieceSteps(pid,-1,1,true,()=>{});
+    } else {
+      const willLandOnArrow=piece.pos+diceVal===50;
+      const inStretch=piece.pos>=51;
+      let effectiveSteps=diceVal;
+      if(willLandOnArrow) effectiveSteps=diceVal+1;
+      if(inStretch) effectiveSteps=Math.min(diceVal,56-piece.pos);
+      setMsg(`${plName} move ${diceVal} ${diceVal===1?"casa":"casas"}!`);
+      const finalPos=prevPos+effectiveSteps;
+      movePieceSteps(pid,piece.pos,effectiveSteps,false,()=>{
+        // Run capture animation cosmetically — authoritative state arrives via ludo_state_sync
+        const moved=piecesRef.current.find(p=>p.id===pid);
+        if(moved) captureAtPos({...moved,pos:finalPos});
+      });
+    }
+  }
 
   // ── Apply a dice roll locally (no broadcast) ────────────────────────────────
   const applyRoll=useCallback((pl:Player,val:number)=>{
@@ -1498,7 +1547,17 @@ export default function LudoGame() {
         },1300);
       } else if(mv.length===1){
         setMsg(`${plName} tirou ${val}!`);
-        doSelectPiece(mv[0],val,pl,piecesRef.current);
+        if(pl===myColor){
+          // Auto-move: broadcast piece_selected so opponent can animate
+          channelRef.current?.send({type:"broadcast",event:"piece_selected",
+            payload:{pieceId:mv[0],diceVal:val,player:pl,seq:Date.now()}});
+          doSelectPiece(mv[0],val,pl,piecesRef.current);
+        } else if(isBot){
+          // Bot opponent: move directly (no channel)
+          doSelectPiece(mv[0],val,pl,piecesRef.current);
+        }
+        // else: multiplayer opponent — piece_selected broadcast will arrive shortly,
+        //       doOpponentMove handles animation + ludo_state_sync sets final state
       } else {
         setMovable(mv); setPhase("select");
         setMsg(`${plName} — ${val}! ${pl===myColor?"Escolhe uma peça.":""}`);
@@ -1691,7 +1750,8 @@ export default function LudoGame() {
       const diceVal = payload.diceVal as number;
       if(!/^[BG][0-3]$/.test(pieceId)) return;
       if(typeof diceVal !== "number" || diceVal < 1 || diceVal > 6 || !Number.isInteger(diceVal)) return;
-      doSelectPiece(
+      // Use doOpponentMove (animation only) — final state comes via ludo_state_sync
+      doOpponentMove(
         pieceId as PieceId,
         diceVal,
         payload.player as Player,
@@ -1724,6 +1784,32 @@ export default function LudoGame() {
       setDiceBlue(p.diceBlue); setDiceGreen(p.diceGreen);
       piecesRef.current=p.pieces; turnRef.current=p.turn; phaseRef.current=p.phase;
       diceBlueRef.current=p.diceBlue; diceGreenRef.current=p.diceGreen;
+    });
+
+    // ── Authoritative state sync — sent by the moving player after every move ──
+    channel.on("broadcast",{ event:"ludo_state_sync" },({ payload })=>{
+      if(phaseRef.current==="done") return;
+      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;winner?:Player};
+      // Delay slightly so ongoing capture animation can finish before state is overwritten
+      setTimeout(()=>{
+        setPieces(p.pieces);
+        setTurn(p.turn);
+        setPhase(p.phase);
+        setDiceBlue(p.diceBlue??null);
+        setDiceGreen(p.diceGreen??null);
+        piecesRef.current=p.pieces;
+        turnRef.current=p.turn;
+        phaseRef.current=p.phase;
+        diceBlueRef.current=p.diceBlue??null;
+        diceGreenRef.current=p.diceGreen??null;
+        if(p.winner){
+          setWinner(p.winner);
+          winnerRef.current=p.winner;
+          phaseRef.current="done";
+        } else if(p.phase==="roll"){
+          setMsg(p.turn===myColor ? myTurnMsg : oppTurnMsg);
+        }
+      },200);
     });
 
     channel.on("broadcast",{ event:"rematch_request" },({ payload })=>{
