@@ -132,8 +132,10 @@ const TRACK: [number,number][] = [
   [14,7],[14,6],
 ];
 // Home stretches — entered AFTER the arrow cell (pos 50)
-const BLUE_STRETCH:  [number,number][] = [[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]];
-const GREEN_STRETCH: [number,number][] = [[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]];
+// 5 cells only: [8,7] (blue) and [6,7] (green) sit inside the center 3×3 triangle
+// region and must NOT be resting squares — center is pos 56 = [7,7]
+const BLUE_STRETCH:  [number,number][] = [[13,7],[12,7],[11,7],[10,7],[9,7]];
+const GREEN_STRETCH: [number,number][] = [[1,7],[2,7],[3,7],[4,7],[5,7]];
 
 const PLAYER_START: Record<Player,number> = { blue:0, green:26 };
 const HOME_SLOTS: Record<Player,[number,number][]> = {
@@ -165,8 +167,8 @@ const PAWN_SIZE  = 16;  // px — single-piece size (height ≈ 22px, fits in 27
 function getPieceCoord(p: GamePiece): [number,number] {
   if (p.pos === -1)  return HOME_SLOTS[p.player][parseInt(p.id[1])];
   if (p.pos <= 50)   return TRACK[(PLAYER_START[p.player] + p.pos) % 52];
-  if (p.pos <= 56)   return (p.player==="blue" ? BLUE_STRETCH : GREEN_STRETCH)[p.pos - 51];
-  return [7,7]; // pos 57 = finished (center)
+  if (p.pos <= 55)   return (p.player==="blue" ? BLUE_STRETCH : GREEN_STRETCH)[p.pos - 51];
+  return [7,7]; // pos 56+ = finished (center triangle)
 }
 
 // ─── Colors ─────────────────────────────────────────────────────────────────────
@@ -452,15 +454,15 @@ function Board({ pieces, movable, onSelectPiece }:{
   // Build cell map for stacking offsets (exclude home base and finished)
   const cellMap = new Map<string,GamePiece[]>();
   pieces.forEach(p=>{
-    if(p.pos===-1||p.pos===57) return;
+    if(p.pos===-1||p.pos>=56) return;
     const [r,c]=getPieceCoord(p);
     const k=`${r},${c}`;
     cellMap.set(k,[...(cellMap.get(k)||[]),p]);
   });
 
   // Finished pieces rendered in center triangles
-  const blueFinished  = pieces.filter(p=>p.pos===57&&p.player==="blue");
-  const greenFinished = pieces.filter(p=>p.pos===57&&p.player==="green");
+  const blueFinished  = pieces.filter(p=>p.pos>=56&&p.player==="blue");
+  const greenFinished = pieces.filter(p=>p.pos>=56&&p.player==="green");
 
   function renderFinished(arr:GamePiece[], cxSvg:number, cySvg:number) {
     if(!arr.length) return null;
@@ -500,7 +502,7 @@ function Board({ pieces, movable, onSelectPiece }:{
         const color: PawnColor = p.player==="blue" ? "blue" : "green";
 
         // Finished pieces rendered separately below
-        if(p.pos===57) return null;
+        if(p.pos>=56) return null;
 
         // Home pieces: render at SVG slot coordinates
         if(p.pos===-1){
@@ -1334,16 +1336,16 @@ export default function LudoGame() {
 
   function calcMovable(ps:GamePiece[],pl:Player,d:number):PieceId[] {
     return ps.filter(p=>p.player===pl).filter(p=>{
-      if(p.pos===57) return false;
+      if(p.pos>=56) return false; // pos 56 = center (finished)
       if(p.pos===-1) return d===6;
-      // In the home stretch (pos 51-56), piece must land exactly on or before 57 — no overshooting
-      if(p.pos>=51) return p.pos+d<=57;
-      return p.pos+d<=57;
+      // In the home stretch (pos 51-55), piece must land exactly on center (56) — no overshooting
+      if(p.pos>=51) return p.pos+d<=56;
+      return p.pos+d<=56;
     }).map(p=>p.id) as PieceId[];
   }
 
   function finishedCount(ps:GamePiece[],pl:Player):number {
-    return ps.filter(p=>p.player===pl&&p.pos===57).length;
+    return ps.filter(p=>p.player===pl&&p.pos>=56).length;
   }
 
   function movePieceSteps(id:PieceId,curPos:number,steps:number,isExit:boolean,onDone:()=>void){
@@ -1403,7 +1405,7 @@ export default function LudoGame() {
     if(finishedCount(updatedPs,currentTurn)===4){
       setWinner(currentTurn); setPhase("done"); return;
     }
-    const enteredHome = mover.pos===57 && prevPos<57;
+    const enteredHome = mover.pos>=56 && prevPos<56;
     if(enteredHome) playVictoryChime();
     const extraTurn = diceVal===6 || captured || enteredHome;
     if(extraTurn){
@@ -1445,11 +1447,11 @@ export default function LudoGame() {
     } else {
       // Auto-enter stretch: if piece would land exactly on arrow cell (pos 50), push it to pos 51
       const willLandOnArrow = piece.pos + diceVal === 50;
-      // Stretch overshoot: pieces at pos 51-56 cap their move at 57
+      // Stretch: pieces at pos 51-55 cap their move at 56 (center)
       const inStretch = piece.pos >= 51;
       let effectiveSteps = diceVal;
       if (willLandOnArrow) effectiveSteps = diceVal + 1;
-      if (inStretch) effectiveSteps = Math.min(diceVal, 57 - piece.pos);
+      if (inStretch) effectiveSteps = Math.min(diceVal, 56 - piece.pos);
       setMsg(`${plName} move ${diceVal} ${diceVal===1?"casa":"casas"}!`);
       movePieceSteps(pid,piece.pos,effectiveSteps,false,()=>handleMoveComplete(pid,effectiveSteps,pl,prevPos));
     }
@@ -1596,7 +1598,7 @@ export default function LudoGame() {
       const newPos=piece.pos===-1?0:piece.pos+diceVal;
       let score=0;
       // Finish: highest priority
-      if(newPos===57){score+=3000;}
+      if(newPos>=56){score+=3000;}
       // Exit from base
       else if(piece.pos===-1){score+=600;}
       else{
