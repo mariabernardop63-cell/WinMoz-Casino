@@ -119,7 +119,7 @@ export default function AffiliatesPage() {
   const [users, setUsers]       = useState<UserRow[]>([]);
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState("");
-  const [tab, setTab]           = useState<"affiliates" | "all">("affiliates");
+  const [tab, setTab]           = useState<"affiliates" | "all">("all");
   const [toggling, setToggling] = useState<string | null>(null);
   const [toast, setToast]       = useState<{ msg: string; ok: boolean } | null>(null);
   const [stats, setStats]       = useState({ total: 0, pending: 0, totalReferrals: 0 });
@@ -133,19 +133,36 @@ export default function AffiliatesPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      /* FIX: use let so we can reassign after .eq() */
-      let query = adminSupabase
-        .from("profiles")
-        .select(
-          "id, full_name, phone, my_invite_code, is_affiliate, " +
-          "affiliate_pending_earnings, affiliate_milestone_500_claimed, " +
-          "affiliate_milestone_2000_claimed"
-        )
-        .order("full_name", { ascending: true });
+      /*
+       * Strategy: try the full SELECT first (all affiliate columns).
+       * If it fails (columns not yet created in Supabase), fall back
+       * to the minimal SELECT that we know always works.
+       */
+      const FULL_SELECT =
+        "id, full_name, phone, my_invite_code, is_affiliate, " +
+        "affiliate_pending_earnings, affiliate_milestone_500_claimed, " +
+        "affiliate_milestone_2000_claimed";
+      const BASE_SELECT = "id, full_name, phone, my_invite_code, is_affiliate";
 
-      if (tab === "affiliates") query = query.eq("is_affiliate", true);
+      /* Build query — use let so we can chain .eq() and reassign */
+      const buildQuery = (select: string) => {
+        let q = adminSupabase
+          .from("profiles")
+          .select(select)
+          .order("full_name", { ascending: true });
+        if (tab === "affiliates") q = q.eq("is_affiliate", true);
+        return q;
+      };
 
-      const { data: profilesData, error: profilesError } = await query;
+      let { data: profilesData, error: profilesError } = await buildQuery(FULL_SELECT);
+
+      /* If full SELECT failed (missing columns), retry with base columns */
+      if (profilesError) {
+        console.warn("[affiliates] full SELECT failed, retrying with base columns:", profilesError.message);
+        const fallback = await buildQuery(BASE_SELECT);
+        profilesData  = fallback.data;
+        profilesError = fallback.error;
+      }
 
       if (profilesError) {
         console.error("[affiliates] profiles query error:", profilesError);
