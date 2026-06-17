@@ -73,6 +73,10 @@ function mapTxIcon(dbType: string): { icon: TxIcon; color: string } {
   return { icon: CreditCard, color: "#94a3b8" };
 }
 
+function stripBotMarkers(s: string): string {
+  return s.replace(/\s*\[bot\]\s*/gi, " ").replace(/\s*\[bot-fim\]\s*/gi, "").trim();
+}
+
 function parseTxDescription(raw: string | null, type: string): string {
   if (!raw) return mapTxType(type);
   try {
@@ -81,7 +85,7 @@ function parseTxDescription(raw: string | null, type: string): string {
     if (p.mode === "bet")     return "Aposta via Carteira Móvel";
     if (p.confirmationMsg)   return mapTxType(type) + " manual";
   } catch { /* not JSON — use raw text */ }
-  return raw;
+  return stripBotMarkers(raw);
 }
 
 const FERRAMENTAS_BASE = [

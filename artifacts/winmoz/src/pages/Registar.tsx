@@ -3,7 +3,6 @@ import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, X, ArrowLeft, ShieldCheck, Loader2, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { API_BASE } from "@/lib/apiBase";
 
 function WinMozLogo() {
   return (
@@ -61,15 +60,23 @@ export default function Registar() {
   const [inviteStatus, setInviteStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
   const inviteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const checkInviteCode = async (code: string) => {
-    if (!code) { setInviteStatus("idle"); return; }
+  // Returns true=valid, false=invalid, null=unknown (allow through)
+  const checkInviteCode = async (code: string): Promise<boolean | null> => {
+    if (!code) { setInviteStatus("idle"); return null; }
     setInviteStatus("checking");
     try {
-      const res = await fetch(`${API_BASE}/validate-invite?code=${encodeURIComponent(code)}`);
-      const data = await res.json() as { valid: boolean };
-      setInviteStatus(data.valid ? "valid" : "invalid");
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("my_invite_code", code.toUpperCase())
+        .maybeSingle();
+      if (error) { setInviteStatus("idle"); return null; } // DB error → allow through
+      const isValid = !!data;
+      setInviteStatus(isValid ? "valid" : "invalid");
+      return isValid;
     } catch {
-      setInviteStatus("idle"); // network error — allow through silently
+      setInviteStatus("idle");
+      return null; // unexpected error → allow through
     }
   };
 
@@ -119,15 +126,21 @@ export default function Registar() {
           errs.invite = "Formato inválido";
         } else if (inviteStatus === "invalid") {
           errs.invite = "Código de convite inválido ou inexistente";
-        } else if (inviteStatus === "checking") {
-          // Wait for check to finish — re-trigger inline
+        } else if (inviteStatus === "checking" || inviteStatus === "idle") {
+          // Not yet verified — check inline right now
+          if (inviteTimerRef.current) { clearTimeout(inviteTimerRef.current); inviteTimerRef.current = null; }
           setLoading(true);
-          await checkInviteCode(invite);
+          const result = await checkInviteCode(invite);
           setLoading(false);
-          // The state update from checkInviteCode is async; re-run goNext on next tick
-          setTimeout(() => goNext(), 50);
+          if (result === false) {
+            setErrors({ invite: "Código de convite inválido ou inexistente" });
+            return;
+          }
+          // result === true (valid) or null (DB/network error → allow through)
+          setDir(1); setStep(3); setErrors({});
           return;
         }
+        // inviteStatus === "valid" → falls through to proceed below
       }
       if (Object.keys(errs).length) { setErrors(errs); return; }
       setDir(1); setStep(3); setErrors({});
@@ -260,11 +273,14 @@ export default function Registar() {
                         const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
                         setInvite(v);
                         clearError("invite");
-                        setInviteStatus(v ? "checking" : "idle");
-                        if (inviteTimerRef.current) clearTimeout(inviteTimerRef.current);
-                        if (v.length >= 4) {
-                          inviteTimerRef.current = setTimeout(() => checkInviteCode(v), 600);
-                        } else if (!v) {
+                        if (inviteTimerRef.current) { clearTimeout(inviteTimerRef.current); inviteTimerRef.current = null; }
+                        if (!v) {
+                          setInviteStatus("idle");
+                        } else if (v.length >= 4) {
+                          setInviteStatus("checking");
+                          inviteTimerRef.current = setTimeout(() => checkInviteCode(v), 700);
+                        } else {
+                          // < 4 chars — too short, don't query yet
                           setInviteStatus("idle");
                         }
                       }}

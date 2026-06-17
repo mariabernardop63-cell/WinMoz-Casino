@@ -88,10 +88,15 @@ export default function Extratos() {
         const mapped: Tx[] = data.map((t: any) => {
           const displayType = mapType(t.type);
           const rawDate = new Date(t.created_at);
+          const rawDesc: string = t.description || "";
+          const cleanDesc = rawDesc
+            .replace(/\s*\[bot\]\s*/gi, " ")
+            .replace(/\s*\[bot-fim\]\s*/gi, "")
+            .trim();
           return {
             id: t.id.slice(0, 8).toUpperCase(),
             type: displayType,
-            name: t.description || displayType,
+            name: cleanDesc || displayType,
             date: rawDate.toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" }),
             rawDate,
             amount: Math.abs(parseFloat(t.amount)),

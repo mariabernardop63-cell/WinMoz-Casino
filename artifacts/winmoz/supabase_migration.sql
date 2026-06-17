@@ -84,3 +84,100 @@ BEGIN
     $policy$;
   END IF;
 END $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6. TABELA REFERRALS — sistema de convites e afiliados
+--    Corre este bloco no Supabase SQL Editor para ativar o sistema de referidos.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.referrals (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  referrer_id UUID        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  referred_id UUID        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(referred_id)  -- each user can only be referred once
+);
+
+CREATE INDEX IF NOT EXISTS referrals_referrer_id_idx ON public.referrals (referrer_id);
+CREATE INDEX IF NOT EXISTS referrals_referred_id_idx ON public.referrals (referred_id);
+
+-- Ativar RLS
+ALTER TABLE public.referrals ENABLE ROW LEVEL SECURITY;
+
+-- Política: cada utilizador autenticado pode ver os referidos onde É o referrer
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'referrals' AND policyname = 'referrer can view own referrals'
+  ) THEN
+    EXECUTE $policy$
+      CREATE POLICY "referrer can view own referrals"
+      ON public.referrals FOR SELECT
+      TO authenticated
+      USING (referrer_id = auth.uid())
+    $policy$;
+  END IF;
+END $$;
+
+-- Política: o service_role pode inserir referrals (via complete-registration)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'referrals' AND policyname = 'service role can insert referrals'
+  ) THEN
+    EXECUTE $policy$
+      CREATE POLICY "service role can insert referrals"
+      ON public.referrals FOR INSERT
+      TO authenticated
+      WITH CHECK (true)
+    $policy$;
+  END IF;
+END $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7. TABELA AFFILIATE_BETS — apostas contabilizadas por afiliado
+--    Necessária para o Programa de Afiliados Oficial.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS public.affiliate_bets (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  affiliate_id UUID        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  referred_id  UUID        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  bet_count    INTEGER     DEFAULT 0,
+  updated_at   TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(affiliate_id, referred_id)
+);
+
+ALTER TABLE public.affiliate_bets ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'affiliate_bets' AND policyname = 'affiliate can view own bets'
+  ) THEN
+    EXECUTE $policy$
+      CREATE POLICY "affiliate can view own bets"
+      ON public.affiliate_bets FOR SELECT
+      TO authenticated
+      USING (affiliate_id = auth.uid())
+    $policy$;
+  END IF;
+END $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 8. Permitir leitura pública de my_invite_code para validação no sign-up
+--    (preciso apenas de saber se um código existe — não expõe dados sensíveis)
+-- ─────────────────────────────────────────────────────────────────────────────
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE tablename = 'profiles' AND policyname = 'public can lookup invite codes'
+  ) THEN
+    EXECUTE $policy$
+      CREATE POLICY "public can lookup invite codes"
+      ON public.profiles FOR SELECT
+      TO anon
+      USING (my_invite_code IS NOT NULL)
+    $policy$;
+  END IF;
+END $$;
