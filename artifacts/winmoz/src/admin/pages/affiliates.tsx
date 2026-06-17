@@ -17,7 +17,7 @@ function fmtMZN(val: number) {
   return `MT ${Number(val.toFixed(2)).toLocaleString("pt-PT")}`;
 }
 
-/* ─── Avatar (real photo first, DiceBear fallback) ─── */
+/* ─── Avatar (real photo first, initials fallback) ─── */
 function Avatar({ seed, avatarUrl, size = 32 }: { seed: string; avatarUrl?: string | null; size?: number }) {
   if (avatarUrl) {
     return (
@@ -31,17 +31,27 @@ function Avatar({ seed, avatarUrl, size = 32 }: { seed: string; avatarUrl?: stri
       />
     );
   }
-  const palette = ["6C5CE7", "7c3aed", "4f46e5", "0ea5e9", "10b981", "f59e0b", "ec4899"];
-  const color = palette[seed.charCodeAt(0) % palette.length];
+  const palette = ["#6C5CE7", "#7c3aed", "#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899"];
+  const bg = palette[seed.charCodeAt(0) % palette.length];
+  const initials = seed
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0].toUpperCase())
+    .join("") || seed.slice(0, 2).toUpperCase();
   return (
-    <img
-      src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${encodeURIComponent(seed)}&backgroundColor=${color}`}
-      alt={seed}
+    <div
+      aria-label={seed}
       style={{
         width: size, height: size, borderRadius: "50%", flexShrink: 0,
-        background: "white", border: "1.5px solid rgba(108,92,231,.14)",
+        background: bg, border: "1.5px solid rgba(108,92,231,.14)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: Math.round(size * 0.38), fontWeight: 700, color: "#fff",
+        lineHeight: 1, userSelect: "none",
       }}
-    />
+    >
+      {initials}
+    </div>
   );
 }
 

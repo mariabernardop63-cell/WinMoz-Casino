@@ -983,6 +983,8 @@ export default function ChessGame(){
   const[winReason,setWinReason]=useState("");
   const[promotionPending,setPromotionPending]=useState<{from:Sq;to:Sq}|null>(null);
   const[timers,setTimers]=useState<Record<PColor,number>>({w:600,b:600});
+  const timerTurnStartRef  = useRef<number>(Date.now());
+  const timerTurnValueRef  = useRef<number>(600);
 
   // Refs for realtime callbacks
   const boardRef=useRef(board);const turnRef=useRef(turn);
@@ -997,7 +999,12 @@ export default function ChessGame(){
   const opponentBal=isBot&&botBal?`${botBal} MT`:"—";
 
   useEffect(()=>{boardRef.current=board;},[board]);
-  useEffect(()=>{turnRef.current=turn;},[turn]);
+  useEffect(()=>{
+    turnRef.current=turn;
+    timerTurnStartRef.current = Date.now();
+    timerTurnValueRef.current = timers[turn];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[turn]);
   useEffect(()=>{epRef.current=ep;},[ep]);
   useEffect(()=>{statusRef.current=status;},[status]);
 
@@ -1107,23 +1114,36 @@ export default function ChessGame(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[winner]);
 
-  // ── Timer countdown ───────────────────────────────────────────────────────────
+  // ── Timer countdown (wall-clock based — stays accurate in background tabs) ──
   useEffect(()=>{
     if(status!=="playing"&&status!=="check")return;
-    // Timer counts for both player and bot — bot must also finish within time limit
+    timerTurnStartRef.current = Date.now();
+    timerTurnValueRef.current = timers[turn];
+    let firedExpiry = false;
+    const fireExpiry = () => {
+      if(firedExpiry) return;
+      firedExpiry = true;
+      setWinner(turn==="w"?"b":"w");
+      setWinReason("Tempo esgotado!");
+      setStatus("checkmate");
+      clearInterval(tick);
+    };
     const tick=setInterval(()=>{
-      setTimers(prev=>{
-        const nb={...prev,[turn]:prev[turn]-1};
-        if(nb[turn]<=0){
-          setWinner(turn==="w"?"b":"w");
-          setWinReason("Tempo esgotado!");
-          setStatus("checkmate");
-          clearInterval(tick);
-        }
-        return nb;
-      });
-    },1000);
-    return()=>clearInterval(tick);
+      const elapsed = Math.floor((Date.now() - timerTurnStartRef.current) / 1000);
+      const newTime = Math.max(0, timerTurnValueRef.current - elapsed);
+      setTimers(prev=>prev[turn]===newTime?prev:{...prev,[turn]:newTime});
+      if(newTime<=0){ fireExpiry(); }
+    },500);
+    const onVisible = () => {
+      if(document.visibilityState!=="visible") return;
+      const elapsed = Math.floor((Date.now() - timerTurnStartRef.current) / 1000);
+      const newTime = Math.max(0, timerTurnValueRef.current - elapsed);
+      setTimers(prev=>({...prev,[turn]:newTime}));
+      if(newTime<=0){ fireExpiry(); }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return()=>{ clearInterval(tick); document.removeEventListener("visibilitychange", onVisible); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[turn,status,isBot]);
 
   // ── Check king square ─────────────────────────────────────────────────────────

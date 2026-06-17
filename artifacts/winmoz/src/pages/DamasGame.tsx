@@ -771,6 +771,8 @@ export default function DamasGame() {
   const winCreditedRef = useRef(false);
   const lastMoveTimeRef = useRef<number>(0); // rate limit: min 200ms between moves
   const [opponentBal, setOpponentBal] = useState(isBot && botBal ? `${botBal} MT` : "—");
+  const oppTimerRecvAtRef  = useRef<number>(0);
+  const oppTimerRecvValRef = useRef<number>(30);
   const [botThinking, setBotThinking] = useState(false);
   const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
   const [kingsOnlyCount, setKingsOnlyCount] = useState(0);
@@ -1024,25 +1026,35 @@ export default function DamasGame() {
   };
 
   // ── Timers ────────────────────────────────────────────────────────────────
-  // My turn timer
+  // My turn timer (wall-clock based + visibilitychange catch-up)
   useEffect(() => {
     if (winner || turn !== myColor || chainPiece) return;
-    // Broadcast timer reset to opponent
     channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:30 } });
     const timerStart = Date.now();
+    let firedExpiry = false;
+    const fireExpiry = () => {
+      if (firedExpiry) return;
+      firedExpiry = true;
+      clearInterval(tick);
+      channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:0 } });
+      setTimeout(() => timerExpiryRef.current(), 0);
+    };
     const tick = setInterval(() => {
       const elapsed = Math.floor((Date.now() - timerStart) / 1000);
       const nv = Math.max(0, 30 - elapsed);
       setTimers(prev => ({ ...prev, [myColor]: nv }));
-      if (nv <= 0) {
-        clearInterval(tick);
-        channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:0 } });
-        setTimeout(() => timerExpiryRef.current(), 0);
-        return;
-      }
+      if (nv <= 0) { fireExpiry(); return; }
       channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:nv } });
     }, 500);
-    return () => clearInterval(tick);
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+      const nv = Math.max(0, 30 - elapsed);
+      setTimers(prev => ({ ...prev, [myColor]: nv }));
+      if (nv <= 0) fireExpiry();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { clearInterval(tick); document.removeEventListener("visibilitychange", onVisible); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turn, winner, chainPiece]);
 
@@ -1062,6 +1074,20 @@ export default function DamasGame() {
     return () => clearInterval(tick);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turn, winner, isBot]);
+
+  // ── Local countdown for opponent timer (ticks locally so display never freezes) ──
+  useEffect(() => {
+    if (winner || isBot || gameId === "local" || turn === myColor) return;
+    oppTimerRecvAtRef.current  = Date.now();
+    oppTimerRecvValRef.current = 30;
+    const tick = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - oppTimerRecvAtRef.current) / 1000);
+      const t = Math.max(0, oppTimerRecvValRef.current - elapsed);
+      setTimers(prev => ({ ...prev, [oppColor]: t }));
+    }, 400);
+    return () => clearInterval(tick);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [turn, winner]);
 
   // ── Apply remote move ─────────────────────────────────────────────────────
   const applyRemoteMove = useCallback((from: Sq, to: Sq, captured: Sq[], nextTurn: PColor) => {
@@ -1123,6 +1149,8 @@ export default function DamasGame() {
         const t = payload.t as number;
         if (typeof t === "number" && t >= 0 && t <= 30) {
           setTimers(prev => ({ ...prev, [payload.player as string]: t }));
+          oppTimerRecvAtRef.current  = Date.now();
+          oppTimerRecvValRef.current = t;
         }
       }
     });

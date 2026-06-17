@@ -1195,6 +1195,8 @@ export default function LudoGame() {
 
   const [opponentBal, setOpponentBal] = useState(isBot && botBal ? `${botBal} MT` : "—");
   const [opponentTimeLeft, setOpponentTimeLeft] = useState(30);
+  const oppTimerRecvAtRef  = useRef<number>(0);
+  const oppTimerRecvValRef = useRef<number>(30);
   const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
   const [rematchRequester, setRematchRequester] = useState("");
 
@@ -1216,6 +1218,7 @@ export default function LudoGame() {
   const [movable,setMovable]       = useState<PieceId[]>([]);
   const [winner,setWinner]         = useState<Player|null>(null);
   const [lives,setLives]           = useState(_savedLudo?.lives ?? {blue:5,green:5});
+  const livesRef                   = useRef<{blue:number;green:number}>(_savedLudo?.lives ?? {blue:5,green:5});
   const [timeLeft,setTimeLeft]     = useState(30);
 
   // ── Dice algorithm state ────────────────────────────────────────────────────
@@ -1257,6 +1260,7 @@ export default function LudoGame() {
   useEffect(()=>{turnRef.current=turn;},[turn]);
   useEffect(()=>{winnerRef.current=winner;},[winner]);
   useEffect(()=>{stuckTurnsRef.current=stuckTurns;},[stuckTurns]);
+  useEffect(()=>{livesRef.current=lives;},[lives]);
 
   // Persist game state for reconnection
   useEffect(()=>{
@@ -1760,7 +1764,24 @@ export default function LudoGame() {
     });
 
     channel.on("broadcast",{ event:"ludo_timer" },({ payload })=>{
-      if((payload.player as string)!==myColor) setOpponentTimeLeft(payload.t as number);
+      if((payload.player as string)!==myColor){
+        const t = payload.t as number;
+        setOpponentTimeLeft(t);
+        oppTimerRecvAtRef.current  = Date.now();
+        oppTimerRecvValRef.current = t;
+      }
+    });
+
+    channel.on("broadcast",{ event:"ludo_lives_sync" },({ payload })=>{
+      const newLives = payload.lives as {blue:number;green:number};
+      if(!newLives||typeof newLives.blue!=="number"||typeof newLives.green!=="number") return;
+      setLives(newLives);
+      livesRef.current = newLives;
+      if(payload.gameOver){
+        setWinner(myColor);
+        setPhase("done");
+        setMsg(`${playerName.split(" ")[0]} venceu! ${opponentName} perdeu todas as vidas.`);
+      }
     });
 
     channel.on("broadcast",{ event:"ludo_forfeit" },()=>{
@@ -1907,23 +1928,42 @@ export default function LudoGame() {
   const autoPlayRef    = useRef<(()=>void)|null>(null);
   const timerStartRef  = useRef<number>(0);
   autoPlayRef.current  = () => {
-    setLives(l => {
-      const nb = l[myColor] - 1;
-      if (nb <= 0) {
-        setWinner(opponentColor); setPhase("done");
-        setMsg(`${opponentName} venceu! ${playerName.split(" ")[0]} perdeu todas as vidas.`);
-        return { ...l, [myColor]: 0 };
-      }
-      setMsg(`Tempo esgotado! ${playerName.split(" ")[0]} perde 1 vida (${nb} restante${nb===1?"":"s"}).`);
-      const cur = phaseRef.current;
-      const mv  = movableRef.current;
-      const dv  = myColor === "blue" ? diceBlueRef.current : diceGreenRef.current;
-      if (cur === "roll") setTimeout(() => doRoll(), 200);
-      else if (cur === "select" && mv.length > 0 && dv !== null)
-        setTimeout(() => doSelectPiece(mv[Math.floor(Math.random() * mv.length)], dv, myColor, piecesRef.current), 200);
-      return { ...l, [myColor]: nb };
-    });
+    const l    = livesRef.current;
+    const nb   = l[myColor] - 1;
+    const newLives = { ...l, [myColor]: Math.max(0, nb) };
+    setLives(newLives);
+    livesRef.current = newLives;
+    if (nb <= 0) {
+      setWinner(opponentColor); setPhase("done");
+      setMsg(`${opponentName} venceu! ${playerName.split(" ")[0]} perdeu todas as vidas.`);
+      if (!isBot) channelRef.current?.send({ type:"broadcast", event:"ludo_lives_sync",
+        payload:{ lives: newLives, gameOver: true } });
+      return;
+    }
+    setMsg(`Tempo esgotado! ${playerName.split(" ")[0]} perde 1 vida (${nb} restante${nb===1?"":"s"}).`);
+    if (!isBot) channelRef.current?.send({ type:"broadcast", event:"ludo_lives_sync",
+      payload:{ lives: newLives, gameOver: false } });
+    const cur = phaseRef.current;
+    const mv  = movableRef.current;
+    const dv  = myColor === "blue" ? diceBlueRef.current : diceGreenRef.current;
+    if (cur === "roll") setTimeout(() => doRoll(), 200);
+    else if (cur === "select" && mv.length > 0 && dv !== null)
+      setTimeout(() => doSelectPiece(mv[Math.floor(Math.random() * mv.length)], dv, myColor, piecesRef.current), 200);
   };
+
+  // ── Local countdown for opponent timer (keeps ticking even when their tab is throttled) ──
+  useEffect(()=>{
+    if(winner||isBot||gameId==="local"||turn===myColor) return;
+    oppTimerRecvAtRef.current  = Date.now();
+    oppTimerRecvValRef.current = 30;
+    const tick = setInterval(()=>{
+      const elapsed = Math.floor((Date.now() - oppTimerRecvAtRef.current) / 1000);
+      const t = Math.max(0, oppTimerRecvValRef.current - elapsed);
+      setOpponentTimeLeft(t);
+    }, 400);
+    return ()=>clearInterval(tick);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[turn, winner]);
 
   useEffect(() => {
     setTimeLeft(30);
