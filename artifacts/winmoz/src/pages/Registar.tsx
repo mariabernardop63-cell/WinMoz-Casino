@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, X, ArrowLeft, ShieldCheck, Loader2 } from "lucide-react";
+import { Eye, EyeOff, X, ArrowLeft, ShieldCheck, Loader2, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { API_BASE } from "@/lib/apiBase";
 
 function WinMozLogo() {
   return (
@@ -57,6 +58,21 @@ export default function Registar() {
   const [loading, setLoading] = useState(false);
   const [generalError, setGeneralError] = useState("");
 
+  const [inviteStatus, setInviteStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
+  const inviteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const checkInviteCode = async (code: string) => {
+    if (!code) { setInviteStatus("idle"); return; }
+    setInviteStatus("checking");
+    try {
+      const res = await fetch(`${API_BASE}/validate-invite?code=${encodeURIComponent(code)}`);
+      const data = await res.json() as { valid: boolean };
+      setInviteStatus(data.valid ? "valid" : "invalid");
+    } catch {
+      setInviteStatus("idle"); // network error — allow through silently
+    }
+  };
+
   const inputStyle = (field: string): React.CSSProperties => ({
     width: "100%",
     padding: "15px 16px",
@@ -98,7 +114,21 @@ export default function Registar() {
 
     } else if (step === 2) {
       if (!/^8[2-7]\d{7}$/.test(phone)) errs.phone = "Número inválido (ex: 821234567)";
-      if (invite && !/^[A-Z0-9]{4,8}$/.test(invite)) errs.invite = "Código inválido";
+      if (invite) {
+        if (!/^[A-Z0-9]{4,8}$/.test(invite)) {
+          errs.invite = "Formato inválido";
+        } else if (inviteStatus === "invalid") {
+          errs.invite = "Código de convite inválido ou inexistente";
+        } else if (inviteStatus === "checking") {
+          // Wait for check to finish — re-trigger inline
+          setLoading(true);
+          await checkInviteCode(invite);
+          setLoading(false);
+          // The state update from checkInviteCode is async; re-run goNext on next tick
+          setTimeout(() => goNext(), 50);
+          return;
+        }
+      }
       if (Object.keys(errs).length) { setErrors(errs); return; }
       setDir(1); setStep(3); setErrors({});
 
@@ -224,12 +254,44 @@ export default function Registar() {
                   <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#374151", marginBottom: 7 }}>
                     Código de Convite <span style={{ fontWeight: 400, color: "#9ca3af", fontSize: 11 }}>(opcional)</span>
                   </label>
-                  <input type="text" placeholder="EX: WM1234" value={invite} maxLength={8}
-                    onChange={e => { const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8); setInvite(v); clearError("invite"); }}
-                    onFocus={() => setFocused("invite")} onBlur={() => setFocused(null)}
-                    style={{ ...inputStyle("invite"), letterSpacing: "0.18em", fontWeight: 700 }}
-                    disabled={loading} />
-                  {errors.invite && <p style={{ fontSize: 11.5, color: "#ef4444", marginTop: 5 }}>{errors.invite}</p>}
+                  <div style={{ position: "relative" }}>
+                    <input type="text" placeholder="EX: AB1234" value={invite} maxLength={8}
+                      onChange={e => {
+                        const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
+                        setInvite(v);
+                        clearError("invite");
+                        setInviteStatus(v ? "checking" : "idle");
+                        if (inviteTimerRef.current) clearTimeout(inviteTimerRef.current);
+                        if (v.length >= 4) {
+                          inviteTimerRef.current = setTimeout(() => checkInviteCode(v), 600);
+                        } else if (!v) {
+                          setInviteStatus("idle");
+                        }
+                      }}
+                      onFocus={() => setFocused("invite")} onBlur={() => setFocused(null)}
+                      style={{ ...inputStyle("invite"), letterSpacing: "0.18em", fontWeight: 700, paddingRight: 44 }}
+                      disabled={loading} />
+                    {/* Status icon */}
+                    <div style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center" }}>
+                      {inviteStatus === "checking" && invite && (
+                        <Loader2 style={{ width: 16, height: 16, color: "#9ca3af", animation: "spin 1s linear infinite" }} />
+                      )}
+                      {inviteStatus === "valid" && (
+                        <Check style={{ width: 16, height: 16, color: "#16a34a" }} />
+                      )}
+                      {inviteStatus === "invalid" && (
+                        <X style={{ width: 16, height: 16, color: "#ef4444" }} />
+                      )}
+                    </div>
+                  </div>
+                  {inviteStatus === "valid" && !errors.invite && (
+                    <p style={{ fontSize: 11.5, color: "#16a34a", marginTop: 5 }}>✓ Código válido</p>
+                  )}
+                  {(errors.invite || inviteStatus === "invalid") && (
+                    <p style={{ fontSize: 11.5, color: "#ef4444", marginTop: 5 }}>
+                      {errors.invite || "Código de convite inválido ou inexistente"}
+                    </p>
+                  )}
                 </div>
               </motion.div>
             )}

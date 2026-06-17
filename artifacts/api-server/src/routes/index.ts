@@ -231,6 +231,42 @@ router.post("/complete-registration", async (req, res) => {
   }
 });
 
+/* ── Invite code validation (public — no auth needed) ── */
+router.get("/validate-invite", async (req, res) => {
+  try {
+    const code = (req.query["code"] as string ?? "").toUpperCase().trim();
+    if (!code || !/^[A-Z0-9]{4,8}$/.test(code)) {
+      res.json({ valid: false, reason: "format" });
+      return;
+    }
+
+    const supabaseUrl     = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "";
+    const supabaseService = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"] ?? "";
+
+    if (!supabaseUrl || !supabaseService) {
+      // Can't validate without env vars — allow through so signup isn't blocked
+      res.json({ valid: true, reason: "env_missing" });
+      return;
+    }
+
+    const admin = buildAdminClient(supabaseUrl, supabaseService);
+    const { data, error } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("my_invite_code", code)
+      .maybeSingle();
+
+    if (error) {
+      res.json({ valid: true, reason: "db_error" }); // allow through on DB error
+      return;
+    }
+
+    res.json({ valid: !!data });
+  } catch {
+    res.json({ valid: true, reason: "exception" }); // allow through on unexpected error
+  }
+});
+
 /* ── Recharge code validation ── */
 router.post("/recharge", async (req, res) => {
   try {
