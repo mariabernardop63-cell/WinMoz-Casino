@@ -98,7 +98,6 @@ export default function DepositRequests() {
       if (txErr || !txData) throw new Error("Pedido não encontrado");
       if ((txData as any).status !== "pending") throw new Error("Pedido já processado");
 
-      // Credit balance for both manual deposits AND manual bets (carteira móvel)
       if ((txData as any).type === "manual_deposit" || (txData as any).type === "manual_bet") {
         const { data: profile, error: profErr } = await adminSupabase
           .from("profiles")
@@ -182,15 +181,19 @@ export default function DepositRequests() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">Gestão de Depósitos</h1>
-          <p className="text-sm text-white/40 mt-1">
+          <h1 className="text-2xl font-bold" style={{ color: "var(--gz-text-primary)" }}>Gestão de Depósitos</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--gz-text-muted)" }}>
             Pedidos manuais de depósito e aposta pendentes de aprovação
           </p>
         </div>
         <button
           onClick={() => { setLoading(true); loadRequests(); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-          style={{ background: "#1c1c1e", color: "#8e8e93" }}>
+          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:-translate-y-0.5 active:scale-95"
+          style={{
+            background: "var(--gz-bg-subtle)",
+            color: "var(--gz-text-muted)",
+            border: "1px solid var(--gz-border)",
+          }}>
           <RefreshCw style={{ width: 14, height: 14 }} />
           Actualizar
         </button>
@@ -203,16 +206,14 @@ export default function DepositRequests() {
           { label: "Depósitos", val: requests.filter(r => r.type === "manual_deposit").length, icon: Wallet, color: CYAN },
           { label: "Apostas", val: requests.filter(r => r.type === "manual_bet").length, icon: Gamepad2, color: "#a78bfa" },
         ].map(stat => (
-          <div key={stat.label}
-            className="rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3"
-            style={{ background: "#1c1c1e", border: "1px solid #2c2c2e" }}>
+          <div key={stat.label} className="gz-card rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0"
               style={{ background: `${stat.color}18` }}>
               <stat.icon style={{ width: 16, height: 16, color: stat.color }} />
             </div>
             <div>
-              <p className="text-xl sm:text-2xl font-bold text-white">{stat.val}</p>
-              <p className="text-[10px] sm:text-xs" style={{ color: "rgba(255,255,255,0.4)" }}>{stat.label}</p>
+              <p className="text-xl sm:text-2xl font-bold" style={{ color: "var(--gz-text-primary)" }}>{stat.val}</p>
+              <p className="text-[10px] sm:text-xs" style={{ color: "var(--gz-text-muted)" }}>{stat.label}</p>
             </div>
           </div>
         ))}
@@ -229,8 +230,9 @@ export default function DepositRequests() {
             onClick={() => setFilter(tab.key as "all" | "deposit" | "bet")}
             className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
             style={{
-              background: filter === tab.key ? CYAN : "#1c1c1e",
-              color: filter === tab.key ? "#000" : "#8e8e93",
+              background: filter === tab.key ? CYAN : "var(--gz-bg-subtle)",
+              color: filter === tab.key ? "#000" : "var(--gz-text-muted)",
+              border: `1px solid ${filter === tab.key ? CYAN : "var(--gz-border)"}`,
             }}>
             {tab.label}
           </button>
@@ -240,16 +242,16 @@ export default function DepositRequests() {
       {/* List */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-white/60 animate-spin" />
+          <div className="w-8 h-8 rounded-full border-2 animate-spin"
+            style={{ borderColor: "var(--gz-border)", borderTopColor: "var(--gz-text-muted)" }} />
         </div>
       ) : filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
-            style={{ background: "#1c1c1e" }}>
-            <CheckCircle2 style={{ width: 28, height: 28, color: "#3a3a3c" }} />
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 gz-card">
+            <CheckCircle2 style={{ width: 28, height: 28, color: "var(--gz-text-tertiary)" }} />
           </div>
-          <p className="text-white/40 text-sm">Nenhum pedido pendente</p>
-          <p className="text-white/20 text-xs mt-1">Tudo em dia!</p>
+          <p className="text-sm" style={{ color: "var(--gz-text-muted)" }}>Nenhum pedido pendente</p>
+          <p className="text-xs mt-1" style={{ color: "var(--gz-text-tertiary)" }}>Tudo em dia!</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -267,12 +269,11 @@ export default function DepositRequests() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8, scale: 0.97 }}
                   transition={{ duration: 0.2 }}
-                  className="rounded-2xl overflow-hidden"
-                  style={{ background: "#1c1c1e", border: "1px solid #2c2c2e" }}>
+                  className="gz-card rounded-2xl overflow-hidden">
 
                   {/* Type badge */}
                   <div className="flex items-center justify-between px-4 pt-4 pb-3"
-                    style={{ borderBottom: "1px solid #2c2c2e" }}>
+                    style={{ borderBottom: "1px solid var(--gz-border)" }}>
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center"
                         style={{ background: isDeposit ? `${CYAN}18` : "rgba(167,139,250,0.15)" }}>
@@ -285,25 +286,25 @@ export default function DepositRequests() {
                         {isDeposit ? "Depósito" : "Aposta"}
                       </span>
                     </div>
-                    <span className="text-xs text-white/30">{timeAgo(req.created_at)}</span>
+                    <span className="text-xs" style={{ color: "var(--gz-text-tertiary)" }}>{timeAgo(req.created_at)}</span>
                   </div>
 
                   {/* Main info */}
                   <div className="px-4 py-4">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <p className="text-2xl font-bold text-white">
-                          {fmtMZN(Number(req.amount))} <span className="text-base font-medium text-white/30">MZN</span>
+                        <p className="text-2xl font-bold" style={{ color: "var(--gz-text-primary)" }}>
+                          {fmtMZN(Number(req.amount))} <span className="text-base font-medium" style={{ color: "var(--gz-text-tertiary)" }}>MZN</span>
                         </p>
                         <div className="flex items-center gap-3 mt-1.5">
                           <div className="flex items-center gap-1.5">
-                            <User style={{ width: 11, height: 11, color: "#71717a" }} />
-                            <span className="text-xs text-white/40">{meta.userName}</span>
+                            <User style={{ width: 11, height: 11, color: "var(--gz-text-tertiary)" }} />
+                            <span className="text-xs" style={{ color: "var(--gz-text-muted)" }}>{meta.userName}</span>
                           </div>
                           {meta.phone && (
                             <div className="flex items-center gap-1.5">
-                              <Phone style={{ width: 11, height: 11, color: "#71717a" }} />
-                              <span className="text-xs text-white/40">{meta.phone}</span>
+                              <Phone style={{ width: 11, height: 11, color: "var(--gz-text-tertiary)" }} />
+                              <span className="text-xs" style={{ color: "var(--gz-text-muted)" }}>{meta.phone}</span>
                             </div>
                           )}
                         </div>
@@ -312,7 +313,8 @@ export default function DepositRequests() {
                       {/* Action buttons */}
                       <div className="flex items-center gap-2">
                         {isProcessing ? (
-                          <div className="w-8 h-8 rounded-full border-2 border-white/10 border-t-white/50 animate-spin" />
+                          <div className="w-8 h-8 rounded-full border-2 animate-spin"
+                            style={{ borderColor: "var(--gz-border)", borderTopColor: "var(--gz-text-muted)" }} />
                         ) : (
                           <>
                             <motion.button
@@ -339,7 +341,8 @@ export default function DepositRequests() {
                     {/* Expand/collapse confirmation message */}
                     <button
                       onClick={() => setExpandedId(isExpanded ? null : req.id)}
-                      className="flex items-center gap-1.5 text-xs text-white/30 hover:text-white/60 transition-colors">
+                      className="flex items-center gap-1.5 text-xs transition-colors"
+                      style={{ color: "var(--gz-text-tertiary)" }}>
                       <MessageSquare style={{ width: 12, height: 12 }} />
                       {isExpanded ? "Ocultar mensagem" : "Ver mensagem de confirmação"}
                       {isExpanded
@@ -355,9 +358,14 @@ export default function DepositRequests() {
                           exit={{ opacity: 0, height: 0 }}
                           transition={{ duration: 0.2 }}
                           className="overflow-hidden">
-                          <div className="mt-3 p-3 rounded-xl text-xs leading-relaxed text-white/50 break-words"
-                            style={{ background: "#111", border: "1px solid #2c2c2e", fontFamily: "system-ui" }}>
-                            {meta.confirmationMsg || <span className="text-white/20 italic">Sem mensagem</span>}
+                          <div className="mt-3 p-3 rounded-xl text-xs leading-relaxed break-words"
+                            style={{
+                              background: "var(--gz-bg-subtle)",
+                              border: "1px solid var(--gz-border)",
+                              color: "var(--gz-text-muted)",
+                              fontFamily: "system-ui",
+                            }}>
+                            {meta.confirmationMsg || <span style={{ color: "var(--gz-text-tertiary)", fontStyle: "italic" }}>Sem mensagem</span>}
                           </div>
                         </motion.div>
                       )}

@@ -17,13 +17,25 @@ function fmtMZN(val: number) {
   return `MT ${Number(val.toFixed(2)).toLocaleString("pt-PT")}`;
 }
 
+/* ─── Detect auto-generated/placeholder avatar URLs (DiceBear, etc.) ─── */
+function isRealPhoto(url: string | null | undefined): boolean {
+  if (!url || url.trim() === "") return false;
+  const lower = url.toLowerCase();
+  if (lower.includes("dicebear.com")) return false;
+  if (lower.includes("ui-avatars.com")) return false;
+  if (lower.includes("gravatar.com/avatar/0000")) return false;
+  if (lower.includes("robohash.org")) return false;
+  return true;
+}
+
 /* ─── Avatar (real photo first, initials fallback) ─── */
 function Avatar({ seed, avatarUrl, size = 32 }: { seed: string; avatarUrl?: string | null; size?: number }) {
-  if (avatarUrl) {
+  if (isRealPhoto(avatarUrl)) {
     return (
       <img
-        src={avatarUrl}
+        src={avatarUrl!}
         alt={seed}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
         style={{
           width: size, height: size, borderRadius: "50%", flexShrink: 0,
           objectFit: "cover", border: "1.5px solid rgba(108,92,231,.14)",
