@@ -3,3 +3,4 @@
 - [Winmoz game fixes](winmoz-game-fixes.md) — payout 90%, rematch transaction records, resume DB check, notification persistence
 - [Winmoz bet deduction bug](winmoz-bet-deduction.md) — betDeductedRef must be persisted in sessionStorage to survive back+resume; active game record must include playerColor+playerName for resume URL
 - [Winmoz admin bots data source](winmoz-admin-bots.md) — matches table not in migration SQL, may not exist; bots page now reads from transactions with [bot] marker in description
+- [Winmoz security hardening](winmoz-security.md) — all balance mutations (bet/win/refund) now server-side via /api/games/*; RLS SQL in supabase_security_migration.sql must be applied by user in Supabase SQL Editor to complete the protection

@@ -282,9 +282,9 @@ export default function Settings() {
     fetch("/api/admin/settings/get?key=admin_security_password")
       .then(r => r.ok ? r.json() : null)
       .then((data: { setting?: { value: string } | null } | null) => {
-        setCurrentSecPw(data?.setting?.value ?? "12345678y");
+        setCurrentSecPw(data?.setting?.value ?? "");
       })
-      .catch(() => setCurrentSecPw("12345678y"));
+      .catch(() => setCurrentSecPw(""));
   }, []);
 
   const handleSaveSecPw = async () => {

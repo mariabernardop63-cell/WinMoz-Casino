@@ -1016,8 +1016,13 @@ export default function ChessGame(){
       try{
         const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
         if(data){
-          await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
-          await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:`Aposta (Xadrez) [bot] vs ${opponentName}`,status:"approved"});
+          const { data: { session: _bs } } = await supabase.auth.getSession();
+          const _bt = _bs?.access_token ?? "";
+          await fetch("/api/games/bet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_bt}` },
+            body: JSON.stringify({ gameId, gameType: "Xadrez", betAmount: BET, opponentName }),
+          });
           try{sessionStorage.setItem(`wm_bet_deducted_chess_${gameId}`,"1");}catch{}
           await supabase.from("matches").upsert({
             id:gameId,game_type:"xadrez",
@@ -1079,12 +1084,16 @@ export default function ChessGame(){
     (async()=>{
       try{
         if(winner===myColor){
-          const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
-          if(data){
-            await supabase.from("profiles").update({balance:parseFloat(String(data.balance))+payout}).eq("id",profile.id);
-            await supabase.from("transactions").insert({user_id:profile.id,type:"win",amount:payout,description:`Vitória de jogo (Xadrez) +${payout} MT`,status:"approved"});
-            await refreshProfile();
-          }
+          const { data: { session: _ws } } = await supabase.auth.getSession();
+          const _wt = _ws?.access_token ?? "";
+          const _wr = await fetch("/api/games/win", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_wt}` },
+            body: JSON.stringify({ gameId, gameType: "Xadrez", betAmount: BET }),
+          });
+          const _wd = await _wr.json() as { ok: boolean; duplicate?: boolean };
+          if (!_wd.ok && !_wd.duplicate) throw new Error("Win processing failed");
+          await refreshProfile();
         } else if(isBot){
           // Bot won — insert zero-amount marker so admin panel can detect game ended
           await supabase.from("transactions").insert({user_id:profile.id,type:"win",amount:0,description:`Fim de jogo (Xadrez) [bot] [bot-fim]`,status:"approved"});
@@ -1274,9 +1283,13 @@ export default function ChessGame(){
         if(BET>0&&profile?.id){
           const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
           if(data){
-            const newBal=parseFloat(String(data.balance))-BET;
-            await supabase.from("profiles").update({balance:newBal}).eq("id",profile.id);
-            await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de revanche (Xadrez)",status:"approved"});
+            const { data: { session: _rs } } = await supabase.auth.getSession();
+            const _rt = _rs?.access_token ?? "";
+            await fetch("/api/games/bet", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_rt}` },
+              body: JSON.stringify({ gameId, gameType: "Xadrez", betAmount: BET, opponentName: opponentName ?? "adversário" }),
+            });
           }
         }
         setRematchPhase("idle");
@@ -1300,8 +1313,13 @@ export default function ChessGame(){
           try{
             const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
             if(data){
-              await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
-              await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de jogo (Xadrez)",status:"approved"});
+              const { data: { session: _nbS } } = await supabase.auth.getSession();
+              const _nbT = _nbS?.access_token ?? "";
+              await fetch("/api/games/bet", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_nbT}` },
+                body: JSON.stringify({ gameId, gameType: "Xadrez", betAmount: BET, opponentName }),
+              });
               await refreshProfile();
             }
           }catch{betDeductedRef.current=false;}
@@ -1369,9 +1387,13 @@ export default function ChessGame(){
         setRematchPhase("opp_no_balance");return;
       }
       if(BET>0){
-        const newBal=parseFloat(String(data.balance))-BET;
-        await supabase.from("profiles").update({balance:newBal}).eq("id",profile.id);
-        await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de revanche (Xadrez)",status:"approved"});
+        const { data: { session: _raS } } = await supabase.auth.getSession();
+        const _raT = _raS?.access_token ?? "";
+        await fetch("/api/games/bet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_raT}` },
+          body: JSON.stringify({ gameId, gameType: "Xadrez", betAmount: BET, opponentName: opponentName ?? "adversário" }),
+        });
       }
       channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:true}});
       setRematchPhase("idle");

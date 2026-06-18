@@ -44,23 +44,35 @@ function setBanState(state: BanState | null) {
 }
 
 function isSessionAuthenticated(): boolean {
-  return sessionStorage.getItem(SESSION_KEY) === "1";
-}
-
-function setSessionAuthenticated() {
-  sessionStorage.setItem(SESSION_KEY, "1");
-}
-
-const MASTER_PW = "12345678y";
-
-async function fetchSecurityPassword(): Promise<string> {
   try {
-    const res = await fetch("/api/admin/settings/get?key=admin_security_password");
-    if (!res.ok) return MASTER_PW;
-    const data = await res.json() as { setting?: { value: string } | null };
-    return data?.setting?.value ?? MASTER_PW;
+    const token = sessionStorage.getItem(SESSION_KEY);
+    if (!token || token.length < 20) return false;
+    const pad = (4 - (token.length % 4)) % 4;
+    const b64 = token.padEnd(token.length + pad, "=").replace(/-/g, "+").replace(/_/g, "/");
+    const parsed = JSON.parse(atob(b64)) as { ts?: string; nonce?: string; sig?: string };
+    if (!parsed.ts || !parsed.nonce || !parsed.sig) return false;
+    const age = Date.now() - parseInt(parsed.ts);
+    return age >= 0 && age < 8 * 3_600_000;
   } catch {
-    return MASTER_PW;
+    return false;
+  }
+}
+
+function setSessionAuthenticated(token: string) {
+  sessionStorage.setItem(SESSION_KEY, token);
+}
+
+async function verifyAdminPassword(pw: string): Promise<{ ok: boolean; token?: string }> {
+  try {
+    const res = await fetch("/api/admin/auth/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: pw }),
+    });
+    if (!res.ok) return { ok: false };
+    return await res.json() as { ok: boolean; token?: string };
+  } catch {
+    return { ok: false };
   }
 }
 
@@ -121,12 +133,12 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
     setLoading(true);
     setError("");
 
-    const correctPw = await fetchSecurityPassword();
+    const result = await verifyAdminPassword(password);
 
-    if (password === correctPw || password === MASTER_PW) {
+    if (result.ok && result.token) {
       // Correct — clear ban state, set session
       setBanState(null);
-      setSessionAuthenticated();
+      setSessionAuthenticated(result.token);
       setPassed(true);
     } else {
       // Wrong password

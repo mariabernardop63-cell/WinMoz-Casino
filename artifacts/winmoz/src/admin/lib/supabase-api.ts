@@ -1,22 +1,12 @@
 import { useQuery, useMutation, useQueryClient, useQueryClient as useQC } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { createClient } from "@supabase/supabase-js";
 import { useEffect } from "react";
 
-const _adminUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "https://placeholder.supabase.co";
-// Use service role key for admin operations — required to bypass RLS and read all users' data
-const _adminKey = (import.meta.env.VITE_SUPABASE_SERVICE_ROLE as string)
-  || (import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY as string)
-  || (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
-  || "placeholder";
-export const adminSupabase = createClient(_adminUrl, _adminKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-    detectSessionInUrl: false,
-    storageKey: "sb-admin-isolated",
-  },
-});
+// ⚠️ SECURITY: adminSupabase now uses the authenticated user's Supabase session.
+// NEVER set VITE_SUPABASE_SERVICE_ROLE as a build-time env var — it would expose
+// the service role key in the JavaScript bundle and grant anyone full database access.
+// Admin data access is controlled by RLS policies (apply supabase_security_migration.sql).
+export const adminSupabase = supabase;
 
 /* ──────────────────────────────────────────────────────────────
    SUPABASE-BACKED ADMIN API

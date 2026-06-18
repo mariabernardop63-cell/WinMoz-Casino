@@ -1296,21 +1296,15 @@ export default function LudoGame() {
     (async()=>{
       try {
         if (isWinner) {
-          const { data: freshData } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-          // Use fetched balance if available, fall back to profile context balance
-          const currentBal = freshData
-            ? parseFloat(String(freshData.balance))
-            : parseFloat(String(profile.balance ?? 0));
-          const { error: creditErr } = await supabase
-            .from("profiles").update({ balance: currentBal + payout }).eq("id", profile.id);
-          if (creditErr) throw creditErr; // triggers retry via catch block
-          await supabase.from("transactions").insert({
-            user_id: profile.id,
-            type: "win",
-            amount: payout,
-            description: `Vitória de jogo (Ludo) +${payout} MT`,
-            status: "approved",
+          const { data: { session: _ws } } = await supabase.auth.getSession();
+          const _wt = _ws?.access_token ?? "";
+          const _wr = await fetch("/api/games/win", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_wt}` },
+            body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT }),
           });
+          const _wd = await _wr.json() as { ok: boolean; duplicate?: boolean; error?: string };
+          if (!_wd.ok && !_wd.duplicate) throw new Error(_wd.error ?? "Win processing failed");
           await refreshProfile();
         }
         // Only "blue" (first player) updates the match record
@@ -1571,20 +1565,29 @@ export default function LudoGame() {
   },[myColor,playerName,opponentName,doSelectPiece]);
 
   // ── Roll my color dice — uses weighted algorithm + broadcasts ───────────────
-  const doRoll=useCallback(()=>{
+  const doRoll=useCallback(async()=>{
     if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current||captureAnimRef.current) return;
     playAudio(_rollAudio, 0.55);
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
     const oppPieces = piecesRef.current.filter(p=>p.player!==myColor);
-    const val = generateWeightedDice(
-      myPieces,
-      oppPieces,
-      myColor,
-      stuckTurnsRef.current[myColor],
-      consecutiveSixesRef.current,
-      gameId,
-    );
+    let val: number;
+    try {
+      const { data: { session: _ds } } = await supabase.auth.getSession();
+      const _dt = _ds?.access_token ?? "";
+      if (!_dt) throw new Error("no token");
+      const _dr = await fetch("/api/games/ludo/dice", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_dt}` },
+        body: JSON.stringify({ gameId, turn: Date.now() }),
+      });
+      const _dd = await _dr.json() as { value?: number };
+      if (typeof _dd.value === "number" && _dd.value >= 1 && _dd.value <= 6) {
+        val = _dd.value;
+      } else { throw new Error("invalid dice response"); }
+    } catch {
+      val = generateWeightedDice(myPieces, oppPieces, myColor, stuckTurnsRef.current[myColor], consecutiveSixesRef.current, gameId);
+    }
 
     const seq = Date.now();
     channelRef.current?.send({
@@ -1622,10 +1625,12 @@ export default function LudoGame() {
       try{
         const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
         if(data){
-          await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET_AMOUNT}).eq("id",profile.id);
-          await supabase.from("transactions").insert({
-            user_id:profile.id,type:"bet",amount:-BET_AMOUNT,
-            description:`Aposta (Ludo) vs ${opponentName}`,status:"approved",
+          const { data: { session: _bs } } = await supabase.auth.getSession();
+          const _bt = _bs?.access_token ?? "";
+          await fetch("/api/games/bet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_bt}` },
+            body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName }),
           });
           try{sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`,"1");}catch{}
           await supabase.from("matches").upsert({
@@ -1845,9 +1850,13 @@ export default function LudoGame() {
           if(!data || parseFloat(String(data.balance)) < BET_AMOUNT){
             setRematchPhase("no_balance"); return;
           }
-          const newBal=parseFloat(String(data.balance))-BET_AMOUNT;
-          await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
-          await supabase.from("transactions").insert({ user_id:profile.id, type:"bet", amount:-BET_AMOUNT, description:"Aposta de revanche (Ludo)", status:"approved" });
+          const { data: { session: _rs } } = await supabase.auth.getSession();
+          const _rt = _rs?.access_token ?? "";
+          await fetch("/api/games/bet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_rt}` },
+            body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName: opponentName ?? "adversário" }),
+          });
           await refreshProfile();
         }
         setRematchPhase("idle");
@@ -1886,14 +1895,12 @@ export default function LudoGame() {
           try {
             const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
             if(data){
-              const newBal = parseFloat(String(data.balance)) - BET_AMOUNT;
-              await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
-              await supabase.from("transactions").insert({
-                user_id: profile.id,
-                type: "bet",
-                amount: -BET_AMOUNT,
-                description: "Aposta de jogo (Ludo)",
-                status: "approved",
+              const { data: { session: _nbS } } = await supabase.auth.getSession();
+              const _nbT = _nbS?.access_token ?? "";
+              await fetch("/api/games/bet", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_nbT}` },
+                body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName }),
               });
               // Persiste flag para não re-debitar se o componente remontar (back + resume)
               try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`, "1"); } catch { /* ignore */ }
@@ -2045,8 +2052,13 @@ export default function LudoGame() {
       try{
         const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
         if(!data||parseFloat(String(data.balance))<BET_AMOUNT){ setRematchPhase("no_balance"); return; }
-        await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET_AMOUNT}).eq("id",profile.id);
-        await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET_AMOUNT,description:"Aposta de revanche (Ludo) vs bot",status:"approved"});
+        const { data: { session: _brS } } = await supabase.auth.getSession();
+        const _brT = _brS?.access_token ?? "";
+        await fetch("/api/games/bet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_brT}` },
+          body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName: opponentName ?? "bot" }),
+        });
         await refreshProfile();
         resetGame();
       }catch{ setRematchPhase("no_balance"); }
@@ -2076,9 +2088,13 @@ export default function LudoGame() {
         setRematchPhase("opp_no_balance"); return;
       }
       if(BET_AMOUNT>0){
-        const newBal=parseFloat(String(data.balance))-BET_AMOUNT;
-        await supabase.from("profiles").update({ balance: newBal }).eq("id",profile.id);
-        await supabase.from("transactions").insert({ user_id:profile.id, type:"bet", amount:-BET_AMOUNT, description:"Aposta de revanche (Ludo)", status:"approved" });
+        const { data: { session: _raS } } = await supabase.auth.getSession();
+        const _raT = _raS?.access_token ?? "";
+        await fetch("/api/games/bet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_raT}` },
+          body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName: opponentName ?? "adversário" }),
+        });
         await refreshProfile();
       }
       channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });

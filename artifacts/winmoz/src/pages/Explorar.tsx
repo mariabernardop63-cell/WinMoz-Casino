@@ -246,38 +246,35 @@ function SalaTab() {
   const onlineCount = getSalaOnlineCount(tick);
   const activeRoomCount = 358 + Math.min(myRooms.filter(r => r.status === "waiting").length, 50);
 
-  async function deductBalance(amount: number, desc: string): Promise<boolean> {
+  async function deductBalance(amount: number, _desc: string, gameRoomCode?: string): Promise<boolean> {
     if (!user?.id) return false;
     try {
-      // Read fresh balance from Supabase
-      const { data, error } = await supabase
-        .from("profiles").select("balance").eq("id", user.id).single();
-      if (error || !data) {
-        // Supabase read failed — fall back to cached profile to avoid blocking the user
-        const cachedBal = parseFloat(String(profile?.balance ?? "0"));
-        if (cachedBal < amount) return false;
-        // Attempt update using cached value (best effort)
-        await supabase.from("profiles").update({ balance: cachedBal - amount }).eq("id", user.id);
-        await supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" });
-        refreshProfile();
-        return true;
-      }
-      const bal = parseFloat(String(data.balance ?? "0"));
-      if (bal < amount) return false;
-      await supabase.from("profiles").update({ balance: bal - amount }).eq("id", user.id);
-      await supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" });
-      refreshProfile();
-      return true;
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+      if (!token) return false;
+      const roomId = gameRoomCode ?? `lobby-${Date.now()}`;
+      const resp = await fetch("/api/games/bet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ gameId: roomId, gameType: "Ludo", betAmount: amount, opponentName: "adversário" }),
+      });
+      const result = await resp.json() as { ok: boolean; duplicate?: boolean; error?: string };
+      if (result.ok || result.duplicate) { refreshProfile(); return true; }
+      return false;
     } catch { return false; }
   }
 
   async function refundBalance(amount: number, code: string) {
     if (!user?.id || amount <= 0) return;
     try {
-      const { data } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
-      const bal = parseFloat(String(data?.balance ?? "0"));
-      await supabase.from("profiles").update({ balance: bal + amount }).eq("id", user.id);
-      await supabase.from("transactions").insert({ user_id: user.id, type: "win", amount, description: `Reembolso sala ${code}`, status: "approved" });
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+      if (!token) return;
+      await fetch("/api/games/refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ roomCode: code, amount, gameType: "Ludo" }),
+      });
       refreshProfile();
     } catch { /* ignore */ }
   }
