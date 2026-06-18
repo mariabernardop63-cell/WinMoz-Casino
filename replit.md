@@ -2,7 +2,7 @@
 
 App de jogos e apostas online com painel de administração integrado.
 
-## Run & Operate
+## Run & Operatee
 
 - `pnpm --filter @workspace/winmoz run dev` — run the frontend (port 3000)
 - `pnpm run typecheck` — full typecheck across all packages
