@@ -50,7 +50,7 @@ function nowTime() {
 const INITIAL: Msg[] = [
   {
     id: "i1", from: "support", sender: "ai",
-    text: "Olá! 👋 Bem-vindo ao suporte da Equipa Poker Winner. Estou aqui para ajudar.",
+    text: "Olá! 👋 Bem-vindo ao suporte da Equipa Mozbet. Estou aqui para ajudar.",
     time: nowTime(),
   },
   {

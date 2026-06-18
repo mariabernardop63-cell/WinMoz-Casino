@@ -364,7 +364,7 @@ export default function Dashboard() {
                 <span className="gz-gradient-text">Admin!</span>
               </h1>
               <p className="mt-1.5 text-[13px] font-medium" style={{ color: "var(--gz-text-accent)" }}>
-                Aqui está o resumo da plataforma POKER WINNER.
+                Aqui está o resumo da plataforma MOZBET.
               </p>
             </div>
             <div className="flex items-center gap-1.5 mb-0.5">

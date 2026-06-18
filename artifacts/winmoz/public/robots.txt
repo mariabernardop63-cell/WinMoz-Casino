@@ -2,9 +2,9 @@ User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: https://pokerwinner.online/sitemap.xml
+Sitemap: https://mozbet.online/sitemap.xml
 
 # LLMs / AI systems
 # This site provides llms.txt for AI-readable content
-# See: https://pokerwinner.online/llms.txt
-# Full documentation: https://pokerwinner.online/llms-full.txt
+# See: https://mozbet.online/llms.txt
+# Full documentation: https://mozbet.online/llms-full.txt

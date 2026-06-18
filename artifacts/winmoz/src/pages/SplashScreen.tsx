@@ -24,8 +24,8 @@ export default function SplashScreen() {
   const showText    = phase === "draw" || phase === "hold" || phase === "erase";
   const showSpinner = phase === "spinner";
 
-  // Width of the text column (enough for "POKER" at 22px bold ≈ 72px)
-  const targetWidth = (phase === "draw" || phase === "hold") ? 82 : 0;
+  // Width of the text column (enough for "MOZBET" at 22px bold ≈ 90px)
+  const targetWidth = (phase === "draw" || phase === "hold") ? 98 : 0;
   const widthTransition: Parameters<typeof motion.div>[0]["transition"] =
     phase === "draw"
       ? { duration: 1.38, ease: "linear" }
@@ -64,7 +64,7 @@ export default function SplashScreen() {
                 </svg>
               </motion.div>
 
-              {/* Animated text reveal — stacked POKER / WINNER */}
+              {/* Animated text reveal — stacked MOZBET / MOZAMBIQUE */}
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: targetWidth }}
@@ -81,18 +81,18 @@ export default function SplashScreen() {
                     lineHeight: "26px",
                     display: "block",
                   }}>
-                    POKER
+                    MOZBET
                   </span>
                   <span style={{
                     fontFamily: "'Syne', sans-serif",
                     fontWeight: 300,
-                    fontSize: 12,
-                    letterSpacing: "2.5px",
+                    fontSize: 10,
+                    letterSpacing: "2px",
                     color: "#0D0D0D",
                     lineHeight: "18px",
                     display: "block",
                   }}>
-                    WINNER
+                    MOZAMBIQUE
                   </span>
                 </div>
               </motion.div>

@@ -131,7 +131,7 @@ export default function GrupoChat() {
                 <span style={{ position: "absolute", bottom: -3, right: -3, width: 12, height: 12, borderRadius: 999, background: "#22c55e", border: "2px solid #18181b" }} />
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p style={{ color: "#f1f5f9", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14 }}>Grupo Poker Winner</p>
+                <p style={{ color: "#f1f5f9", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14 }}>Grupo Mozbet</p>
                 <p style={{ fontSize: 10.5, color: "#71717a", marginTop: 1 }}>125 participantes · {onlineCount} online</p>
               </div>
             </button>

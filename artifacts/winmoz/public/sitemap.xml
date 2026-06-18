@@ -3,38 +3,38 @@
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
 
   <url>
-    <loc>https://pokerwinner.online/</loc>
+    <loc>https://mozbet.online/</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="pt" href="https://pokerwinner.online/"/>
+    <xhtml:link rel="alternate" hreflang="pt" href="https://mozbet.online/"/>
   </url>
 
   <url>
-    <loc>https://pokerwinner.online/registar</loc>
+    <loc>https://mozbet.online/registar</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://pokerwinner.online/login</loc>
+    <loc>https://mozbet.online/login</loc>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
 
   <url>
-    <loc>https://pokerwinner.online/explorar</loc>
+    <loc>https://mozbet.online/explorar</loc>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
 
   <url>
-    <loc>https://pokerwinner.online/suporte</loc>
+    <loc>https://mozbet.online/suporte</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
 
   <url>
-    <loc>https://pokerwinner.online/privacidade</loc>
+    <loc>https://mozbet.online/privacidade</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
