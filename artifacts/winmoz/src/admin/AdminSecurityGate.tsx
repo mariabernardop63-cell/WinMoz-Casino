@@ -330,7 +330,7 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
             Acesso Restrito
           </h1>
           <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 13.5, margin: 0 }}>
-            Painel Administrativo · Winmoz
+            Painel Administrativo · MOZBET
           </p>
         </div>
 

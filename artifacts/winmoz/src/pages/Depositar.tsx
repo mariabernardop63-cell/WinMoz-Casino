@@ -481,7 +481,7 @@ export default function Depositar() {
               A processar pedido…
             </p>
             <p style={{ fontSize: 13, color: "#71717a", textAlign: "center", lineHeight: 1.6, maxWidth: 270 }}>
-              O teu pedido foi enviado à equipa WinMoz. Aguarda a validação da transferência — normalmente demora poucos minutos.
+              O teu pedido foi enviado à equipa MOZBET. Aguarda a validação da transferência — normalmente demora poucos minutos.
             </p>
             {pendingId && (
               <motion.div
@@ -526,7 +526,7 @@ export default function Depositar() {
                 +{fmtMZN(successAmount || amountVal)} MZN
               </p>
               <p className="text-sm mt-2 leading-relaxed" style={{ color: "#8e8e93" }}>
-                O teu saldo foi creditado com sucesso na carteira WinMoz.
+                O teu saldo foi creditado com sucesso na carteira MOZBET.
               </p>
             </motion.div>
           </motion.div>
@@ -542,7 +542,7 @@ export default function Depositar() {
               {[
                 { label: "Data",     val: txDate },
                 { label: "Origem",   val: "M-Pesa / e-Mola" },
-                { label: "Destino",  val: "Carteira WinMoz" },
+                { label: "Destino",  val: "Carteira MOZBET" },
                 { label: "Montante", val: `${fmtMZN(successAmount || amountVal)} MZN` },
                 { label: "Taxa",     val: "Grátis", green: true },
                 { label: "Estado",   val: "Confirmado ✓", highlight: true },

@@ -14,9 +14,9 @@ type ScanResult = {
 };
 
 const DEMO_RESULTS: ScanResult[] = [
-  { type: "qr", value: "WINMOZ-RECARGA-XK9P2Q", label: "Código de Recarga" },
-  { type: "qr", value: "WINMOZ-CONVITE-ABC123", label: "Código de Convite" },
-  { type: "qr", value: "WINMOZ-SALA-WM-4821", label: "Código de Sala" },
+  { type: "qr", value: "MOZBET-RECARGA-XK9P2Q", label: "Código de Recarga" },
+  { type: "qr", value: "MOZBET-CONVITE-ABC123", label: "Código de Convite" },
+  { type: "qr", value: "MOZBET-SALA-MB-4821", label: "Código de Sala" },
   { type: "barcode", value: "9781234567897", label: "EAN-13" },
 ];
 

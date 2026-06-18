@@ -96,7 +96,7 @@ export default function Definicoes() {
     {
       title: "Aplicação",
       items: [
-        { icon: Info,   label: "Versão",                   desc: `WinMoz v${version}`,                    onPress: () => {}, badge: version },
+        { icon: Info,   label: "Versão",                   desc: `MOZBET v${version}`,                    onPress: () => {}, badge: version },
         { icon: Info,   label: "Termos de serviço",        desc: "Lê os nossos termos",                   onPress: () => {} },
         { icon: Info,   label: "Política de privacidade",  desc: "Sabe como usamos os teus dados",        onPress: () => setLocation("/privacidade") },
         { icon: LogOut, label: "Terminar sessão",          desc: "Sair da conta actual",                  onPress: handleSignOut },

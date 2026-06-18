@@ -121,7 +121,7 @@ export default function Privacidade() {
           <div className="flex items-start gap-2.5">
             <Shield style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
             <p style={{ fontSize: 12, color: "#64748b", lineHeight: 1.6 }}>
-              A WinMoz respeita a tua privacidade. Os teus dados são armazenados de forma segura e nunca são vendidos a terceiros.
+              A MOZBET respeita a tua privacidade. Os teus dados são armazenados de forma segura e nunca são vendidos a terceiros.
             </p>
           </div>
         </div>

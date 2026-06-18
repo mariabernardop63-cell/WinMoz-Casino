@@ -1,5 +1,5 @@
 /**
- * WinMoz Simulation Engine
+ * MOZBET Simulation Engine
  * Central source of truth for all synthetic/live-feeling data.
  * All time-based logic uses Mozambique time (UTC+2).
  */

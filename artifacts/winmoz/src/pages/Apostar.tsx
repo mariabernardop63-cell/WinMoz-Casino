@@ -320,7 +320,7 @@ function SMSBettingScreen({
               A processar pedido…
             </p>
             <p style={{ fontSize: 13, color: "#71717a", textAlign: "center", lineHeight: 1.6, maxWidth: 280 }}>
-              O teu pedido foi enviado à equipa WinMoz. Aguarda a confirmação — normalmente demora apenas alguns minutos.
+              O teu pedido foi enviado à equipa MOZBET. Aguarda a confirmação — normalmente demora apenas alguns minutos.
             </p>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
               style={{ marginTop: 28, display: "flex", alignItems: "center", gap: 8, padding: "8px 16px",
