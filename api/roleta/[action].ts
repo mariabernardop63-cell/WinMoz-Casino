@@ -11,19 +11,24 @@ function getMozambiqueStartOfDayUTC(): string {
 const PAID_SPIN_COST = 5;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
 
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
-  if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  const action = req.query["action"] as string;
+  if (action !== "spin" && action !== "status") {
+    res.status(404).json({ error: "Not found" }); return;
+  }
 
   const authHeader = (req.headers.authorization as string) ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const supabaseUrl = process.env["SUPABASE_URL"];
-  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  const supabaseUrl = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "";
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? "";
   if (!supabaseUrl || !supabaseServiceKey) {
     res.status(500).json({ error: "Serviço indisponível" }); return;
   }
@@ -36,9 +41,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (userError || !userData?.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
   const userId = userData.user.id;
 
+  // ── STATUS ──
+  if (action === "status") {
+    if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+    const todayStart = getMozambiqueStartOfDayUTC();
+    const { data: rows } = await supabaseAdmin
+      .from("transactions").select("id")
+      .eq("user_id", userId).eq("type", "free_spin").gte("created_at", todayStart);
+    res.json({ freeSpinAvailable: !rows || rows.length === 0 });
+    return;
+  }
+
+  // ── SPIN ──
+  if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
   const { isFree } = (req.body ?? {}) as { isFree?: boolean };
 
-  // ── FREE SPIN ──
   if (isFree) {
     const todayStart = getMozambiqueStartOfDayUTC();
     const { data: rows } = await supabaseAdmin
@@ -51,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const { data: profileData } = await supabaseAdmin
       .from("profiles").select("balance").eq("id", userId).single();
-    const currentBalance = Number(profileData?.balance ?? 0);
+    const currentBalance = Number((profileData as any)?.balance ?? 0);
 
     await supabaseAdmin.from("transactions").insert({
       user_id: userId, type: "free_spin", amount: 0,
@@ -63,11 +80,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // ── PAID SPIN ──
+  // Paid spin
   const { data: profileData, error: profileError } = await supabaseAdmin
     .from("profiles").select("balance").eq("id", userId).single();
   if (profileError || !profileData) { res.status(500).json({ error: "Erro ao obter perfil" }); return; }
-  const currentBalance = Number(profileData.balance ?? 0);
+  const currentBalance = Number((profileData as any).balance ?? 0);
 
   if (currentBalance < PAID_SPIN_COST) {
     res.status(400).json({ error: "Saldo insuficiente para apostar." }); return;
