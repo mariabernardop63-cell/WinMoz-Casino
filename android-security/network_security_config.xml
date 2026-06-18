@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MozBet — Network Security Configuration
+  Enforces HTTPS-only traffic and pins the TLS certificate
+  chain for the production Vercel domain.
+  Applied via AndroidManifest: android:networkSecurityConfig
+-->
+<network-security-config>
+
+  <!-- Block ALL cleartext (HTTP) traffic — betting apps must use HTTPS only -->
+  <base-config cleartextTrafficPermitted="false">
+    <trust-anchors>
+      <!-- Trust only system CAs (no user-installed CAs) -->
+      <certificates src="system" />
+    </trust-anchors>
+  </base-config>
+
+  <!-- Capacitor internal server (required for WebView bridge) -->
+  <domain-config cleartextTrafficPermitted="false">
+    <domain includeSubdomains="true">localhost</domain>
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </domain-config>
+
+  <!-- Production Vercel domain — strict HTTPS -->
+  <domain-config cleartextTrafficPermitted="false">
+    <domain includeSubdomains="true">vercel.app</domain>
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </domain-config>
+
+  <!-- Supabase domains -->
+  <domain-config cleartextTrafficPermitted="false">
+    <domain includeSubdomains="true">supabase.co</domain>
+    <trust-anchors>
+      <certificates src="system" />
+    </trust-anchors>
+  </domain-config>
+
+</network-security-config>

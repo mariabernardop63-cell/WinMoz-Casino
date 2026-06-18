@@ -1,0 +1,54 @@
+// ============================================================
+//  MozBet — Signing + Release hardening
+//  Applied via: apply from: '...' in app/build.gradle
+// ============================================================
+
+android {
+
+    signingConfigs {
+        release {
+            storeFile     file(System.getenv("KEYSTORE_PATH") ?: "mozbet-release.keystore")
+            storePassword System.getenv("KEYSTORE_PASSWORD")  ?: ""
+            keyAlias      System.getenv("KEY_ALIAS")          ?: "mozbet"
+            keyPassword   System.getenv("KEY_PASSWORD")       ?: ""
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig    signingConfigs.release
+
+            // Code shrinking + obfuscation via R8/ProGuard
+            minifyEnabled    true
+            shrinkResources  true
+            proguardFiles    getDefaultProguardFile("proguard-android-optimize.txt"),
+                             "proguard-rules.pro"
+
+            // Prevent debug APK distribution
+            debuggable       false
+
+            // Optimise rendering
+            renderscriptOptimLevel 3
+        }
+
+        debug {
+            // Disable signing in debug builds
+            minifyEnabled    false
+            debuggable       true
+        }
+    }
+
+    // Minimum SDK: Android 7.0+ (API 24) — required for modern TLS
+    defaultConfig {
+        minSdkVersion    24
+        targetSdkVersion 34
+    }
+
+    // Pack release APK only (not debug or debug-androidTest)
+    variantFilter { variant ->
+        if (variant.buildType.name == "debug" &&
+            System.getenv("CI") == "true") {
+            variant.setIgnore(true)
+        }
+    }
+}
