@@ -15,6 +15,11 @@ jobs:
         with:
           node-version: 18
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
       - name: Install Expo CLI
         run: npm install -g eas-cli
 
