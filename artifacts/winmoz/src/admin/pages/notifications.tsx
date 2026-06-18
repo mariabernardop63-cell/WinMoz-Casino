@@ -72,8 +72,9 @@ const AUTOMATION_TRIGGERS = [
 export default function Notifications() {
   const [activeTab, setActiveTab] = useState<Tab>("criar");
   const [status, setStatus] = useState<"idle" | "ok" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState<string>("");
   const sendNotification = useSendNotification();
-  const { data: history = [], isLoading: loadingHistory } = useGetNotificationHistory();
+  const { data: history = [], isLoading: loadingHistory, error: historyError } = useGetNotificationHistory();
 
   // Notification form
   const [notifTitle, setNotifTitle]       = useState("");
@@ -115,11 +116,12 @@ export default function Notifications() {
         setStatus("ok");
         setNotifTitle(""); setNotifSubtitle(""); setSpecificUser("");
         setScheduleEnabled(false); setScheduleDate("");
-        setTimeout(() => setStatus("idle"), 4000);
+        setTimeout(() => setStatus("idle"), 5000);
       },
-      onError: () => {
+      onError: (err) => {
         setStatus("error");
-        setTimeout(() => setStatus("idle"), 4000);
+        setErrorMsg(err instanceof Error ? err.message : "Erro ao enviar notificação");
+        setTimeout(() => setStatus("idle"), 6000);
       },
     });
   }
@@ -153,11 +155,12 @@ export default function Notifications() {
       onSuccess: () => {
         setStatus("ok");
         setAnnTitle(""); setAnnSubtitle(""); setAnnImage(""); setAnnBtnLabel(""); setAnnBtnValue("");
-        setTimeout(() => setStatus("idle"), 4000);
+        setTimeout(() => setStatus("idle"), 5000);
       },
-      onError: () => {
+      onError: (err) => {
         setStatus("error");
-        setTimeout(() => setStatus("idle"), 4000);
+        setErrorMsg(err instanceof Error ? err.message : "Erro ao publicar anúncio");
+        setTimeout(() => setStatus("idle"), 6000);
       },
     });
   }
@@ -195,10 +198,13 @@ export default function Notifications() {
         </div>
       )}
       {status === "error" && (
-        <div className="fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl"
+        <div className="fixed top-20 right-6 z-50 flex items-start gap-3 px-5 py-3.5 rounded-2xl shadow-2xl max-w-sm"
           style={{ background: "#ef4444", color: "#fff" }}>
-          <AlertCircle style={{ width: 18, height: 18 }} />
-          <span className="text-[13.5px] font-bold">Erro ao enviar. Tenta novamente.</span>
+          <AlertCircle style={{ width: 18, height: 18, flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <div className="text-[13.5px] font-bold">Erro ao enviar</div>
+            {errorMsg && <div className="text-[11.5px] mt-0.5 opacity-90">{errorMsg}</div>}
+          </div>
         </div>
       )}
 
@@ -490,13 +496,33 @@ export default function Notifications() {
             </span>
           </div>
 
+          {/* Banner de erro de tabela em falta */}
+          {historyError && (
+            <div className="mx-5 mt-4 p-4 rounded-2xl flex items-start gap-3"
+              style={{ background: "rgba(239,68,68,.07)", border: "1.5px solid rgba(239,68,68,.18)" }}>
+              <AlertCircle style={{ width: 17, height: 17, color: "#ef4444", flexShrink: 0, marginTop: 1 }} />
+              <div>
+                <div className="text-[13px] font-bold" style={{ color: "#dc2626" }}>
+                  {(historyError as Error).message?.includes("não existe")
+                    ? "Tabela de notificações não encontrada"
+                    : "Erro ao carregar histórico"}
+                </div>
+                <div className="text-[11.5px] mt-1" style={{ color: "#ef4444" }}>
+                  {(historyError as Error).message?.includes("não existe")
+                    ? "Aplica o ficheiro supabase_notifications_migration.sql no Supabase SQL Editor para criar as tabelas necessárias."
+                    : (historyError as Error).message}
+                </div>
+              </div>
+            </div>
+          )}
+
           {loadingHistory && (
             <div className="flex items-center justify-center py-10">
               <div className="w-5 h-5 rounded-full border-2 border-indigo-300 border-t-indigo-600 animate-spin" />
             </div>
           )}
 
-          {!loadingHistory && history.length === 0 && (
+          {!loadingHistory && !historyError && history.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
               <Bell style={{ width: 28, height: 28, color: "var(--gz-text-tertiary)", opacity: .4 }} />
               <p className="text-[13px]" style={{ color: "var(--gz-text-muted)" }}>Ainda não foram enviadas notificações.</p>

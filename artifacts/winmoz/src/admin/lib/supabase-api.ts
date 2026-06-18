@@ -1098,19 +1098,29 @@ export function useSendNotification() {
       actionButtonLabel?: string;
       actionButtonUrl?: string;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await adminSupabase.from("notifications").insert({
-        title:               payload.title,
-        subtitle:            payload.subtitle ?? null,
-        type:                payload.type ?? "notification",
-        target:              payload.target ?? "all",
-        target_user_ids:     payload.targetUserIds ?? null,
-        image_url:           payload.imageUrl ?? null,
-        action_button_label: payload.actionButtonLabel ?? null,
-        action_button_url:   payload.actionButtonUrl ?? null,
-        sent_by:             user?.id ?? null,
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+      const res = await fetch("/api/notifications/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          title:              payload.title,
+          subtitle:           payload.subtitle,
+          type:               payload.type ?? "notification",
+          target:             payload.target ?? "all",
+          targetUserIds:      payload.targetUserIds,
+          imageUrl:           payload.imageUrl,
+          actionButtonLabel:  payload.actionButtonLabel,
+          actionButtonUrl:    payload.actionButtonUrl,
+        }),
       });
-      if (error) throw error;
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: "Erro desconhecido" })) as { error?: string };
+        throw new Error(d.error ?? "Erro ao enviar notificação");
+      }
       return { ok: true };
     },
   });
@@ -1120,13 +1130,17 @@ export function useGetNotificationHistory() {
   return useQuery({
     queryKey: ["notification-history"],
     queryFn: async () => {
-      const { data, error } = await adminSupabase
-        .from("notifications")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      return data ?? [];
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token ?? "";
+      const res = await fetch("/api/notifications/history", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({ error: "Erro desconhecido" })) as { error?: string };
+        throw new Error(d.error ?? "Erro ao carregar histórico");
+      }
+      const d = await res.json() as { data?: unknown[]; missing_table?: boolean };
+      return d.data ?? [];
     },
     refetchInterval: 15000,
     staleTime: 5000,
