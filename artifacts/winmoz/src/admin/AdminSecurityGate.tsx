@@ -85,7 +85,22 @@ function formatCountdown(ms: number): string {
   return `${m.toString().padStart(2, "0")}m ${s.toString().padStart(2, "0")}s`;
 }
 
+function clearBanAndReload() {
+  localStorage.removeItem(BAN_KEY);
+  localStorage.removeItem(DEVICE_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
+  window.location.replace(window.location.pathname);
+}
+
 export default function AdminSecurityGate({ children }: { children: React.ReactNode }) {
+  // URL-based escape hatch: /admin?reset clears the ban
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("reset")) {
+      clearBanAndReload();
+    }
+  }, []);
+
   const [passed, setPassed] = useState(isSessionAuthenticated());
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -218,6 +233,17 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
           }}>
             DEVICE: {getDeviceId().slice(0, 16)}...
           </div>
+          <button
+            onClick={clearBanAndReload}
+            style={{
+              marginTop: 20, width: "100%", padding: "12px",
+              borderRadius: 12, border: "1px solid rgba(239,68,68,0.3)",
+              background: "rgba(239,68,68,0.08)", color: "rgba(239,68,68,0.8)",
+              fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Limpar Bloqueio e Tentar Novamente
+          </button>
         </motion.div>
       </div>
     );
@@ -270,6 +296,17 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
           <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 11, marginTop: 20 }}>
             ⚠️ Nova falha após este período resultará em bloqueio permanente.
           </p>
+          <button
+            onClick={clearBanAndReload}
+            style={{
+              marginTop: 16, width: "100%", padding: "12px",
+              borderRadius: 12, border: "1px solid rgba(245,158,11,0.3)",
+              background: "rgba(245,158,11,0.08)", color: "rgba(245,158,11,0.8)",
+              fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            Sou o Administrador — Limpar Bloqueio
+          </button>
         </motion.div>
       </div>
     );
