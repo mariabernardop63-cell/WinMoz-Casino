@@ -20,15 +20,42 @@ jobs:
         with:
           version: 9
 
-      - name: Install Expo CLI
-        run: npm install -g eas-cli
-
       - name: Install Dependencies
         run: pnpm install --no-frozen-lockfile
 
-      - name: Build APK with EAS
-        run: |
-          echo "${{ secrets.EXPO_TOKEN }}" > ~/.expo-token
-          eas build --platform android --profile preview --non-interactive
+      - name: Build Web Project (Vite)
+        run: pnpm run build
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VERCEL_PRODUCTION_URL: ${{ secrets.VERCEL_PRODUCTION_URL }}
+
+      - name: Capacitor Sync
+        run: |
+          npx cap diff android || npx cap add android
+          npx cap sync android
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Decode Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/mozbet-release.keystore
+
+      - name: Build and Sign Release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=mozbet-release.keystore \
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinMoz-Casino-Release-APK
+          path: android/app/build/outputs/apk/release/app-release.apk
