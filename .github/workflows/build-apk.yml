@@ -30,8 +30,11 @@ jobs:
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: pnpm
+
+      - name: Confirm Node version
+        run: node --version
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
@@ -70,39 +73,3 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | \
             base64 --decode > artifacts/winmoz/android/app/mozbet-release.keystore
-
-      - name: Cache Gradle
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: gradle-${{ runner.os }}-
-
-      - name: Build signed release APK
-        working-directory: artifacts/winmoz/android
-        run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon \
-            -Pandroid.injected.signing.store.file="$(pwd)/app/mozbet-release.keystore" \
-            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
-            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
-            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
-
-      - name: Verify APK exists
-        run: |
-          APK="artifacts/winmoz/android/app/build/outputs/apk/release/app-release.apk"
-          if [ ! -f "$APK" ]; then
-            echo "ERROR: APK not found!"
-            exit 1
-          fi
-          echo "✓ APK: $(du -sh $APK)"
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: MozBet-release-${{ github.run_number }}
-          path: artifacts/winmoz/android/app/build/outputs/apk/release/app-release.apk
-          retention-days: 90
-          if-no-files-found: error
