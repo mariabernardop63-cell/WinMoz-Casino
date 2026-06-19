@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, X, ArrowLeft, ShieldCheck, Loader2, Check } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { API_BASE } from "@/lib/apiBase";
 
 function WinMozLogo() {
   return (
@@ -64,18 +64,30 @@ export default function Registar() {
     if (!code) { setInviteStatus("idle"); return null; }
     setInviteStatus("checking");
     try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("my_invite_code", code.toUpperCase())
-        .maybeSingle();
-      if (error) { setInviteStatus("idle"); return null; } // DB error → allow through
-      const isValid = !!data;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 6000);
+      let isValid = false;
+      try {
+        const res = await fetch(
+          `${API_BASE}/validate-invite?code=${encodeURIComponent(code.toUpperCase())}`,
+          { signal: ctrl.signal }
+        );
+        if (res.ok) {
+          const json = await res.json();
+          isValid = !!json.valid;
+        } else {
+          // Server error → allow through (don't block signup)
+          setInviteStatus("idle");
+          return null;
+        }
+      } finally {
+        clearTimeout(timer);
+      }
       setInviteStatus(isValid ? "valid" : "invalid");
       return isValid;
     } catch {
       setInviteStatus("idle");
-      return null; // unexpected error → allow through
+      return null; // network/timeout error → allow through
     }
   };
 

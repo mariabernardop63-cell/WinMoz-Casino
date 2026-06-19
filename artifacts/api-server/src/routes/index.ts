@@ -250,7 +250,7 @@ router.post("/complete-registration", async (req, res) => {
 router.get("/validate-invite", async (req, res) => {
   try {
     const code = (req.query["code"] as string ?? "").toUpperCase().trim();
-    if (!code || !/^[A-Z0-9]{4,8}$/.test(code)) {
+    if (!code || !/^[A-Z0-9]{4,10}$/.test(code)) {
       res.json({ valid: false, reason: "format" });
       return;
     }
@@ -259,16 +259,28 @@ router.get("/validate-invite", async (req, res) => {
     const supabaseService = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"] ?? "";
 
     if (!supabaseUrl || !supabaseService) {
-      // Can't validate without env vars — allow through so signup isn't blocked
       res.json({ valid: true, reason: "env_missing" });
       return;
     }
 
     const admin = buildAdminClient(supabaseUrl, supabaseService);
-    const { data, error } = await admin
+
+    // Check my_invite_code first, then affiliate_invite_code
+    const { data: byGeneral } = await admin
       .from("profiles")
       .select("id")
       .eq("my_invite_code", code)
+      .maybeSingle();
+
+    if (byGeneral) {
+      res.json({ valid: true });
+      return;
+    }
+
+    const { data: byAffiliate, error } = await admin
+      .from("profiles")
+      .select("id")
+      .eq("affiliate_invite_code", code)
       .maybeSingle();
 
     if (error) {
@@ -276,7 +288,7 @@ router.get("/validate-invite", async (req, res) => {
       return;
     }
 
-    res.json({ valid: !!data });
+    res.json({ valid: !!byAffiliate });
   } catch {
     res.json({ valid: true, reason: "exception" }); // allow through on unexpected error
   }
