@@ -1,63 +1,110 @@
-name: Build Android APK
+name: 🤖 Build Android APK
+
 on:
   push:
-    branches: [ sdfsdfdsdfgfdsdfgf333 ]
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build:
+    name: Build & Sign Release APK
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 9
-
-      - name: Install Dependencies
-        run: pnpm install --no-frozen-lockfile
-
-      - name: Build Web Project (Vite)
-        # Usamos TSC_COMPILE_ON_ERROR para não travar o build por erros de tipo do backend
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VERCEL_PRODUCTION_URL: ${{ secrets.VERCEL_PRODUCTION_URL }}
-          TSC_COMPILE_ON_ERROR: "true"
-        run: pnpm run build --if-present
-
-      - name: Capacitor Sync
-        run: |
-          npx cap diff android || npx cap add android
-          npx cap sync android
-
-      - name: Setup Java JDK
+      - name: Setup Java 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: temurin
+          java-version: "17"
 
-      - name: Decode Keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/mozbet-release.keystore
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Build and Sign Release APK
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10"
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build web assets
+        working-directory: artifacts/winmoz
+        run: pnpm run build
+        env:
+          NODE_ENV: production
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - name: Add Android platform
+        working-directory: artifacts/winmoz
         run: |
-          cd android
-          ./gradlew assembleRelease \
-            -Pandroid.injected.signing.store.file=mozbet-release.keystore \
+          if [ ! -d "android" ]; then
+            echo "Generating Android project..."
+            npx cap add android
+          else
+            echo "Android project already exists."
+          fi
+        env:
+          CAPACITOR_SERVER_URL: ${{ secrets.VERCEL_PRODUCTION_URL }}
+
+      - name: Capacitor sync
+        working-directory: artifacts/winmoz
+        run: npx cap sync android
+        env:
+          CAPACITOR_SERVER_URL: ${{ secrets.VERCEL_PRODUCTION_URL }}
+
+      - name: Apply security patches
+        working-directory: artifacts/winmoz
+        run: bash ../../android-security/patch-android.sh android
+
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | \
+            base64 --decode > artifacts/winmoz/android/app/mozbet-release.keystore
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Build signed release APK
+        working-directory: artifacts/winmoz/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file="$(pwd)/app/mozbet-release.keystore" \
             -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
             -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
             -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
 
-      - name: Upload APK Artifact
+      - name: Verify APK exists
+        run: |
+          APK="artifacts/winmoz/android/app/build/outputs/apk/release/app-release.apk"
+          if [ ! -f "$APK" ]; then
+            echo "ERROR: APK not found!"
+            exit 1
+          fi
+          echo "✓ APK: $(du -sh $APK)"
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: WinMoz-Casino-Release-APK
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: MozBet-release-${{ github.run_number }}
+          path: artifacts/winmoz/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 90
+          if-no-files-found: error
