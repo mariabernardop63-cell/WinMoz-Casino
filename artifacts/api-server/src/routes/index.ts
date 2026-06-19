@@ -202,12 +202,27 @@ router.post("/complete-registration", async (req, res) => {
     if (invite_code_used && invite_code_used.trim().length >= 4) {
       const code = invite_code_used.toUpperCase().trim();
 
-      // Find the referrer by their invite code
-      const { data: referrerProfile } = await admin
+      // Find the referrer by their invite code (general OR affiliate code)
+      let referrerProfile: { id: string; is_affiliate: boolean } | null = null;
+
+      const { data: byMyCode } = await admin
         .from("profiles")
         .select("id, is_affiliate")
         .eq("my_invite_code", code)
         .maybeSingle();
+
+      if (byMyCode) {
+        referrerProfile = byMyCode as { id: string; is_affiliate: boolean };
+      } else {
+        const { data: byAffCode } = await admin
+          .from("profiles")
+          .select("id, is_affiliate")
+          .eq("affiliate_invite_code", code)
+          .maybeSingle();
+        if (byAffCode) {
+          referrerProfile = byAffCode as { id: string; is_affiliate: boolean };
+        }
+      }
 
       if (referrerProfile && referrerProfile.id !== user_id) {
         // Insert referral record — ON CONFLICT DO NOTHING so no duplicates

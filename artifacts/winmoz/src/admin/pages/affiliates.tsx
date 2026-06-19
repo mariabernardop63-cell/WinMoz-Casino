@@ -138,6 +138,7 @@ interface UserRow {
   phone: string | null;
   avatar_url: string | null;
   my_invite_code: string | null;
+  affiliate_invite_code: string | null;
   is_affiliate: boolean;
   affiliate_pending_earnings: number;
   affiliate_milestone_500_claimed: boolean;
@@ -174,10 +175,10 @@ export default function AffiliatesPage() {
        * to the minimal SELECT that we know always works.
        */
       const FULL_SELECT =
-        "id, full_name, phone, avatar_url, my_invite_code, is_affiliate, " +
+        "id, full_name, phone, avatar_url, my_invite_code, affiliate_invite_code, is_affiliate, " +
         "affiliate_pending_earnings, affiliate_milestone_500_claimed, " +
         "affiliate_milestone_2000_claimed";
-      const BASE_SELECT = "id, full_name, phone, avatar_url, my_invite_code, is_affiliate";
+      const BASE_SELECT = "id, full_name, phone, avatar_url, my_invite_code, affiliate_invite_code, is_affiliate";
 
       /* Build query — use let so we can chain .eq() and reassign */
       const buildQuery = (select: string) => {
@@ -244,6 +245,7 @@ export default function AffiliatesPage() {
             phone:                            p.phone ?? null,
             avatar_url:                       (p.avatar_url as string | null) ?? null,
             my_invite_code:                   p.my_invite_code ?? null,
+            affiliate_invite_code:            (p.affiliate_invite_code as string | null) ?? null,
             is_affiliate:                     !!p.is_affiliate,
             affiliate_pending_earnings:       Number(p.affiliate_pending_earnings ?? 0),
             affiliate_milestone_500_claimed:  !!p.affiliate_milestone_500_claimed,
@@ -280,13 +282,19 @@ export default function AffiliatesPage() {
         .update({ is_affiliate: !current })
         .eq("id", userId);
       if (error) throw error;
-      showToast(!current ? "Utilizador promovido a afiliado!" : "Estatuto de afiliado removido.");
-      setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_affiliate: !current } : u));
-      /* update summary stats */
-      setStats(prev => ({
-        ...prev,
-        total: !current ? prev.total + 1 : prev.total - 1,
-      }));
+
+      // When promoting to affiliate, generate a unique affiliate_invite_code if not set
+      if (!current) {
+        try {
+          await adminSupabase.rpc("generate_affiliate_code", { p_user_id: userId });
+        } catch {
+          // Non-critical — code can be generated later
+        }
+      }
+
+      showToast(!current ? "Utilizador promovido a afiliado! Código de afiliado gerado." : "Estatuto de afiliado removido.");
+      // Reload to get updated affiliate_invite_code
+      await loadData();
     } catch {
       showToast("Erro ao actualizar estatuto.", false);
     }
@@ -532,7 +540,8 @@ function UserCard({ user: u, toggling, onToggle, delay }: {
           </div>
           <p className="text-[11.5px] mt-0.5 font-medium" style={{ color: "var(--gz-text-muted)" }}>
             {u.phone ? `+258 ${u.phone}` : "Sem telemóvel"}
-            {u.my_invite_code && <span style={{ color: "var(--gz-text-tertiary)" }}> · Cód: <span style={{ color: V1, fontWeight: 700 }}>{u.my_invite_code}</span></span>}
+            {u.my_invite_code && <span style={{ color: "var(--gz-text-tertiary)" }}> · Convite: <span style={{ color: V1, fontWeight: 700 }}>{u.my_invite_code}</span></span>}
+            {u.is_affiliate && u.affiliate_invite_code && <span style={{ color: "var(--gz-text-tertiary)" }}> · Afiliado: <span style={{ color: V4, fontWeight: 700 }}>{u.affiliate_invite_code}</span></span>}
           </p>
         </div>
 

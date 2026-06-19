@@ -94,7 +94,7 @@ export default function ProgramaAfiliados() {
 
   useEffect(() => { loadStats(); }, [loadStats]);
 
-  const code = profile?.my_invite_code ?? "";
+  const code = (profile as any)?.affiliate_invite_code ?? profile?.my_invite_code ?? "";
   const shareLink = `https://mozbet.site/${code}`;
   const shareText = `🎮 Junta-te ao MozBet e ganha bónus! Usa o meu link: ${shareLink}`;
 

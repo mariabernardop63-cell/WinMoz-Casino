@@ -15,23 +15,30 @@ export default function ConvidarAmigos() {
   const [code, setCode] = useState("");
   const [copied, setCopied] = useState(false);
   const [referralCount, setReferralCount] = useState(0);
+  const [creditedCount, setCreditedCount] = useState(0);
 
   useEffect(() => {
     if (profile?.my_invite_code) {
       setCode(profile.my_invite_code);
     }
     if (profile?.id) {
-      supabase
-        .from("referrals")
-        .select("id", { count: "exact", head: true })
-        .eq("referrer_id", profile.id)
-        .then(({ count }) => {
-          if (count !== null) setReferralCount(count);
-        });
+      Promise.all([
+        supabase
+          .from("referrals")
+          .select("id", { count: "exact", head: true })
+          .eq("referrer_id", profile.id),
+        supabase
+          .from("invite_credits")
+          .select("id", { count: "exact", head: true })
+          .eq("referrer_id", profile.id),
+      ]).then(([refRes, creditRes]) => {
+        if (refRes.count !== null) setReferralCount(refRes.count);
+        if (creditRes.count !== null) setCreditedCount(creditRes.count);
+      });
     }
   }, [profile]);
 
-  const earned = referralCount * 2.5;
+  const earned = creditedCount * 2.5;
 
   const shareLink = `https://mozbet.site/${code}`;
   const shareText = `🎮 Junta-te ao MozBet e ganha bónus! Regista-te com o meu link: ${shareLink}`;
