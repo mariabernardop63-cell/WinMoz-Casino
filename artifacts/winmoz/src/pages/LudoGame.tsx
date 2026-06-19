@@ -1251,6 +1251,10 @@ export default function LudoGame() {
       : false
   );
   const winCreditedRef = useRef(false);
+  // Tracks the gameId for the current round (changes on rematch to avoid duplicate-check collision)
+  const currentGameIdRef = useRef(gameId);
+  // Holds the new gameId proposed by the rematch requester so both players use the same one
+  const rematchGameIdRef = useRef("");
 
   useEffect(()=>{piecesRef.current=pieces;},[pieces]);
   useEffect(()=>{phaseRef.current=phase;},[phase]);
@@ -1301,7 +1305,7 @@ export default function LudoGame() {
           const _wr = await fetch("/api/games/win", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_wt}` },
-            body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT }),
+            body: JSON.stringify({ gameId: currentGameIdRef.current, gameType: "Ludo", betAmount: BET_AMOUNT }),
           });
           const _wd = await _wr.json() as { ok: boolean; duplicate?: boolean; error?: string };
           if (!_wd.ok && !_wd.duplicate) throw new Error(_wd.error ?? "Win processing failed");
@@ -1630,7 +1634,7 @@ export default function LudoGame() {
           await fetch("/api/games/bet", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_bt}` },
-            body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName }),
+            body: JSON.stringify({ gameId: currentGameIdRef.current, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName }),
           });
           try{sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`,"1");}catch{}
           await supabase.from("matches").upsert({
@@ -1839,6 +1843,8 @@ export default function LudoGame() {
     });
 
     channel.on("broadcast",{ event:"rematch_request" },({ payload })=>{
+      // Store the new gameId proposed by the requester so the accepter uses the same one
+      if(payload.newGameId) rematchGameIdRef.current = payload.newGameId as string;
       setRematchRequester((payload.name as string) ?? opponentName);
       setRematchPhase("received");
     });
@@ -1855,10 +1861,11 @@ export default function LudoGame() {
           await fetch("/api/games/bet", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_rt}` },
-            body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName: opponentName ?? "adversário" }),
+            body: JSON.stringify({ gameId: rematchGameIdRef.current || currentGameIdRef.current, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName: opponentName ?? "adversário" }),
           });
           await refreshProfile();
         }
+        currentGameIdRef.current = rematchGameIdRef.current || currentGameIdRef.current;
         setRematchPhase("idle");
         resetGame();
         // Prevent channel re-subscribe from deducting the bet a second time
@@ -1900,7 +1907,7 @@ export default function LudoGame() {
               await fetch("/api/games/bet", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_nbT}` },
-                body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName }),
+                body: JSON.stringify({ gameId: currentGameIdRef.current, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName }),
               });
               // Persiste flag para não re-debitar se o componente remontar (back + resume)
               try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`, "1"); } catch { /* ignore */ }
@@ -2054,10 +2061,12 @@ export default function LudoGame() {
         if(!data||parseFloat(String(data.balance))<BET_AMOUNT){ setRematchPhase("no_balance"); return; }
         const { data: { session: _brS } } = await supabase.auth.getSession();
         const _brT = _brS?.access_token ?? "";
+        const _botNewId = `${currentGameIdRef.current}-r${Date.now()}`;
+        currentGameIdRef.current = _botNewId;
         await fetch("/api/games/bet", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_brT}` },
-          body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName: opponentName ?? "bot" }),
+          body: JSON.stringify({ gameId: _botNewId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName: opponentName ?? "bot" }),
         });
         await refreshProfile();
         resetGame();
@@ -2071,7 +2080,9 @@ export default function LudoGame() {
       const data    = await Promise.race([fetch,timeout]) as {balance:string|number}|null;
       if(!data||parseFloat(String(data.balance))<BET_AMOUNT){ setRematchPhase("no_balance"); return; }
       setRematchPhase("waiting");
-      channelRef.current?.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0] } });
+      const _newId = `${currentGameIdRef.current}-r${Date.now()}`;
+      rematchGameIdRef.current = _newId;
+      channelRef.current?.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0], newGameId: _newId } });
     } catch {
       setRematchPhase("no_balance");
     }
@@ -2088,13 +2099,15 @@ export default function LudoGame() {
         setRematchPhase("opp_no_balance"); return;
       }
       if(BET_AMOUNT>0){
+        const _acceptId = rematchGameIdRef.current || currentGameIdRef.current;
         const { data: { session: _raS } } = await supabase.auth.getSession();
         const _raT = _raS?.access_token ?? "";
         await fetch("/api/games/bet", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_raT}` },
-          body: JSON.stringify({ gameId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName: opponentName ?? "adversário" }),
+          body: JSON.stringify({ gameId: _acceptId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName: opponentName ?? "adversário" }),
         });
+        currentGameIdRef.current = _acceptId;
         await refreshProfile();
       }
       channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });

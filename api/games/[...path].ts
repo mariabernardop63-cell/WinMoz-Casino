@@ -15,26 +15,35 @@ async function handleBet(req: VercelRequest, res: VercelResponse, admin: ReturnT
     res.status(400).json({ ok: false, error: "Parâmetros inválidos" }); return;
   }
 
+  // Duplicate check using reference_id (exact match, immune to old text-search false positives)
   const { data: existing } = await admin
     .from("transactions").select("id").eq("user_id", userId).eq("type", "bet")
-    .ilike("description", `%${gameId}%`).maybeSingle();
-  if (existing) { res.json({ ok: true, duplicate: true }); return; }
+    .eq("reference_id", gameId).maybeSingle();
+  if (existing) {
+    const { data: prof } = await admin.from("profiles").select("balance").eq("id", userId).single();
+    res.json({ ok: true, duplicate: true, newBalance: parseFloat(String(prof?.balance ?? 0)) }); return;
+  }
 
   const { data: profileData, error: profileError } = await admin
     .from("profiles").select("balance").eq("id", userId).single();
   if (profileError || !profileData) { res.status(500).json({ ok: false, error: "Erro ao obter saldo" }); return; }
 
   const currentBalance = Math.round(Number((profileData as any).balance ?? 0) * 100) / 100;
-  if (currentBalance < betAmount) { res.status(400).json({ ok: false, error: "Saldo insuficiente" }); return; }
+  if (currentBalance < betAmount) { res.status(400).json({ ok: false, error: "Saldo insuficiente", balance: currentBalance }); return; }
 
   const newBalance = Math.round((currentBalance - betAmount) * 100) / 100;
   const { error: updateError } = await admin.from("profiles").update({ balance: newBalance }).eq("id", userId);
   if (updateError) { res.status(500).json({ ok: false, error: "Erro ao debitar saldo" }); return; }
 
+  const opp = typeof opponentName === "string" ? opponentName.slice(0, 60) : "adversário";
   await admin.from("transactions").insert({
-    user_id: userId, type: "bet", amount: -betAmount,
-    description: JSON.stringify({ gameId, gameType, opponentName: opponentName ?? "adversário" }),
-    status: "approved", created_at: new Date().toISOString(),
+    user_id: userId,
+    type: "bet",
+    amount: -betAmount,
+    description: `Aposta (${gameType}) vs ${opp}`,
+    reference_id: gameId,
+    status: "approved",
+    created_at: new Date().toISOString(),
   });
   res.json({ ok: true, newBalance });
 }
@@ -47,9 +56,10 @@ async function handleWin(req: VercelRequest, res: VercelResponse, admin: ReturnT
     res.status(400).json({ ok: false, error: "Parâmetros inválidos" }); return;
   }
 
+  // Duplicate check using reference_id
   const { data: existing } = await admin
     .from("transactions").select("id").eq("user_id", userId).eq("type", "win")
-    .ilike("description", `%${gameId}%`).maybeSingle();
+    .eq("reference_id", gameId).maybeSingle();
   if (existing) { res.json({ ok: true, duplicate: true }); return; }
 
   const prize = Math.floor(betAmount * 2 * (1 - PLATFORM_COMMISSION));
@@ -64,9 +74,13 @@ async function handleWin(req: VercelRequest, res: VercelResponse, admin: ReturnT
   if (updateError) { res.status(500).json({ ok: false, error: "Erro ao creditar saldo" }); return; }
 
   await admin.from("transactions").insert({
-    user_id: userId, type: "win", amount: prize,
-    description: JSON.stringify({ gameId, gameType, betAmount, prize }),
-    status: "approved", created_at: new Date().toISOString(),
+    user_id: userId,
+    type: "win",
+    amount: prize,
+    description: `Vitória (${gameType}) — prémio ${prize} MT`,
+    reference_id: gameId,
+    status: "approved",
+    created_at: new Date().toISOString(),
   });
   res.json({ ok: true, prize, newBalance });
 }
@@ -79,14 +93,16 @@ async function handleRefund(req: VercelRequest, res: VercelResponse, admin: Retu
     res.status(400).json({ ok: false, error: "Parâmetros inválidos" }); return;
   }
 
+  // Check original bet exists using reference_id
   const { data: betTx } = await admin
     .from("transactions").select("id").eq("user_id", userId).eq("type", "bet")
-    .ilike("description", `%${roomCode}%`).maybeSingle();
+    .eq("reference_id", roomCode).maybeSingle();
   if (!betTx) { res.json({ ok: true, skipped: true }); return; }
 
+  // Check no refund already issued
   const { data: existingRefund } = await admin
     .from("transactions").select("id").eq("user_id", userId).eq("type", "refund")
-    .ilike("description", `%${roomCode}%`).maybeSingle();
+    .eq("reference_id", roomCode).maybeSingle();
   if (existingRefund) { res.json({ ok: true, duplicate: true }); return; }
 
   const { data: profileData, error: profileError } = await admin
@@ -100,9 +116,13 @@ async function handleRefund(req: VercelRequest, res: VercelResponse, admin: Retu
   if (updateError) { res.status(500).json({ ok: false, error: "Erro ao creditar reembolso" }); return; }
 
   await admin.from("transactions").insert({
-    user_id: userId, type: "refund", amount,
-    description: JSON.stringify({ roomCode, gameType: gameType ?? "unknown", reason: "game_cancelled" }),
-    status: "approved", created_at: new Date().toISOString(),
+    user_id: userId,
+    type: "refund",
+    amount,
+    description: `Reembolso (${gameType ?? "jogo"}) — sala cancelada`,
+    reference_id: roomCode,
+    status: "approved",
+    created_at: new Date().toISOString(),
   });
   res.json({ ok: true, newBalance });
 }
@@ -123,7 +143,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(404).json({ error: "Not found" }); return;
   }
 
-  // ludo/dice needs no auth, just returns a random number
   if (route === "ludo/dice") {
     res.json({ value: Math.floor(Math.random() * 6) + 1 });
     return;
