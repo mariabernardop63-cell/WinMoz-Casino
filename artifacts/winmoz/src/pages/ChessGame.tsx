@@ -1020,11 +1020,13 @@ export default function ChessGame(){
         if(data){
           const { data: { session: _bs } } = await supabase.auth.getSession();
           const _bt = _bs?.access_token ?? "";
-          await fetch("/api/games/bet", {
+          const _cbr = await fetch("/api/games/bet", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_bt}` },
             body: JSON.stringify({ gameId: currentGameIdRef.current, gameType: "Xadrez", betAmount: BET, opponentName }),
           });
+          const _cbd = await _cbr.json() as { ok: boolean; duplicate?: boolean; error?: string };
+          if (!_cbd.ok && !_cbd.duplicate) throw new Error(_cbd.error ?? "Erro ao processar aposta");
           try{sessionStorage.setItem(`wm_bet_deducted_chess_${gameId}`,"1");}catch{}
           await supabase.from("matches").upsert({
             id:gameId,game_type:"xadrez",
@@ -1096,9 +1098,6 @@ export default function ChessGame(){
           const _wd = await _wr.json() as { ok: boolean; duplicate?: boolean };
           if (!_wd.ok && !_wd.duplicate) throw new Error("Win processing failed");
           await refreshProfile();
-        } else if(isBot){
-          // Bot won — insert zero-amount marker so admin panel can detect game ended
-          await supabase.from("transactions").insert({user_id:profile.id,type:"win",amount:0,description:`Fim de jogo (Xadrez) [bot] [bot-fim]`,status:"approved"});
         }
       }catch{winCreditedRef.current=false;}
     })();
@@ -1288,11 +1287,13 @@ export default function ChessGame(){
           if(data){
             const { data: { session: _rs } } = await supabase.auth.getSession();
             const _rt = _rs?.access_token ?? "";
-            await fetch("/api/games/bet", {
+            const _crr = await fetch("/api/games/bet", {
               method: "POST",
               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_rt}` },
               body: JSON.stringify({ gameId: rematchGameIdRef.current || currentGameIdRef.current, gameType: "Xadrez", betAmount: BET, opponentName: opponentName ?? "adversário" }),
             });
+            const _crd = await _crr.json() as { ok: boolean; duplicate?: boolean };
+            if (!_crd.ok && !_crd.duplicate) return;
           }
         }
         currentGameIdRef.current = rematchGameIdRef.current || currentGameIdRef.current;
@@ -1319,11 +1320,13 @@ export default function ChessGame(){
             if(data){
               const { data: { session: _nbS } } = await supabase.auth.getSession();
               const _nbT = _nbS?.access_token ?? "";
-              await fetch("/api/games/bet", {
+              const _cnbR = await fetch("/api/games/bet", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_nbT}` },
                 body: JSON.stringify({ gameId: currentGameIdRef.current, gameType: "Xadrez", betAmount: BET, opponentName }),
               });
+              const _cnbD = await _cnbR.json() as { ok: boolean; duplicate?: boolean; error?: string };
+              if (!_cnbD.ok && !_cnbD.duplicate) throw new Error(_cnbD.error ?? "Erro ao processar aposta");
               await refreshProfile();
             }
           }catch{betDeductedRef.current=false;}
@@ -1396,11 +1399,13 @@ export default function ChessGame(){
         const _acceptId = rematchGameIdRef.current || currentGameIdRef.current;
         const { data: { session: _raS } } = await supabase.auth.getSession();
         const _raT = _raS?.access_token ?? "";
-        await fetch("/api/games/bet", {
+        const _car = await fetch("/api/games/bet", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_raT}` },
           body: JSON.stringify({ gameId: _acceptId, gameType: "Xadrez", betAmount: BET, opponentName: opponentName ?? "adversário" }),
         });
+        const _cad = await _car.json() as { ok: boolean; duplicate?: boolean; error?: string };
+        if (!_cad.ok && !_cad.duplicate) throw new Error(_cad.error ?? "Saldo insuficiente");
         currentGameIdRef.current = _acceptId;
       }
       channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:true}});

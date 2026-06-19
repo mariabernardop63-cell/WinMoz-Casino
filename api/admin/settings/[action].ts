@@ -18,6 +18,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? "";
 
   if (!supabaseUrl || !supabaseServiceKey) {
+    if (action === "set") {
+      console.error("settings/set: missing env vars SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+      res.status(500).json({ error: "Serviço indisponível — variáveis de ambiente em falta" }); return;
+    }
     res.status(200).json({ setting: null }); return;
   }
 

@@ -1631,11 +1631,13 @@ export default function LudoGame() {
         if(data){
           const { data: { session: _bs } } = await supabase.auth.getSession();
           const _bt = _bs?.access_token ?? "";
-          await fetch("/api/games/bet", {
+          const _br2 = await fetch("/api/games/bet", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_bt}` },
             body: JSON.stringify({ gameId: currentGameIdRef.current, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName }),
           });
+          const _bd2 = await _br2.json() as { ok: boolean; duplicate?: boolean; error?: string };
+          if (!_bd2.ok && !_bd2.duplicate) throw new Error(_bd2.error ?? "Erro ao processar aposta");
           try{sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`,"1");}catch{}
           await supabase.from("matches").upsert({
             id:gameId,game_type:"ludo",
@@ -1858,11 +1860,13 @@ export default function LudoGame() {
           }
           const { data: { session: _rs } } = await supabase.auth.getSession();
           const _rt = _rs?.access_token ?? "";
-          await fetch("/api/games/bet", {
+          const _rr2 = await fetch("/api/games/bet", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_rt}` },
             body: JSON.stringify({ gameId: rematchGameIdRef.current || currentGameIdRef.current, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName: opponentName ?? "adversário" }),
           });
+          const _rd2 = await _rr2.json() as { ok: boolean; duplicate?: boolean; error?: string };
+          if (!_rd2.ok && !_rd2.duplicate) { setRematchPhase("no_balance"); return; }
           await refreshProfile();
         }
         currentGameIdRef.current = rematchGameIdRef.current || currentGameIdRef.current;
@@ -1904,11 +1908,13 @@ export default function LudoGame() {
             if(data){
               const { data: { session: _nbS } } = await supabase.auth.getSession();
               const _nbT = _nbS?.access_token ?? "";
-              await fetch("/api/games/bet", {
+              const _nbR = await fetch("/api/games/bet", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_nbT}` },
                 body: JSON.stringify({ gameId: currentGameIdRef.current, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName }),
               });
+              const _nbD = await _nbR.json() as { ok: boolean; duplicate?: boolean; error?: string };
+              if (!_nbD.ok && !_nbD.duplicate) throw new Error(_nbD.error ?? "Erro ao processar aposta");
               // Persiste flag para não re-debitar se o componente remontar (back + resume)
               try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`, "1"); } catch { /* ignore */ }
               await refreshProfile();
@@ -2063,11 +2069,13 @@ export default function LudoGame() {
         const _brT = _brS?.access_token ?? "";
         const _botNewId = `${currentGameIdRef.current}-r${Date.now()}`;
         currentGameIdRef.current = _botNewId;
-        await fetch("/api/games/bet", {
+        const _rr = await fetch("/api/games/bet", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_brT}` },
           body: JSON.stringify({ gameId: _botNewId, gameType: "Ludo", betAmount: BET_AMOUNT, opponentName: opponentName ?? "bot" }),
         });
+        const _rd = await _rr.json() as { ok: boolean; duplicate?: boolean; error?: string };
+        if (!_rd.ok && !_rd.duplicate) throw new Error(_rd.error ?? "Erro ao processar aposta");
         await refreshProfile();
         resetGame();
       }catch{ setRematchPhase("no_balance"); }

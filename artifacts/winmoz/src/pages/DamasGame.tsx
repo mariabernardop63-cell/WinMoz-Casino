@@ -821,11 +821,13 @@ export default function DamasGame() {
         if (data) {
           const { data: { session: _bs } } = await supabase.auth.getSession();
           const _bt = _bs?.access_token ?? "";
-          await fetch("/api/games/bet", {
+          const _br = await fetch("/api/games/bet", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_bt}` },
             body: JSON.stringify({ gameId: currentGameIdRef.current, gameType: "Damas", betAmount: BET, opponentName }),
           });
+          const _bd = await _br.json() as { ok: boolean; duplicate?: boolean; error?: string };
+          if (!_bd.ok && !_bd.duplicate) throw new Error(_bd.error ?? "Erro ao processar aposta");
           try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch {}
           await supabase.from("matches").upsert({
             id: gameId, game_type: "dama",
@@ -947,9 +949,6 @@ export default function DamasGame() {
           const _wd = await _wr.json() as { ok: boolean; duplicate?: boolean; error?: string };
           if (!_wd.ok && !_wd.duplicate) throw new Error(_wd.error ?? "Win processing failed");
           await refreshProfile();
-        } else if (isBot) {
-          // Bot won — insert zero-amount marker so admin panel can detect game ended
-          await supabase.from("transactions").insert({ user_id: profile.id, type: "win", amount: 0, description: `Fim de jogo (Damas) [bot] [bot-fim]`, status: "approved" });
         }
         // Update match record as finished (only player "w" to avoid duplicate updates)
         if (myColor === "w") {
@@ -1225,11 +1224,13 @@ export default function DamasGame() {
           if (data) {
             const { data: { session: _drS } } = await supabase.auth.getSession();
             const _drT = _drS?.access_token ?? "";
-            await fetch("/api/games/bet", {
+            const _dr = await fetch("/api/games/bet", {
               method: "POST",
               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_drT}` },
               body: JSON.stringify({ gameId: rematchGameIdRef.current || currentGameIdRef.current, gameType: "Damas", betAmount: BET, opponentName: opponentName ?? "adversário" }),
             });
+            const _drd = await _dr.json() as { ok: boolean; duplicate?: boolean };
+            if (!_drd.ok && !_drd.duplicate) return;
           }
         }
         currentGameIdRef.current = rematchGameIdRef.current || currentGameIdRef.current;
@@ -1267,11 +1268,13 @@ export default function DamasGame() {
             if(data){
               const { data: { session: _nbS } } = await supabase.auth.getSession();
               const _nbT = _nbS?.access_token ?? "";
-              await fetch("/api/games/bet", {
+              const _nbR = await fetch("/api/games/bet", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_nbT}` },
                 body: JSON.stringify({ gameId: currentGameIdRef.current, gameType: "Damas", betAmount: BET, opponentName }),
               });
+              const _nbD = await _nbR.json() as { ok: boolean; duplicate?: boolean; error?: string };
+              if (!_nbD.ok && !_nbD.duplicate) throw new Error(_nbD.error ?? "Erro ao processar aposta");
               // Persiste flag para não re-debitar se o componente remontar (back + resume)
               try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch { /* ignore */ }
               await refreshProfile();
@@ -1519,11 +1522,13 @@ export default function DamasGame() {
         const _acceptId = rematchGameIdRef.current || currentGameIdRef.current;
         const { data: { session: _raS } } = await supabase.auth.getSession();
         const _raT = _raS?.access_token ?? "";
-        await fetch("/api/games/bet", {
+        const _rar = await fetch("/api/games/bet", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${_raT}` },
           body: JSON.stringify({ gameId: _acceptId, gameType: "Damas", betAmount: BET, opponentName: opponentName ?? "adversário" }),
         });
+        const _rad = await _rar.json() as { ok: boolean; duplicate?: boolean; error?: string };
+        if (!_rad.ok && !_rad.duplicate) throw new Error(_rad.error ?? "Saldo insuficiente");
         currentGameIdRef.current = _acceptId;
       }
       channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
