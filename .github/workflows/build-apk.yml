@@ -33,9 +33,6 @@ jobs:
           node-version: "24"
           cache: pnpm
 
-      - name: Confirm Node version
-        run: node --version
-
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
@@ -51,10 +48,7 @@ jobs:
         working-directory: artifacts/winmoz
         run: |
           if [ ! -d "android" ]; then
-            echo "Generating Android project..."
             npx cap add android
-          else
-            echo "Android project already exists."
           fi
         env:
           CAPACITOR_SERVER_URL: ${{ secrets.VERCEL_PRODUCTION_URL }}
@@ -73,3 +67,46 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | \
             base64 --decode > artifacts/winmoz/android/app/mozbet-release.keystore
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Build signed release APK
+        working-directory: artifacts/winmoz/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file="$(pwd)/app/mozbet-release.keystore" \
+            -Pandroid.injected.signing.store.password="${{ secrets.KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.KEY_PASSWORD }}"
+
+      - name: Find APK and prepare for upload
+        run: |
+          echo "=== All APK files found ==="
+          find artifacts/winmoz/android -name "*.apk" 2>/dev/null || echo "None"
+          echo "=========================="
+          APK=$(find artifacts/winmoz/android/app/build -name "app-release.apk" 2>/dev/null | head -1)
+          if [ -z "$APK" ]; then
+            APK=$(find artifacts/winmoz/android/app/build -name "*.apk" ! -name "*unsigned*" 2>/dev/null | head -1)
+          fi
+          if [ -z "$APK" ]; then
+            echo "ERROR: No signed APK found!"
+            exit 1
+          fi
+          echo "✓ APK: $APK ($(du -sh $APK | cut -f1))"
+          cp "$APK" mozbet-release.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MozBet-release-${{ github.run_number }}
+          path: mozbet-release.apk
+          retention-days: 90
+          if-no-files-found: error
