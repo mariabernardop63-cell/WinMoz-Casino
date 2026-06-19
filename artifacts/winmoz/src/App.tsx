@@ -37,6 +37,7 @@ import Roleta from "@/pages/Roleta";
 import BilharEmBreve from "@/pages/BilharEmBreve";
 import NotificationBanner from "@/components/NotificationBanner";
 import MaintenancePage from "@/components/MaintenancePage";
+import CookieConsent from "@/components/CookieConsent";
 import { useState, useEffect } from "react";
 import { adminSupabase } from "@/admin/lib/supabase-api";
 
@@ -205,6 +206,7 @@ function AppContent() {
     <MaintenanceGate>
       <Router />
       <NotificationBanner />
+      <CookieConsent />
     </MaintenanceGate>
   );
 }

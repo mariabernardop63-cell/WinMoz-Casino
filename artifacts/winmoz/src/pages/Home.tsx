@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link, useLocation } from "wouter";
 import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp, Bell, User } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import HomeFooter from "@/components/HomeFooter";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSyntheticUser, generateWithdrawalAmount, getWithdrawalInterval, shouldBootWithdrawal, getLivePlayerCount, formatPlayerCount } from "@/lib/simulation";
 
@@ -1404,6 +1405,9 @@ export default function Home() {
               <circle cx="15.5" cy="11" r="1.5" fill="#7c3aed" />
             </svg>
           </motion.button>
+
+        {/* HOME FOOTER */}
+        <HomeFooter />
 
         {/* BOTTOM NAV */}
         <BottomNav />

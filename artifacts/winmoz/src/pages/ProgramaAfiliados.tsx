@@ -273,7 +273,7 @@ export default function ProgramaAfiliados() {
             </div>
             <div className="px-4 pb-3">
               <p className="text-white/25 text-[10px] leading-relaxed">
-                Ganhas 2,50 MT por cada aposta dos teus referidos (máx. 5 apostas por utilizador).
+                Ganhas 5 MT por cada aposta dos teus referidos (máx. 5 apostas por utilizador).
               </p>
             </div>
           </motion.div>

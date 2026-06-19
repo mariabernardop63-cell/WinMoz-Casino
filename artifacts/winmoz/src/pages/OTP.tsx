@@ -124,9 +124,8 @@ export default function OTP() {
       inputRefs.current[idx + 1]?.focus();
     }
 
-    const filled = next.join("");
-    if (filled.length === 6 && !filled.includes("")) {
-      handleVerify(filled);
+    if (!next.includes("") && next.length === 6) {
+      handleVerify(next.join(""));
     }
   };
 

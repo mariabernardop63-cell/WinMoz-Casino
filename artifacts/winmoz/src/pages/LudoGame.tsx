@@ -1627,6 +1627,7 @@ export default function LudoGame() {
             user_id:profile.id,type:"bet",amount:-BET_AMOUNT,
             description:`Aposta (Ludo) vs ${opponentName}`,status:"approved",
           });
+          fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile.id }) }).catch(() => {});
           try{sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`,"1");}catch{}
           await supabase.from("matches").upsert({
             id:gameId,game_type:"ludo",
@@ -1895,6 +1896,7 @@ export default function LudoGame() {
                 description: "Aposta de jogo (Ludo)",
                 status: "approved",
               });
+              fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile.id }) }).catch(() => {});
               // Persiste flag para não re-debitar se o componente remontar (back + resume)
               try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`, "1"); } catch { /* ignore */ }
               await refreshProfile();

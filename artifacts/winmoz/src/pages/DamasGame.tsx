@@ -819,6 +819,7 @@ export default function DamasGame() {
         if (data) {
           await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
           await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: `Aposta (Damas) [bot] vs ${opponentName}`, status: "approved" });
+          fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile.id }) }).catch(() => {});
           try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch {}
           await supabase.from("matches").upsert({
             id: gameId, game_type: "dama",
@@ -1254,6 +1255,7 @@ export default function DamasGame() {
             if(data){
               await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
               await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta de jogo (Damas)", status: "approved" });
+              fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile.id }) }).catch(() => {});
               // Persiste flag para não re-debitar se o componente remontar (back + resume)
               try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch { /* ignore */ }
               await refreshProfile();

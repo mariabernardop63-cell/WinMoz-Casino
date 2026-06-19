@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Settings as SettingsIcon, Bell, Shield, Globe, Database,
   Bot, Lock, Mail, Key, Eye, EyeOff, CheckCircle, AlertCircle,
-  Save, Wrench, Smartphone, Copy,
+  Save, Wrench, Smartphone, Copy, Link2, Phone, LayoutTemplate,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useGetPlatformSettings, useUpdatePlatformSetting } from "@/admin/lib/supabase-api";
@@ -217,12 +217,35 @@ export default function Settings() {
   const [savingWebhookToken, setSavingWebhookToken] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
 
+  // Footer settings
+  const [footerTagline, setFooterTagline] = useState("Joga. Aposta. Vence.");
+  const [footerPhone, setFooterPhone]     = useState("");
+  const [footerEmail, setFooterEmail]     = useState("");
+  const [footerAppUrl, setFooterAppUrl]   = useState("");
+  const [savingFooter, setSavingFooter]   = useState(false);
+
   useEffect(() => {
     if (platformSettings["sms_mpesa_number"]) setMpesaNum(platformSettings["sms_mpesa_number"]);
     if (platformSettings["sms_emola_number"]) setEmolaNum(platformSettings["sms_emola_number"]);
     if (platformSettings["sms_mpesa_name"])   setMpesaName(platformSettings["sms_mpesa_name"]);
     if (platformSettings["sms_emola_name"])   setEmolaName(platformSettings["sms_emola_name"]);
+    if (platformSettings["footer_tagline"])          setFooterTagline(platformSettings["footer_tagline"]);
+    if (platformSettings["footer_phone"])            setFooterPhone(platformSettings["footer_phone"]);
+    if (platformSettings["footer_email"])            setFooterEmail(platformSettings["footer_email"]);
+    if (platformSettings["footer_app_download_url"]) setFooterAppUrl(platformSettings["footer_app_download_url"]);
   }, [platformSettings]);
+
+  const handleSaveFooter = async () => {
+    setSavingFooter(true);
+    try {
+      await updateSetting.mutateAsync({ key: "footer_tagline",          value: footerTagline.trim() });
+      await updateSetting.mutateAsync({ key: "footer_phone",            value: footerPhone.trim() });
+      await updateSetting.mutateAsync({ key: "footer_email",            value: footerEmail.trim() });
+      await updateSetting.mutateAsync({ key: "footer_app_download_url", value: footerAppUrl.trim() });
+      toast.success("Rodapé guardado com sucesso");
+    } catch { toast.error("Erro ao guardar rodapé"); }
+    setSavingFooter(false);
+  };
 
   const handleSaveMpesa = async () => {
     if (!mpesaNum.trim()) { toast.error("Insere o número M-Pesa"); return; }
@@ -383,6 +406,76 @@ export default function Settings() {
               <FunctionalToggle settingKey="support_ai_mode" value={settings.support_ai_mode ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
             </div>
           </SettingRow>
+        </SectionCard>
+
+        {/* Footer & App Download */}
+        <SectionCard title="Rodapé & App" icon={LayoutTemplate} color="#8b5cf6" bg="rgba(139,92,246,0.1)">
+          <div style={{ paddingTop: 12, display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Tagline */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
+                Tagline do Rodapé
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(139,92,246,0.2)" }}>
+                <LayoutTemplate style={{ width: 14, height: 14, color: "#8b5cf6", flexShrink: 0 }} />
+                <input type="text" value={footerTagline} onChange={e => setFooterTagline(e.target.value)} placeholder="Ex: Joga. Aposta. Vence."
+                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
+              </div>
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
+                Telefone de Contacto
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(139,92,246,0.2)" }}>
+                <Phone style={{ width: 14, height: 14, color: "#8b5cf6", flexShrink: 0 }} />
+                <input type="text" value={footerPhone} onChange={e => setFooterPhone(e.target.value)} placeholder="Ex: +258 84 000 0000"
+                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
+              </div>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
+                E-mail de Contacto
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(139,92,246,0.2)" }}>
+                <Mail style={{ width: 14, height: 14, color: "#8b5cf6", flexShrink: 0 }} />
+                <input type="email" value={footerEmail} onChange={e => setFooterEmail(e.target.value)} placeholder="Ex: suporte@mozbet.co.mz"
+                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
+              </div>
+            </div>
+
+            {/* App download URL */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
+                Link de Download da App
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(139,92,246,0.2)" }}>
+                <Link2 style={{ width: 14, height: 14, color: "#8b5cf6", flexShrink: 0 }} />
+                <input type="url" value={footerAppUrl} onChange={e => setFooterAppUrl(e.target.value)} placeholder="https://play.google.com/..."
+                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 5 }}>URL para o botão "Descarregar App" no rodapé da página inicial.</p>
+            </div>
+
+            {/* Save button */}
+            <button onClick={handleSaveFooter} disabled={savingFooter}
+              style={{
+                padding: "11px 20px", borderRadius: 12, border: "none",
+                background: "linear-gradient(135deg, #8b5cf6, #6C5CE7)",
+                color: "#fff", fontWeight: 700, fontSize: 13,
+                display: "flex", alignItems: "center", gap: 8,
+                cursor: savingFooter ? "wait" : "pointer",
+                fontFamily: "inherit", alignSelf: "flex-start",
+                boxShadow: "0 4px 14px rgba(139,92,246,0.3)",
+              }}>
+              {savingFooter ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+              Guardar Rodapé
+            </button>
+          </div>
         </SectionCard>
 
         {/* Database */}
@@ -726,7 +819,7 @@ export default function Settings() {
             <Wrench style={{ width: 17, height: 17, color: "#a78bfa" }} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>Winmoz Admin v1.0</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>MOZBET Admin v1.0</div>
             <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Plataforma de jogos com apostas em tempo real</div>
           </div>
         </div>

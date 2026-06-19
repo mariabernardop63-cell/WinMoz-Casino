@@ -3,3 +3,5 @@
 - [Winmoz game fixes](winmoz-game-fixes.md) — payout 90%, rematch transaction records, resume DB check, notification persistence
 - [Winmoz bet deduction bug](winmoz-bet-deduction.md) — betDeductedRef must be persisted in sessionStorage to survive back+resume; active game record must include playerColor+playerName for resume URL
 - [Winmoz admin bots data source](winmoz-admin-bots.md) — matches table not in migration SQL, may not exist; bots page now reads from transactions with [bot] marker in description
+- [Winmoz affiliate reward API](winmoz-affiliate-reward.md) — /api/record-bet-reward.ts credits referrers on bet; regular=2.5 MT first bet only, affiliate=5 MT max 5 bets/referred; called fire-and-forget in DamasGame+LudoGame after initial bet inserts
+- [Winmoz OTP bug](winmoz-otp-bug.md) — JS string.includes("") is always true; fix is array.includes("") to check for empty slots; was preventing OTP auto-verify
