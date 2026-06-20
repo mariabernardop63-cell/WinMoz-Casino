@@ -1219,6 +1219,11 @@ export default function ChessGame(){
   }
 
   function executeMove(from:Sq,to:Sq,prom:PType){
+    // Game has definitively started — credit referral reward now (player's own first move)
+    if(BET>0&&!rewardFiredRef.current){
+      rewardFiredRef.current=true;
+      fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:profile?.id})}).catch(()=>{});
+    }
     const seq=Date.now();
     channelRef.current?.send({type:"broadcast",event:"chess_move",
       payload:{from,to,prom,seq}});
@@ -1242,6 +1247,11 @@ export default function ChessGame(){
       if(seq&&lastSeqRef.current[key]>=seq)return;
       if(seq)lastSeqRef.current[key]=seq;
       if(statusRef.current==="checkmate"||statusRef.current==="stalemate")return;
+      // Game has definitively started — credit referral reward now (opponent's first move)
+      if(BET>0&&!rewardFiredRef.current){
+        rewardFiredRef.current=true;
+        fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:profile?.id})}).catch(()=>{});
+      }
       applyMoveToState(boardRef.current,payload.from as Sq,payload.to as Sq,
         payload.prom as PType,epRef.current,turnRef.current);
     });
@@ -1315,10 +1325,8 @@ export default function ChessGame(){
     ch.on("presence",{event:"sync"},()=>{
       const state=ch.presenceState<{color:string}>();
       const all=Object.values(state).flat() as Array<{color:string}>;
-      if(BET>0&&!rewardFiredRef.current&&all.length>=2){
-        rewardFiredRef.current=true;
-        fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:profile?.id})}).catch(()=>{});
-      }
+      // Reward fires only on first real game move (see executeMove / chess_move handler)
+      void all;
     });
     return()=>{supabase.removeChannel(ch);};
   },[gameId,applyMoveToState]);

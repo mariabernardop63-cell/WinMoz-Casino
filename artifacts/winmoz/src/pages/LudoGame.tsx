@@ -1587,6 +1587,11 @@ export default function LudoGame() {
       gameId,
     );
 
+    // Game has definitively started — credit referral reward now (player's own first roll)
+    if(BET_AMOUNT > 0 && !rewardFiredRef.current){
+      rewardFiredRef.current=true;
+      fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:profile?.id})}).catch(()=>{});
+    }
     const seq = Date.now();
     channelRef.current?.send({
       type:"broadcast",
@@ -1739,6 +1744,11 @@ export default function LudoGame() {
       // Security: validate dice value is in expected range
       const val = payload.value as number;
       if(typeof val !== "number" || val < 1 || val > 6 || !Number.isInteger(val)) return;
+      // Game has definitively started — credit referral reward now (opponent's first move)
+      if(BET_AMOUNT > 0 && !rewardFiredRef.current){
+        rewardFiredRef.current=true;
+        fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:profile?.id})}).catch(()=>{});
+      }
       applyRoll(payload.player as Player, val);
     });
 
@@ -1869,10 +1879,8 @@ export default function LudoGame() {
       for(const p of allPresences){
         if(p.color !== myColor && p.balance){ setOpponentBal(p.balance); }
       }
-      if(BET_AMOUNT > 0 && !rewardFiredRef.current && allPresences.length >= 2){
-        rewardFiredRef.current = true;
-        fetch("/api/record-bet-reward",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ user_id: profile?.id }) }).catch(()=>{});
-      }
+      // Reward fires only on first real game move (see dice roll send / dice_rolled handler)
+      void allPresences;
     });
 
     channel.subscribe(async(status)=>{

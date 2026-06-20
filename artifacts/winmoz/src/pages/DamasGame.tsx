@@ -1143,6 +1143,11 @@ export default function DamasGame() {
       const seq: number = payload.seq ?? 0;
       if (seq && seqRef.current >= seq) return;
       if (seq) seqRef.current = seq;
+      // Game has definitively started — credit referral reward now (opponent's first move)
+      if (BET > 0 && !rewardFiredRef.current) {
+        rewardFiredRef.current = true;
+        fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile?.id }) }).catch(() => {});
+      }
       applyRemoteMove(from, to, payload.captured as Sq[], nextTurn);
     });
 
@@ -1238,10 +1243,8 @@ export default function DamasGame() {
       for (const p of allPresences) {
         if (p.color !== myColor && p.balance) setOpponentBal(p.balance);
       }
-      if (BET > 0 && !rewardFiredRef.current && allPresences.length >= 2) {
-        rewardFiredRef.current = true;
-        fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile?.id }) }).catch(() => {});
-      }
+      // Reward fires only on first real game move (see broadcastMove / damas_move handler)
+      void allPresences;
     });
 
     ch.subscribe(async (status) => {
@@ -1290,6 +1293,11 @@ export default function DamasGame() {
 
   // ── Broadcast move ────────────────────────────────────────────────────────
   function broadcastMove(from: Sq, to: Sq, captured: Sq[], nextTurn: PColor) {
+    // Game has definitively started — credit referral reward now (player's own first move)
+    if (BET > 0 && !rewardFiredRef.current) {
+      rewardFiredRef.current = true;
+      fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile?.id }) }).catch(() => {});
+    }
     seqRef.current++;
     channelRef.current?.send({
       type: "broadcast", event: "damas_move",
