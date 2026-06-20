@@ -60,38 +60,49 @@ export default function Registar() {
   const [inviteStatus, setInviteStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
   const inviteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Returns true=valid, false=invalid, null=network/server error
+  // Returns true=valid, false=invalid, null=supabase error (allow through)
   const checkInviteCode = async (code: string): Promise<boolean | null> => {
     if (!code) { setInviteStatus("idle"); return null; }
     setInviteStatus("checking");
     try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 8000);
-      let isValid = false;
-      let serverError = false;
-      try {
-        const res = await fetch(
-          `/api/validate-invite?code=${encodeURIComponent(code.toUpperCase())}`,
-          { signal: ctrl.signal }
-        );
-        if (res.ok) {
-          const json = await res.json();
-          isValid = !!json.valid;
-        } else {
-          serverError = true;
-        }
-      } finally {
-        clearTimeout(timer);
+      const upper = code.toUpperCase().trim();
+
+      // Check my_invite_code (regular user codes) — allowed by RLS for anon
+      const { data: byGeneral, error: err1 } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("my_invite_code", upper)
+        .maybeSingle();
+
+      if (err1) {
+        // Supabase error — don't block signup
+        setInviteStatus("idle");
+        return null;
       }
-      if (serverError) {
-        setInviteStatus("invalid");
-        return false;
+
+      if (byGeneral) {
+        setInviteStatus("valid");
+        return true;
       }
+
+      // Check affiliate_invite_code
+      const { data: byAffiliate, error: err2 } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("affiliate_invite_code", upper)
+        .maybeSingle();
+
+      if (err2) {
+        setInviteStatus("idle");
+        return null;
+      }
+
+      const isValid = !!byAffiliate;
       setInviteStatus(isValid ? "valid" : "invalid");
       return isValid;
     } catch {
-      setInviteStatus("invalid");
-      return false; // network/timeout error → treat as invalid
+      setInviteStatus("idle");
+      return null;
     }
   };
 
