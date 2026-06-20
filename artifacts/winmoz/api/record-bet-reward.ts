@@ -30,10 +30,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
 
   try {
-    /* 1. Find referral record */
+    /* 1. Find referral record — include referral_type (stored at registration).
+          This is the source of truth: do NOT use is_affiliate from the profile,
+          because an affiliate can also share their friend invite code (my_invite_code)
+          and in that case the reward must be 2.50 MT, not 5 MT. */
     const { data: referral } = await admin
       .from("referrals")
-      .select("referrer_id")
+      .select("referrer_id, referral_type")
       .eq("referred_id", user_id)
       .maybeSingle();
 
@@ -42,6 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const referrerId = referral.referrer_id as string;
+    const storedReferralType: string | null = (referral as any).referral_type ?? null;
 
     /* 2. Get referrer profile */
     const { data: referrer } = await admin
@@ -54,8 +58,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ credited: false, reason: "referrer_not_found" });
     }
 
-    /* 3. Affiliate flow */
-    if (referrer.is_affiliate) {
+    /* 3. Determine reward type:
+          - If referral_type is stored → use it (most accurate).
+          - If referral_type is null (old row before this fix) → fall back to is_affiliate. */
+    const isAffiliateReferral: boolean =
+      storedReferralType !== null
+        ? storedReferralType === "affiliate"
+        : !!(referrer as any).is_affiliate;
+
+    if (isAffiliateReferral) {
       const { data: existingBet } = await admin
         .from("affiliate_bets")
         .select("bet_count")

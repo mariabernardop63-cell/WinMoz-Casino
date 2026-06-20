@@ -63,8 +63,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .maybeSingle();
 
       if (!existingRef) {
-        /* Find referrer by my_invite_code first, then affiliate_invite_code */
+        /* Find referrer by my_invite_code first, then affiliate_invite_code.
+           IMPORTANT: store which type of code was used so the reward logic
+           does NOT rely on is_affiliate (an affiliate can also share their
+           friend invite code and should receive 2.50 MT, not 5 MT). */
         let referrerId: string | null = null;
+        let referralType: "friend" | "affiliate" = "friend";
 
         const { data: byGeneral } = await admin
           .from("profiles")
@@ -75,6 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         if (byGeneral?.id) {
           referrerId = byGeneral.id;
+          referralType = "friend";
         } else {
           const { data: byAffiliate } = await admin
             .from("profiles")
@@ -85,6 +90,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
           if (byAffiliate?.id) {
             referrerId = byAffiliate.id;
+            referralType = "affiliate";
           }
         }
 
@@ -92,6 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const { error: refErr } = await admin.from("referrals").insert({
             referrer_id: referrerId,
             referred_id: user_id,
+            referral_type: referralType,
           });
 
           if (refErr) {

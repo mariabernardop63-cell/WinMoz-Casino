@@ -202,25 +202,31 @@ router.post("/complete-registration", async (req, res) => {
     if (invite_code_used && invite_code_used.trim().length >= 4) {
       const code = invite_code_used.toUpperCase().trim();
 
-      // Find the referrer by their invite code (general OR affiliate code)
-      let referrerProfile: { id: string; is_affiliate: boolean } | null = null;
+      /* Find the referrer and record WHICH type of code was used.
+         This is critical: an affiliate can share their my_invite_code (friend invite)
+         and in that case the reward must be 2.50 MT (friend), NOT 5 MT (affiliate).
+         We must NOT rely on is_affiliate at reward time — we store referral_type here. */
+      let referrerProfile: { id: string } | null = null;
+      let referralType: "friend" | "affiliate" = "friend";
 
       const { data: byMyCode } = await admin
         .from("profiles")
-        .select("id, is_affiliate")
+        .select("id")
         .eq("my_invite_code", code)
         .maybeSingle();
 
       if (byMyCode) {
-        referrerProfile = byMyCode as { id: string; is_affiliate: boolean };
+        referrerProfile = byMyCode as { id: string };
+        referralType = "friend";
       } else {
         const { data: byAffCode } = await admin
           .from("profiles")
-          .select("id, is_affiliate")
+          .select("id")
           .eq("affiliate_invite_code", code)
           .maybeSingle();
         if (byAffCode) {
-          referrerProfile = byAffCode as { id: string; is_affiliate: boolean };
+          referrerProfile = byAffCode as { id: string };
+          referralType = "affiliate";
         }
       }
 
@@ -229,6 +235,7 @@ router.post("/complete-registration", async (req, res) => {
         const { error: refErr } = await admin.from("referrals").insert({
           referrer_id: referrerProfile.id,
           referred_id: user_id,
+          referral_type: referralType,
         });
 
         if (refErr && !refErr.message.includes("duplicate") && !refErr.message.includes("unique")) {
@@ -267,9 +274,12 @@ router.post("/record-bet-reward", async (req, res) => {
     const referredId = userData.user.id;
 
     // Look up the referral record for this user
+    // IMPORTANT: use referral_type (stored at registration) — NOT is_affiliate.
+    // An affiliate can share their friend invite code (my_invite_code) and must
+    // receive 2.50 MT for that referral, not 5 MT.
     const { data: referralRow, error: refErr } = await admin
       .from("referrals")
-      .select("id, referrer_id, reward_paid")
+      .select("id, referrer_id, reward_paid, referral_type")
       .eq("referred_id", referredId)
       .maybeSingle();
 
@@ -280,8 +290,10 @@ router.post("/record-bet-reward", async (req, res) => {
 
     const referrerId: string = (referralRow as any).referrer_id;
     const rewardAlreadyPaid: boolean = !!(referralRow as any).reward_paid;
+    // referral_type is the source of truth; fall back to checking is_affiliate
+    // only for old rows that predate this fix (referral_type will be null/missing).
+    const storedReferralType: string | null = (referralRow as any).referral_type ?? null;
 
-    // Get referrer profile to know if they are an affiliate
     const { data: referrerProfile } = await admin
       .from("profiles")
       .select("id, is_affiliate, balance, affiliate_pending_earnings")
@@ -292,7 +304,13 @@ router.post("/record-bet-reward", async (req, res) => {
       res.json({ success: false, reason: "referrer_not_found" }); return;
     }
 
-    const isAffiliate: boolean = !!(referrerProfile as any).is_affiliate;
+    // Determine reward type:
+    // 1. If referral_type is stored → use it (most accurate).
+    // 2. If referral_type is missing (old row) → fall back to is_affiliate.
+    const isAffiliate: boolean =
+      storedReferralType !== null
+        ? storedReferralType === "affiliate"
+        : !!(referrerProfile as any).is_affiliate;
 
     if (isAffiliate) {
       // ── AFFILIATE LOGIC: 5 MT per bet, up to 5 bets per referred friend ──
