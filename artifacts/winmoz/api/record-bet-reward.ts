@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 
-const REGULAR_REWARD   = 2.5;  // MT credited to referrer on referred user's first bet
-const AFFILIATE_REWARD = 5.0;  // MT credited per bet to affiliate's pending earnings
-const AFFILIATE_MAX    = 5;    // Max rewarded bets per referred user for affiliates
+const REGULAR_REWARD   = 2.5;
+const AFFILIATE_REWARD = 5.0;
+const AFFILIATE_MAX    = 5;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") {
@@ -15,10 +15,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: "user_id is required" });
   }
 
-  const supabaseUrl  = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "";
-  const serviceKey   = process.env["SUPABASE_SERVICE_ROLE_KEY"]
-    ?? process.env["VITE_SUPABASE_SERVICE_ROLE"]
-    ?? process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"] ?? "";
+  const supabaseUrl = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "";
+  const serviceKey  =
+    process.env["SUPABASE_SERVICE_ROLE_KEY"] ??
+    process.env["VITE_SUPABASE_SERVICE_ROLE"] ??
+    process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"] ?? "";
 
   if (!supabaseUrl || !serviceKey) {
     return res.status(200).json({ credited: false, reason: "env_missing" });
@@ -29,7 +30,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   });
 
   try {
-    /* 1. Find referral record for this user */
+    /* 1. Find referral record */
     const { data: referral } = await admin
       .from("referrals")
       .select("referrer_id")
@@ -68,7 +69,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ credited: false, reason: "max_bets_reached" });
       }
 
-      /* Upsert affiliate_bets row */
       if (existingBet) {
         await admin
           .from("affiliate_bets")
@@ -83,14 +83,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
 
-      /* Credit pending earnings */
       const currentPending = parseFloat(String(referrer.affiliate_pending_earnings ?? 0));
       await admin
         .from("profiles")
         .update({ affiliate_pending_earnings: currentPending + AFFILIATE_REWARD })
         .eq("id", referrerId);
 
-      /* Record transaction for visibility */
       await admin.from("transactions").insert({
         user_id:     referrerId,
         type:        "affiliate_bonus",
@@ -102,31 +100,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ credited: true, type: "affiliate", amount: AFFILIATE_REWARD });
     }
 
-    /* 4. Regular referral flow — reward 2.5 MT only on first bet */
-    const { count } = await admin
-      .from("transactions")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", referrerId)
-      .eq("type", "referral_bonus")
-      .ilike("description", `%${user_id}%`);
+    /* 4. Regular referral flow — use invite_credits for idempotency
+          (same table used by process_bet_reward RPC, prevents double rewards) */
+    const { data: existingCredit } = await admin
+      .from("invite_credits")
+      .select("id")
+      .eq("referrer_id", referrerId)
+      .eq("referred_id", user_id)
+      .maybeSingle();
 
-    if ((count ?? 0) > 0) {
+    if (existingCredit) {
       return res.status(200).json({ credited: false, reason: "already_rewarded" });
     }
 
-    /* Credit balance */
     const currentBal = parseFloat(String(referrer.balance ?? 0));
     await admin
       .from("profiles")
       .update({ balance: currentBal + REGULAR_REWARD })
       .eq("id", referrerId);
 
-    /* Record transaction */
+    await admin.from("invite_credits").insert({
+      referrer_id: referrerId,
+      referred_id: user_id,
+    });
+
     await admin.from("transactions").insert({
       user_id:     referrerId,
       type:        "referral_bonus",
       amount:      REGULAR_REWARD,
-      description: `Bónus de convite: amigo ${user_id} fez a primeira aposta`,
+      description: "Bónus de convite: amigo fez a primeira aposta",
       status:      "approved",
     });
 

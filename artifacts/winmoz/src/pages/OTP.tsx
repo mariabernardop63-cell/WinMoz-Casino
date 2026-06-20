@@ -82,26 +82,43 @@ export default function OTP() {
         const pendingRaw = sessionStorage.getItem("pendingReg");
         const pending = pendingRaw ? JSON.parse(pendingRaw) : {};
         if (pending.full_name || pending.phone || pending.invite_code_used) {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 5000);
-          try {
-            await fetch(`${API_BASE}/complete-registration`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              signal: ctrl.signal,
-              body: JSON.stringify({
-                user_id: data.session.user.id,
-                full_name: pending.full_name,
-                phone: pending.phone,
-                invite_code_used: pending.invite_code_used,
-              }),
-            });
-          } finally {
-            clearTimeout(timer);
+          const profileUpdate: Record<string, unknown> = {};
+          if (pending.full_name) profileUpdate.full_name = pending.full_name;
+          if (pending.phone) profileUpdate.phone = pending.phone.replace(/\D/g, "");
+          if (pending.invite_code_used) profileUpdate.invite_code_used = pending.invite_code_used;
+
+          // PRIMARY: update profile directly via Supabase client.
+          // This triggers the fn_auto_link_referral DB trigger server-side,
+          // which reliably creates the referral entry without any API call.
+          const { error: updateErr } = await supabase
+            .from("profiles")
+            .update(profileUpdate)
+            .eq("id", data.session.user.id);
+
+          if (updateErr) {
+            // FALLBACK: if direct update fails, try the API
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 8000);
+            try {
+              await fetch(`${API_BASE}/complete-registration`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                signal: ctrl.signal,
+                body: JSON.stringify({
+                  user_id: data.session.user.id,
+                  full_name: pending.full_name,
+                  phone: pending.phone,
+                  invite_code_used: pending.invite_code_used,
+                }),
+              });
+            } finally {
+              clearTimeout(timer);
+            }
           }
+
           sessionStorage.removeItem("pendingReg");
         }
-      } catch { /* non-critical */ }
+      } catch { /* non-critical — profile update is best-effort */ }
       setVerifying(false);
       setLocation("/splash");
     } else if (otpType === "recovery") {
