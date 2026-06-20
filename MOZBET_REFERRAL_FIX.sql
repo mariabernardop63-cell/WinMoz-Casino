@@ -105,8 +105,10 @@ CREATE TRIGGER trg_auto_link_referral
 
 -- ── 4. CORRIGIR process_bet_reward (RPC chamada pelo Apostar.tsx) ──
 -- Versão completa que trata convite normal (2.5 MT) e afiliado (5 MT × 5).
+-- Necessário DROP primeiro porque o tipo de retorno mudou.
 
-CREATE OR REPLACE FUNCTION process_bet_reward()
+DROP FUNCTION IF EXISTS process_bet_reward();
+CREATE FUNCTION process_bet_reward()
 RETURNS JSON AS $$
 DECLARE
   v_user_id      UUID;
