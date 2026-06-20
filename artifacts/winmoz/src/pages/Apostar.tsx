@@ -1066,17 +1066,11 @@ export default function Apostar() {
   const canStart = selectedBet !== null;
 
   /* ── Trigger referral reward when this user places their first bet ── */
-  const triggerBetReward = async () => {
+  const triggerBetReward = () => {
     if (!user?.id) return;
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return;
-      fetch(`${API_BASE}/record-bet-reward`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-      }).catch(() => { /* fire-and-forget — reward failure doesn't block the game */ });
-    } catch { /* ignore */ }
+    // Calls a SECURITY DEFINER Supabase function — no API server needed, bypasses RLS
+    // Fire-and-forget: reward failure never blocks the game
+    supabase.rpc("process_bet_reward").then(() => {}).catch(() => {});
   };
 
   const handleStart = async () => {
