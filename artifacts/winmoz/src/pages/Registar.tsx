@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, X, ArrowLeft, ShieldCheck, Loader2, Check } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import { API_BASE } from "@/lib/apiBase";
 
 function WinMozLogo() {
@@ -59,35 +60,38 @@ export default function Registar() {
   const [inviteStatus, setInviteStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
   const inviteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Returns true=valid, false=invalid, null=unknown (allow through)
+  // Returns true=valid, false=invalid, null=network/server error
   const checkInviteCode = async (code: string): Promise<boolean | null> => {
     if (!code) { setInviteStatus("idle"); return null; }
     setInviteStatus("checking");
     try {
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 6000);
+      const timer = setTimeout(() => ctrl.abort(), 8000);
       let isValid = false;
+      let serverError = false;
       try {
         const res = await fetch(
-          `${API_BASE}/validate-invite?code=${encodeURIComponent(code.toUpperCase())}`,
+          `/api/validate-invite?code=${encodeURIComponent(code.toUpperCase())}`,
           { signal: ctrl.signal }
         );
         if (res.ok) {
           const json = await res.json();
           isValid = !!json.valid;
         } else {
-          // Server error → allow through (don't block signup)
-          setInviteStatus("idle");
-          return null;
+          serverError = true;
         }
       } finally {
         clearTimeout(timer);
       }
+      if (serverError) {
+        setInviteStatus("invalid");
+        return false;
+      }
       setInviteStatus(isValid ? "valid" : "invalid");
       return isValid;
     } catch {
-      setInviteStatus("idle");
-      return null; // network/timeout error → allow through
+      setInviteStatus("invalid");
+      return false; // network/timeout error → treat as invalid
     }
   };
 
@@ -147,7 +151,7 @@ export default function Registar() {
             setErrors({ invite: "Código de convite inválido ou inexistente" });
             return;
           }
-          // result === true (valid) or null (DB/network error → allow through)
+          // result === true → valid code, proceed
           setDir(1); setStep(3); setErrors({});
           return;
         }
