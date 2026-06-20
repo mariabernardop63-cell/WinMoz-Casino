@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .from("affiliate_bets")
         .select("bet_count")
         .eq("affiliate_id", referrerId)
-        .eq("referred_id", user_id)
+        .eq("referred_user_id", user_id)
         .maybeSingle();
 
       const currentCount = (existingBet?.bet_count as number | null) ?? 0;
@@ -74,12 +74,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .from("affiliate_bets")
           .update({ bet_count: currentCount + 1 })
           .eq("affiliate_id", referrerId)
-          .eq("referred_id", user_id);
+          .eq("referred_user_id", user_id);
       } else {
         await admin.from("affiliate_bets").insert({
-          affiliate_id: referrerId,
-          referred_id:  user_id,
-          bet_count:    1,
+          affiliate_id:     referrerId,
+          referred_user_id: user_id,
+          bet_count:        1,
         });
       }
 
