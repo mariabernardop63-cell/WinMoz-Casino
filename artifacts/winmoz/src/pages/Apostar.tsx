@@ -4,7 +4,7 @@ import { useRoute, useLocation, Link } from "wouter";
 import {
   ChevronLeft, Star, Wifi, Gamepad2, Zap, Trophy,
   XCircle, RotateCcw, AlertTriangle, Swords, Users,
-  CreditCard, Smartphone, CheckCircle2, Clock, X, Pencil, Phone, Copy,
+  CreditCard, Smartphone, CheckCircle2, Clock, X, Pencil, Phone, Copy, Hash,
 } from "lucide-react";
 import { supabase, getSessionWithRefresh, isSessionExpiredError } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -117,7 +117,7 @@ function fmtBalance(v: number) {
 
 type GameMode  = "solo" | "squad";
 type PayMethod = "poker" | "carteira";
-type Screen    = "bet" | "processing" | "rejected" | "matchmaking" | "matched" | "timeout" | "pin-confirmation";
+type Screen    = "bet" | "processing" | "rejected" | "matchmaking" | "matched" | "timeout" | "pin-confirmation" | "sala-menu" | "sala-aguardar" | "sala-entrar";
 
 /* ── Processing Screen (Conta Poker only) ── */
 function ProcessingScreen() {
@@ -1027,7 +1027,7 @@ function MobileWalletPhoneField({
 export default function Apostar() {
   const [, params]   = useRoute("/apostar/:gameId");
   const [, setLocation] = useLocation();
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile } = useAuth();
 
   const gameId = params?.gameId ?? "damas";
 
@@ -1051,6 +1051,143 @@ export default function Apostar() {
 
   /* Verified deposit txId (for crediting back on bet cancel) */
   const [verifiedDepositTxId, setVerifiedDepositTxId] = useState<string | null>(null);
+
+  /* ── Sala Privada state ── */
+  const [salaCode, setSalaCode]     = useState<string | null>(null);
+  const [salaRoomId, setSalaRoomId] = useState<string | null>(null);
+  const [salaInput, setSalaInput]   = useState("");
+  const [salaError, setSalaError]   = useState("");
+  const [salaLoading, setSalaLoading] = useState(false);
+  const salaChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  useEffect(() => () => {
+    if (salaChannelRef.current) { supabase.removeChannel(salaChannelRef.current); salaChannelRef.current = null; }
+  }, []);
+
+  function generateRoomCode(): string {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let code = "";
+    for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
+  }
+
+  async function handleCriarSala() {
+    if (!user?.id || !selectedBet || salaLoading) return;
+    setSalaLoading(true); setSalaError("");
+    try {
+      const { data: pd } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
+      const bal = parseFloat(String(pd?.balance ?? "0"));
+      if (bal < selectedBet) { setSalaError("Saldo insuficiente."); setSalaLoading(false); return; }
+      const code = generateRoomCode();
+      await supabase.from("profiles").update({ balance: bal - selectedBet }).eq("id", user.id);
+      await supabase.from("transactions").insert({
+        user_id: user.id, type: "bet", amount: -selectedBet,
+        description: `Sala privada (${gameId}) — código ${code}`, status: "approved",
+      });
+      const { data: room, error: rErr } = await supabase.from("game_rooms")
+        .insert({ code, creator_id: user.id, game_type: gameId, bet_amount: selectedBet, status: "waiting" })
+        .select("id").single();
+      if (rErr || !room) {
+        await supabase.from("profiles").update({ balance: bal }).eq("id", user.id);
+        setSalaError("Erro ao criar sala. Tenta de novo."); setSalaLoading(false); return;
+      }
+      setSalaCode(code); setSalaRoomId(room.id);
+      const ch = supabase.channel(`sala:${code}`);
+      ch.on("broadcast", { event: "joiner_ready" }, ({ payload }) => {
+        supabase.removeChannel(ch); salaChannelRef.current = null;
+        const gId      = payload.gameId as string;
+        const jName    = payload.joinerName as string;
+        const myEnc    = encodeURIComponent(profile?.full_name ?? "Jogador");
+        const oppEnc   = encodeURIComponent(jName);
+        const bet      = selectedBet;
+        try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gId}`,  "1"); } catch {}
+        try { sessionStorage.setItem(`wm_bet_deducted_damas_${gId}`, "1"); } catch {}
+        try { sessionStorage.setItem(`wm_bet_deducted_chess_${gId}`, "1"); } catch {}
+        setScreen("matched");
+        let dest = "/";
+        if (gameId === "ludo")   dest = `/ludo-jogo?gameId=${gId}&color=blue&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+        else if (gameId === "xadrez") dest = `/xadrez-jogo?gameId=${gId}&color=white&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+        else if (gameId === "damas")  dest = `/damas-jogo?gameId=${gId}&color=w&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+        setTimeout(() => setLocation(dest), 2200);
+      });
+      ch.subscribe();
+      salaChannelRef.current = ch;
+      await refreshProfile?.();
+      setSalaLoading(false);
+      setScreen("sala-aguardar");
+    } catch { setSalaError("Erro inesperado. Tenta de novo."); setSalaLoading(false); }
+  }
+
+  async function handleCancelarSala() {
+    if (!user?.id || salaLoading) return;
+    setSalaLoading(true);
+    try {
+      if (salaRoomId) {
+        const { data: room } = await supabase.from("game_rooms").select("status, bet_amount").eq("id", salaRoomId).single();
+        if (room?.status === "waiting") {
+          await supabase.from("game_rooms").delete().eq("id", salaRoomId);
+          const { data: pd } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
+          const refund = Number(room.bet_amount) || selectedBet || 0;
+          await supabase.from("profiles").update({ balance: parseFloat(String(pd?.balance ?? "0")) + refund }).eq("id", user.id);
+          await supabase.from("transactions").insert({
+            user_id: user.id, type: "win", amount: refund,
+            description: `Reembolso: sala cancelada (${gameId})`, status: "approved",
+          });
+          await refreshProfile?.();
+        }
+      }
+      if (salaChannelRef.current) { supabase.removeChannel(salaChannelRef.current); salaChannelRef.current = null; }
+      setSalaCode(null); setSalaRoomId(null);
+    } catch { /* ignore */ }
+    setSalaLoading(false);
+    setScreen("bet");
+  }
+
+  async function handleEntrarSala() {
+    if (!user?.id || !salaInput.trim() || salaLoading) return;
+    setSalaLoading(true); setSalaError("");
+    const code = salaInput.trim().toUpperCase();
+    try {
+      const { data: room } = await supabase.from("game_rooms").select("*").eq("code", code).eq("status", "waiting").maybeSingle();
+      if (!room) { setSalaError("Sala não encontrada ou já preenchida."); setSalaLoading(false); return; }
+      if (room.creator_id === user.id) { setSalaError("Não podes entrar na tua própria sala."); setSalaLoading(false); return; }
+      if (room.game_type !== gameId) { setSalaError(`Esta sala é de ${room.game_type}. Muda o jogo.`); setSalaLoading(false); return; }
+      if (Number(room.bet_amount) !== selectedBet) {
+        setSalaError(`Esta sala tem aposta de ${room.bet_amount} MT. Seleciona esse valor.`);
+        setSalaLoading(false); return;
+      }
+      const { data: pd } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
+      const bal = parseFloat(String(pd?.balance ?? "0"));
+      if (bal < Number(room.bet_amount)) { setSalaError("Saldo insuficiente."); setSalaLoading(false); return; }
+      const gId = `sala_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      await supabase.from("profiles").update({ balance: bal - Number(room.bet_amount) }).eq("id", user.id);
+      await supabase.from("transactions").insert({
+        user_id: user.id, type: "bet", amount: -Number(room.bet_amount),
+        description: `Sala privada (${room.game_type}) — código ${code}`, status: "approved",
+      });
+      await supabase.from("game_rooms").update({ status: "matched", joiner_id: user.id }).eq("id", room.id);
+      try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gId}`,  "1"); } catch {}
+      try { sessionStorage.setItem(`wm_bet_deducted_damas_${gId}`, "1"); } catch {}
+      try { sessionStorage.setItem(`wm_bet_deducted_chess_${gId}`, "1"); } catch {}
+      const joinerName = profile?.full_name ?? "Jogador";
+      const ch = supabase.channel(`sala:${code}`);
+      ch.subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await ch.send({ type: "broadcast", event: "joiner_ready", payload: { gameId: gId, joinerName } });
+          supabase.removeChannel(ch);
+        }
+      });
+      await refreshProfile?.();
+      const myEnc  = encodeURIComponent(joinerName);
+      const oppEnc = encodeURIComponent("Adversário");
+      let dest = "/";
+      if (room.game_type === "ludo")   dest = `/ludo-jogo?gameId=${gId}&color=green&bet=${room.bet_amount}&opp=${oppEnc}&myname=${myEnc}`;
+      else if (room.game_type === "xadrez") dest = `/xadrez-jogo?gameId=${gId}&color=black&bet=${room.bet_amount}&opp=${oppEnc}&myname=${myEnc}`;
+      else if (room.game_type === "damas")  dest = `/damas-jogo?gameId=${gId}&color=b&bet=${room.bet_amount}&opp=${oppEnc}&myname=${myEnc}`;
+      setSalaLoading(false);
+      setScreen("matched");
+      setTimeout(() => setLocation(dest), 2200);
+    } catch { setSalaError("Erro ao entrar na sala. Tenta de novo."); setSalaLoading(false); }
+  }
 
   /* Live player counts */
   const [tick, setTick] = useState(0);
@@ -1106,6 +1243,121 @@ export default function Apostar() {
   };
 
   const recommendedGames = ALL_GAMES.filter(g => g.id !== gameId);
+
+  /* ── Sala Menu ── */
+  if (screen === "sala-menu") {
+    const gameName = ALL_GAMES.find(g => g.id === gameId)?.label ?? gameId;
+    return (
+      <div style={{ minHeight: "100vh", background: "#080810", display: "flex", justifyContent: "center" }}>
+        <div style={{ width: "100%", maxWidth: 430, display: "flex", flexDirection: "column", minHeight: "100vh", padding: "0 20px 40px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 48, paddingBottom: 28 }}>
+            <button onClick={() => setScreen("bet")} style={{ width: 40, height: 40, borderRadius: "50%", background: "#1c1c1e", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ChevronLeft style={{ width: 20, height: 20, color: "#fff" }} />
+            </button>
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 17, color: "#fff" }}>Sala Privada</p>
+            <div style={{ width: 40 }} />
+          </div>
+          <div style={{ background: "rgba(138,43,226,0.1)", border: "1px solid rgba(138,43,226,0.3)", borderRadius: 16, padding: "14px 18px", marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div>
+              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>Jogo · Aposta</p>
+              <p style={{ fontSize: 16, color: "#fff", fontWeight: 800, fontFamily: "'Syne', sans-serif" }}>{gameName} · {fmtMT(selectedBet ?? 0)}</p>
+            </div>
+          </div>
+          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginBottom: 20, lineHeight: 1.6 }}>
+            Joga com quem quiseres. Cria uma sala e partilha o código, ou entra num jogo com o código de um amigo.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <button onClick={() => { setSalaError(""); setScreen("sala-entrar"); }} style={{ width: "100%", height: 68, borderRadius: 20, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", display: "flex", alignItems: "center", gap: 16, padding: "0 20px", textAlign: "left" }}>
+              <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(0,212,180,0.15)", border: "1px solid rgba(0,212,180,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Hash style={{ width: 20, height: 20, color: "#00D4B4" }} />
+              </div>
+              <div>
+                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff", marginBottom: 2 }}>Entrar numa Sala</p>
+                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Tens um código? Entra no jogo do teu amigo.</p>
+              </div>
+            </button>
+            <button onClick={() => { if (!selectedBet) return; setSalaError(""); handleCriarSala(); }} disabled={salaLoading || !selectedBet} style={{ width: "100%", height: 68, borderRadius: 20, background: `linear-gradient(135deg, ${VIOLET} 0%, #5b21b6 100%)`, border: "none", cursor: salaLoading ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 16, padding: "0 20px", opacity: salaLoading ? 0.7 : 1, textAlign: "left" }}>
+              <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Users style={{ width: 20, height: 20, color: "#fff" }} />
+              </div>
+              <div>
+                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff", marginBottom: 2 }}>{salaLoading ? "A criar sala…" : "Criar Sala"}</p>
+                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>Gera um código e convida um amigo.</p>
+              </div>
+            </button>
+          </div>
+          {salaError ? <p style={{ marginTop: 14, fontSize: 13, color: "#f87171", textAlign: "center" }}>{salaError}</p> : null}
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Sala Aguardar (creator waiting) ── */
+  if (screen === "sala-aguardar") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#080810", display: "flex", justifyContent: "center" }}>
+        <div style={{ width: "100%", maxWidth: 430, display: "flex", flexDirection: "column", alignItems: "center", padding: "0 20px 40px", textAlign: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", paddingTop: 48, paddingBottom: 32 }}>
+            <div style={{ width: 40 }} />
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 17, color: "#fff" }}>Sala Criada</p>
+            <div style={{ width: 40 }} />
+          </div>
+          <motion.div animate={{ scale: [1, 1.06, 1], opacity: [0.6, 1, 0.6] }} transition={{ duration: 2.2, repeat: Infinity }}
+            style={{ width: 80, height: 80, borderRadius: "50%", background: `radial-gradient(circle, ${VIOLET}55, transparent 70%)`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 24 }}>
+            <Users style={{ width: 36, height: 36, color: VIOLET }} />
+          </motion.div>
+          <p style={{ fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 10 }}>Partilha este código com o teu amigo</p>
+          <div style={{ background: "#1c1c1e", border: `2px solid ${VIOLET}66`, borderRadius: 20, padding: "20px 28px", marginBottom: 12, width: "100%" }}>
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 36, color: "#fff", letterSpacing: 8 }}>{salaCode}</p>
+          </div>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", marginBottom: 32 }}>O código expira em 30 minutos · Aposta: {fmtMT(selectedBet ?? 0)}</p>
+          <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.8, repeat: Infinity }}
+            style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 40 }}>
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00D4B4" }} />
+            <p style={{ fontSize: 13, color: "#00D4B4" }}>À espera que o teu amigo entre…</p>
+          </motion.div>
+          <button onClick={handleCancelarSala} disabled={salaLoading} style={{ width: "100%", height: 52, borderRadius: 99, background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, cursor: salaLoading ? "wait" : "pointer" }}>
+            {salaLoading ? "A cancelar…" : "Cancelar e Devolver Aposta"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Sala Entrar (join with code) ── */
+  if (screen === "sala-entrar") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#080810", display: "flex", justifyContent: "center" }}>
+        <div style={{ width: "100%", maxWidth: 430, display: "flex", flexDirection: "column", minHeight: "100vh", padding: "0 20px 40px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 48, paddingBottom: 28 }}>
+            <button onClick={() => { setSalaError(""); setScreen("sala-menu"); }} style={{ width: 40, height: 40, borderRadius: "50%", background: "#1c1c1e", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ChevronLeft style={{ width: 20, height: 20, color: "#fff" }} />
+            </button>
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 17, color: "#fff" }}>Entrar na Sala</p>
+            <div style={{ width: 40 }} />
+          </div>
+          <p style={{ fontSize: 14, color: "rgba(255,255,255,0.45)", marginBottom: 24, lineHeight: 1.6 }}>
+            Insere o código de 6 caracteres que o teu amigo te enviou.
+          </p>
+          <input
+            value={salaInput}
+            onChange={e => setSalaInput(e.target.value.toUpperCase().slice(0, 6))}
+            placeholder="XXXXXX"
+            maxLength={6}
+            style={{ width: "100%", height: 64, borderRadius: 18, background: "#1c1c1e", border: `1.5px solid ${salaError ? "#f87171" : "#3a3a3c"}`, color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 28, textAlign: "center", letterSpacing: 10, outline: "none", boxSizing: "border-box" }}
+          />
+          {salaError ? <p style={{ marginTop: 10, fontSize: 13, color: "#f87171", textAlign: "center" }}>{salaError}</p> : null}
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={handleEntrarSala}
+            disabled={salaInput.length !== 6 || salaLoading || !selectedBet}
+            style={{ width: "100%", height: 60, borderRadius: 99, background: salaInput.length === 6 && selectedBet ? `linear-gradient(135deg, ${VIOLET}, #5b21b6)` : "#1c1c1e", border: "none", color: salaInput.length === 6 && selectedBet ? "#fff" : "#52525b", fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 15, cursor: salaInput.length === 6 && !salaLoading && selectedBet ? "pointer" : "not-allowed", marginTop: 24 }}>
+            {salaLoading ? "A entrar…" : "Entrar na Sala"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   /* ── SMS Wallet Confirmation ── */
   if (screen === "pin-confirmation") {
@@ -1484,6 +1736,26 @@ export default function Apostar() {
                 Seleciona um valor de aposta para continuar
               </p>
             )}
+          </motion.div>
+
+          {/* Sala Privada Button */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.36, duration: 0.4 }} style={{ marginBottom: 28 }}>
+            <button
+              onClick={() => { if (canStart) { setSalaError(""); setScreen("sala-menu"); } }}
+              disabled={!canStart}
+              style={{
+                width: "100%", height: 52, borderRadius: 99,
+                background: "transparent",
+                border: canStart ? "1.5px solid rgba(124,58,237,0.45)" : "1.5px solid #2c2c2e",
+                cursor: canStart ? "pointer" : "not-allowed",
+                color: canStart ? "#a78bfa" : "#3f3f46",
+                fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              }}>
+              <Hash style={{ width: 14, height: 14 }} />
+              Sala Privada (Joga com um Amigo)
+            </button>
           </motion.div>
 
           {/* Recommended Games */}

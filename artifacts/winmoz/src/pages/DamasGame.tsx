@@ -1486,17 +1486,19 @@ export default function DamasGame() {
       } catch { setRematchPhase("no_balance"); }
       return;
     }
+    if (!profile?.id) { setRematchPhase("no_balance"); return; }
+    if (!channelRef.current) { setRematchPhase("no_balance"); return; }
     setRematchPhase("checking");
     try {
-      const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000));
-      const fetch   = supabase.from("profiles").select("balance").eq("id", profile!.id).single()
-                       .then(r => r.data);
-      const data = await Promise.race([fetch, timeout]) as { balance: string | number } | null;
+      const timeout   = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000));
+      const fetchBal  = supabase.from("profiles").select("balance").eq("id", profile.id).single()
+                         .then(r => r.data);
+      const data = await Promise.race([fetchBal, timeout]) as { balance: string | number } | null;
       if (!data || parseFloat(String(data.balance)) < BET) {
         setRematchPhase("no_balance"); return;
       }
       setRematchPhase("waiting");
-      channelRef.current?.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0] } });
+      channelRef.current.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0] } }).catch(() => {});
     } catch {
       setRematchPhase("no_balance");
     }

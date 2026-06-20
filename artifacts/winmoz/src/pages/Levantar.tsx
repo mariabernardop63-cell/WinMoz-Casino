@@ -544,10 +544,11 @@ export default function Levantar() {
 
   // ─── Approved Screen ──────────────────────────────────────────────────────
   if (screen === "approved") {
+    const fee = amountVal >= MIN_WITHDRAW ? 5 : 0;
     return (
       <div className="min-h-screen w-full flex justify-center" style={{ background: "#000" }}>
-        <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
-          <div className="flex items-center justify-between pt-12 pb-8">
+        <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5 pb-10">
+          <div className="flex items-center justify-between pt-12 pb-6">
             <button onClick={() => setLocation("/perfil")}
               className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#1c1c1e" }}>
               <ChevronLeft className="w-5 h-5 text-white" />
@@ -555,27 +556,71 @@ export default function Levantar() {
             <p className="font-semibold text-white text-base">Levantamento</p>
             <div className="w-10" />
           </div>
-          <motion.div className="flex flex-col items-center mb-8"
+
+          <motion.div className="flex flex-col items-center mb-6"
             initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
             transition={{ type: "spring", stiffness: 280, damping: 20 }}>
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5 shadow-2xl"
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4 shadow-2xl"
               style={{ background: "linear-gradient(135deg, #00b09b, #00D4B4)" }}>
               <CheckCircle2 className="w-10 h-10 text-white" strokeWidth={2.5} />
             </div>
-            <p className="text-white/50 text-sm font-medium uppercase tracking-widest mb-1">Aprovado!</p>
+            <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-1">Pagamento Aprovado</p>
             <p className="text-white font-light text-center"
-              style={{ fontSize: "2.8rem", fontFamily: "system-ui", lineHeight: 1.1 }}>
-              {fmtMZN(amountVal)}<span className="text-2xl text-white/40 ml-1">MZN</span>
+              style={{ fontSize: "2.6rem", fontFamily: "system-ui", lineHeight: 1.1 }}>
+              {fmtMZN(amountVal)}<span className="text-xl text-white/40 ml-1">MZN</span>
             </p>
-            <p className="text-white/40 text-sm mt-2">O pagamento foi aprovado e enviado para o teu M-Pesa.</p>
+            <p className="text-white/40 text-sm mt-2 text-center">
+              O valor foi enviado para o teu {METHOD_NAME}.
+            </p>
           </motion.div>
-          <div className="flex flex-col gap-3">
-            <button onClick={() => setLocation("/perfil")}
-              className="w-full h-14 rounded-full font-semibold text-base text-black"
-              style={{ background: CYAN }}>
-              Voltar ao Perfil
-            </button>
-          </div>
+
+          <motion.div className="rounded-2xl overflow-hidden mb-5"
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.4 }}
+            style={{ background: "#1c1c1e" }}>
+            <div className="px-4 py-4 border-b" style={{ borderColor: "#2c2c2e" }}>
+              <p className="text-white font-bold text-sm">Recibo do Levantamento</p>
+            </div>
+            <div className="px-4 py-3 flex flex-col gap-3.5">
+              {[
+                { label: "ID de Transação",  val: txId },
+                { label: "Data",             val: txDate },
+                { label: "Método",           val: `${METHOD_NAME} · ${phoneDisplay}` },
+                { label: "Valor Enviado",    val: `${fmtMZN(amountVal)} MZN` },
+                { label: "Taxa de Serviço",  val: fee > 0 ? `${fmtMZN(fee)} MZN` : "Sem taxa" },
+                { label: "Total Debitado",   val: `${fmtMZN(amountVal + fee)} MZN` },
+              ].map(row => (
+                <div key={row.label} className="flex items-center justify-between">
+                  <span className="text-sm" style={{ color: "#8e8e93" }}>{row.label}</span>
+                  <span className="text-sm font-medium text-white text-right" style={{ maxWidth: 200 }}>
+                    {row.val}
+                  </span>
+                </div>
+              ))}
+              <div className="border-t" style={{ borderColor: "#3a3a3c" }} />
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-white">Você Recebeu</span>
+                <span className="text-base font-bold" style={{ color: CYAN }}>
+                  {fmtMZN(amountVal)} MZN
+                </span>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
+            className="flex items-center gap-2 p-3 rounded-xl mb-6" style={{ background: "rgba(0,212,180,0.08)", border: `1px solid ${CYAN}22` }}>
+            <CheckCircle2 style={{ width: 14, height: 14, color: CYAN, flexShrink: 0 }} />
+            <p className="text-xs" style={{ color: "#8e8e93", lineHeight: 1.5 }}>
+              Transação concluída com sucesso. Guarda este recibo para referência futura.
+            </p>
+          </motion.div>
+
+          <button onClick={() => setLocation("/perfil")}
+            className="w-full h-14 rounded-full font-semibold text-base text-black"
+            style={{ background: CYAN }}>
+            Voltar ao Perfil
+          </button>
         </div>
       </div>
     );
