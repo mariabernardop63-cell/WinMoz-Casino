@@ -60,7 +60,7 @@ export default function Registar() {
   const [inviteStatus, setInviteStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
   const inviteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Returns true=valid, false=invalid, null=server error (allow through)
+  // Returns true=valid, false=invalid, null=server/network error (allow through)
   // Uses the server API (service role key) to bypass RLS — works for both
   // regular my_invite_code AND affiliate_invite_code
   const checkInviteCode = async (code: string): Promise<boolean | null> => {
@@ -68,19 +68,37 @@ export default function Registar() {
     setInviteStatus("checking");
     try {
       const upper = code.toUpperCase().trim();
-      const res = await fetch(`${API_BASE}/validate-invite?code=${encodeURIComponent(upper)}`);
-      if (!res.ok) {
-        // Server error — don't block signup
+
+      // 5-second timeout so the form never hangs indefinitely
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+      let res: Response;
+      try {
+        res = await fetch(
+          `${API_BASE}/validate-invite?code=${encodeURIComponent(upper)}`,
+          { signal: controller.signal }
+        );
+        clearTimeout(timeoutId);
+      } catch {
+        // Network error or timeout — don't block signup
+        clearTimeout(timeoutId);
         setInviteStatus("idle");
         return null;
       }
+
+      if (!res.ok) {
+        setInviteStatus("idle");
+        return null;
+      }
+
       const data = await res.json();
       // If server says env_missing or db_error it returns valid:true — allow through
       const isValid = !!data.valid;
       setInviteStatus(isValid ? "valid" : "invalid");
       return isValid;
     } catch {
-      // Network error — don't block signup
+      // Any other error — don't block signup
       setInviteStatus("idle");
       return null;
     }
