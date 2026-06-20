@@ -206,7 +206,17 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- ── 5. GARANTIR POLÍTICA RLS PARA PROFILES ──────────────────────
+-- ── 5. REMOVER TRIGGER DUPLICADO QUE CAUSAVA 10 MT ─────────────
+-- O trigger trg_credit_affiliate_on_bet disparava ao inserir transações
+-- do tipo 'bet'/'manual_bet', creditando 5 MT ao afiliado.
+-- MAS os jogos (Ludo, Damas, Xadrez) TAMBÉM chamam /api/record-bet-reward
+-- para o mesmo efeito → resultado: 10 MT creditados em vez de 5 MT.
+-- Solução: remover o trigger e usar apenas a chamada explícita dos jogos.
+
+DROP TRIGGER IF EXISTS trg_credit_affiliate_on_bet ON public.transactions;
+DROP FUNCTION IF EXISTS credit_affiliate_on_bet();
+
+-- ── 6. GARANTIR POLÍTICA RLS PARA PROFILES ──────────────────────
 -- Utilizadores autenticados devem poder actualizar o próprio perfil
 -- (necessário para guardar invite_code_used directamente do frontend).
 

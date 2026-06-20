@@ -1065,14 +1065,6 @@ export default function Apostar() {
 
   const canStart = selectedBet !== null;
 
-  /* ── Trigger referral reward when this user places their first bet ── */
-  const triggerBetReward = () => {
-    if (!user?.id) return;
-    // Calls a SECURITY DEFINER Supabase function — no API server needed, bypasses RLS
-    // Fire-and-forget: reward failure never blocks the game
-    supabase.rpc("process_bet_reward").then(() => {}).catch(() => {});
-  };
-
   const handleStart = async () => {
     if (!canStart) return;
 
@@ -1101,13 +1093,11 @@ export default function Apostar() {
         setScreen("rejected");
         return;
       }
-      triggerBetReward();
       setScreen("matchmaking");
     } catch {
       await new Promise(res => setTimeout(res, 1200));
       const fallback = parseFloat(String(profile?.balance ?? "0"));
       if (fallback >= (selectedBet ?? 0)) {
-        triggerBetReward();
         setScreen("matchmaking");
       } else {
         setScreen("rejected");
@@ -1124,7 +1114,7 @@ export default function Apostar() {
         amount={selectedBet ?? 0}
         userPhone={mobilePhone}
         onCancel={() => { setVerifiedDepositTxId(null); setScreen("bet"); }}
-        onSuccess={(txId) => { setVerifiedDepositTxId(txId ?? null); triggerBetReward(); setScreen("matchmaking"); }}
+        onSuccess={(txId) => { setVerifiedDepositTxId(txId ?? null); setScreen("matchmaking"); }}
       />
     );
   }
