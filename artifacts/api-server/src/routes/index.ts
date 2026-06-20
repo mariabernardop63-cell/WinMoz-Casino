@@ -420,7 +420,7 @@ router.get("/validate-invite", async (req, res) => {
     const supabaseService = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"] ?? "";
 
     if (!supabaseUrl || !supabaseService) {
-      res.json({ valid: true, reason: "env_missing" });
+      res.json({ valid: false, reason: "env_missing" });
       return;
     }
 
@@ -445,13 +445,13 @@ router.get("/validate-invite", async (req, res) => {
       .maybeSingle();
 
     if (error) {
-      res.json({ valid: true, reason: "db_error" }); // allow through on DB error
+      res.json({ valid: false, reason: "db_error" });
       return;
     }
 
     res.json({ valid: !!byAffiliate });
   } catch {
-    res.json({ valid: true, reason: "exception" }); // allow through on unexpected error
+    res.json({ valid: false, reason: "exception" });
   }
 });
 

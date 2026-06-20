@@ -3,7 +3,6 @@ import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, X, ArrowLeft, ShieldCheck, Loader2, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { API_BASE } from "@/lib/apiBase";
 
 function WinMozLogo() {
   return (
@@ -60,47 +59,27 @@ export default function Registar() {
   const [inviteStatus, setInviteStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
   const inviteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Returns true=valid, false=invalid, null=server/network error (allow through)
-  // Uses the server API (service role key) to bypass RLS — works for both
-  // regular my_invite_code AND affiliate_invite_code
-  const checkInviteCode = async (code: string): Promise<boolean | null> => {
-    if (!code) { setInviteStatus("idle"); return null; }
+  // Returns true=valid, false=invalid
+  // Uses a SECURITY DEFINER Supabase RPC that bypasses RLS — works for both
+  // regular my_invite_code AND affiliate_invite_code with just the anon key
+  const checkInviteCode = async (code: string): Promise<boolean> => {
+    if (!code) { setInviteStatus("idle"); return false; }
     setInviteStatus("checking");
     try {
       const upper = code.toUpperCase().trim();
-
-      // 5-second timeout so the form never hangs indefinitely
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-      let res: Response;
-      try {
-        res = await fetch(
-          `${API_BASE}/validate-invite?code=${encodeURIComponent(upper)}`,
-          { signal: controller.signal }
-        );
-        clearTimeout(timeoutId);
-      } catch {
-        // Network error or timeout — don't block signup
-        clearTimeout(timeoutId);
-        setInviteStatus("idle");
-        return null;
+      const { data, error } = await supabase.rpc("check_invite_code", { p_code: upper });
+      if (error) {
+        // If the RPC doesn't exist yet, show a clear error
+        console.error("[checkInviteCode] RPC error:", error.message);
+        setInviteStatus("invalid");
+        return false;
       }
-
-      if (!res.ok) {
-        setInviteStatus("idle");
-        return null;
-      }
-
-      const data = await res.json();
-      // If server says env_missing or db_error it returns valid:true — allow through
-      const isValid = !!data.valid;
+      const isValid = data === true;
       setInviteStatus(isValid ? "valid" : "invalid");
       return isValid;
     } catch {
-      // Any other error — don't block signup
-      setInviteStatus("idle");
-      return null;
+      setInviteStatus("invalid");
+      return false;
     }
   };
 
@@ -154,13 +133,13 @@ export default function Registar() {
           // Not yet verified — check inline right now
           if (inviteTimerRef.current) { clearTimeout(inviteTimerRef.current); inviteTimerRef.current = null; }
           setLoading(true);
-          const result = await checkInviteCode(invite);
+          const isValid = await checkInviteCode(invite);
           setLoading(false);
-          if (result === false) {
+          if (!isValid) {
             setErrors({ invite: "Código de convite inválido ou inexistente" });
             return;
           }
-          // result === true → valid code, proceed
+          // valid code → proceed
           setDir(1); setStep(3); setErrors({});
           return;
         }
