@@ -84,6 +84,10 @@ function parseTxDescription(raw: string | null, type: string): string {
     if (p.mode === "deposit") return "Depósito via M-Pesa/e-Mola";
     if (p.mode === "bet")     return "Aposta via Carteira Móvel";
     if (p.confirmationMsg)   return mapTxType(type) + " manual";
+    if (type === "withdrawal" && p.method) {
+      const phone = p.phone ? String(p.phone) : null;
+      return phone ? `Levamento via ${p.method} · ${phone}` : `Levamento via ${p.method}`;
+    }
   } catch { /* not JSON — use raw text */ }
   return stripBotMarkers(raw);
 }

@@ -1059,9 +1059,56 @@ export default function Apostar() {
   const [salaError, setSalaError]   = useState("");
   const [salaLoading, setSalaLoading] = useState(false);
   const salaChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const cancellingRef  = useRef(false);
   useEffect(() => () => {
     if (salaChannelRef.current) { supabase.removeChannel(salaChannelRef.current); salaChannelRef.current = null; }
   }, []);
+
+  /* ── Recover abandoned sala on page load ── */
+  useEffect(() => {
+    if (!user?.id || !gameId) return;
+    let alive = true;
+    (async () => {
+      try {
+        const { data: rooms } = await supabase
+          .from("game_rooms")
+          .select("id, code, bet_amount, status")
+          .eq("creator_id", user.id)
+          .eq("game_type", gameId)
+          .eq("status", "waiting")
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (!alive || !rooms || rooms.length === 0) return;
+        const room = rooms[0];
+        const bet = Number(room.bet_amount);
+        setSalaCode(room.code);
+        setSalaRoomId(room.id);
+        setSelectedBet(bet);
+        const ch = supabase.channel(`sala:${room.code}`);
+        ch.on("broadcast", { event: "joiner_ready" }, ({ payload }) => {
+          supabase.removeChannel(ch); salaChannelRef.current = null;
+          const gId   = payload.gameId as string;
+          const jName = payload.joinerName as string;
+          const myEnc  = encodeURIComponent(profile?.full_name ?? "Jogador");
+          const oppEnc = encodeURIComponent(jName);
+          try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gId}`,  "1"); } catch {}
+          try { sessionStorage.setItem(`wm_bet_deducted_damas_${gId}`, "1"); } catch {}
+          try { sessionStorage.setItem(`wm_bet_deducted_chess_${gId}`, "1"); } catch {}
+          setScreen("matched");
+          let dest = "/";
+          if (gameId === "ludo")   dest = `/ludo-jogo?gameId=${gId}&color=blue&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+          else if (gameId === "xadrez") dest = `/xadrez-jogo?gameId=${gId}&color=white&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+          else if (gameId === "damas")  dest = `/damas-jogo?gameId=${gId}&color=w&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+          setTimeout(() => setLocation(dest), 2200);
+        });
+        ch.subscribe();
+        salaChannelRef.current = ch;
+        setScreen("sala-aguardar");
+      } catch { /* ignore */ }
+    })();
+    return () => { alive = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, gameId]);
 
   function generateRoomCode(): string {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -1118,26 +1165,39 @@ export default function Apostar() {
   }
 
   async function handleCancelarSala() {
-    if (!user?.id || salaLoading) return;
+    if (!user?.id || cancellingRef.current) return;
+    cancellingRef.current = true;
     setSalaLoading(true);
     try {
       if (salaRoomId) {
-        const { data: room } = await supabase.from("game_rooms").select("status, bet_amount").eq("id", salaRoomId).single();
+        /* Delete first — only refund if delete succeeds and row was in "waiting" */
+        const { data: room } = await supabase
+          .from("game_rooms")
+          .select("status, bet_amount")
+          .eq("id", salaRoomId)
+          .single();
         if (room?.status === "waiting") {
-          await supabase.from("game_rooms").delete().eq("id", salaRoomId);
-          const { data: pd } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
-          const refund = Number(room.bet_amount) || selectedBet || 0;
-          await supabase.from("profiles").update({ balance: parseFloat(String(pd?.balance ?? "0")) + refund }).eq("id", user.id);
-          await supabase.from("transactions").insert({
-            user_id: user.id, type: "win", amount: refund,
-            description: `Reembolso: sala cancelada (${gameId})`, status: "approved",
-          });
-          await refreshProfile?.();
+          const { error: delErr } = await supabase
+            .from("game_rooms")
+            .delete()
+            .eq("id", salaRoomId)
+            .eq("status", "waiting"); /* atomic guard — only deletes if still waiting */
+          if (!delErr) {
+            const { data: pd } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
+            const refund = Number(room.bet_amount) || selectedBet || 0;
+            await supabase.from("profiles").update({ balance: parseFloat(String(pd?.balance ?? "0")) + refund }).eq("id", user.id);
+            await supabase.from("transactions").insert({
+              user_id: user.id, type: "win", amount: refund,
+              description: `Reembolso: sala cancelada (${gameId})`, status: "approved",
+            });
+            await refreshProfile?.();
+          }
         }
       }
       if (salaChannelRef.current) { supabase.removeChannel(salaChannelRef.current); salaChannelRef.current = null; }
       setSalaCode(null); setSalaRoomId(null);
     } catch { /* ignore */ }
+    cancellingRef.current = false;
     setSalaLoading(false);
     setScreen("bet");
   }

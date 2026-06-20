@@ -991,7 +991,11 @@ export default function ChessGame(){
   const epRef=useRef(ep);const statusRef=useRef(status);
   const channelRef=useRef<ReturnType<typeof supabase.channel>|null>(null);
   const lastSeqRef=useRef<Record<string,number>>({});
-  const betDeductedRef=useRef(false);
+  const betDeductedRef=useRef(
+    gameId!=="local"
+      ?sessionStorage.getItem(`wm_bet_deducted_chess_${gameId}`)==="1"
+      :false
+  );
   const winCreditedRef=useRef(false);
   const rewardFiredRef=useRef(false);
   const[rematchPhase,setRematchPhase]=useState<RematchPhase>("idle");
