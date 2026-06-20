@@ -6,6 +6,7 @@ import {
   Clock, Wallet, Gamepad2, RefreshCw, User, Phone, MessageSquare,
 } from "lucide-react";
 import { adminSupabase } from "@/admin/lib/supabase-api";
+import { supabase } from "@/lib/supabase";
 import { playAdminNotificationSound } from "@/admin/hooks/useAdminNotificationSound";
 
 const CYAN = "#00D4B4";
@@ -74,14 +75,14 @@ export default function DepositRequests() {
   useEffect(() => {
     loadRequests();
 
-    const channel = adminSupabase
+    const channel = supabase
       .channel("deposit-requests-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => {
         loadRequests();
       })
       .subscribe();
 
-    return () => { adminSupabase.removeChannel(channel); };
+    return () => { supabase.removeChannel(channel); };
   }, [loadRequests]);
 
   const handleApprove = async (req: DepositRequest) => {

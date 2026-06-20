@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { adminSupabase } from "@/admin/lib/supabase-api";
-import { Smartphone, Mail, Phone, MapPin, ExternalLink } from "lucide-react";
+import { Smartphone, Mail, Phone, ExternalLink } from "lucide-react";
 
 interface FooterSettings {
   footer_tagline: string;
@@ -17,6 +17,17 @@ const LINKS = [
   { label: "Suporte", href: "/suporte" },
   { label: "Privacidade", href: "/privacidade" },
 ];
+
+function MozBetLogo() {
+  return (
+    <svg viewBox="0 0 190 46" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 2 L11 2 L7 44 L0 44 Z" fill="#0D0D0D"/>
+      <path d="M13 2 L20 2 L16 44 L10 44 Z" fill="#0D0D0D" opacity="0.18"/>
+      <text x="23" y="27" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="22" letterSpacing="0.5" fill="#0D0D0D">MOZBET</text>
+      <text x="23" y="41" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">MOZAMBIQUE</text>
+    </svg>
+  );
+}
 
 export default function HomeFooter() {
   const [, navigate] = useLocation();
@@ -42,49 +53,34 @@ export default function HomeFooter() {
 
   return (
     <footer style={{
-      background: "linear-gradient(180deg, #0a0a14 0%, #080810 100%)",
-      borderTop: "1px solid rgba(124,58,237,0.15)",
-      padding: "28px 20px 20px",
+      background: "#fff",
+      borderTop: "1px solid #e5e7eb",
+      padding: "28px 20px 24px",
     }}>
       <div style={{ maxWidth: 430, margin: "0 auto" }}>
 
         {/* Brand */}
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <div style={{
-              width: 28, height: 28, borderRadius: 8,
-              background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="white" fillOpacity="0.95" />
-              </svg>
-            </div>
-            <span style={{
-              fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 16,
-              background: "linear-gradient(135deg, #fff, #a78bfa)", WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}>
-              MOZBET
-            </span>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: 8 }}>
+            <MozBetLogo />
           </div>
           {s.footer_tagline && (
-            <p style={{ fontSize: 11.5, color: "#52525b", lineHeight: 1.5 }}>
+            <p style={{ fontSize: 12.5, color: "#6b7280", lineHeight: 1.5, margin: 0 }}>
               {s.footer_tagline}
             </p>
           )}
         </div>
 
         {/* Quick links */}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 20px", marginBottom: 16 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 20px", marginBottom: 18 }}>
           {LINKS.map(l => (
             <button
               key={l.href}
               onClick={() => navigate(l.href)}
               style={{
                 background: "none", border: "none", cursor: "pointer",
-                fontSize: 12, color: "#71717a", padding: 0,
-                fontFamily: "inherit",
+                fontSize: 12.5, color: "#374151", padding: 0,
+                fontFamily: "inherit", fontWeight: 500,
               }}
             >
               {l.label}
@@ -94,17 +90,17 @@ export default function HomeFooter() {
 
         {/* Contact info */}
         {(s.footer_phone || s.footer_email) && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 16 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 }}>
             {s.footer_phone && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Phone style={{ width: 11, height: 11, color: "#52525b" }} />
-                <span style={{ fontSize: 11.5, color: "#52525b" }}>{s.footer_phone}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <Phone style={{ width: 12, height: 12, color: "#9ca3af" }} />
+                <span style={{ fontSize: 12, color: "#6b7280" }}>{s.footer_phone}</span>
               </div>
             )}
             {s.footer_email && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <Mail style={{ width: 11, height: 11, color: "#52525b" }} />
-                <span style={{ fontSize: 11.5, color: "#52525b" }}>{s.footer_email}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <Mail style={{ width: 12, height: 12, color: "#9ca3af" }} />
+                <span style={{ fontSize: 12, color: "#6b7280" }}>{s.footer_email}</span>
               </div>
             )}
           </div>
@@ -118,22 +114,21 @@ export default function HomeFooter() {
             rel="noopener noreferrer"
             style={{
               display: "inline-flex", alignItems: "center", gap: 7,
-              padding: "9px 16px", borderRadius: 10, marginBottom: 16,
-              background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+              padding: "9px 18px", borderRadius: 8, marginBottom: 18,
+              background: "#0D0D0D",
               color: "#fff", textDecoration: "none",
               fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12,
-              boxShadow: "0 4px 14px rgba(124,58,237,0.35)",
             }}
           >
-            <Smartphone style={{ width: 14, height: 14 }} />
+            <Smartphone style={{ width: 13, height: 13 }} />
             Descarregar App
-            <ExternalLink style={{ width: 11, height: 11, opacity: 0.7 }} />
+            <ExternalLink style={{ width: 11, height: 11, opacity: 0.6 }} />
           </a>
         )}
 
         {/* Divider + copyright */}
-        <div style={{ borderTop: "1px solid #1c1c2e", paddingTop: 12 }}>
-          <p style={{ fontSize: 10.5, color: "#3f3f46", textAlign: "center" }}>
+        <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 14 }}>
+          <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", margin: 0 }}>
             © {new Date().getFullYear()} MOZBET. Todos os direitos reservados. +18 · Jogo responsável.
           </p>
         </div>
