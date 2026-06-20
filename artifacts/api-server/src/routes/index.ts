@@ -246,6 +246,167 @@ router.post("/complete-registration", async (req, res) => {
   }
 });
 
+/* ── Record Bet Reward — trigger referral payout when a referred user places a bet ── */
+router.post("/record-bet-reward", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+    const supabaseUrl     = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "";
+    const supabaseService = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"] ?? "";
+    if (!supabaseUrl || !supabaseService) {
+      res.json({ success: false, reason: "env_missing" }); return;
+    }
+
+    const admin = buildAdminClient(supabaseUrl, supabaseService);
+
+    // Verify JWT and get the user who just bet (the referred user)
+    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    if (userError || !userData?.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
+    const referredId = userData.user.id;
+
+    // Look up the referral record for this user
+    const { data: referralRow, error: refErr } = await admin
+      .from("referrals")
+      .select("id, referrer_id, reward_paid")
+      .eq("referred_id", referredId)
+      .maybeSingle();
+
+    if (refErr || !referralRow) {
+      // No referral — user wasn't referred by anyone
+      res.json({ success: false, reason: "no_referral" }); return;
+    }
+
+    const referrerId: string = (referralRow as any).referrer_id;
+    const rewardAlreadyPaid: boolean = !!(referralRow as any).reward_paid;
+
+    // Get referrer profile to know if they are an affiliate
+    const { data: referrerProfile } = await admin
+      .from("profiles")
+      .select("id, is_affiliate, balance, affiliate_pending_earnings")
+      .eq("id", referrerId)
+      .single();
+
+    if (!referrerProfile) {
+      res.json({ success: false, reason: "referrer_not_found" }); return;
+    }
+
+    const isAffiliate: boolean = !!(referrerProfile as any).is_affiliate;
+
+    if (isAffiliate) {
+      // ── AFFILIATE LOGIC: 5 MT per bet, up to 5 bets per referred friend ──
+      // Use the affiliate_bets table which the dashboard reads for bet counts
+      const { data: existingBetRow } = await admin
+        .from("affiliate_bets")
+        .select("id, bet_count")
+        .eq("affiliate_id", referrerId)
+        .eq("referred_id", referredId)
+        .maybeSingle();
+
+      const betCount: number = (existingBetRow as any)?.bet_count ?? 0;
+
+      if (betCount >= 5) {
+        res.json({ success: false, reason: "max_affiliate_bets_reached" }); return;
+      }
+
+      const AFFILIATE_REWARD = 5;
+      const currentPending = Number((referrerProfile as any).affiliate_pending_earnings ?? 0);
+      const newPending = Math.round((currentPending + AFFILIATE_REWARD) * 100) / 100;
+
+      // Update affiliate_pending_earnings
+      await admin
+        .from("profiles")
+        .update({ affiliate_pending_earnings: newPending })
+        .eq("id", referrerId);
+
+      // Upsert the affiliate_bets row — this is what the dashboard reads
+      if (existingBetRow) {
+        await admin
+          .from("affiliate_bets")
+          .update({ bet_count: betCount + 1 })
+          .eq("id", (existingBetRow as any).id);
+      } else {
+        await admin.from("affiliate_bets").insert({
+          affiliate_id: referrerId,
+          referred_id: referredId,
+          bet_count: 1,
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      // Record the bonus transaction for audit trail
+      await admin.from("transactions").insert({
+        user_id: referrerId,
+        type: "referral_bonus",
+        amount: AFFILIATE_REWARD,
+        description: JSON.stringify({ referred_id: referredId, bet_num: betCount + 1, type: "affiliate" }),
+        status: "approved",
+        created_at: new Date().toISOString(),
+      });
+
+      console.log(`[record-bet-reward] Affiliate reward paid: ${referrerId} ← ${AFFILIATE_REWARD} MT (referred: ${referredId}, bet #${betCount + 1})`);
+      res.json({ success: true, type: "affiliate", rewarded: AFFILIATE_REWARD, bets_rewarded: betCount + 1 });
+      return;
+    }
+
+    // ── NORMAL REFERRAL LOGIC: 2.50 MT one-time on first bet ──
+    if (rewardAlreadyPaid) {
+      res.json({ success: false, reason: "already_paid" }); return;
+    }
+
+    // Double-check via transactions as fallback (in case reward_paid column doesn't exist)
+    const { data: existingBonus } = await admin
+      .from("transactions")
+      .select("id")
+      .eq("user_id", referrerId)
+      .eq("type", "referral_bonus")
+      .ilike("description", `%${referredId}%`)
+      .limit(1);
+
+    if (existingBonus && existingBonus.length > 0) {
+      res.json({ success: false, reason: "already_paid" }); return;
+    }
+
+    const FRIEND_REWARD = 2.5;
+    const currentBalance = Number((referrerProfile as any).balance ?? 0);
+    const newBalance = Math.round((currentBalance + FRIEND_REWARD) * 100) / 100;
+
+    // Credit referrer balance
+    const { error: balErr } = await admin
+      .from("profiles")
+      .update({ balance: newBalance })
+      .eq("id", referrerId);
+
+    if (balErr) {
+      res.status(500).json({ error: "Erro ao creditar bónus" }); return;
+    }
+
+    // Record the bonus transaction
+    await admin.from("transactions").insert({
+      user_id: referrerId,
+      type: "referral_bonus",
+      amount: FRIEND_REWARD,
+      description: JSON.stringify({ referred_id: referredId, type: "friend" }),
+      status: "approved",
+      created_at: new Date().toISOString(),
+    });
+
+    // Mark reward as paid on the referrals record (best-effort — column may not exist yet)
+    await admin
+      .from("referrals")
+      .update({ reward_paid: true })
+      .eq("id", (referralRow as any).id)
+      .then(() => { /* ignore error if column doesn't exist */ });
+
+    console.log(`[record-bet-reward] Friend referral reward paid: ${referrerId} ← ${FRIEND_REWARD} MT (referred: ${referredId})`);
+    res.json({ success: true, type: "friend", rewarded: FRIEND_REWARD });
+  } catch (err) {
+    console.error("[record-bet-reward] error:", err);
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── Invite code validation (public — no auth needed) ── */
 router.get("/validate-invite", async (req, res) => {
   try {

@@ -60,47 +60,27 @@ export default function Registar() {
   const [inviteStatus, setInviteStatus] = useState<"idle" | "checking" | "valid" | "invalid">("idle");
   const inviteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Returns true=valid, false=invalid, null=supabase error (allow through)
+  // Returns true=valid, false=invalid, null=server error (allow through)
+  // Uses the server API (service role key) to bypass RLS — works for both
+  // regular my_invite_code AND affiliate_invite_code
   const checkInviteCode = async (code: string): Promise<boolean | null> => {
     if (!code) { setInviteStatus("idle"); return null; }
     setInviteStatus("checking");
     try {
       const upper = code.toUpperCase().trim();
-
-      // Check my_invite_code (regular user codes) — allowed by RLS for anon
-      const { data: byGeneral, error: err1 } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("my_invite_code", upper)
-        .maybeSingle();
-
-      if (err1) {
-        // Supabase error — don't block signup
+      const res = await fetch(`${API_BASE}/validate-invite?code=${encodeURIComponent(upper)}`);
+      if (!res.ok) {
+        // Server error — don't block signup
         setInviteStatus("idle");
         return null;
       }
-
-      if (byGeneral) {
-        setInviteStatus("valid");
-        return true;
-      }
-
-      // Check affiliate_invite_code
-      const { data: byAffiliate, error: err2 } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("affiliate_invite_code", upper)
-        .maybeSingle();
-
-      if (err2) {
-        setInviteStatus("idle");
-        return null;
-      }
-
-      const isValid = !!byAffiliate;
+      const data = await res.json();
+      // If server says env_missing or db_error it returns valid:true — allow through
+      const isValid = !!data.valid;
       setInviteStatus(isValid ? "valid" : "invalid");
       return isValid;
     } catch {
+      // Network error — don't block signup
       setInviteStatus("idle");
       return null;
     }
