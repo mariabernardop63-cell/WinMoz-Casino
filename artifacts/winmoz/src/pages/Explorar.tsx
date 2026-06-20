@@ -235,6 +235,7 @@ function SalaTab() {
   const [waitRemaining, setWaitRemaining] = useState(300);
   const matchedRef = useRef(false);
   const channelRef = useRef<any>(null);
+  const refundingRef = useRef(false);
   const { user, profile, refreshProfile } = useAuth();
   const [, setLocation] = useLocation();
 
@@ -285,6 +286,10 @@ function SalaTab() {
   function navigateToGame(gameId: string, color: string, oppName: string, bet: number, gameRoom: string) {
     const myEnc = encodeURIComponent(profile?.full_name ?? "Jogador");
     const oppEnc = encodeURIComponent(oppName);
+    /* Prevent game pages from double-deducting the bet that was already charged here */
+    try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameRoom}`,  "1"); } catch {}
+    try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameRoom}`, "1"); } catch {}
+    try { sessionStorage.setItem(`wm_bet_deducted_chess_${gameRoom}`, "1"); } catch {}
     let dest = "/explorar";
     if (gameId === "ludo") dest = `/ludo-jogo?gameId=${gameRoom}&color=${color}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
     else if (gameId === "xadrez") dest = `/xadrez-jogo?gameId=${gameRoom}&color=${color === "blue" ? "white" : "black"}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
@@ -440,7 +445,16 @@ function SalaTab() {
             </button>
           )}
         </div>
-        <button onClick={async () => { await refundBalance(activeBet, activeCode); setView("main"); }}
+        <button onClick={async () => {
+            if (refundingRef.current) return;
+            refundingRef.current = true;
+            /* Mark room as expired FIRST — prevents double-refund on rapid clicks */
+            const updated = myRooms.map(r => r.code === activeCode ? { ...r, status: "expired" as const } : r);
+            saveRooms(updated); setMyRooms(updated);
+            await refundBalance(activeBet, activeCode);
+            refundingRef.current = false;
+            setView("main");
+          }}
           className="w-full h-12 rounded-xl font-syne font-medium text-sm flex items-center justify-center gap-2 bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
           <X className="w-4 h-4" /> Cancelar e Receber Reembolso
         </button>
@@ -738,24 +752,44 @@ function SalaTab() {
               className="text-[10px] text-red-400 font-semibold hover:underline">Limpar expiradas</button>
           </div>
           <div className="flex flex-col gap-2">
-            {myRooms.slice(0, 6).map((room, idx) => (
-              <motion.div key={room.code} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
-                className="flex items-center gap-3 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
-                <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
-                  <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-card.jpg"} alt="" className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-syne font-semibold text-slate-900 text-sm">{room.gameName}</p>
-                  <p className="text-[10.5px] text-slate-400 font-mono">{room.code}</p>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <p className="text-[11px] font-bold text-violet-700">{room.betAmount} MT</p>
-                  <span className={`text-[9px] font-bold uppercase ${room.status === "waiting" ? "text-emerald-500" : "text-slate-400"}`}>
-                    {room.status === "waiting" ? "Activa" : room.status === "matched" ? "Jogada" : "Expirada"}
-                  </span>
-                </div>
-              </motion.div>
-            ))}
+            {myRooms.slice(0, 6).map((room, idx) => {
+              const TWENTY_FOUR_H = 24 * 60 * 60 * 1000;
+              const isExpiredByAge = room.status === "waiting" && (Date.now() - room.createdAt) > TWENTY_FOUR_H;
+              const effectiveStatus = isExpiredByAge ? "expired" : room.status;
+              const isReenterable = effectiveStatus === "waiting";
+              return (
+                <motion.div key={room.code} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.05 }}
+                  onClick={() => {
+                    if (!isReenterable) return;
+                    if (isExpiredByAge) {
+                      const updated = myRooms.map(r => r.code === room.code ? { ...r, status: "expired" as const } : r);
+                      saveRooms(updated); setMyRooms(updated); return;
+                    }
+                    setActiveCode(room.code);
+                    setActiveGameId(room.gameId);
+                    setActiveBet(room.betAmount);
+                    setRoomRole("creator");
+                    setWaitRemaining(300); setWaitFound(false);
+                    matchedRef.current = false;
+                    setView("room-waiting");
+                  }}
+                  className={`flex items-center gap-3 p-3 bg-white rounded-xl border shadow-sm transition-all duration-200 ${isReenterable ? "border-violet-200 cursor-pointer hover:border-violet-400 hover:shadow-md" : "border-slate-100"}`}>
+                  <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
+                    <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-card.jpg"} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-syne font-semibold text-slate-900 text-sm">{room.gameName}</p>
+                    <p className="text-[10.5px] text-slate-400 font-mono">{room.code}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-[11px] font-bold text-violet-700">{room.betAmount} MT</p>
+                    <span className={`text-[9px] font-bold uppercase ${effectiveStatus === "waiting" ? "text-emerald-500" : "text-slate-400"}`}>
+                      {effectiveStatus === "waiting" ? "Activa · Entrar" : effectiveStatus === "matched" ? "Jogada" : "Expirada"}
+                    </span>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
       )}
