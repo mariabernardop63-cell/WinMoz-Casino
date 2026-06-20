@@ -1251,6 +1251,7 @@ export default function LudoGame() {
       : false
   );
   const winCreditedRef = useRef(false);
+  const rewardFiredRef = useRef(false);
 
   useEffect(()=>{piecesRef.current=pieces;},[pieces]);
   useEffect(()=>{phaseRef.current=phase;},[phase]);
@@ -1864,12 +1865,13 @@ export default function LudoGame() {
 
     channel.on("presence",{ event:"sync" },()=>{
       const state = channel.presenceState<{ color:string; balance?:string }>();
-      for(const presences of Object.values(state)){
-        for(const p of presences as Array<{ color:string; balance?:string }>){
-          if(p.color !== myColor && p.balance){
-            setOpponentBal(p.balance);
-          }
-        }
+      const allPresences = Object.values(state).flat() as Array<{ color:string; balance?:string }>;
+      for(const p of allPresences){
+        if(p.color !== myColor && p.balance){ setOpponentBal(p.balance); }
+      }
+      if(BET_AMOUNT > 0 && !rewardFiredRef.current && allPresences.length >= 2){
+        rewardFiredRef.current = true;
+        fetch("/api/record-bet-reward",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ user_id: profile?.id }) }).catch(()=>{});
       }
     });
 
@@ -1896,7 +1898,6 @@ export default function LudoGame() {
                 description: "Aposta de jogo (Ludo)",
                 status: "approved",
               });
-              fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile.id }) }).catch(() => {});
               // Persiste flag para não re-debitar se o componente remontar (back + resume)
               try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`, "1"); } catch { /* ignore */ }
               await refreshProfile();
@@ -2009,6 +2010,7 @@ export default function LudoGame() {
   function resetGame(){
     betDeductedRef.current=false;
     winCreditedRef.current=false;
+    rewardFiredRef.current=false;
     setPieces(initialPieces()); setTurn("blue"); setPhase("roll");
     setDiceBlue(null); setDiceGreen(null); setRollingB(false); setRollingG(false);
     setMovable([]); setWinner(null); setLives({blue:5,green:5}); setTimeLeft(30);

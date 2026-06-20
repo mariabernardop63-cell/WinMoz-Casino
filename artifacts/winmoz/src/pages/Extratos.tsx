@@ -89,10 +89,18 @@ export default function Extratos() {
           const displayType = mapType(t.type);
           const rawDate = new Date(t.created_at);
           const rawDesc: string = t.description || "";
-          const cleanDesc = rawDesc
+          let cleanDesc = rawDesc
             .replace(/\s*\[bot\]\s*/gi, " ")
             .replace(/\s*\[bot-fim\]\s*/gi, "")
             .trim();
+          if (t.type === "withdrawal" && rawDesc.startsWith("{")) {
+            try {
+              const meta = JSON.parse(rawDesc);
+              const method = meta.method ?? "M-Pesa";
+              const phone  = meta.phone  ? String(meta.phone) : null;
+              cleanDesc = phone ? `Levantamento via ${method} · ${phone}` : `Levantamento via ${method}`;
+            } catch { /* keep cleanDesc */ }
+          }
           return {
             id: t.id.slice(0, 8).toUpperCase(),
             type: displayType,

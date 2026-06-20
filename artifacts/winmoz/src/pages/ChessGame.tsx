@@ -993,6 +993,7 @@ export default function ChessGame(){
   const lastSeqRef=useRef<Record<string,number>>({});
   const betDeductedRef=useRef(false);
   const winCreditedRef=useRef(false);
+  const rewardFiredRef=useRef(false);
   const[rematchPhase,setRematchPhase]=useState<RematchPhase>("idle");
   const[rematchRequester,setRematchRequester]=useState("");
   const[botThinking,setBotThinking]=useState(false);
@@ -1282,6 +1283,7 @@ export default function ChessGame(){
         }
         setRematchPhase("idle");
         resetGame();
+        betDeductedRef.current=true;
       }else if((payload.reason as string)==="no_balance"){
         setRematchPhase("opp_no_balance");
       }else{
@@ -1303,11 +1305,19 @@ export default function ChessGame(){
             if(data){
               await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
               await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de jogo (Xadrez)",status:"approved"});
-              fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:profile.id})}).catch(()=>{});
               await refreshProfile();
             }
           }catch{betDeductedRef.current=false;}
         }
+        await ch.track({userId:profile.id,color:myColor});
+      }
+    });
+    ch.on("presence",{event:"sync"},()=>{
+      const state=ch.presenceState<{color:string}>();
+      const all=Object.values(state).flat() as Array<{color:string}>;
+      if(BET>0&&!rewardFiredRef.current&&all.length>=2){
+        rewardFiredRef.current=true;
+        fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:profile?.id})}).catch(()=>{});
       }
     });
     return()=>{supabase.removeChannel(ch);};
@@ -1316,6 +1326,7 @@ export default function ChessGame(){
   function resetGame(){
     betDeductedRef.current=false;
     winCreditedRef.current=false;
+    rewardFiredRef.current=false;
     setBoard(makeInitialBoard());setTurn("w");setEp(null);
     setSelected(null);setLegalDests([]);setLastMove(null);
     setHistory([]);setCaptured({w:[],b:[]});setStatus("playing");
@@ -1378,6 +1389,7 @@ export default function ChessGame(){
       channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:true}});
       setRematchPhase("idle");
       resetGame();
+      betDeductedRef.current=true;
     } catch {
       channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:false,reason:"no_balance"}});
       setRematchPhase("no_balance");

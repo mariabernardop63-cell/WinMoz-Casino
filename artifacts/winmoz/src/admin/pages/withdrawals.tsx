@@ -192,7 +192,7 @@ export default function Withdrawals() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0 mr-3">
                     <div className="font-bold text-[14px] truncate" style={{ color: "var(--gz-text-primary)" }}>{w.playerName}</div>
-                    <div className="text-[11px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>{w.method}</div>
+                    <div className="text-[11px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>{w.method}{(w as any).phone ? ` · ${(w as any).phone}` : ""}</div>
                     <div className="text-[11px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>
                       {new Date(w.createdAt).toLocaleDateString("pt-BR")}
                     </div>
@@ -252,7 +252,7 @@ export default function Withdrawals() {
                   <tr key={w.id} className="hover:bg-indigo-50/20 transition-colors" style={{ borderBottom: "1px solid rgba(108,92,231,.04)" }}>
                     <td className="px-5 py-3.5 font-medium" style={{ color: "var(--gz-text-primary)" }}>{w.playerName}</td>
                     <td className="px-5 py-3.5 font-bold" style={{ color: V1 }}>MT {w.amount.toFixed(2)}</td>
-                    <td className="px-5 py-3.5" style={{ color: "var(--gz-text-secondary)" }}>{w.method}</td>
+                    <td className="px-5 py-3.5" style={{ color: "var(--gz-text-secondary)" }}>{w.method}{(w as any).phone ? <><br/><span className="text-xs">{(w as any).phone}</span></> : ""}</td>
                     <td className="px-5 py-3.5"><StatusBadge status={w.status} /></td>
                     <td className="px-5 py-3.5 text-xs" style={{ color: "var(--gz-text-muted)" }}>{new Date(w.createdAt).toLocaleDateString("pt-BR")}</td>
                     <td className="px-5 py-3.5">

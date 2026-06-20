@@ -769,6 +769,7 @@ export default function DamasGame() {
       : false
   );
   const winCreditedRef = useRef(false);
+  const rewardFiredRef = useRef(false);
   const lastMoveTimeRef = useRef<number>(0); // rate limit: min 200ms between moves
   const [opponentBal, setOpponentBal] = useState(isBot && botBal ? `${botBal} MT` : "—");
   const oppTimerRecvAtRef  = useRef<number>(0);
@@ -1223,6 +1224,7 @@ export default function DamasGame() {
         }
         setRematchPhase("idle");
         resetGame();
+        betDeductedRef.current = true;
       } else if ((payload.reason as string) === "no_balance") {
         setRematchPhase("opp_no_balance");
       } else {
@@ -1232,10 +1234,13 @@ export default function DamasGame() {
 
     ch.on("presence", { event: "sync" }, () => {
       const state = ch.presenceState<{ color: string; balance?: string }>();
-      for (const presences of Object.values(state)) {
-        for (const p of presences as Array<{ color: string; balance?: string }>) {
-          if (p.color !== myColor && p.balance) setOpponentBal(p.balance);
-        }
+      const allPresences = Object.values(state).flat() as Array<{ color: string; balance?: string; userId?: string }>;
+      for (const p of allPresences) {
+        if (p.color !== myColor && p.balance) setOpponentBal(p.balance);
+      }
+      if (BET > 0 && !rewardFiredRef.current && allPresences.length >= 2) {
+        rewardFiredRef.current = true;
+        fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile?.id }) }).catch(() => {});
       }
     });
 
@@ -1255,7 +1260,6 @@ export default function DamasGame() {
             if(data){
               await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
               await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta de jogo (Damas)", status: "approved" });
-              fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile.id }) }).catch(() => {});
               // Persiste flag para não re-debitar se o componente remontar (back + resume)
               try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch { /* ignore */ }
               await refreshProfile();
@@ -1469,7 +1473,19 @@ export default function DamasGame() {
   }
 
   async function handleReplay() {
-    if (gameId === "local" || BET === 0 || isBot) { resetGame(); return; }
+    if (gameId === "local" || BET === 0) { resetGame(); return; }
+    if (isBot) {
+      if (!profile?.id) return;
+      try {
+        const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
+        if (!data || parseFloat(String(data.balance)) < BET) { setRematchPhase("no_balance"); return; }
+        await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
+        await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta de revanche (Damas) vs bot", status: "approved" });
+        await refreshProfile();
+        resetGame();
+      } catch { setRematchPhase("no_balance"); }
+      return;
+    }
     setRematchPhase("checking");
     try {
       const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000));
@@ -1505,6 +1521,7 @@ export default function DamasGame() {
       channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
       setRematchPhase("idle");
       resetGame();
+      betDeductedRef.current = true;
     } catch {
       channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } });
       setRematchPhase("no_balance");
@@ -1519,6 +1536,7 @@ export default function DamasGame() {
   function resetGame() {
     betDeductedRef.current = false;
     winCreditedRef.current = false;
+    rewardFiredRef.current = false;
     kingsOnlyCountRef.current = 0;
     setKingsOnlyCount(0);
     setIsDraw(false);

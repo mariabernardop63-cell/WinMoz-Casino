@@ -530,6 +530,13 @@ export default function Levantar() {
             <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
             <span className="text-xs font-semibold text-violet-400">A aguardar aprovação do administrador…</span>
           </motion.div>
+
+          <button
+            onClick={() => setLocation("/perfil")}
+            className="w-full py-4 rounded-2xl font-bold text-sm"
+            style={{ background: "rgba(124,58,237,0.12)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.25)" }}>
+            Aguardar no Perfil
+          </button>
         </div>
       </div>
     );

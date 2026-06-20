@@ -75,14 +75,14 @@ export default function DepositRequests() {
   useEffect(() => {
     loadRequests();
 
-    const channel = supabase
+    const channel = adminSupabase
       .channel("deposit-requests-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "transactions" }, () => {
         loadRequests();
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { adminSupabase.removeChannel(channel); };
   }, [loadRequests]);
 
   const handleApprove = async (req: DepositRequest) => {
