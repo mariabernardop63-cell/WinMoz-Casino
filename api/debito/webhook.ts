@@ -80,13 +80,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Extrair campos conforme documentação oficial:
-  // { "event": "payment.completed", "data": { "payment_id": "...", "amount": 150, ... } }
+  // Extrair campos do payload real da Debito Pay:
+  // { "id": "uuid-evento", "event": "payment.completed", "data": { "transaction_id": "...", "amount": 100, ... } }
+  // NOTA: o campo real é "transaction_id" dentro de data (não "payment_id" como na documentação)
   const event: string = body?.event || "unknown";
   const data: Record<string, any> = body?.data ?? {};
-  const debitoPaymentId: string | null = data?.payment_id ?? null;
 
-  console.log("[debito/webhook] Evento:", event, "| payment_id:", debitoPaymentId, "| amount:", data?.amount, "| reference:", data?.reference);
+  // Procurar primeiro em transaction_id (campo real), depois payment_id (fallback documentação)
+  const debitoPaymentId: string | null =
+    data?.transaction_id ?? data?.payment_id ?? body?.id ?? null;
+
+  console.log("[debito/webhook] Evento:", event,
+    "| transaction_id:", data?.transaction_id,
+    "| payment_id:", data?.payment_id,
+    "| id_usado:", debitoPaymentId,
+    "| amount:", data?.amount,
+    "| method:", data?.method);
 
   // Responder 200 imediatamente (< 5s conforme docs) — a Debito Pay não retenta se receber 200
   // Continuamos o processamento a seguir
@@ -101,7 +110,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // === ENCONTRAR A TRANSAÇÃO NA BASE DE DADOS ===
   let tx: any = null;
 
-  // Estratégia 1: match por payment_id (guardado em description.debitoPaymentId)
+  // Estratégia 1: match pelo ID do webhook (transaction_id ou payment_id)
+  // O campo real da Debito Pay é "transaction_id"; "payment_id" é fallback da documentação
   if (debitoPaymentId) {
     const { data: results } = await supabase
       .from("transactions")
@@ -113,22 +123,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const t of results ?? []) {
       try {
         const d = JSON.parse((t as any).description || "{}");
-        if (d.debitoPaymentId === debitoPaymentId) {
+        // Comparar com todos os campos onde podemos ter guardado o ID
+        if (
+          d.debitoPaymentId    === debitoPaymentId ||
+          d.debitoTransactionId === debitoPaymentId ||
+          d.debitoReference    === debitoPaymentId ||
+          d.sourceId           === debitoPaymentId
+        ) {
           tx = t;
-          console.log("[debito/webhook] Estratégia 1 (payment_id exato) → tx:", (t as any).id);
+          console.log("[debito/webhook] Estratégia 1 (ID exato) → tx:", (t as any).id);
           break;
         }
       } catch { /* skip */ }
     }
 
-    // Estratégia 1b: payment_id aparece no description (match parcial)
+    // Estratégia 1b: ID aparece em algum lugar da description (match parcial)
     if (!tx && results && results.length > 0) {
       tx = results[0];
-      console.log("[debito/webhook] Estratégia 1b (payment_id parcial) → tx:", (tx as any).id);
+      console.log("[debito/webhook] Estratégia 1b (ID parcial na description) → tx:", (tx as any).id);
     }
   }
 
-  // Estratégia 2: match por reference (EH2026...)
+  // Estratégia 2: match por reference (EH2026...) — e-Mola provider reference
   if (!tx && data?.reference) {
     const { data: results } = await supabase
       .from("transactions")
@@ -140,39 +156,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     for (const t of results ?? []) {
       try {
         const d = JSON.parse((t as any).description || "{}");
-        if (d.debitoReference === data.reference) {
+        if (d.debitoReference === data.reference || d.providerReference === data.reference) {
           tx = t;
           console.log("[debito/webhook] Estratégia 2 (reference) → tx:", (t as any).id);
           break;
         }
       } catch { /* skip */ }
     }
+
+    // Estratégia 2b: reference aparece parcialmente
+    if (!tx && results && results.length > 0) {
+      tx = results[0];
+      console.log("[debito/webhook] Estratégia 2b (reference parcial) → tx:", (tx as any).id);
+    }
   }
 
-  // Estratégia 3: match por montante + recente (últimos 6 min) — fallback robusto
+  // Estratégia 3: match por montante + pendente recente (últimos 10 min) — fallback robusto
   if (!tx && data?.amount) {
-    const sixMinAgo = new Date(Date.now() - 6 * 60 * 1000).toISOString();
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     const { data: results } = await supabase
       .from("transactions")
-      .select("id, user_id, amount, description, status")
+      .select("id, user_id, amount, description, status, created_at")
       .eq("status", "pending")
-      .gte("created_at", sixMinAgo)
+      .gte("created_at", tenMinAgo)
       .order("created_at", { ascending: false })
       .limit(50);
 
     const webhookAmt = Number(data.amount);
-    const candidates = (results ?? []).filter(t => Math.abs(Number((t as any).amount) - webhookAmt) < 0.5);
+    const candidates = (results ?? []).filter(
+      t => Math.abs(Number((t as any).amount) - webhookAmt) < 0.5
+    );
 
     if (candidates.length >= 1) {
-      // Pegar o mais recente
-      tx = candidates[0];
+      tx = candidates[0]; // mais recente
       console.log("[debito/webhook] Estratégia 3 (amount+recente) → tx:", (tx as any).id,
         candidates.length > 1 ? `(${candidates.length} candidatos — escolhido mais recente)` : "");
     }
   }
 
   if (!tx) {
-    console.error("[debito/webhook] ✗ Transação NÃO encontrada. payment_id:", debitoPaymentId, "| amount:", data?.amount);
+    console.error("[debito/webhook] ✗ Transação NÃO encontrada.",
+      "| id_usado:", debitoPaymentId,
+      "| amount:", data?.amount,
+      "| method:", data?.method);
     return;
   }
 
