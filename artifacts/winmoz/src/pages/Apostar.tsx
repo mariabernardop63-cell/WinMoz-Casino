@@ -271,15 +271,29 @@ function SMSBettingScreen({
         .subscribe();
       realtimeRef.current = channel;
 
-      // countdown timer
+      // countdown timer — ao chegar a 0 cancela automaticamente (USSD expira em 2 min)
+      let timedOut = false;
       countdownRef.current = setInterval(() => {
-        setCountdown(prev => (prev > 0 ? prev - 1 : 0));
+        setCountdown(prev => {
+          const next = prev > 1 ? prev - 1 : 0;
+          if (prev === 1 && !timedOut) {
+            timedOut = true;
+            clearInterval(pollRef.current!);
+            clearInterval(countdownRef.current!);
+            supabase.removeChannel(channel);
+            setTimeout(() => {
+              setRejectReason("Tempo esgotado. O pedido USSD expirou. Tenta novamente.");
+              setStep("rejected");
+            }, 0);
+          }
+          return next;
+        });
       }, 1000);
 
-      // Polling a cada 3s via /api/debito/check-status
-      // Usa service role key no servidor — bypassa RLS, lê sempre o estado real da DB
-      const maxCycles = Math.ceil(300 / 3); // 100 ciclos × 3s = 5min (e-Mola é async — webhook pode demorar)
+      // Polling a cada 3s via /api/debito/check-status (máx 40 ciclos = 2 min)
+      const maxCycles = Math.ceil(TIMEOUT_SECS / 3);
       pollRef.current = setInterval(async () => {
+        if (timedOut) return;
         count++;
         try {
           const csRes = await fetch("/api/debito/check-status", {
@@ -290,11 +304,13 @@ function SMSBettingScreen({
           if (csRes.ok) {
             const csData = await csRes.json() as { status: string; reason?: string };
             if (csData.status === "approved") {
+              timedOut = true;
               stopAll(channel);
               onSuccess(null);
               return;
             }
             if (csData.status === "rejected") {
+              timedOut = true;
               stopAll(channel);
               setRejectReason(csData.reason || "");
               setStep("rejected");
@@ -303,7 +319,8 @@ function SMSBettingScreen({
           }
         } catch { /* erro de rede — tenta no próximo ciclo */ }
 
-        if (count >= maxCycles) {
+        if (count >= maxCycles && !timedOut) {
+          timedOut = true;
           stopAll(channel);
           setRejectReason("Tempo de espera esgotado. Não respondeste ao USSD a tempo.");
           setStep("rejected");

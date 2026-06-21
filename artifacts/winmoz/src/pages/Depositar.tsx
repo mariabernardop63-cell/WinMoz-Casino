@@ -130,16 +130,32 @@ export default function Depositar() {
       .subscribe();
     realtimeRef.current = channel;
 
-    // countdown timer — ticks every second
+    // countdown timer — ticks every second; ao chegar a 0 cancela automaticamente
+    let timedOut = false;
     countdownRef.current = setInterval(() => {
-      setCountdown(prev => (prev > 0 ? prev - 1 : 0));
+      setCountdown(prev => {
+        const next = prev > 1 ? prev - 1 : 0;
+        if (prev === 1 && !timedOut) {
+          // USSD expirou (2 min) — cancela tudo e mostra rejeição
+          timedOut = true;
+          clearInterval(pollRef.current!);
+          clearInterval(countdownRef.current!);
+          supabase.removeChannel(channel);
+          // usa setTimeout(0) para não atualizar estado dentro do setState
+          setTimeout(() => {
+            setRejectReason("Tempo esgotado. O pedido USSD expirou. Tenta novamente.");
+            setScreen("rejected");
+          }, 0);
+        }
+        return next;
+      });
     }, 1000);
 
-    // Polling a cada 3s via /api/debito/check-status
-    // Usa service role key no servidor — bypassa RLS, lê sempre o estado real da DB
+    // Polling a cada 3s via /api/debito/check-status (máx 40 ciclos = 2 min)
+    const maxCycles = Math.ceil(TIMEOUT_SECS / 3);
     pollRef.current = setInterval(async () => {
+      if (timedOut) return;
       count++;
-      const maxCycles = Math.ceil(300 / 3); // 100 ciclos × 3s = 5min (e-Mola é async — webhook pode demorar)
 
       try {
         const csRes = await fetch("/api/debito/check-status", {
@@ -150,12 +166,14 @@ export default function Depositar() {
         if (csRes.ok) {
           const csData = await csRes.json() as { status: string; reason?: string };
           if (csData.status === "approved") {
+            timedOut = true;
             stopAll(channel);
             setSuccessAmount(amt);
             setScreen("success");
             return;
           }
           if (csData.status === "rejected") {
+            timedOut = true;
             stopAll(channel);
             setRejectReason(csData.reason || "");
             setScreen("rejected");
@@ -164,7 +182,8 @@ export default function Depositar() {
         }
       } catch { /* erro de rede — tenta no próximo ciclo */ }
 
-      if (count >= maxCycles) {
+      if (count >= maxCycles && !timedOut) {
+        timedOut = true;
         stopAll(channel);
         setRejectReason("Tempo de espera esgotado. Não respondeste ao USSD a tempo.");
         setScreen("rejected");

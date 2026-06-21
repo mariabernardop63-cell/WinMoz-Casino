@@ -181,23 +181,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    // Extrair payment_id de todas as localizações possíveis na resposta
+    // Extrair payment_id de TODAS as localizações possíveis na resposta Debito Pay
+    // Log completo da resposta para diagnóstico nos logs da Vercel
+    console.log("[debito/initiate] RESPOSTA COMPLETA Debito Pay:", JSON.stringify(debitoData));
+
     const debitoPaymentId: string | null =
       debitoData?.payment_id ||
+      debitoData?.id ||
       debitoData?.payment?.id ||
+      debitoData?.payment?.payment_id ||
       debitoData?.data?.payment_id ||
       debitoData?.data?.id ||
-      debitoData?.id ||
+      debitoData?.transaction_id ||
+      debitoData?.transactionId ||
+      debitoData?.txid ||
+      debitoData?.uuid ||
       null;
 
-    // Extrair reference (DebitoPay pode retorná-lo na resposta)
+    // Extrair reference
     const debitoReference: string | null =
       debitoData?.reference ||
+      debitoData?.provider_reference ||
       debitoData?.data?.reference ||
       debitoData?.payment?.reference ||
+      debitoData?.payment?.provider_reference ||
       null;
 
     console.log("[debito/initiate] IDs extraídos — payment_id:", debitoPaymentId, "| reference:", debitoReference, "| sourceId:", sourceId);
+
+    if (!debitoPaymentId) {
+      console.warn("[debito/initiate] AVISO: payment_id não encontrado na resposta. " +
+        "O webhook e o check-status não conseguirão identificar esta transação automaticamente. " +
+        "Verifica os logs acima para a estrutura real da resposta da Debito Pay.");
+    }
 
     // Guardar TODOS os identificadores para o webhook conseguir encontrar a transação
     await supabase
