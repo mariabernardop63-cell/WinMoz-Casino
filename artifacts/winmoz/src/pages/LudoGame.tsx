@@ -1855,7 +1855,10 @@ export default function LudoGame() {
         if(BET_AMOUNT > 0 && profile?.id){
           const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
           if(!data || parseFloat(String(data.balance)) < BET_AMOUNT){
-            setRematchPhase("no_balance"); return;
+            // Requester no longer has enough balance — notify opponent and abort
+            channel.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } }).catch(()=>{});
+            setRematchPhase("no_balance");
+            return;
           }
           const newBal=parseFloat(String(data.balance))-BET_AMOUNT;
           await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);

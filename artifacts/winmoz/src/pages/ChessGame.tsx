@@ -635,7 +635,7 @@ function RematchOverlay({ phase, requesterName, onAccept, onDecline, onClose }: 
   const m = msgs[phase];
   return (
     <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.82)", zIndex:60,
+      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.82)", zIndex:200,
         display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(10px)" }}>
       <motion.div initial={{ scale:0.85, y:20 }} animate={{ scale:1, y:0 }}
         transition={{ type:"spring", stiffness:280, damping:22 }}
@@ -1289,11 +1289,16 @@ export default function ChessGame(){
       if(payload.accepted){
         if(BET>0&&profile?.id){
           const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
-          if(data){
-            const newBal=parseFloat(String(data.balance))-BET;
-            await supabase.from("profiles").update({balance:newBal}).eq("id",profile.id);
-            await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de revanche (Xadrez)",status:"approved"});
+          if(!data||parseFloat(String(data.balance))<BET){
+            // Requester no longer has enough balance — notify opponent and abort
+            ch.send({type:"broadcast",event:"rematch_response",payload:{accepted:false,reason:"no_balance"}}).catch(()=>{});
+            setRematchPhase("no_balance");
+            return;
           }
+          const newBal=parseFloat(String(data.balance))-BET;
+          await supabase.from("profiles").update({balance:newBal}).eq("id",profile.id);
+          await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de revanche (Xadrez)",status:"approved"});
+          await refreshProfile();
         }
         setRematchPhase("idle");
         resetGame();
