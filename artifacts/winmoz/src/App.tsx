@@ -56,45 +56,53 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
   const isAdminRoute = location.startsWith("/admin");
 
   useEffect(() => {
-    if (isAdminRoute) return; // don't even subscribe for admin routes
+    if (isAdminRoute) return;
 
-    // Initial fetch using service-role client (bypasses RLS)
-    adminSupabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "maintenance_mode")
-      .single()
-      .then(({ data }) => {
-        setMaintenance((data as { value: string } | null)?.value === "true");
-        setChecked(true);
-      }, () => setChecked(true));
+    // Ler via API server-side (usa service role — nunca bloqueado por RLS)
+    const fetchMaintenance = () => {
+      fetch("/api/admin/settings/get?key=maintenance_mode")
+        .then(r => r.json())
+        .then((d: { setting?: { value: string } | null }) => {
+          setMaintenance(d?.setting?.value === "true");
+          setChecked(true);
+        })
+        .catch(() => setChecked(true));
+    };
 
-    // Realtime subscription via service-role client
+    fetchMaintenance();
+
+    // Polling a cada 30 segundos para apanhar mudanças em tempo real
+    // (substitui Realtime que falha com anon key quando RLS está ativo)
+    const interval = setInterval(fetchMaintenance, 30_000);
+
+    // Realtime como bonus — se RLS permitir, recebe mudanças imediatamente
     const channel = adminSupabase
-      .channel("maintenance-watch-v2")
+      .channel("maintenance-watch-v3")
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "platform_settings", filter: "key=eq.maintenance_mode" },
-        (payload) => {
-          const newVal = (payload.new as { value?: string } | undefined)?.value;
-          setMaintenance(newVal === "true");
+        () => {
+          // Quando o Realtime dispara, faz fetch via API (não confia no payload que pode ter RLS)
+          fetchMaintenance();
         }
       )
       .subscribe();
 
-    return () => { adminSupabase.removeChannel(channel); };
+    return () => {
+      clearInterval(interval);
+      adminSupabase.removeChannel(channel);
+    };
   }, [isAdminRoute]);
 
   // Admin routes always pass through
   if (isAdminRoute) return <>{children}</>;
 
-  // Still checking — show nothing to avoid flash, but only briefly
+  // Still checking
   if (!checked) return null;
 
-  // Wait for auth to resolve before blocking admin users
+  // Admin user bypasses maintenance mode
   const isAdmin = !authLoading && user?.email === ADMIN_EMAIL;
 
-  // Block non-admin users when maintenance is on
   if (maintenance && !isAdmin) {
     return <MaintenancePage />;
   }
