@@ -112,7 +112,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const debitoBody = {
-      action: "process",
       amount: Number(amount.toFixed(2)),
       currency: "MZN",
       mobile: fullPhone,
@@ -122,9 +121,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       callback_url: `${siteOrigin}/api/debito/webhook`,
     };
 
-    console.log("[debito/initiate] Calling Debito Pay:", `${debitoBaseUrl}/payment-orchestrator`, JSON.stringify(debitoBody));
+    const debitoUrl = `${debitoBaseUrl}/payment-orchestrator?action=process`;
+    console.log("[debito/initiate] Calling Debito Pay:", debitoUrl, JSON.stringify(debitoBody));
 
-    const debitoRes = await fetch(`${debitoBaseUrl}/payment-orchestrator`, {
+    const debitoRes = await fetch(debitoUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -193,14 +193,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 }
 
 function parseDebitoError(data: any, status: number): string {
-  const msg = data?.message || data?.error || data?.detail || "";
-  if (status === 401 || status === 403) return "Gateway não autorizado. Contacta o suporte.";
+  const msg: string = data?.message || data?.error || data?.detail || "";
+  const low = msg.toLowerCase();
+  if (status === 401 || status === 403) return "Gateway não autorizado — verifica a API key no Vercel.";
   if (status === 422 || status === 400) {
-    if (msg.toLowerCase().includes("phone") || msg.toLowerCase().includes("msisdn")) return "Número de telefone inválido para este operador.";
-    if (msg.toLowerCase().includes("amount")) return "Montante inválido.";
-    if (msg.toLowerCase().includes("provider")) return "Operador não suportado de momento.";
-    return msg || "Dados de pagamento inválidos.";
+    if (low.includes("phone") || low.includes("msisdn") || low.includes("mobile")) return "Número de telefone inválido para este operador.";
+    if (low.includes("amount")) return "Montante inválido.";
+    if (low.includes("provider")) return "Operador não suportado de momento.";
+    if (low.includes("reference")) return "Referência duplicada. Tenta novamente.";
+    // Return raw Debito Pay error so we can debug, avoid misleading messages
+    return msg ? `Erro do gateway: ${msg}` : "Dados de pagamento rejeitados pelo gateway. Tenta novamente.";
   }
   if (status >= 500) return "Erro temporário do gateway de pagamento. Tenta novamente.";
-  return msg || "Erro ao iniciar pagamento. Tenta novamente.";
+  return msg ? `Erro do gateway: ${msg}` : "Erro ao iniciar pagamento. Tenta novamente.";
 }
