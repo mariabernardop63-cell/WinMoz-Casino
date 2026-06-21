@@ -47,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     settings[(row as any).key] = (row as any).value;
   }
 
-  const debitoBaseUrl = (settings["debito_api_base_url"] || "https://api.debitopay.co.mz").replace(/\/$/, "");
+  const debitoBaseUrl = (settings["debito_api_base_url"] || "https://api.debito.co.mz").replace(/\/$/, "");
   const merchantId = settings["debito_public_id"] || "1e4d1d55-d740-447f-8cb4-8c8ce1bb0a0c";
 
   const cleanPhone = phone.replace(/\D/g, "").replace(/^258/, "");
@@ -91,23 +91,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const debitoBody = {
       amount: Number(amount.toFixed(2)),
       currency: "MZN",
-      msisdn: fullPhone,
-      provider: provider === "emola" ? "e-mola" : "mpesa",
-      external_id: reference,
-      tx_ref: txId,
-      narration: `${type === "deposit" ? "Deposito" : "Aposta"} MozBet`,
+      mobile: fullPhone,
+      provider: provider === "emola" ? "emola" : "mpesa",
+      reference,
+      description: `${type === "deposit" ? "Deposito" : "Aposta"} MozBet - ${reference}`,
       callback_url: `${siteOrigin}/api/debito/webhook`,
     };
 
-    console.log("[debito/initiate] Calling Debito Pay:", debitoBaseUrl, JSON.stringify(debitoBody));
+    console.log("[debito/initiate] Calling Debito Pay:", `${debitoBaseUrl}/v1/payments/c2b`, JSON.stringify(debitoBody));
 
-    const debitoRes = await fetch(`${debitoBaseUrl}/v1/payments`, {
+    const debitoRes = await fetch(`${debitoBaseUrl}/v1/payments/c2b`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${debitoApiKey}`,
-        "X-Merchant-ID": merchantId,
-        "X-Public-ID": merchantId,
       },
       body: JSON.stringify(debitoBody),
     });
