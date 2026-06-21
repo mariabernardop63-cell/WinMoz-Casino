@@ -8,17 +8,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") { res.status(200).end(); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
-  const { amount, phone, provider, type, userId } = req.body as {
-    amount: number;
-    phone: string;
-    provider: "emola" | "mpesa";
-    type: "deposit" | "bet";
-    userId: string;
-  };
+  // Explicit body parsing — Vercel may deliver body as pre-parsed object or raw string
+  let parsedBody: Record<string, any> = {};
+  try {
+    if (typeof req.body === "string") {
+      parsedBody = JSON.parse(req.body);
+    } else if (req.body && typeof req.body === "object") {
+      parsedBody = req.body as Record<string, any>;
+    } else {
+      // Read raw body from stream as last resort
+      const chunks: Buffer[] = [];
+      await new Promise<void>((resolve, reject) => {
+        (req as any).on("data", (c: Buffer) => chunks.push(c));
+        (req as any).on("end", resolve);
+        (req as any).on("error", reject);
+      });
+      parsedBody = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    }
+  } catch (e) {
+    console.error("[debito/initiate] Body parse error:", e, "raw body type:", typeof req.body, "raw:", String(req.body).slice(0, 200));
+    res.status(400).json({ error: "Pedido inválido — não foi possível ler os dados." });
+    return;
+  }
 
-  if (!amount || amount <= 0) { res.status(400).json({ error: "Montante inválido" }); return; }
+  const amount: number = Number(parsedBody["amount"]);
+  const phone: string = String(parsedBody["phone"] ?? "");
+  const provider: string = String(parsedBody["provider"] ?? "emola");
+  const type: string = String(parsedBody["type"] ?? "deposit");
+  const userId: string = String(parsedBody["userId"] ?? "");
+
+  console.log("[debito/initiate] Parsed body — amount:", amount, "phone:", phone, "provider:", provider, "type:", type, "userId:", userId ? "ok" : "MISSING");
+
+  if (!amount || isNaN(amount) || amount <= 0) { res.status(400).json({ error: `Montante inválido (recebido: ${parsedBody["amount"]})` }); return; }
   if (!phone || phone.replace(/\D/g, "").length < 9) { res.status(400).json({ error: "Número de telefone inválido" }); return; }
-  if (!userId) { res.status(400).json({ error: "Utilizador não autenticado" }); return; }
+  if (!userId || userId === "undefined") { res.status(400).json({ error: "Utilizador não autenticado" }); return; }
 
   const supabaseUrl = process.env["SUPABASE_URL"];
   const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
