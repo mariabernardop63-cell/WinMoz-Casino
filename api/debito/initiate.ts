@@ -16,7 +16,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else if (req.body && typeof req.body === "object") {
       parsedBody = req.body as Record<string, any>;
     } else {
-      // Read raw body from stream as last resort
       const chunks: Buffer[] = [];
       await new Promise<void>((resolve, reject) => {
         (req as any).on("data", (c: Buffer) => chunks.push(c));
@@ -26,22 +25,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parsedBody = JSON.parse(Buffer.concat(chunks).toString("utf8"));
     }
   } catch (e) {
-    console.error("[debito/initiate] Body parse error:", e, "raw body type:", typeof req.body, "raw:", String(req.body).slice(0, 200));
+    console.error("[debito/initiate] Body parse error:", e);
     res.status(400).json({ error: "Pedido inválido — não foi possível ler os dados." });
     return;
   }
 
   const amount: number = Number(parsedBody["amount"]);
-  const phone: string = String(parsedBody["phone"] ?? "");
-  const provider: string = String(parsedBody["provider"] ?? "emola");
+  // frontend sends field "phone" (9 digits, no country code)
+  const phoneRaw: string = String(parsedBody["phone"] ?? "");
+  // frontend sends field "provider" ("emola" | "mpesa")
+  const paymentMethod: string = String(parsedBody["provider"] ?? "emola");
   const type: string = String(parsedBody["type"] ?? "deposit");
   const userId: string = String(parsedBody["userId"] ?? "");
 
-  console.log("[debito/initiate] Parsed body — amount:", amount, "phone:", phone, "provider:", provider, "type:", type, "userId:", userId ? "ok" : "MISSING");
+  console.log("[debito/initiate] Parsed — amount:", amount, "phone:", phoneRaw, "method:", paymentMethod, "type:", type, "userId:", userId ? "ok" : "MISSING");
 
-  if (!amount || isNaN(amount) || amount <= 0) { res.status(400).json({ error: `Montante inválido (recebido: ${parsedBody["amount"]})` }); return; }
-  if (!phone || phone.replace(/\D/g, "").length < 9) { res.status(400).json({ error: "Número de telefone inválido" }); return; }
-  if (!userId || userId === "undefined") { res.status(400).json({ error: "Utilizador não autenticado" }); return; }
+  if (!amount || isNaN(amount) || amount <= 0) {
+    res.status(400).json({ error: `Montante inválido (recebido: ${parsedBody["amount"]})` });
+    return;
+  }
+  if (!phoneRaw || phoneRaw.replace(/\D/g, "").length < 9) {
+    res.status(400).json({ error: "Número de telefone inválido" });
+    return;
+  }
+  if (!userId || userId === "undefined") {
+    res.status(400).json({ error: "Utilizador não autenticado" });
+    return;
+  }
 
   const supabaseUrl = process.env["SUPABASE_URL"];
   const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
@@ -60,10 +70,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // Read merchant settings from platform_settings table
   const { data: settingsRows } = await supabase
     .from("platform_settings")
     .select("key, value")
-    .in("key", ["debito_api_base_url", "debito_public_id"]);
+    .in("key", ["debito_api_base_url", "debito_public_id", "debito_wallet_code"]);
 
   const settings: Record<string, string> = {};
   for (const row of settingsRows ?? []) {
@@ -71,13 +82,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const debitoBaseUrl = (settings["debito_api_base_url"] || "https://gyqoaningqhurhvdugne.supabase.co/functions/v1").replace(/\/$/, "");
-  const merchantId = settings["debito_public_id"] || "1e4d1d55-d740-447f-8cb4-8c8ce1bb0a0c";
+  // merchant_id: the merchant UUID from Debito Pay Settings → API
+  const merchantId = settings["debito_public_id"] || process.env["DEBITO_MERCHANT_ID"] || "";
+  // wallet_code: the 5-digit public wallet code from Debito Pay
+  const walletCode = settings["debito_wallet_code"] || process.env["DEBITO_WALLET_CODE"] || "";
 
-  const cleanPhone = phone.replace(/\D/g, "").replace(/^258/, "");
+  if (!walletCode) {
+    console.error("[debito/initiate] wallet_code not configured — set debito_wallet_code in platform_settings or DEBITO_WALLET_CODE env var");
+    res.status(503).json({ error: "Gateway de pagamento não configurado (wallet). Contacta o suporte." });
+    return;
+  }
+
+  // Build phone in format accepted by Debito Pay: 258XXXXXXXXX
+  const cleanPhone = phoneRaw.replace(/\D/g, "").replace(/^258/, "");
   const fullPhone = `258${cleanPhone}`;
 
-  const reference = `MOZBET-${type.toUpperCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  // source_id used for our own reference tracking
+  const sourceId = `MOZBET-${type.toUpperCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
+  // Create pending transaction in our DB first
   const { data: txRow, error: txError } = await supabase
     .from("transactions")
     .insert({
@@ -86,9 +109,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       amount,
       status: "pending",
       description: JSON.stringify({
-        provider,
+        paymentMethod,
         phone: fullPhone,
-        reference,
+        sourceId,
         debitoPaymentId: null,
         paymentType: type,
         paymentGateway: "debitopay",
@@ -106,35 +129,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const txId = (txRow as any).id as string;
 
-  // Use the production domain — VERCEL_URL is the deployment preview URL, not the custom domain
-  const siteOrigin =
-    process.env["SITE_URL"] ||
-    process.env["NEXT_PUBLIC_SITE_URL"] ||
-    (process.env["VERCEL_PROJECT_PRODUCTION_URL"] ? `https://${process.env["VERCEL_PROJECT_PRODUCTION_URL"]}` : null) ||
-    (process.env["VERCEL_URL"] ? `https://${process.env["VERCEL_URL"]}` : "") ||
-    "";
-
   try {
-    const debitoBody = {
+    // Build request body exactly as per Debito Pay API documentation
+    const debitoBody: Record<string, any> = {
       action: "process",
+      payment_method: paymentMethod === "mpesa" ? "mpesa" : "emola",
       merchant_id: merchantId,
+      wallet_code: walletCode,
       amount: Math.round(amount),
       currency: "MZN",
-      mobile: fullPhone,
-      provider: provider === "emola" ? "emola" : "mpesa",
-      reference,
-      description: `${type === "deposit" ? "Deposito" : "Aposta"} MozBet - ${reference}`,
-      callback_url: `${siteOrigin}/api/debito/webhook`,
+      phone: fullPhone,
+      source: "gateway",
+      source_id: sourceId,
     };
 
     const debitoUrl = `${debitoBaseUrl}/payment-orchestrator`;
-    console.log("[debito/initiate] Calling Debito Pay:", debitoUrl, JSON.stringify(debitoBody));
+    console.log("[debito/initiate] → Debito Pay:", debitoUrl, JSON.stringify({ ...debitoBody, merchant_id: "***" }));
 
     const debitoRes = await fetch(debitoUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${debitoApiKey}`,
+        "Accept": "application/json",
       },
       body: JSON.stringify(debitoBody),
     });
@@ -143,7 +160,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let debitoData: any = {};
     try { debitoData = JSON.parse(responseText); } catch { debitoData = { raw: responseText }; }
 
-    console.log("[debito/initiate] Debito Pay response status:", debitoRes.status, "body:", JSON.stringify(debitoData));
+    console.log("[debito/initiate] ← Debito Pay status:", debitoRes.status, "body:", JSON.stringify(debitoData));
 
     if (!debitoRes.ok) {
       await supabase
@@ -151,8 +168,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .update({
           status: "rejected",
           description: JSON.stringify({
-            provider, phone: fullPhone, reference, paymentGateway: "debitopay",
-            error: debitoData?.message || debitoData?.error || "Erro do gateway de pagamento",
+            paymentMethod, phone: fullPhone, sourceId, paymentGateway: "debitopay",
+            error: debitoData?.error || debitoData?.message || "Erro do gateway",
             httpStatus: debitoRes.status,
             rejectedAt: new Date().toISOString(),
           }),
@@ -164,21 +181,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    const debitoPaymentId =
-      debitoData?.id ||
-      debitoData?.payment_id ||
-      debitoData?.data?.id ||
-      debitoData?.data?.payment_id ||
-      debitoData?.transaction_id ||
-      null;
+    // Response has payment_id at top level (per docs)
+    const debitoPaymentId: string | null = debitoData?.payment_id || null;
 
+    // Update transaction with debitoPaymentId so webhook/check-status can find it
     await supabase
       .from("transactions")
       .update({
         description: JSON.stringify({
-          provider,
+          paymentMethod,
           phone: fullPhone,
-          reference,
+          sourceId,
           debitoPaymentId,
           paymentType: type,
           paymentGateway: "debitopay",
@@ -187,13 +200,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
       .eq("id", txId);
 
-    res.status(200).json({ ok: true, txId, paymentId: debitoPaymentId, reference });
+    res.status(200).json({ ok: true, txId, paymentId: debitoPaymentId, sourceId });
   } catch (err: any) {
     console.error("[debito/initiate] Network/fetch error:", err);
-    await supabase
-      .from("transactions")
-      .update({ status: "rejected" })
-      .eq("id", txId);
+    await supabase.from("transactions").update({ status: "rejected" }).eq("id", txId);
     res.status(500).json({ error: "Erro de ligação ao gateway de pagamento. Tenta novamente." });
   }
 }
@@ -201,15 +211,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 function parseDebitoError(data: any, status: number): string {
   const msg: string = data?.message || data?.error || data?.detail || "";
   const low = msg.toLowerCase();
-  if (status === 401 || status === 403) return "Gateway não autorizado — verifica a API key no Vercel.";
-  if (status === 422 || status === 400) {
+  if (status === 401) return "API key inválida — verifica a configuração no Vercel.";
+  if (status === 403) return "Domínio não autorizado no gateway de pagamento. Contacta o suporte.";
+  if (status === 404) return "Configuração do gateway inválida (wallet_code). Contacta o suporte.";
+  if (status === 429) return "Demasiados pedidos ao gateway. Aguarda alguns segundos e tenta novamente.";
+  if (status === 400) {
     if (low.includes("phone") || low.includes("msisdn") || low.includes("mobile")) return "Número de telefone inválido para este operador.";
-    if (low.includes("amount")) return "Montante inválido.";
-    if (low.includes("provider")) return "Operador não suportado de momento.";
-    if (low.includes("reference")) return "Referência duplicada. Tenta novamente.";
-    // Return raw Debito Pay error so we can debug, avoid misleading messages
-    return msg ? `Erro do gateway: ${msg}` : "Dados de pagamento rejeitados pelo gateway. Tenta novamente.";
+    if (low.includes("amount") || low.includes("minimum")) return "Montante inválido — mínimo é 10 MZN.";
+    if (low.includes("payment_method") || low.includes("unsupported")) return "Método de pagamento não suportado de momento.";
+    if (low.includes("wallet_code") || low.includes("wallet")) return "Código de carteira inválido. Contacta o suporte.";
+    if (low.includes("required")) return "Dados em falta no pedido. Contacta o suporte.";
+    return msg ? `Erro do gateway: ${msg}` : "Pedido rejeitado pelo gateway. Tenta novamente.";
   }
-  if (status >= 500) return "Erro temporário do gateway de pagamento. Tenta novamente.";
+  if (status >= 500) return "Erro temporário do gateway de pagamento. Tenta novamente mais tarde.";
   return msg ? `Erro do gateway: ${msg}` : "Erro ao iniciar pagamento. Tenta novamente.";
 }

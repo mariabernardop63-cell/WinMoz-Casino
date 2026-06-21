@@ -1,29 +1,56 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
+
+// Disable Vercel's automatic body parsing so we can read the raw body for HMAC verification
+export const config = { api: { bodyParser: false } };
+
+async function readRawBody(req: VercelRequest): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+    req.on("error", reject);
+  });
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "GET") {
-    res.status(200).json({ ok: true, service: "MozBet Debito Pay Webhook", version: "1.0" });
+    res.status(200).json({ ok: true, service: "MozBet Debito Pay Webhook", version: "2.0" });
     return;
   }
   if (req.method === "OPTIONS") {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Webhook-Secret");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-webhook-signature");
     res.status(200).end();
     return;
   }
   if (req.method !== "POST") { res.status(405).end(); return; }
 
-  // Validate webhook secret if configured
+  // Read raw body for HMAC signature verification
+  const rawBody = await readRawBody(req);
+
+  let body: any = {};
+  try { body = JSON.parse(rawBody); } catch {
+    console.error("[debito/webhook] Invalid JSON body");
+    res.status(400).json({ ok: false, error: "Invalid JSON" });
+    return;
+  }
+
+  // Validate HMAC-SHA256 signature — per Debito Pay docs:
+  // signature is in header x-webhook-signature
+  // hash = HMAC-SHA256(rawBody, webhookSecret).hex
   const configuredSecret = process.env["DEBITO_WEBHOOK_SECRET"];
   if (configuredSecret) {
-    const incomingSecret =
-      req.headers["x-webhook-secret"] ||
-      req.headers["x-debito-secret"] ||
-      req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "");
-    if (incomingSecret !== configuredSecret) {
-      console.error("[debito/webhook] Invalid webhook secret — rejected");
+    const incomingSig = (req.headers["x-webhook-signature"] as string) || "";
+    const expectedSig = crypto
+      .createHmac("sha256", configuredSecret)
+      .update(rawBody)
+      .digest("hex");
+
+    if (expectedSig !== incomingSig) {
+      console.error("[debito/webhook] HMAC signature mismatch — rejected");
       res.status(401).json({ ok: false, error: "Unauthorized" });
       return;
     }
@@ -34,7 +61,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error("[debito/webhook] Missing Supabase env vars");
-    res.status(200).json({ ok: true });
+    res.status(200).json({ ok: true }); // always 200 to Debito Pay
     return;
   }
 
@@ -42,107 +69,88 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const body = req.body as any;
   console.log("[debito/webhook] Received event:", JSON.stringify(body));
 
-  const event: string =
-    body?.event ||
-    body?.type ||
-    body?.status ||
-    (body?.data?.status ? `payment.${body.data.status}` : "unknown");
+  // Per docs webhook payload:
+  // { "event": "payment.completed", "data": { "payment_id": "uuid", "method": "emola", ... }, "timestamp": "..." }
+  const event: string = body?.event || "unknown";
+  const data = body?.data || {};
 
-  const data = body?.data || body;
+  // Per docs: payment_id is the key identifier
+  const debitoPaymentId: string | null = data?.payment_id || null;
 
-  const debitoPaymentId: string | null =
-    data?.id ||
-    data?.payment_id ||
-    data?.transaction_id ||
-    body?.id ||
-    null;
+  console.log("[debito/webhook] event:", event, "payment_id:", debitoPaymentId);
 
-  const reference: string | null =
-    data?.external_id ||
-    data?.tx_ref ||
-    data?.reference ||
-    body?.external_id ||
-    body?.tx_ref ||
-    null;
-
-  const txIdDirect: string | null = data?.tx_ref || body?.tx_ref || null;
-
-  console.log("[debito/webhook] event:", event, "paymentId:", debitoPaymentId, "reference:", reference, "txId:", txIdDirect);
-
-  if (!debitoPaymentId && !reference && !txIdDirect) {
-    console.error("[debito/webhook] Cannot identify payment — no id, reference, or tx_ref");
+  if (!debitoPaymentId) {
+    console.error("[debito/webhook] No payment_id in webhook payload");
     res.status(200).json({ ok: true });
     return;
   }
 
-  let tx: any = null;
+  // Find our transaction by matching stored debitoPaymentId
+  const { data: pendingTxs } = await supabase
+    .from("transactions")
+    .select("id, user_id, amount, description, status")
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(200);
 
-  if (txIdDirect) {
-    const { data: txByid } = await supabase
-      .from("transactions")
-      .select("id, user_id, amount, description, status")
-      .eq("id", txIdDirect)
-      .maybeSingle();
-    if (txByid) tx = txByid;
+  let tx: any = null;
+  for (const t of pendingTxs ?? []) {
+    try {
+      const desc = JSON.parse((t as any).description || "{}");
+      if (desc.debitoPaymentId === debitoPaymentId) { tx = t; break; }
+    } catch { /* skip */ }
   }
 
   if (!tx) {
-    const { data: pendingTxs } = await supabase
+    // Also try to find by source_id / reference field in description
+    const { data: allPending } = await supabase
       .from("transactions")
       .select("id, user_id, amount, description, status")
       .eq("status", "pending")
       .order("created_at", { ascending: false })
       .limit(200);
 
-    for (const t of pendingTxs ?? []) {
+    for (const t of allPending ?? []) {
       try {
         const desc = JSON.parse((t as any).description || "{}");
-        const matchId = debitoPaymentId && desc.debitoPaymentId === debitoPaymentId;
-        const matchRef = reference && desc.reference === reference;
-        if (matchId || matchRef) { tx = t; break; }
+        if (
+          desc.debitoPaymentId === debitoPaymentId ||
+          desc.sourceId === data?.source_id ||
+          desc.reference === data?.reference
+        ) {
+          tx = t;
+          break;
+        }
       } catch { /* skip */ }
     }
   }
 
   if (!tx) {
-    console.error("[debito/webhook] Transaction not found for event:", event, "paymentId:", debitoPaymentId, "ref:", reference);
+    console.error("[debito/webhook] Transaction not found for payment_id:", debitoPaymentId);
     res.status(200).json({ ok: true });
     return;
   }
 
-  const isCompleted =
-    event === "payment.completed" ||
-    event === "completed" ||
-    event === "COMPLETED" ||
-    data?.status === "completed" ||
-    data?.status === "COMPLETED" ||
-    data?.status === "success" ||
-    data?.status === "SUCCESS";
-
-  const isFailed =
-    event === "payment.failed" ||
-    event === "failed" ||
-    event === "FAILED" ||
-    event === "payment.cancelled" ||
-    event === "cancelled" ||
-    data?.status === "failed" ||
-    data?.status === "FAILED" ||
-    data?.status === "cancelled" ||
-    data?.status === "CANCELLED" ||
-    data?.status === "rejected" ||
-    data?.status === "REJECTED" ||
-    data?.status === "timeout" ||
-    data?.status === "expired";
+  // Idempotency check — skip if already resolved
+  if ((tx as any).status === "approved" || (tx as any).status === "rejected") {
+    console.log("[debito/webhook] Transaction already resolved:", (tx as any).status);
+    res.status(200).json({ ok: true });
+    return;
+  }
 
   let desc: Record<string, any> = {};
   try { desc = JSON.parse((tx as any).description || "{}"); } catch { /* ok */ }
 
   const paymentType: string = desc.paymentType || "deposit";
 
+  // Per docs: "payment.completed" = paid; "payment.failed" = declined/expired
+  const isCompleted = event === "payment.completed";
+  const isFailed = event === "payment.failed";
+
   if (isCompleted) {
+    // Credit user balance only for deposits
     if (paymentType === "deposit") {
       const { data: profile } = await supabase
         .from("profiles")
@@ -173,23 +181,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status: "approved",
         description: JSON.stringify({
           ...desc,
-          debitoPaymentId: debitoPaymentId || desc.debitoPaymentId,
-          completedAt: new Date().toISOString(),
+          debitoPaymentId,
+          completedAt: data?.paid_at || new Date().toISOString(),
           debitoEvent: event,
         }),
       })
       .eq("id", (tx as any).id);
 
-  } else if (isFailed) {
-    const failReason =
-      data?.failure_reason ||
-      data?.reason ||
-      data?.message ||
-      data?.description ||
-      body?.reason ||
-      "Pagamento não concluído";
+    console.log(`[debito/webhook] ✓ Payment completed for tx ${(tx as any).id}`);
 
-    const userReason = parseFailReason(failReason, data?.status || event);
+  } else if (isFailed) {
+    const userReason = parseFailReason(data?.method || "", event);
 
     await supabase
       .from("transactions")
@@ -197,31 +199,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         status: "rejected",
         description: JSON.stringify({
           ...desc,
-          debitoPaymentId: debitoPaymentId || desc.debitoPaymentId,
+          debitoPaymentId,
           rejectedAt: new Date().toISOString(),
           failReason: userReason,
-          rawReason: failReason,
           debitoEvent: event,
         }),
       })
       .eq("id", (tx as any).id);
 
-    console.log(`[debito/webhook] Payment failed tx ${(tx as any).id}: ${failReason}`);
+    console.log(`[debito/webhook] ✗ Payment failed for tx ${(tx as any).id}`);
   } else {
-    console.log(`[debito/webhook] Unhandled event type: ${event} — no action taken`);
+    console.log(`[debito/webhook] Unhandled event: ${event} — no action taken`);
   }
 
+  // Always respond 200 within 5s (per Debito Pay best practices)
   res.status(200).json({ ok: true });
 }
 
-function parseFailReason(raw: string, status: string): string {
-  const lower = (raw || "").toLowerCase();
-  if (lower.includes("pin") || lower.includes("invalid pin") || lower.includes("wrong pin")) return "PIN incorrecto. O pagamento foi cancelado.";
-  if (lower.includes("insufficient") || lower.includes("balance") || lower.includes("funds")) return "Saldo insuficiente na carteira móvel.";
-  if (lower.includes("timeout") || lower.includes("expired") || status === "timeout" || status === "expired") return "Tempo esgotado. Não respondeste ao USSD a tempo.";
-  if (lower.includes("cancelled") || lower.includes("cancel") || status === "cancelled") return "Pagamento cancelado pelo utilizador.";
-  if (lower.includes("limit") || lower.includes("exceed")) return "Limite diário/mensal da carteira atingido.";
-  if (lower.includes("blocked") || lower.includes("restricted")) return "A tua conta móvel está bloqueada ou restrita.";
-  if (lower.includes("network") || lower.includes("unavailable")) return "Serviço e-Mola temporariamente indisponível. Tenta mais tarde.";
-  return raw || "Pagamento não concluído. Tenta novamente.";
+function parseFailReason(method: string, event: string): string {
+  if (event === "payment.failed") return "Pagamento recusado ou expirado. Verifica o teu saldo e-Mola e tenta novamente.";
+  return "Pagamento não concluído. Tenta novamente.";
 }

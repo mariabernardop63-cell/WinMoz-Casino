@@ -47,3 +47,14 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Env files with real secrets — NEVER commit these
+**/.env.local
+**/.env.production
+**/.env.production.local
+.env.local
+.env.production
+
+# Attached assets text files (API docs pasted by agent — may contain key patterns)
+attached_assets/*.txt
+attached_assets/*.md

@@ -33,6 +33,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!tx) { res.status(404).json({ error: "Transacção não encontrada" }); return; }
 
   const currentStatus = (tx as any).status as string;
+
+  // Already resolved — return immediately
   if (currentStatus === "approved" || currentStatus === "rejected") {
     res.status(200).json({ status: currentStatus });
     return;
@@ -41,19 +43,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let desc: Record<string, any> = {};
   try { desc = JSON.parse((tx as any).description || "{}"); } catch { /* ok */ }
 
-  const reference: string | null = desc.reference || null;
-  if (!reference) { res.status(200).json({ status: currentStatus }); return; }
+  // Per docs: check-status requires payment_id (the UUID returned by Debito Pay on initiation)
+  const debitoPaymentId: string | null = desc.debitoPaymentId || null;
+  if (!debitoPaymentId) {
+    // payment_id not stored yet (initiation may still be in flight) — return current status
+    console.log("[debito/check-status] No debitoPaymentId stored for tx:", txId);
+    res.status(200).json({ status: currentStatus });
+    return;
+  }
 
   const debitoBaseUrl = "https://gyqoaningqhurhvdugne.supabase.co/functions/v1";
 
   try {
+    // Per docs: { "action": "check-status", "payment_id": "uuid-pending-payment" }
     const checkRes = await fetch(`${debitoBaseUrl}/payment-orchestrator`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${debitoApiKey}`,
+        "Accept": "application/json",
       },
-      body: JSON.stringify({ action: "check-status", reference }),
+      body: JSON.stringify({ action: "check-status", payment_id: debitoPaymentId }),
     });
 
     const responseText = await checkRes.text();
@@ -62,22 +72,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log("[debito/check-status] response:", checkRes.status, JSON.stringify(checkData));
 
+    // Per docs response: { "success": true, "payment": { "id": "...", "status": "success"|"pending"|"failed"|"expired" } }
     const remoteStatus: string =
+      checkData?.payment?.status ||
       checkData?.status ||
-      checkData?.data?.status ||
       "pending";
 
-    const isSuccess =
-      remoteStatus === "success" ||
-      remoteStatus === "SUCCESS" ||
-      remoteStatus === "completed" ||
-      remoteStatus === "COMPLETED";
+    // "success" = paid and credited (per docs)
+    const isSuccess = remoteStatus === "success" || remoteStatus === "SUCCESS";
 
+    // "failed" or "expired" = declined/timed out (per docs)
     const isFailed =
       remoteStatus === "failed" ||
       remoteStatus === "FAILED" ||
+      remoteStatus === "expired" ||
+      remoteStatus === "EXPIRED" ||
       remoteStatus === "cancelled" ||
-      remoteStatus === "CANCELLED" ||
       remoteStatus === "rejected";
 
     if (isSuccess && currentStatus === "pending") {
@@ -99,7 +109,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .from("transactions")
         .update({
           status: "approved",
-          description: JSON.stringify({ ...desc, approvedAt: new Date().toISOString(), approvedVia: "check-status" }),
+          description: JSON.stringify({
+            ...desc,
+            approvedAt: new Date().toISOString(),
+            approvedVia: "check-status",
+          }),
         })
         .eq("id", txId);
 
@@ -112,7 +126,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .from("transactions")
         .update({
           status: "rejected",
-          description: JSON.stringify({ ...desc, failReason: checkData?.message || "Pagamento recusado.", rejectedAt: new Date().toISOString(), rejectedVia: "check-status" }),
+          description: JSON.stringify({
+            ...desc,
+            failReason: checkData?.payment?.status === "expired"
+              ? "Tempo esgotado. Não respondeste ao USSD a tempo."
+              : (checkData?.message || "Pagamento recusado."),
+            rejectedAt: new Date().toISOString(),
+            rejectedVia: "check-status",
+          }),
         })
         .eq("id", txId);
 

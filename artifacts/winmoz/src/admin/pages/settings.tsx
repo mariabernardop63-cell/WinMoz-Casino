@@ -137,6 +137,9 @@ function DebitoPaySection() {
   const [publicId, setPublicId] = useState("");
   const [savingPID, setSavingPID] = useState(false);
 
+  const [walletCode, setWalletCode] = useState("55291");
+  const [savingWC, setSavingWC] = useState(false);
+
   const [apiBaseUrl, setApiBaseUrl] = useState("");
   const [savingBase, setSavingBase] = useState(false);
 
@@ -144,6 +147,7 @@ function DebitoPaySection() {
 
   useEffect(() => {
     if (platformSettings["debito_public_id"]) setPublicId(platformSettings["debito_public_id"]);
+    if (platformSettings["debito_wallet_code"]) setWalletCode(platformSettings["debito_wallet_code"]);
     if (platformSettings["debito_api_base_url"]) setApiBaseUrl(platformSettings["debito_api_base_url"]);
   }, [platformSettings]);
 
@@ -234,6 +238,28 @@ function DebitoPaySection() {
           </div>
           <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
             O identificador público visível no painel Debito Pay. Pré-preenchido com o valor por defeito.
+          </p>
+        </div>
+
+        {/* Wallet Code */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+            Wallet Code <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 100, background: "rgba(0,212,180,0.1)", color: CYAN_COLOR, textTransform: "uppercase", letterSpacing: "0.5px", marginLeft: 4 }}>OBRIGATÓRIO</span>
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={inputBox()}>
+              <Zap style={{ width: 14, height: 14, color: CYAN_COLOR, flexShrink: 0 }} />
+              <input type="text" value={walletCode} onChange={e => setWalletCode(e.target.value)}
+                placeholder="55291"
+                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "monospace" }} />
+            </div>
+            <button onClick={() => saveKey("debito_wallet_code", walletCode, setSavingWC, "Wallet Code")}
+              disabled={!walletCode.trim() || savingWC} style={saveBtn(!!walletCode.trim(), savingWC)}>
+              {savingWC ? <div style={spinStyle} /> : <Save style={{ width: 14, height: 14 }} />}
+            </button>
+          </div>
+          <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
+            Código de 5 dígitos da carteira — visível em <strong>Debito Pay → Settings → API</strong>. Campo obrigatório em todos os pedidos de pagamento.
           </p>
         </div>
 
