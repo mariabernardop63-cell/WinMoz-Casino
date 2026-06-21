@@ -174,17 +174,23 @@ function SMSBettingScreen({
 }) {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const [step, setStep] = useState<"wallet" | "phone" | "verifying" | "rejected">("wallet");
+  // Skip wallet selection — go straight to phone input (e-Mola only)
+  const [step, setStep] = useState<"phone" | "verifying" | "rejected">("phone");
   const [provider] = useState<"emola">("emola");
   const [phoneInput, setPhoneInput] = useState(initialPhone?.replace(/\D/g, "").replace(/^258/, "") || "");
   const [phoneError, setPhoneError] = useState("");
   const [initiating, setInitiating] = useState(false);
   const [initError, setInitError] = useState("");
   const [rejectReason, setRejectReason] = useState("");
+  const [countdown, setCountdown] = useState(120);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
   }, []);
 
   const cleanPhone = phoneInput.replace(/\D/g, "").replace(/^258/, "");
@@ -229,11 +235,44 @@ function SMSBettingScreen({
       const pid = resData?.txId as string;
       setInitiating(false);
       setStep("verifying");
+      setCountdown(120);
+
+      // countdown timer
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
 
       let count = 0;
+      const maxCycles = 40; // 40 * 3s = 2 minutes
       pollRef.current = setInterval(async () => {
         count++;
         try {
+          // Every 3 cycles (~9s) call check-status to query Debito Pay directly
+          if (count % 3 === 0) {
+            try {
+              const csRes = await fetch("/api/debito/check-status", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ txId: pid }),
+              });
+              if (csRes.ok) {
+                const csData = await csRes.json() as { status: string };
+                if (csData.status === "approved") {
+                  clearInterval(pollRef.current!);
+                  clearInterval(countdownRef.current!);
+                  onSuccess(null);
+                  return;
+                } else if (csData.status === "rejected") {
+                  clearInterval(pollRef.current!);
+                  clearInterval(countdownRef.current!);
+                  setStep("rejected");
+                  return;
+                }
+              }
+            } catch { /* fallback to Supabase */ }
+          }
+
+          // Poll Supabase for status set by webhook
           const { data } = await supabase
             .from("transactions")
             .select("status, description")
@@ -242,18 +281,33 @@ function SMSBettingScreen({
           const status = (data as any)?.status as string | undefined;
           if (status === "approved") {
             clearInterval(pollRef.current!);
+            clearInterval(countdownRef.current!);
             onSuccess(null);
+            return;
           } else if (status === "rejected") {
             clearInterval(pollRef.current!);
+            clearInterval(countdownRef.current!);
             try {
               const desc = JSON.parse((data as any)?.description || "{}");
               setRejectReason(desc.failReason || "");
             } catch { setRejectReason(""); }
             setStep("rejected");
+            return;
           }
-          if (count >= 200) { clearInterval(pollRef.current!); setRejectReason("Tempo de espera esgotado."); setStep("rejected"); }
+
+          if (count >= maxCycles) {
+            clearInterval(pollRef.current!);
+            clearInterval(countdownRef.current!);
+            setRejectReason("Tempo de espera esgotado. Não respondeste ao USSD a tempo.");
+            setStep("rejected");
+          }
         } catch {
-          if (count >= 200) { clearInterval(pollRef.current!); setStep("rejected"); }
+          if (count >= maxCycles) {
+            clearInterval(pollRef.current!);
+            clearInterval(countdownRef.current!);
+            setRejectReason("Tempo de espera esgotado.");
+            setStep("rejected");
+          }
         }
       }, 3000);
     } catch {
@@ -293,10 +347,22 @@ function SMSBettingScreen({
               Introduz o teu <strong style={{ color: "#a1a1aa" }}>PIN e-Mola</strong> para confirmar a aposta.
             </p>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-              style={{ marginTop: 28, display: "flex", alignItems: "center", gap: 8, padding: "8px 16px",
+              style={{ marginTop: 28, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px",
                 background: `rgba(0,212,180,0.12)`, borderRadius: 99, border: `1px solid ${CYAN}33` }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: CYAN }} className="animate-pulse" />
-              <span style={{ fontSize: 11, color: CYAN, fontWeight: 600, letterSpacing: "0.5px" }}>A AGUARDAR CONFIRMAÇÃO DO PIN…</span>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: CYAN }} className="animate-pulse" />
+                <span style={{ fontSize: 11, color: CYAN, fontWeight: 600, letterSpacing: "0.5px" }}>A AGUARDAR CONFIRMAÇÃO DO PIN…</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: countdown <= 30 ? "#f59e0b" : "#52525b" }}>Expira em</span>
+                <span style={{
+                  fontSize: 14, fontWeight: 700, fontFamily: "monospace",
+                  color: countdown <= 30 ? "#f59e0b" : "#8e8e93",
+                  minWidth: 36, textAlign: "center",
+                }}>
+                  {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, "0")}
+                </span>
+              </div>
             </motion.div>
           </motion.div>
         </div>
@@ -353,75 +419,16 @@ function SMSBettingScreen({
     );
   }
 
-  if (step === "wallet") {
-    return (
-      <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
-        <div className="w-full max-w-[430px] flex flex-col min-h-screen">
-          <div className="flex items-center justify-between px-5 pt-12 pb-4">
-            <button onClick={onCancel} className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: "#1c1c1e" }}>
-              <X style={{ width: 18, height: 18, color: "#fff" }} />
-            </button>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>
-              Carteira Móvel
-            </p>
-            <div className="w-10" />
-          </div>
-          <div className="flex-1 px-5 pb-10 overflow-y-auto">
-            <div className="flex items-center justify-center mb-6">
-              <div className="px-5 py-2 rounded-full" style={{ background: "#1c1c1e", border: `1.5px solid ${CYAN}22` }}>
-                <span style={{ fontSize: 13, color: "#8e8e93" }}>Aposta: </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: CYAN }}>{fmtMT(amount)} MZN</span>
-              </div>
-            </div>
-            <p style={{ fontSize: 11, fontWeight: 700, color: "#636366", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: 16 }}>
-              Selecciona a tua carteira
-            </p>
-            {/* e-Mola — ACTIVE */}
-            <motion.button whileTap={{ scale: 0.97 }} onClick={() => setStep("phone")}
-              className="w-full rounded-2xl p-5 mb-3 flex items-center justify-between"
-              style={{ background: "rgba(52,211,153,0.06)", border: "2px solid #34d399", cursor: "pointer" }}>
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(52,211,153,0.15)" }}>
-                  <span style={{ fontSize: 22 }}>💳</span>
-                </div>
-                <div className="text-left">
-                  <p style={{ fontWeight: 700, color: "#34d399", fontSize: 16 }}>e-Mola</p>
-                  <p style={{ fontSize: 12, color: "#71717a", marginTop: 2 }}>Pagamento via USSD instantâneo</p>
-                </div>
-              </div>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 99, background: "rgba(52,211,153,0.15)", color: "#34d399" }}>ACTIVO</span>
-            </motion.button>
-            {/* M-Pesa — disabled */}
-            <div className="w-full rounded-2xl p-5 mb-6 flex items-center justify-between"
-              style={{ background: "#111", border: "2px solid #2c2c2e", opacity: 0.45, cursor: "not-allowed" }}>
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(231,76,60,0.1)" }}>
-                  <span style={{ fontSize: 22 }}>📱</span>
-                </div>
-                <div className="text-left">
-                  <p style={{ fontWeight: 700, color: "#e74c3c", fontSize: 16 }}>M-Pesa</p>
-                  <p style={{ fontSize: 12, color: "#52525b", marginTop: 2 }}>Brevemente disponível</p>
-                </div>
-              </div>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 99, background: "#1c1c1e", color: "#52525b" }}>EM BREVE</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
       <div className="w-full max-w-[430px] flex flex-col min-h-screen">
         <div className="flex items-center justify-between px-5 pt-12 pb-4">
-          <button onClick={() => { setInitError(""); setStep("wallet"); }} className="w-10 h-10 rounded-full flex items-center justify-center"
+          <button onClick={() => { setInitError(""); onCancel(); }} className="w-10 h-10 rounded-full flex items-center justify-center"
             style={{ background: "#1c1c1e" }}>
             <ChevronLeft style={{ width: 18, height: 18, color: "#fff" }} />
           </button>
           <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>
-            Número e-Mola
+            Pagar com e-Mola
           </p>
           <div className="w-10" />
         </div>
@@ -1750,26 +1757,7 @@ export default function Apostar() {
             )}
           </motion.div>
 
-          {/* Sala Privada Button */}
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.36, duration: 0.4 }} style={{ marginBottom: 28 }}>
-            <button
-              onClick={() => { if (canStart) { setSalaError(""); setScreen("sala-menu"); } }}
-              disabled={!canStart}
-              style={{
-                width: "100%", height: 52, borderRadius: 99,
-                background: "transparent",
-                border: canStart ? "1.5px solid rgba(124,58,237,0.45)" : "1.5px solid #2c2c2e",
-                cursor: canStart ? "pointer" : "not-allowed",
-                color: canStart ? "#a78bfa" : "#3f3f46",
-                fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              }}>
-              <Hash style={{ width: 14, height: 14 }} />
-              Sala Privada (Joga com um Amigo)
-            </button>
-          </motion.div>
-
+  
           {/* Recommended Games */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.38, duration: 0.4 }}>

@@ -55,11 +55,16 @@ export default function Depositar() {
   const [rejectReason, setRejectReason] = useState("");
   const [initiating, setInitiating] = useState(false);
   const [initError, setInitError] = useState("");
+  const [countdown, setCountdown] = useState(120);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const txDate = new Date().toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" });
 
   useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
   }, []);
 
   const amountVal = parseFloat(amountStr) || 0;
@@ -86,12 +91,24 @@ export default function Depositar() {
   const cleanPhone = phoneInput.replace(/\D/g, "").replace(/^258/, "");
   const isPhoneValid = cleanPhone.length === 9;
 
+  const TIMEOUT_SECS = 120; // 2 minutes
+
   const startPolling = (pid: string, amt: number) => {
     let count = 0;
+    setCountdown(TIMEOUT_SECS);
+
+    // countdown timer — ticks every second
+    countdownRef.current = setInterval(() => {
+      setCountdown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    // status polling — every 3 seconds
     pollRef.current = setInterval(async () => {
       count++;
+      const maxCycles = Math.ceil(TIMEOUT_SECS / 3); // ~40 cycles
+
       try {
-        // Every 3 cycles (~9s) also call check-status to query Debito Pay directly
+        // Every 3 cycles (~9s) call check-status to query Debito Pay directly
         if (count % 3 === 0) {
           try {
             const csRes = await fetch("/api/debito/check-status", {
@@ -103,19 +120,21 @@ export default function Depositar() {
               const csData = await csRes.json() as { status: string };
               if (csData.status === "approved") {
                 clearInterval(pollRef.current!);
+                clearInterval(countdownRef.current!);
                 setSuccessAmount(amt);
                 setScreen("success");
                 return;
               } else if (csData.status === "rejected") {
                 clearInterval(pollRef.current!);
+                clearInterval(countdownRef.current!);
                 setScreen("rejected");
                 return;
               }
             }
-          } catch { /* silent — fallback to Supabase poll below */ }
+          } catch { /* fallback to Supabase poll below */ }
         }
 
-        // Always poll Supabase for status set by webhook or check-status
+        // Poll Supabase directly for status set by webhook
         const { data } = await supabase
           .from("transactions")
           .select("status, description")
@@ -124,19 +143,35 @@ export default function Depositar() {
         const status = (data as any)?.status as string | undefined;
         if (status === "approved") {
           clearInterval(pollRef.current!);
+          clearInterval(countdownRef.current!);
           setSuccessAmount(amt);
           setScreen("success");
+          return;
         } else if (status === "rejected") {
           clearInterval(pollRef.current!);
+          clearInterval(countdownRef.current!);
           try {
             const desc = JSON.parse((data as any)?.description || "{}");
             setRejectReason(desc.failReason || "");
           } catch { setRejectReason(""); }
           setScreen("rejected");
+          return;
         }
-        if (count >= 200) { clearInterval(pollRef.current!); setRejectReason("Tempo de espera esgotado."); setScreen("rejected"); }
+
+        // Timeout after 2 minutes
+        if (count >= maxCycles) {
+          clearInterval(pollRef.current!);
+          clearInterval(countdownRef.current!);
+          setRejectReason("Tempo de espera esgotado. Não respondeste ao USSD a tempo.");
+          setScreen("rejected");
+        }
       } catch {
-        if (count >= 200) { clearInterval(pollRef.current!); setRejectReason(""); setScreen("rejected"); }
+        if (count >= maxCycles) {
+          clearInterval(pollRef.current!);
+          clearInterval(countdownRef.current!);
+          setRejectReason("Tempo de espera esgotado.");
+          setScreen("rejected");
+        }
       }
     }, 3000);
   };
@@ -526,6 +561,19 @@ export default function Depositar() {
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: CYAN }} className="animate-pulse" />
                 <span style={{ fontSize: 11, color: CYAN, fontWeight: 600, letterSpacing: "0.5px" }}>
                   A AGUARDAR CONFIRMAÇÃO DO PIN…
+                </span>
+              </div>
+              {/* Countdown timer */}
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 12, color: countdown <= 30 ? "#f59e0b" : "#52525b" }}>
+                  Expira em
+                </span>
+                <span style={{
+                  fontSize: 14, fontWeight: 700, fontFamily: "monospace",
+                  color: countdown <= 30 ? "#f59e0b" : "#8e8e93",
+                  minWidth: 36, textAlign: "center",
+                }}>
+                  {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, "0")}
                 </span>
               </div>
               <p style={{ fontSize: 11, color: "#52525b", textAlign: "center", maxWidth: 240, lineHeight: 1.5 }}>
