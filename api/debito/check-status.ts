@@ -34,9 +34,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const currentStatus = (tx as any).status as string;
 
-  // Already resolved — return immediately
-  if (currentStatus === "approved" || currentStatus === "rejected") {
-    res.status(200).json({ status: currentStatus });
+  // Already resolved — return immediately with reason if rejected
+  if (currentStatus === "approved") {
+    res.status(200).json({ status: "approved" });
+    return;
+  }
+  if (currentStatus === "rejected") {
+    let reason = "";
+    try { reason = JSON.parse((tx as any).description || "{}").failReason || ""; } catch { /* ok */ }
+    res.status(200).json({ status: "rejected", reason });
     return;
   }
 

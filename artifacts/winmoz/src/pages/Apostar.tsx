@@ -276,68 +276,39 @@ function SMSBettingScreen({
         setCountdown(prev => (prev > 0 ? prev - 1 : 0));
       }, 1000);
 
-      // Polling de backup a cada 2s
-      const maxCycles = Math.ceil(TIMEOUT_SECS / 2);
+      // Polling a cada 3s via /api/debito/check-status
+      // Usa service role key no servidor — bypassa RLS, lê sempre o estado real da DB
+      const maxCycles = Math.ceil(TIMEOUT_SECS / 3); // 40 ciclos × 3s = 120s
       pollRef.current = setInterval(async () => {
         count++;
         try {
-          // A cada 3 ciclos (~6s) consulta check-status diretamente
-          if (count % 3 === 0) {
-            try {
-              const csRes = await fetch("/api/debito/check-status", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ txId: pid }),
-              });
-              if (csRes.ok) {
-                const csData = await csRes.json() as { status: string };
-                if (csData.status === "approved") {
-                  stopAll(channel);
-                  onSuccess(null);
-                  return;
-                } else if (csData.status === "rejected") {
-                  stopAll(channel);
-                  setStep("rejected");
-                  return;
-                }
-              }
-            } catch { /* continua para poll do Supabase */ }
+          const csRes = await fetch("/api/debito/check-status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ txId: pid }),
+          });
+          if (csRes.ok) {
+            const csData = await csRes.json() as { status: string; reason?: string };
+            if (csData.status === "approved") {
+              stopAll(channel);
+              onSuccess(null);
+              return;
+            }
+            if (csData.status === "rejected") {
+              stopAll(channel);
+              setRejectReason(csData.reason || "");
+              setStep("rejected");
+              return;
+            }
           }
+        } catch { /* erro de rede — tenta no próximo ciclo */ }
 
-          // Poll direto ao Supabase
-          const { data } = await supabase
-            .from("transactions")
-            .select("status, description")
-            .eq("id", pid)
-            .single();
-          const status = (data as any)?.status as string | undefined;
-          if (status === "approved") {
-            stopAll(channel);
-            onSuccess(null);
-            return;
-          } else if (status === "rejected") {
-            stopAll(channel);
-            try {
-              const desc = JSON.parse((data as any)?.description || "{}");
-              setRejectReason(desc.failReason || "");
-            } catch { setRejectReason(""); }
-            setStep("rejected");
-            return;
-          }
-
-          if (count >= maxCycles) {
-            stopAll(channel);
-            setRejectReason("Tempo de espera esgotado. Não respondeste ao USSD a tempo.");
-            setStep("rejected");
-          }
-        } catch {
-          if (count >= maxCycles) {
-            stopAll(channel);
-            setRejectReason("Tempo de espera esgotado.");
-            setStep("rejected");
-          }
+        if (count >= maxCycles) {
+          stopAll(channel);
+          setRejectReason("Tempo de espera esgotado. Não respondeste ao USSD a tempo.");
+          setStep("rejected");
         }
-      }, 2000);
+      }, 3000);
     } catch {
       setInitError("Erro de ligação. Verifica a internet e tenta de novo.");
       setInitiating(false);

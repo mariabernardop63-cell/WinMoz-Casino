@@ -1,0 +1,520 @@
+Overview
+The Debito Pay Payments API exposes thre
+e main endpoints: payment-orchestrator (create payments), payment-session (authorize front-end checkout) and wallet-balance (query balances). All methods return JSON and use Bearer token authentication.
+
+Base URL
+
+https://gyqoaningqhurhvdugne.supabase.co/functions/v1
+/payment-orchestrator
+Create the charge in any method. Single entry point.
+
+/payment-session
+Session token for browser checkout, bound to domain.
+
+/wallet-balance
+Balance of authenticated merchant's wallets.
+
+< 30 min
+
+Average integration time
+
+99.9%
+
+Guaranteed uptime (SLA)
+
+5
+
+Payment methods
+
+2
+
+Currencies (MZN, ZAR)
+
+Minimum amounts per transaction
+
+• M-Pesa / e-Mola / mKesh: 10 MZN
+• Visa / Mastercard: 50 MZN
+• PayFast (ZAR): 5 ZAR
+Standard HTTP headers on all calls
+
+• Authorization: Bearer sk_live_… / sk_sandbox_…
+• Content-Type: application/json
+• Accept: application/json
+• X-Idempotency-Key: <uuid> (optional, prevents duplicates on retries)
+Encaminhamento do IP/Origem do Cliente Final (server-to-server)
+
+Quando a sua aplicação chama esta API a partir do seu servidor (axios, curl, python-requests, etc.), o IP e User-Agent capturados pelo gateway são os do seu servidor, não do cliente final. Para que a Zumbo Cloud registe o IP/Origem real do cliente final (essencial para anti-fraude, KYC e relatórios geográficos), envie os seguintes headers opcionais mas recomendados:
+
+• X-Customer-IP: 41.220.xxx.xxx — IP público do cliente final
+• X-Customer-User-Agent: Mozilla/5.0 … — User-Agent do browser do cliente
+• X-Customer-Origin: https://loja.exemplo.co.mz/checkout — URL da página de origem
+Alternativa: pode enviar os mesmos valores dentro do body da requisição como customer_ip, customer_user_agent, customer_origin_url. Os headers têm prioridade sobre o body.
+
+http
+Copy
+POST /api/v1/payments
+Authorization: Bearer sk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Content-Type: application/json
+X-Customer-IP: 41.220.15.88
+X-Customer-User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15
+X-Customer-Origin: https://loja.exemplo.co.mz/checkout
+Authentication
+All server-side calls use Bearer with the merchant API key (sk_live_… or sk_sandbox_…). Issued at Merchant → Settings → API Keys or via /api-sandbox for tests.
+
+http
+Copy
+Authorization: Bearer sk_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Content-Type: application/json
+How the key is validated
+
+• The function extracts the token from the header Authorization.
+• Computes SHA-256 and compares with merchant_api_keys.key_hash.
+• Verifies status = 'active' and the wallet's authorized domain.
+• Resolves the merchant_id from the key — do not send it in the path.
+Never expose the secret key in client code. For the browser only use session_token issued by /payment-session.
+merchant_id & wallet_code
+The whole integration uses only two public identifiers. The internal wallet_id never needs to be sent.
+
+merchant_id
+Merchant UUID. Available in Settings → API.
+
+wallet_code
+Public 5-digit wallet code (e.g.: 12345).
+
+Payment Flow
+Single flow regardless of payment method — server-to-server, with synchronous confirmation (M-Pesa) or asynchronous via callback/webhook (e-Mola, mKesh, cards).
+
+1
+POST /payment-orchestrator
+Server-to-server: send merchant_id + wallet_code + payment_method + amount + phone (mobile money) or return_url (cards).
+
+2
+Gateway response
+M-Pesa: synchronous confirmation (success). e-Mola/mKesh: pending → callback. Visa/MC and PayFast: return checkout_url to redirect customer to Debito Pay green Hosted Checkout.
+
+3
+Confirmation
+Mobile money credits the wallet directly via callback. Cards (Visa/MC and PayFast) are processed in Debito Pay Hosted Checkout and credit the wallet via ledger_transactions after confirmation.
+
+4
+Merchant webhook
+The webhook-receiver fires payment.completed / payment.failed event to your URL.
+
+Payment Orchestrator
+Single entry point to create payments. Internally routes to the right gateway based on method and currency — all provider complexity stays on our side.
+
+POST
+/payment-orchestrator
+Request body — common fields
+json
+Copy
+{
+  "action": "process",
+  "payment_method": "mpesa | emola | mkesh | visa_mastercard | payfast",
+  "merchant_id": "uuid-do-merchant",
+  "wallet_code": "12345",
+  "amount": 150,
+  "currency": "MZN",
+  "source": "gateway",
+  "source_id": "ORDER_123",
+  "customer_name": "João Silva",
+  "customer_email": "joao@example.com",
+  "customer_phone": "+258841234567"
+}
+cURL example — M-Pesa
+bash
+Copy
+curl -X POST https://gyqoaningqhurhvdugne.supabase.co/functions/v1/payment-orchestrator \
+  -H "Authorization: Bearer sk_live_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "process",
+    "payment_method": "mpesa",
+    "merchant_id": "MERCHANT_UUID",
+    "wallet_code": "12345",
+    "amount": 150,
+    "currency": "MZN",
+    "phone": "+258841234567",
+    "source": "gateway",
+    "source_id": "ORDER_123"
+  }'
+cURL example — Visa/Mastercard
+bash
+Copy
+curl -X POST https://gyqoaningqhurhvdugne.supabase.co/functions/v1/payment-orchestrator \
+  -H "Authorization: Bearer sk_live_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": "process",
+    "payment_method": "visa_mastercard",
+    "merchant_id": "MERCHANT_UUID",
+    "wallet_code": "12345",
+    "amount": 500,
+    "currency": "MZN",
+    "customer_email": "joao@example.com",
+    "customer_name": "João Silva",
+    "return_url": "https://meusite.com/checkout/result"
+  }'
+Response — M-Pesa (synchronous)
+json
+Copy
+{
+  "success": true,
+  "payment_id": "uuid-pending-payment",
+  "payment_method": "mpesa",
+  "status": "success",
+  "transactionId": "DD55JOL0XYT",
+  "reference": "DD55JOL0XYT"
+}
+Response — e-Mola / mKesh (asynchronous)
+json
+Copy
+{
+  "success": true,
+  "payment_id": "uuid-pending-payment",
+  "payment_method": "emola",
+  "status": "pending",
+  "reference": "EH202604051402371EB6",
+  "awaiting_confirmation": true
+}
+Response — Visa/Mastercard (Hosted Checkout)
+json
+Copy
+{
+  "success": true,
+  "payment_id": "uuid-pending-payment",
+  "payment_method": "visa_mastercard",
+  "status": "pending",
+  "checkout_url": "https://debitopay.com/checkout/card?session_id=...&order_id=...&merchant_id=...&amount=500&currency=MZN&return_url=https%3A%2F%2Fmeusite.com%2Fresult"
+}
+Redirect the customer to checkout_url. Debito Pay processes the card on its domain (PCI-DSS) and returns the customer to your return_url with the result.
+
+Payment Session
+Use in browser/public checkout. Returns a short-lived (15 min) session_token bound to merchant + wallet + authorized domain.
+
+POST
+/payment-session
+Request body
+json
+Copy
+{
+  "merchant_id": "MERCHANT_UUID",
+  "wallet_code": "12345",
+  "domain": "meusite.com"
+}
+Response
+json
+Copy
+{
+  "success": true,
+  "session_token": "dps_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "expires_at": "2026-04-18T10:24:00Z",
+  "authorized_domain": "meusite.com"
+}
+Backend mode (server-to-server)
+For server-side calls without browser origin, send the API key and backend_transaction: true:
+
+json
+Copy
+{
+  "merchant_id": "MERCHANT_UUID",
+  "wallet_code": "12345",
+  "backend_transaction": true,
+  "api_key": "sk_live_xxx"
+}
+Validate session before charging
+POST
+/payment-session/validate
+json
+Copy
+{
+  "session_token": "dps_xxx...",
+  "origin": "https://meusite.com"
+}
+Wallet Balance
+Query the balance of the authenticated merchant's wallets, with filters by wallet_code and currency.
+
+GET
+/wallet-balance
+List all wallets
+http
+Copy
+GET https://gyqoaningqhurhvdugne.supabase.co/functions/v1/wallet-balance
+Authorization: Bearer sk_live_xxx
+Filter by wallet_code
+http
+Copy
+GET https://gyqoaningqhurhvdugne.supabase.co/functions/v1/wallet-balance?wallet_code=12345
+Authorization: Bearer sk_live_xxx
+Response
+json
+Copy
+{
+  "success": true,
+  "wallets": [
+    {
+      "wallet_id": "uuid",
+      "wallet_code": "12345",
+      "currency": "MZN",
+      "payment_method": "mpesa",
+      "balance": 12450.75,
+      "status": "active",
+      "allowed_domain": "meusite.com",
+      "updated_at": "2026-04-16T10:24:00Z"
+    }
+  ]
+}
+Accepts Bearer with API key (sk_live_/sk_test_) or user JWT. Returns only the authenticated merchant's wallets.
+M-Pesa
+C2B charge (USSD push). Synchronous confirmation — webhook is not needed to confirm; it's used only to notify your system.
+
+json
+Copy
+POST https://gyqoaningqhurhvdugne.supabase.co/functions/v1/payment-orchestrator
+Authorization: Bearer sk_live_xxx
+
+{
+  "action": "process",
+  "payment_method": "mpesa",
+  "merchant_id": "MERCHANT_UUID",
+  "wallet_code": "12345",
+  "amount": 150,
+  "currency": "MZN",
+  "phone": "+258841234567"
+}
+Phone accepted in format +258XXXXXXXXX, 258XXXXXXXXX, 84XXXXXXX.
+e-Mola
+Charge via Easyhost. Asynchronous confirmation by callback.
+
+json
+Copy
+POST https://gyqoaningqhurhvdugne.supabase.co/functions/v1/payment-orchestrator
+Authorization: Bearer sk_live_xxx
+
+{
+  "action": "process",
+  "payment_method": "emola",
+  "merchant_id": "MERCHANT_UUID",
+  "wallet_code": "12345",
+  "amount": 750,
+  "currency": "MZN",
+  "phone": "258861234567"
+}
+mKesh
+Charge via STK Push to customer's number. Asynchronous confirmation by callback.
+
+json
+Copy
+POST https://gyqoaningqhurhvdugne.supabase.co/functions/v1/payment-orchestrator
+Authorization: Bearer sk_live_xxx
+
+{
+  "action": "process",
+  "payment_method": "mkesh",
+  "merchant_id": "MERCHANT_UUID",
+  "wallet_code": "12345",
+  "amount": 100,
+  "currency": "MZN",
+  "phone": "258821234567"
+}
+Phone accepted in format +258XXXXXXXXX, 258XXXXXXXXX, 82XXXXXXX.
+
+Visa & Mastercard (Hosted Checkout)
+International cards in MZN with automatic 3D Secure. Customer is redirected to Debito Pay's custom green Hosted Checkout — you build nothing on the card side.
+
+json
+Copy
+POST https://gyqoaningqhurhvdugne.supabase.co/functions/v1/payment-orchestrator
+Authorization: Bearer sk_live_xxx
+
+{
+  "action": "process",
+  "payment_method": "visa_mastercard",
+  "merchant_id": "MERCHANT_UUID",
+  "wallet_code": "12345",
+  "amount": 500,
+  "currency": "MZN",
+  "customer_email": "joao@example.com",
+  "customer_name": "João Silva",
+  "return_url": "https://meusite.com/checkout/result"
+}
+Response
+json
+Copy
+{
+  "success": true,
+  "payment_id": "uuid-pending-payment",
+  "payment_method": "visa_mastercard",
+  "status": "pending",
+  "checkout_url": "https://debitopay.com/checkout/card?payment_id=...&merchant_id=...&amount=500&currency=MZN&return_url=https%3A%2F%2Fmeusite.com%2Fresult"
+}
+Redirect the customer to the returned checkout_url. The card form is rendered on Debito Pay's domain (PCI-DSS, 3D Secure, anti-fraud) — card data never touches your server or frontend. After payment, the customer is returned to your return_url with ?status=success or ?status=failed.
+
+Recurring (subscription) is supported only for Visa/Mastercard via tokenization — managed by the subscription-engine.
+PayFast (ZAR)
+Cards and EFT in South African Rand (ZAR) via PayFast. Same Hosted Checkout flow — customer is redirected to Debito Pay, completes payment and returns to your return_url.
+
+json
+Copy
+POST https://gyqoaningqhurhvdugne.supabase.co/functions/v1/payment-orchestrator
+Authorization: Bearer sk_live_xxx
+
+{
+  "action": "process",
+  "payment_method": "payfast",
+  "merchant_id": "MERCHANT_UUID",
+  "wallet_code": "67890",
+  "amount": 250,
+  "currency": "ZAR",
+  "customer_email": "thabo@example.co.za",
+  "customer_name": "Thabo Mokoena",
+  "customer_phone": "+27821234567",
+  "return_url": "https://meusite.co.za/checkout/result"
+}
+Response
+json
+Copy
+{
+  "success": true,
+  "payment_id": "uuid-pending-payment",
+  "payment_method": "payfast",
+  "status": "pending",
+  "checkout_url": "https://debitopay.com/checkout/payfast?payment_id=...&merchant_id=...&amount=250&currency=ZAR&return_url=https%3A%2F%2Fmeusite.co.za%2Fresult"
+}
+Use PayFast when the customer pays in ZAR (South Africa). The merchant wallet must be configured in ZAR with PayFast as method. Confirmation is asynchronous via ITN (Instant Transaction Notification) — the payment.completed webhook fires when payment is validated.
+
+PayFast only accepts currency: "ZAR". Phone in international format +27XXXXXXXXX.
+Check Status
+Check the status of a payment created by the orchestrator at any time. Useful for reconciliation and fallback when the webhook is lost.
+
+POST
+/payment-orchestrator
+json
+Copy
+{
+  "action": "check-status",
+  "payment_id": "uuid-pending-payment"
+}
+Response
+json
+Copy
+{
+  "success": true,
+  "payment": {
+    "id": "uuid-pending-payment",
+    "status": "success",
+    "provider_reference": "DD55JOL0XYT",
+    "payment_method": "mpesa",
+    "amount": 150,
+    "currency": "MZN"
+  }
+}
+pending
+Awaiting customer / callback
+
+success
+Paid and credited to wallet
+
+failed
+Declined by gateway
+
+expired
+Session expired
+
+Webhooks
+Events sent to the URL configured in Settings → Webhooks. Mandatory HMAC-SHA256 validation with the webhook secret. Automatic retries with exponential backoff up to 24h.
+
+Events fired
+Event	Description
+payment.completed	Payment confirmed and credited to wallet
+payment.failed	Payment declined or expired
+payment.refunded	Payment refunded (Visa/MC)
+payment.chargeback	Chargeback received (Visa/MC)
+json
+Copy
+{
+  "event": "payment.completed",
+  "data": {
+    "payment_id": "uuid-pending-payment",
+    "merchant_id": "MERCHANT_UUID",
+    "wallet_code": "12345",
+    "amount": 150,
+    "currency": "MZN",
+    "method": "mpesa",
+    "reference": "DD55JOL0XYT",
+    "paid_at": "2026-04-18T12:02:15Z"
+  },
+  "timestamp": "2026-04-18T12:02:16Z"
+}
+javascript
+Copy
+import crypto from "crypto";
+
+function verifyWebhook(rawBody, signature, secret) {
+  const hash = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  return hash === signature;
+}
+Webhook best practices
+
+• Reply HTTP 200 in less than 5 seconds — otherwise we retry.
+• Always validate the signature in the x-webhook-signature header.
+• Handle each payment_id idempotently — events may be delivered more than once.
+• Configure multiple webhook URLs (production + staging) in Settings → Webhooks.
+Error Codes
+Standard response for errors — always with explicit success and error fields.
+
+json
+Copy
+{
+  "success": false,
+  "error": "INVALID_API_KEY"
+}
+Status	Code	When it occurs
+400	Missing required fields	payment_method, merchant_id or amount missing
+400	Invalid amount	Amount below the method's minimum
+400	Unsupported payment method	payment_method not recognized
+401	INVALID_API_KEY	Bearer missing or hash doesn't match merchant_api_keys
+403	WALLET_DOMAIN_NOT_ALLOWED	Origin differs from wallet's allowed_domain
+404	WALLET_CODE_NOT_FOUND	wallet_code does not exist
+429	Rate limit exceeded	More than 60 sessions/min for the same merchant
+500	Internal server error	Gateway/upstream failure
+Sandbox
+Generate an API key + test wallet in seconds. Sandbox payments are simulated — no card is charged and no USSD SMS is sent.
+
+Open /api-sandbox
+After generating, use the sk_sandbox_… key and wallet_code in exactly the same endpoints documented above.
+
+Test phones (mobile money)
++258840000001 — immediate success
++258840000002 — pending, then success
++258840000003 — failure (insufficient balance)
++258840000004 — timeout (customer doesn't respond)
+Test cards (Visa/MC)
+4111 1111 1111 1111 — Visa approved
+5555 5555 5555 4444 — Mastercard approved
+4000 0000 0000 0002 — declined by issuer
+4000 0000 0000 0069 — expired card
+SDKs and Support
+No SDK is required — any HTTP client works. But if you prefer, we maintain ready-to-copy examples for the most popular languages.
+
+Node.js
+native fetch or axios — examples on GitHub.
+
+PHP
+cURL or Guzzle — ready for Laravel/WooCommerce.
+
+Python
+requests — examples for Django/FastAPI.
+
+Java/Kotlin
+OkHttp or HttpClient — Spring Boot ready.
+
+C# / .NET
+HttpClient — ASP.NET Core examples.
+
+Go
+pure net/http — ideal for microservices.
+
+Need help?
+
+Tech team in Maputo and Johannesburg, response in < 2h during business hours. E-mail: developers@debitopay.com · WhatsApp: +258 84 000 0000

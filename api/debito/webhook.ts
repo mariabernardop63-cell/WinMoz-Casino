@@ -38,22 +38,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // Validate HMAC-SHA256 signature — per Debito Pay docs:
-  // signature is in header x-webhook-signature
-  // hash = HMAC-SHA256(rawBody, webhookSecret).hex
+  // Validate HMAC-SHA256 signature (se DEBITO_WEBHOOK_SECRET estiver configurado)
   const configuredSecret = process.env["DEBITO_WEBHOOK_SECRET"];
   if (configuredSecret) {
-    const incomingSig = (req.headers["x-webhook-signature"] as string) || "";
+    const rawSig = (req.headers["x-webhook-signature"] as string) || "";
+    // Alguns gateways prefixam a assinatura com "sha256=", "v1=", etc.
+    const incomingSig = rawSig.replace(/^(sha256=|v1=|sha1=|hmac=)/, "");
     const expectedSig = crypto
       .createHmac("sha256", configuredSecret)
       .update(rawBody)
       .digest("hex");
 
     if (expectedSig !== incomingSig) {
-      console.error("[debito/webhook] HMAC signature mismatch — rejected");
+      // Log detalhado para diagnóstico — ver nos logs do Vercel
+      console.error("[debito/webhook] HMAC mismatch. esperado:", expectedSig, "| recebido:", incomingSig, "| header raw:", rawSig);
+      // AVISO: para desativar esta validação enquanto não tens o secret correto,
+      // apaga a variável DEBITO_WEBHOOK_SECRET no Vercel.
       res.status(401).json({ ok: false, error: "Unauthorized" });
       return;
     }
+    console.log("[debito/webhook] Assinatura HMAC válida ✓");
+  } else {
+    console.log("[debito/webhook] Sem DEBITO_WEBHOOK_SECRET — validação HMAC ignorada");
   }
 
   const supabaseUrl = process.env["SUPABASE_URL"];
@@ -104,31 +110,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch { /* skip */ }
   }
 
-  // Fallback: scan por source_id ou reference
-  if (!tx && (data?.source_id || data?.reference)) {
-    const { data: fallbackResults } = await supabase
+  // Estratégia 2: match por debitoReference (guardado na iniciação, se DebitoPay o retornar)
+  if (!tx && data?.reference) {
+    const { data: refResults } = await supabase
       .from("transactions")
       .select("id, user_id, amount, description, status")
-      .eq("status", "pending")
+      .like("description", `%${data.reference}%`)
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(10);
 
-    for (const t of fallbackResults ?? []) {
+    for (const t of refResults ?? []) {
       try {
         const desc = JSON.parse((t as any).description || "{}");
-        if (
-          desc.sourceId === data?.source_id ||
-          desc.reference === data?.reference
-        ) {
+        if (desc.debitoReference === data.reference) {
           tx = t;
+          console.log("[debito/webhook] Estratégia 2 (debitoReference) encontrou tx:", (t as any).id);
           break;
         }
       } catch { /* skip */ }
     }
   }
 
+  // Estratégia 3 (último recurso): montante + pending + recente (últimos 3 min)
+  // Só usa se houver exatamente UMA transação pendente com este montante (evita ambiguidade)
+  if (!tx && data?.amount) {
+    const threeMinAgo = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+    const { data: recentResults } = await supabase
+      .from("transactions")
+      .select("id, user_id, amount, description, status")
+      .eq("status", "pending")
+      .gte("created_at", threeMinAgo)
+      .order("created_at", { ascending: false })
+      .limit(20);
+
+    const webhookAmount = Number(data.amount);
+    const matching = (recentResults ?? []).filter(t => Math.abs(Number((t as any).amount) - webhookAmount) < 0.5);
+
+    if (matching.length === 1) {
+      tx = matching[0];
+      console.log("[debito/webhook] Estratégia 3 (amount+recente único) encontrou tx:", (tx as any).id);
+    } else if (matching.length > 1) {
+      console.warn("[debito/webhook] Estratégia 3: múltiplos matches ambíguos — a ignorar");
+    }
+  }
+
   if (!tx) {
-    console.error("[debito/webhook] Transaction not found for payment_id:", debitoPaymentId);
+    console.error("[debito/webhook] Transação não encontrada para payment_id:", debitoPaymentId, "| reference:", data?.reference, "| amount:", data?.amount);
     res.status(200).json({ ok: true });
     return;
   }

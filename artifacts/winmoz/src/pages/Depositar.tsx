@@ -135,72 +135,41 @@ export default function Depositar() {
       setCountdown(prev => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
-    // Polling de backup a cada 2s (caso o Realtime não esteja disponível)
+    // Polling a cada 3s via /api/debito/check-status
+    // Usa service role key no servidor — bypassa RLS, lê sempre o estado real da DB
     pollRef.current = setInterval(async () => {
       count++;
-      const maxCycles = Math.ceil(TIMEOUT_SECS / 2); // ~60 ciclos a 2s
+      const maxCycles = Math.ceil(TIMEOUT_SECS / 3); // 40 ciclos × 3s = 120s
 
       try {
-        // A cada 3 ciclos (~6s) consulta o check-status da Debito Pay diretamente
-        if (count % 3 === 0) {
-          try {
-            const csRes = await fetch("/api/debito/check-status", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ txId: pid }),
-            });
-            if (csRes.ok) {
-              const csData = await csRes.json() as { status: string };
-              if (csData.status === "approved") {
-                stopAll(channel);
-                setSuccessAmount(amt);
-                setScreen("success");
-                return;
-              } else if (csData.status === "rejected") {
-                stopAll(channel);
-                setScreen("rejected");
-                return;
-              }
-            }
-          } catch { /* continua para o poll do Supabase */ }
+        const csRes = await fetch("/api/debito/check-status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ txId: pid }),
+        });
+        if (csRes.ok) {
+          const csData = await csRes.json() as { status: string; reason?: string };
+          if (csData.status === "approved") {
+            stopAll(channel);
+            setSuccessAmount(amt);
+            setScreen("success");
+            return;
+          }
+          if (csData.status === "rejected") {
+            stopAll(channel);
+            setRejectReason(csData.reason || "");
+            setScreen("rejected");
+            return;
+          }
         }
+      } catch { /* erro de rede — tenta no próximo ciclo */ }
 
-        // Poll direto ao Supabase — apanha estado definido pelo webhook
-        const { data } = await supabase
-          .from("transactions")
-          .select("status, description")
-          .eq("id", pid)
-          .single();
-        const status = (data as any)?.status as string | undefined;
-        if (status === "approved") {
-          stopAll(channel);
-          setSuccessAmount(amt);
-          setScreen("success");
-          return;
-        } else if (status === "rejected") {
-          stopAll(channel);
-          try {
-            const desc = JSON.parse((data as any)?.description || "{}");
-            setRejectReason(desc.failReason || "");
-          } catch { setRejectReason(""); }
-          setScreen("rejected");
-          return;
-        }
-
-        // Timeout após 2 minutos
-        if (count >= maxCycles) {
-          stopAll(channel);
-          setRejectReason("Tempo de espera esgotado. Não respondeste ao USSD a tempo.");
-          setScreen("rejected");
-        }
-      } catch {
-        if (count >= maxCycles) {
-          stopAll(channel);
-          setRejectReason("Tempo de espera esgotado.");
-          setScreen("rejected");
-        }
+      if (count >= maxCycles) {
+        stopAll(channel);
+        setRejectReason("Tempo de espera esgotado. Não respondeste ao USSD a tempo.");
+        setScreen("rejected");
       }
-    }, 2000);
+    }, 3000);
   };
 
   const handleInitiate = async () => {

@@ -181,10 +181,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    // Response has payment_id at top level (per docs)
-    const debitoPaymentId: string | null = debitoData?.payment_id || null;
+    // Extrair payment_id de todas as localizações possíveis na resposta
+    const debitoPaymentId: string | null =
+      debitoData?.payment_id ||
+      debitoData?.payment?.id ||
+      debitoData?.data?.payment_id ||
+      debitoData?.data?.id ||
+      debitoData?.id ||
+      null;
 
-    // Update transaction with debitoPaymentId so webhook/check-status can find it
+    // Extrair reference (DebitoPay pode retorná-lo na resposta)
+    const debitoReference: string | null =
+      debitoData?.reference ||
+      debitoData?.data?.reference ||
+      debitoData?.payment?.reference ||
+      null;
+
+    console.log("[debito/initiate] IDs extraídos — payment_id:", debitoPaymentId, "| reference:", debitoReference, "| sourceId:", sourceId);
+
+    // Guardar TODOS os identificadores para o webhook conseguir encontrar a transação
     await supabase
       .from("transactions")
       .update({
@@ -193,6 +208,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           phone: fullPhone,
           sourceId,
           debitoPaymentId,
+          debitoReference,
           paymentType: type,
           paymentGateway: "debitopay",
           initiatedAt: new Date().toISOString(),
