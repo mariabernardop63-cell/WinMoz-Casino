@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { adminSupabase } from "@/admin/lib/supabase-api";
 import { Smartphone, Mail, Phone, ExternalLink } from "lucide-react";
+import { useBrand } from "@/lib/brand-context";
 
 interface FooterSettings {
   footer_tagline: string;
@@ -19,18 +20,20 @@ const LINKS = [
 ];
 
 function MozBetLogo() {
+  const { brandName, brandSubtitle } = useBrand();
   return (
     <svg viewBox="0 0 190 46" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M1 2 L11 2 L7 44 L0 44 Z" fill="#0D0D0D"/>
       <path d="M13 2 L20 2 L16 44 L10 44 Z" fill="#0D0D0D" opacity="0.18"/>
-      <text x="23" y="27" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="22" letterSpacing="0.5" fill="#0D0D0D">MOZBET</text>
-      <text x="23" y="41" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">MOZAMBIQUE</text>
+      <text x="23" y="27" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="22" letterSpacing="0.5" fill="#0D0D0D">{brandName}</text>
+      <text x="23" y="41" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">{brandSubtitle}</text>
     </svg>
   );
 }
 
 export default function HomeFooter() {
   const [, navigate] = useLocation();
+  const { brandName } = useBrand();
   const [s, setS] = useState<FooterSettings>({
     footer_tagline: "Joga. Aposta. Vence.",
     footer_phone: "",
@@ -129,7 +132,7 @@ export default function HomeFooter() {
         {/* Divider + copyright */}
         <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 14 }}>
           <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", margin: 0 }}>
-            © {new Date().getFullYear()} MOZBET. Todos os direitos reservados. +18 · Jogo responsável.
+            © {new Date().getFullYear()} {brandName}. Todos os direitos reservados. +18 · Jogo responsável.
           </p>
         </div>
       </div>

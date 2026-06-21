@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Search, X, LayoutGrid, Play, RefreshCw } from "lucide-react";
+import { User, Search, X, LayoutGrid, RefreshCw, MessageCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import type { ActiveGameRecord } from "@/lib/simulation";
+import { useBrand } from "@/lib/brand-context";
 
 function HomeIcon({ color }: { color: string }) {
   return (
@@ -47,6 +48,7 @@ const GAME_META: Record<string, { name: string; image: string; imagePos: string 
 
 function ResumeModal({ activeGame, onClose }: { activeGame: ActiveGameRecord | null; onClose: () => void }) {
   const [, setLocation] = useLocation();
+  const { whatsappUrl } = useBrand();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -135,9 +137,11 @@ function ResumeModal({ activeGame, onClose }: { activeGame: ActiveGameRecord | n
           </div>
 
           <div style={{ padding: "0 22px 24px" }}>
-            <button onClick={() => go("/explorar")}
-              style={{ width: "100%", height: 48, background: "rgba(255,255,255,0.06)", color: "#a1a1aa", fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: 13, border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
-              Ver Outros Jogos
+            <button
+              onClick={() => { if (whatsappUrl) window.open(whatsappUrl, "_blank", "noopener,noreferrer"); onClose(); }}
+              style={{ width: "100%", height: 48, background: "rgba(37,211,102,0.12)", color: "#25d366", fontFamily: "'Syne', sans-serif", fontWeight: 600, fontSize: 13, border: "1px solid rgba(37,211,102,0.25)", borderRadius: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <MessageCircle style={{ width: 15, height: 15 }} />
+              Grupo do WhatsApp
             </button>
           </div>
         </motion.div>
@@ -196,10 +200,11 @@ function ResumeModal({ activeGame, onClose }: { activeGame: ActiveGameRecord | n
         </div>
 
         <div style={{ padding: "0 22px 24px" }}>
-          <button onClick={() => go("/explorar")}
-            style={{ width: "100%", height: 52, background: "#fff", color: "#0a0a0f", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, border: "none", borderRadius: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, letterSpacing: "0.2px" }}>
-            <Play style={{ width: 13, height: 13, fill: "#0a0a0f" }} />
-            Ver Todos os Jogos
+          <button
+            onClick={() => { if (whatsappUrl) window.open(whatsappUrl, "_blank", "noopener,noreferrer"); onClose(); }}
+            style={{ width: "100%", height: 52, background: "linear-gradient(135deg,#25d366,#128c7e)", color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, border: "none", borderRadius: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, letterSpacing: "0.2px" }}>
+            <MessageCircle style={{ width: 15, height: 15 }} />
+            Grupo do WhatsApp
           </button>
         </div>
       </motion.div>

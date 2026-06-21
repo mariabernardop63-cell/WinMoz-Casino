@@ -40,6 +40,7 @@ import MaintenancePage from "@/components/MaintenancePage";
 import CookieConsent from "@/components/CookieConsent";
 import { useState, useEffect } from "react";
 import { adminSupabase } from "@/admin/lib/supabase-api";
+import { BrandProvider } from "@/lib/brand-context";
 
 const queryClient = new QueryClient();
 const ADMIN_EMAIL = "nexialonemz@gmail.com";
@@ -216,10 +217,12 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <AppContent />
-          </WouterRouter>
-          <Toaster />
+          <BrandProvider>
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <AppContent />
+            </WouterRouter>
+            <Toaster />
+          </BrandProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

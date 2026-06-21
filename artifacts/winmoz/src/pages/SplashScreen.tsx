@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
+import { useBrand } from "@/lib/brand-context";
 
 type Phase = "init" | "draw" | "hold" | "erase" | "barsOut" | "spinner";
 
 export default function SplashScreen() {
   const [, setLocation] = useLocation();
   const [phase, setPhase] = useState<Phase>("init");
+  const { brandName, brandSubtitle } = useBrand();
 
   useEffect(() => {
     const timers = [
@@ -81,7 +83,7 @@ export default function SplashScreen() {
                     lineHeight: "26px",
                     display: "block",
                   }}>
-                    MOZBET
+                    {brandName}
                   </span>
                   <span style={{
                     fontFamily: "'Syne', sans-serif",
@@ -92,7 +94,7 @@ export default function SplashScreen() {
                     lineHeight: "18px",
                     display: "block",
                   }}>
-                    MOZAMBIQUE
+                    {brandSubtitle}
                   </span>
                 </div>
               </motion.div>

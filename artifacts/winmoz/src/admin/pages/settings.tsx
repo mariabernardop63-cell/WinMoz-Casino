@@ -141,6 +141,7 @@ export default function Settings() {
       backup_auto: platformSettings["backup_auto"] !== "false",
       query_cache: platformSettings["query_cache"] !== "false",
       query_logs: platformSettings["query_logs"] === "true",
+      poker_winner_mode: platformSettings["poker_winner_mode"] === "true",
     });
   }, [platformSettings]);
 
@@ -222,6 +223,7 @@ export default function Settings() {
   const [footerPhone, setFooterPhone]     = useState("");
   const [footerEmail, setFooterEmail]     = useState("");
   const [footerAppUrl, setFooterAppUrl]   = useState("");
+  const [whatsappGroupUrl, setWhatsappGroupUrl] = useState("");
   const [savingFooter, setSavingFooter]   = useState(false);
 
   useEffect(() => {
@@ -233,6 +235,7 @@ export default function Settings() {
     if (platformSettings["footer_phone"])            setFooterPhone(platformSettings["footer_phone"]);
     if (platformSettings["footer_email"])            setFooterEmail(platformSettings["footer_email"]);
     if (platformSettings["footer_app_download_url"]) setFooterAppUrl(platformSettings["footer_app_download_url"]);
+    if (platformSettings["whatsapp_group_url"])      setWhatsappGroupUrl(platformSettings["whatsapp_group_url"]);
   }, [platformSettings]);
 
   const handleSaveFooter = async () => {
@@ -242,6 +245,7 @@ export default function Settings() {
       await updateSetting.mutateAsync({ key: "footer_phone",            value: footerPhone.trim() });
       await updateSetting.mutateAsync({ key: "footer_email",            value: footerEmail.trim() });
       await updateSetting.mutateAsync({ key: "footer_app_download_url", value: footerAppUrl.trim() });
+      await updateSetting.mutateAsync({ key: "whatsapp_group_url",      value: whatsappGroupUrl.trim() });
       toast.success("Rodapé guardado com sucesso");
     } catch { toast.error("Erro ao guardar rodapé"); }
     setSavingFooter(false);
@@ -406,6 +410,19 @@ export default function Settings() {
               <FunctionalToggle settingKey="support_ai_mode" value={settings.support_ai_mode ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
             </div>
           </SettingRow>
+          <SettingRow
+            label="Modo Poker Winner"
+            description={settings.poker_winner_mode ? "🃏 Branding activo: POKER / Winner Online" : "Substituir 'MOZBET'→'POKER' e 'MOZAMBIQUE'→'Winner Online' em toda a plataforma"}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {settings.poker_winner_mode && (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "rgba(139,92,246,0.12)", color: "#8b5cf6", textTransform: "uppercase" }}>
+                  ACTIVO
+                </span>
+              )}
+              <FunctionalToggle settingKey="poker_winner_mode" value={settings.poker_winner_mode ?? false} onChange={handleToggle} loading={updateSetting.isPending} />
+            </div>
+          </SettingRow>
         </SectionCard>
 
         {/* Footer & App Download */}
@@ -459,6 +476,19 @@ export default function Settings() {
                   style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
               </div>
               <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 5 }}>URL para o botão "Descarregar App" no rodapé da página inicial.</p>
+            </div>
+
+            {/* WhatsApp Group URL */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
+                Link do Grupo do WhatsApp
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(37,211,102,0.25)" }}>
+                <Link2 style={{ width: 14, height: 14, color: "#25d366", flexShrink: 0 }} />
+                <input type="url" value={whatsappGroupUrl} onChange={e => setWhatsappGroupUrl(e.target.value)} placeholder="https://chat.whatsapp.com/..."
+                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 5 }}>URL exibido no botão "Grupo do WhatsApp" no menu de jogos.</p>
             </div>
 
             {/* Save button */}
