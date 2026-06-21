@@ -47,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     settings[(row as any).key] = (row as any).value;
   }
 
-  const debitoBaseUrl = (settings["debito_api_base_url"] || "https://api.debito.co.mz").replace(/\/$/, "");
+  const debitoBaseUrl = (settings["debito_api_base_url"] || "https://gyqoaningqhurhvdugne.supabase.co/functions/v1").replace(/\/$/, "");
   const merchantId = settings["debito_public_id"] || "1e4d1d55-d740-447f-8cb4-8c8ce1bb0a0c";
 
   const cleanPhone = phone.replace(/\D/g, "").replace(/^258/, "");
@@ -98,9 +98,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       callback_url: `${siteOrigin}/api/debito/webhook`,
     };
 
-    console.log("[debito/initiate] Calling Debito Pay:", `${debitoBaseUrl}/v1/payments/c2b`, JSON.stringify(debitoBody));
+    console.log("[debito/initiate] Calling Debito Pay:", `${debitoBaseUrl}/payment-orchestrator`, JSON.stringify(debitoBody));
 
-    const debitoRes = await fetch(`${debitoBaseUrl}/v1/payments/c2b`, {
+    const debitoRes = await fetch(`${debitoBaseUrl}/payment-orchestrator`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

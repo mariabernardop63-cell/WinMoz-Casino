@@ -15,6 +15,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (req.method !== "POST") { res.status(405).end(); return; }
 
+  // Validate webhook secret if configured
+  const configuredSecret = process.env["DEBITO_WEBHOOK_SECRET"];
+  if (configuredSecret) {
+    const incomingSecret =
+      req.headers["x-webhook-secret"] ||
+      req.headers["x-debito-secret"] ||
+      req.headers["authorization"]?.toString().replace(/^Bearer\s+/i, "");
+    if (incomingSecret !== configuredSecret) {
+      console.error("[debito/webhook] Invalid webhook secret — rejected");
+      res.status(401).json({ ok: false, error: "Unauthorized" });
+      return;
+    }
+  }
+
   const supabaseUrl = process.env["SUPABASE_URL"];
   const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
 
