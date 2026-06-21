@@ -75,39 +75,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  console.log("[debito/webhook] Received event:", JSON.stringify(body));
-
-  // Per docs webhook payload:
-  // { "event": "payment.completed", "data": { "payment_id": "uuid", "method": "emola", ... }, "timestamp": "..." }
   const event: string = body?.event || "unknown";
   const data = body?.data || {};
-
-  // Per docs: payment_id is the key identifier
   const debitoPaymentId: string | null = data?.payment_id || null;
 
-  console.log("[debito/webhook] event:", event, "payment_id:", debitoPaymentId);
+  // Log completo — inclui TUDO para diagnóstico em Vercel
+  console.log("[debito/webhook] ===PAYLOAD===", JSON.stringify({
+    event, payment_id: debitoPaymentId, amount: data?.amount,
+    method: data?.method, reference: data?.reference,
+    wallet_code: data?.wallet_code, timestamp: body?.timestamp,
+  }));
 
-  if (!debitoPaymentId) {
-    console.error("[debito/webhook] No payment_id in webhook payload");
+  // Ignorar eventos que não são de pagamento (ex: teste da DebitoPay sem payment_id)
+  if (event !== "payment.completed" && event !== "payment.failed") {
+    console.log("[debito/webhook] Evento ignorado (tipo não é pagamento):", event);
     res.status(200).json({ ok: true });
     return;
   }
 
-  // Lookup eficiente: pesquisa pelo payment_id dentro do campo description (JSON text)
+  if (!debitoPaymentId) {
+    console.warn("[debito/webhook] Sem payment_id — a tentar estratégias de fallback (montante + data recente)");
+    // Não retornar — continuar com Estratégias 2 e 3
+  }
+
+  // Estratégia 1: pesquisa pelo payment_id (se disponível no payload)
   let tx: any = null;
 
-  const { data: fastResults } = await supabase
-    .from("transactions")
-    .select("id, user_id, amount, description, status")
-    .like("description", `%${debitoPaymentId}%`)
-    .order("created_at", { ascending: false })
-    .limit(10);
+  if (debitoPaymentId) {
+    const { data: fastResults } = await supabase
+      .from("transactions")
+      .select("id, user_id, amount, description, status")
+      .like("description", `%${debitoPaymentId}%`)
+      .order("created_at", { ascending: false })
+      .limit(10);
 
-  for (const t of fastResults ?? []) {
-    try {
-      const desc = JSON.parse((t as any).description || "{}");
-      if (desc.debitoPaymentId === debitoPaymentId) { tx = t; break; }
-    } catch { /* skip */ }
+    for (const t of fastResults ?? []) {
+      try {
+        const desc = JSON.parse((t as any).description || "{}");
+        if (desc.debitoPaymentId === debitoPaymentId) {
+          tx = t;
+          console.log("[debito/webhook] Estratégia 1 (payment_id) encontrou tx:", (t as any).id);
+          break;
+        }
+      } catch { /* skip */ }
+    }
   }
 
   // Estratégia 2: match por debitoReference (guardado na iniciação, se DebitoPay o retornar)

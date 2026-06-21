@@ -85,16 +85,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       "pending";
 
     // "success" = paid and credited (per docs)
-    const isSuccess = remoteStatus === "success" || remoteStatus === "SUCCESS";
+    const isSuccess =
+      remoteStatus === "success" || remoteStatus === "SUCCESS" ||
+      remoteStatus === "completed" || remoteStatus === "COMPLETED" ||
+      remoteStatus === "paid" || remoteStatus === "PAID" ||
+      remoteStatus === "approved" || remoteStatus === "credited";
 
-    // "failed" or "expired" = declined/timed out (per docs)
     const isFailed =
-      remoteStatus === "failed" ||
-      remoteStatus === "FAILED" ||
-      remoteStatus === "expired" ||
-      remoteStatus === "EXPIRED" ||
-      remoteStatus === "cancelled" ||
-      remoteStatus === "rejected";
+      remoteStatus === "failed" || remoteStatus === "FAILED" ||
+      remoteStatus === "expired" || remoteStatus === "EXPIRED" ||
+      remoteStatus === "cancelled" || remoteStatus === "CANCELLED" ||
+      remoteStatus === "rejected" || remoteStatus === "declined" || remoteStatus === "DECLINED";
 
     if (isSuccess && currentStatus === "pending") {
       const { data: profile } = await supabase

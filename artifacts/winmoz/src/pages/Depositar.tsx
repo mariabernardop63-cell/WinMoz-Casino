@@ -139,7 +139,7 @@ export default function Depositar() {
     // Usa service role key no servidor — bypassa RLS, lê sempre o estado real da DB
     pollRef.current = setInterval(async () => {
       count++;
-      const maxCycles = Math.ceil(TIMEOUT_SECS / 3); // 40 ciclos × 3s = 120s
+      const maxCycles = Math.ceil(300 / 3); // 100 ciclos × 3s = 5min (e-Mola é async — webhook pode demorar)
 
       try {
         const csRes = await fetch("/api/debito/check-status", {
@@ -559,19 +559,26 @@ export default function Depositar() {
                   A AGUARDAR CONFIRMAÇÃO DO PIN…
                 </span>
               </div>
-              {/* Countdown timer */}
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 12, color: countdown <= 30 ? "#f59e0b" : "#52525b" }}>
-                  Expira em
-                </span>
-                <span style={{
-                  fontSize: 14, fontWeight: 700, fontFamily: "monospace",
-                  color: countdown <= 30 ? "#f59e0b" : "#8e8e93",
-                  minWidth: 36, textAlign: "center",
-                }}>
-                  {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, "0")}
-                </span>
-              </div>
+              {/* Countdown / estado de processamento */}
+              {countdown > 0 ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 12, color: countdown <= 30 ? "#f59e0b" : "#52525b" }}>
+                    Expira em
+                  </span>
+                  <span style={{
+                    fontSize: 14, fontWeight: 700, fontFamily: "monospace",
+                    color: countdown <= 30 ? "#f59e0b" : "#8e8e93",
+                    minWidth: 36, textAlign: "center",
+                  }}>
+                    {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, "0")}
+                  </span>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" }} className="animate-pulse" />
+                  <span style={{ fontSize: 12, color: "#f59e0b" }}>A verificar confirmação do banco…</span>
+                </div>
+              )}
               <p style={{ fontSize: 11, color: "#52525b", textAlign: "center", maxWidth: 240, lineHeight: 1.5 }}>
                 Se não recebeste o USSD, verifica a cobertura de rede ou volta atrás e tenta de novo.
               </p>
