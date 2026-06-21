@@ -91,6 +91,31 @@ export default function Depositar() {
     pollRef.current = setInterval(async () => {
       count++;
       try {
+        // Every 3 cycles (~9s) also call check-status to query Debito Pay directly
+        if (count % 3 === 0) {
+          try {
+            const csRes = await fetch("/api/debito/check-status", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ txId: pid }),
+            });
+            if (csRes.ok) {
+              const csData = await csRes.json() as { status: string };
+              if (csData.status === "approved") {
+                clearInterval(pollRef.current!);
+                setSuccessAmount(amt);
+                setScreen("success");
+                return;
+              } else if (csData.status === "rejected") {
+                clearInterval(pollRef.current!);
+                setScreen("rejected");
+                return;
+              }
+            }
+          } catch { /* silent — fallback to Supabase poll below */ }
+        }
+
+        // Always poll Supabase for status set by webhook or check-status
         const { data } = await supabase
           .from("transactions")
           .select("status, description")

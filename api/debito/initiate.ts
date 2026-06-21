@@ -89,6 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const debitoBody = {
+      action: "process",
       amount: Number(amount.toFixed(2)),
       currency: "MZN",
       mobile: fullPhone,
