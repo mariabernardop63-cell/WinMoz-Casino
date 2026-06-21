@@ -47,13 +47,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const debitoBaseUrl = "https://gyqoaningqhurhvdugne.supabase.co/functions/v1";
 
   try {
-    const checkRes = await fetch(`${debitoBaseUrl}/payment-orchestrator?action=check-status`, {
+    const checkRes = await fetch(`${debitoBaseUrl}/payment-orchestrator`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${debitoApiKey}`,
       },
-      body: JSON.stringify({ reference }),
+      body: JSON.stringify({ action: "check-status", reference }),
     });
 
     const responseText = await checkRes.text();

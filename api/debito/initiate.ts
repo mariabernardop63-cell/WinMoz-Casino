@@ -106,12 +106,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const txId = (txRow as any).id as string;
 
-  const siteOrigin = process.env["VERCEL_URL"]
-    ? `https://${process.env["VERCEL_URL"]}`
-    : (process.env["NEXT_PUBLIC_SITE_URL"] || "");
+  // Use the production domain — VERCEL_URL is the deployment preview URL, not the custom domain
+  const siteOrigin =
+    process.env["SITE_URL"] ||
+    process.env["NEXT_PUBLIC_SITE_URL"] ||
+    (process.env["VERCEL_PROJECT_PRODUCTION_URL"] ? `https://${process.env["VERCEL_PROJECT_PRODUCTION_URL"]}` : null) ||
+    (process.env["VERCEL_URL"] ? `https://${process.env["VERCEL_URL"]}` : "") ||
+    "";
 
   try {
     const debitoBody = {
+      action: "process",
       amount: Number(amount.toFixed(2)),
       currency: "MZN",
       mobile: fullPhone,
@@ -121,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       callback_url: `${siteOrigin}/api/debito/webhook`,
     };
 
-    const debitoUrl = `${debitoBaseUrl}/payment-orchestrator?action=process`;
+    const debitoUrl = `${debitoBaseUrl}/payment-orchestrator`;
     console.log("[debito/initiate] Calling Debito Pay:", debitoUrl, JSON.stringify(debitoBody));
 
     const debitoRes = await fetch(debitoUrl, {
