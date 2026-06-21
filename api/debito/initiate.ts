@@ -117,7 +117,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const debitoBody = {
       action: "process",
-      amount: Number(amount.toFixed(2)),
+      merchant_id: merchantId,
+      amount: Math.round(amount),
       currency: "MZN",
       mobile: fullPhone,
       provider: provider === "emola" ? "emola" : "mpesa",
