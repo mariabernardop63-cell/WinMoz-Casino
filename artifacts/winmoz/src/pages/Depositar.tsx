@@ -58,12 +58,14 @@ export default function Depositar() {
   const [countdown, setCountdown] = useState(120);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const txDate = new Date().toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" });
 
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
+      if (realtimeRef.current) supabase.removeChannel(realtimeRef.current);
     };
   }, []);
 
@@ -97,18 +99,49 @@ export default function Depositar() {
     let count = 0;
     setCountdown(TIMEOUT_SECS);
 
+    const stopAll = (ch: ReturnType<typeof supabase.channel>) => {
+      clearInterval(pollRef.current!);
+      clearInterval(countdownRef.current!);
+      supabase.removeChannel(ch);
+    };
+
+    // Supabase Realtime — deteção instantânea quando o webhook atualizar o registo
+    const channel = supabase
+      .channel(`deposit-${pid}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "transactions", filter: `id=eq.${pid}` },
+        (payload) => {
+          const newStatus = (payload.new as any)?.status as string | undefined;
+          if (newStatus === "approved") {
+            stopAll(channel);
+            setSuccessAmount(amt);
+            setScreen("success");
+          } else if (newStatus === "rejected") {
+            stopAll(channel);
+            try {
+              const desc = JSON.parse((payload.new as any)?.description || "{}");
+              setRejectReason(desc.failReason || "");
+            } catch { setRejectReason(""); }
+            setScreen("rejected");
+          }
+        }
+      )
+      .subscribe();
+    realtimeRef.current = channel;
+
     // countdown timer — ticks every second
     countdownRef.current = setInterval(() => {
       setCountdown(prev => (prev > 0 ? prev - 1 : 0));
     }, 1000);
 
-    // status polling — every 3 seconds
+    // Polling de backup a cada 2s (caso o Realtime não esteja disponível)
     pollRef.current = setInterval(async () => {
       count++;
-      const maxCycles = Math.ceil(TIMEOUT_SECS / 3); // ~40 cycles
+      const maxCycles = Math.ceil(TIMEOUT_SECS / 2); // ~60 ciclos a 2s
 
       try {
-        // Every 3 cycles (~9s) call check-status to query Debito Pay directly
+        // A cada 3 ciclos (~6s) consulta o check-status da Debito Pay diretamente
         if (count % 3 === 0) {
           try {
             const csRes = await fetch("/api/debito/check-status", {
@@ -119,22 +152,20 @@ export default function Depositar() {
             if (csRes.ok) {
               const csData = await csRes.json() as { status: string };
               if (csData.status === "approved") {
-                clearInterval(pollRef.current!);
-                clearInterval(countdownRef.current!);
+                stopAll(channel);
                 setSuccessAmount(amt);
                 setScreen("success");
                 return;
               } else if (csData.status === "rejected") {
-                clearInterval(pollRef.current!);
-                clearInterval(countdownRef.current!);
+                stopAll(channel);
                 setScreen("rejected");
                 return;
               }
             }
-          } catch { /* fallback to Supabase poll below */ }
+          } catch { /* continua para o poll do Supabase */ }
         }
 
-        // Poll Supabase directly for status set by webhook
+        // Poll direto ao Supabase — apanha estado definido pelo webhook
         const { data } = await supabase
           .from("transactions")
           .select("status, description")
@@ -142,14 +173,12 @@ export default function Depositar() {
           .single();
         const status = (data as any)?.status as string | undefined;
         if (status === "approved") {
-          clearInterval(pollRef.current!);
-          clearInterval(countdownRef.current!);
+          stopAll(channel);
           setSuccessAmount(amt);
           setScreen("success");
           return;
         } else if (status === "rejected") {
-          clearInterval(pollRef.current!);
-          clearInterval(countdownRef.current!);
+          stopAll(channel);
           try {
             const desc = JSON.parse((data as any)?.description || "{}");
             setRejectReason(desc.failReason || "");
@@ -158,22 +187,20 @@ export default function Depositar() {
           return;
         }
 
-        // Timeout after 2 minutes
+        // Timeout após 2 minutos
         if (count >= maxCycles) {
-          clearInterval(pollRef.current!);
-          clearInterval(countdownRef.current!);
+          stopAll(channel);
           setRejectReason("Tempo de espera esgotado. Não respondeste ao USSD a tempo.");
           setScreen("rejected");
         }
       } catch {
         if (count >= maxCycles) {
-          clearInterval(pollRef.current!);
-          clearInterval(countdownRef.current!);
+          stopAll(channel);
           setRejectReason("Tempo de espera esgotado.");
           setScreen("rejected");
         }
       }
-    }, 3000);
+    }, 2000);
   };
 
   const handleInitiate = async () => {

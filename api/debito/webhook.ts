@@ -87,36 +87,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // Find our transaction by matching stored debitoPaymentId
-  const { data: pendingTxs } = await supabase
+  // Lookup eficiente: pesquisa pelo payment_id dentro do campo description (JSON text)
+  let tx: any = null;
+
+  const { data: fastResults } = await supabase
     .from("transactions")
     .select("id, user_id, amount, description, status")
-    .eq("status", "pending")
+    .like("description", `%${debitoPaymentId}%`)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(10);
 
-  let tx: any = null;
-  for (const t of pendingTxs ?? []) {
+  for (const t of fastResults ?? []) {
     try {
       const desc = JSON.parse((t as any).description || "{}");
       if (desc.debitoPaymentId === debitoPaymentId) { tx = t; break; }
     } catch { /* skip */ }
   }
 
-  if (!tx) {
-    // Also try to find by source_id / reference field in description
-    const { data: allPending } = await supabase
+  // Fallback: scan por source_id ou reference
+  if (!tx && (data?.source_id || data?.reference)) {
+    const { data: fallbackResults } = await supabase
       .from("transactions")
       .select("id, user_id, amount, description, status")
       .eq("status", "pending")
       .order("created_at", { ascending: false })
-      .limit(200);
+      .limit(100);
 
-    for (const t of allPending ?? []) {
+    for (const t of fallbackResults ?? []) {
       try {
         const desc = JSON.parse((t as any).description || "{}");
         if (
-          desc.debitoPaymentId === debitoPaymentId ||
           desc.sourceId === data?.source_id ||
           desc.reference === data?.reference
         ) {

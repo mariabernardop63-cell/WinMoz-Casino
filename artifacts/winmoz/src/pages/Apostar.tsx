@@ -174,9 +174,8 @@ function SMSBettingScreen({
 }) {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  // Skip wallet selection — go straight to phone input (e-Mola only)
-  const [step, setStep] = useState<"phone" | "verifying" | "rejected">("phone");
-  const [provider] = useState<"emola">("emola");
+  const [step, setStep] = useState<"wallet" | "phone" | "verifying" | "rejected">("wallet");
+  const [provider, setProvider] = useState<"emola" | "mpesa">("emola");
   const [phoneInput, setPhoneInput] = useState(initialPhone?.replace(/\D/g, "").replace(/^258/, "") || "");
   const [phoneError, setPhoneError] = useState("");
   const [initiating, setInitiating] = useState(false);
@@ -185,11 +184,13 @@ function SMSBettingScreen({
   const [countdown, setCountdown] = useState(120);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
       if (countdownRef.current) clearInterval(countdownRef.current);
+      if (realtimeRef.current) supabase.removeChannel(realtimeRef.current);
     };
   }, []);
 
@@ -237,17 +238,50 @@ function SMSBettingScreen({
       setStep("verifying");
       setCountdown(120);
 
+      const TIMEOUT_SECS = 120;
+      let count = 0;
+
+      const stopAll = (ch: ReturnType<typeof supabase.channel>) => {
+        clearInterval(pollRef.current!);
+        clearInterval(countdownRef.current!);
+        supabase.removeChannel(ch);
+      };
+
+      // Realtime — deteção instantânea quando o webhook atualizar o registo
+      const channel = supabase
+        .channel(`bet-${pid}`)
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "transactions", filter: `id=eq.${pid}` },
+          (payload) => {
+            const newStatus = (payload.new as any)?.status as string | undefined;
+            if (newStatus === "approved") {
+              stopAll(channel);
+              onSuccess(null);
+            } else if (newStatus === "rejected") {
+              stopAll(channel);
+              try {
+                const desc = JSON.parse((payload.new as any)?.description || "{}");
+                setRejectReason(desc.failReason || "");
+              } catch { setRejectReason(""); }
+              setStep("rejected");
+            }
+          }
+        )
+        .subscribe();
+      realtimeRef.current = channel;
+
       // countdown timer
       countdownRef.current = setInterval(() => {
         setCountdown(prev => (prev > 0 ? prev - 1 : 0));
       }, 1000);
 
-      let count = 0;
-      const maxCycles = 40; // 40 * 3s = 2 minutes
+      // Polling de backup a cada 2s
+      const maxCycles = Math.ceil(TIMEOUT_SECS / 2);
       pollRef.current = setInterval(async () => {
         count++;
         try {
-          // Every 3 cycles (~9s) call check-status to query Debito Pay directly
+          // A cada 3 ciclos (~6s) consulta check-status diretamente
           if (count % 3 === 0) {
             try {
               const csRes = await fetch("/api/debito/check-status", {
@@ -258,21 +292,19 @@ function SMSBettingScreen({
               if (csRes.ok) {
                 const csData = await csRes.json() as { status: string };
                 if (csData.status === "approved") {
-                  clearInterval(pollRef.current!);
-                  clearInterval(countdownRef.current!);
+                  stopAll(channel);
                   onSuccess(null);
                   return;
                 } else if (csData.status === "rejected") {
-                  clearInterval(pollRef.current!);
-                  clearInterval(countdownRef.current!);
+                  stopAll(channel);
                   setStep("rejected");
                   return;
                 }
               }
-            } catch { /* fallback to Supabase */ }
+            } catch { /* continua para poll do Supabase */ }
           }
 
-          // Poll Supabase for status set by webhook
+          // Poll direto ao Supabase
           const { data } = await supabase
             .from("transactions")
             .select("status, description")
@@ -280,13 +312,11 @@ function SMSBettingScreen({
             .single();
           const status = (data as any)?.status as string | undefined;
           if (status === "approved") {
-            clearInterval(pollRef.current!);
-            clearInterval(countdownRef.current!);
+            stopAll(channel);
             onSuccess(null);
             return;
           } else if (status === "rejected") {
-            clearInterval(pollRef.current!);
-            clearInterval(countdownRef.current!);
+            stopAll(channel);
             try {
               const desc = JSON.parse((data as any)?.description || "{}");
               setRejectReason(desc.failReason || "");
@@ -296,25 +326,121 @@ function SMSBettingScreen({
           }
 
           if (count >= maxCycles) {
-            clearInterval(pollRef.current!);
-            clearInterval(countdownRef.current!);
+            stopAll(channel);
             setRejectReason("Tempo de espera esgotado. Não respondeste ao USSD a tempo.");
             setStep("rejected");
           }
         } catch {
           if (count >= maxCycles) {
-            clearInterval(pollRef.current!);
-            clearInterval(countdownRef.current!);
+            stopAll(channel);
             setRejectReason("Tempo de espera esgotado.");
             setStep("rejected");
           }
         }
-      }, 3000);
+      }, 2000);
     } catch {
       setInitError("Erro de ligação. Verifica a internet e tenta de novo.");
       setInitiating(false);
     }
   };
+
+  // Tela de seleção de carteira
+  if (step === "wallet") {
+    return (
+      <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
+        <div className="w-full max-w-[430px] flex flex-col min-h-screen">
+          <div className="flex items-center justify-between px-5 pt-12 pb-4">
+            <button onClick={() => { onCancel(); }} className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ background: "#1c1c1e" }}>
+              <ChevronLeft style={{ width: 18, height: 18, color: "#fff" }} />
+            </button>
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>
+              Escolher Carteira
+            </p>
+            <div className="w-10" />
+          </div>
+
+          <div className="flex-1 px-5 pb-10">
+            <div className="flex items-center justify-center mb-8">
+              <div className="px-5 py-2 rounded-full" style={{ background: "#1c1c1e", border: `1.5px solid ${CYAN}22` }}>
+                <span style={{ fontSize: 13, color: "#8e8e93" }}>Aposta: </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: CYAN }}>{fmtMT(amount)} MZN</span>
+              </div>
+            </div>
+
+            <p style={{ fontSize: 11, fontWeight: 600, marginBottom: 14, letterSpacing: "0.08em",
+              color: "#636366", textTransform: "uppercase" }}>
+              Selecciona a tua carteira móvel
+            </p>
+
+            {/* e-Mola — ACTIVO */}
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => { setProvider("emola"); setStep("phone"); }}
+              style={{
+                width: "100%", background: "rgba(52,211,153,0.08)",
+                border: "2px solid #34d399", borderRadius: 16, padding: "20px",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                cursor: "pointer", marginBottom: 12,
+              }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(52,211,153,0.15)",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                  💳
+                </div>
+                <div style={{ textAlign: "left" }}>
+                  <p style={{ fontWeight: 700, color: "#34d399", fontSize: 16, letterSpacing: "0.5px", margin: 0 }}>e-Mola</p>
+                  <p style={{ fontSize: 11, color: "#71717a", margin: "2px 0 0" }}>Pagamento instantâneo via USSD</p>
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99,
+                  background: "rgba(52,211,153,0.15)", color: "#34d399" }}>
+                  ACTIVO
+                </span>
+                <CheckCircle2 style={{ width: 16, height: 16, color: "#34d399" }} />
+              </div>
+            </motion.button>
+
+            {/* M-Pesa — EM BREVE */}
+            <div style={{
+              width: "100%", background: "#111", border: "2px solid #2c2c2e", borderRadius: 16,
+              padding: "20px", display: "flex", alignItems: "center", justifyContent: "space-between",
+              opacity: 0.5, cursor: "not-allowed", marginBottom: 32,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(231,76,60,0.1)",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
+                  📱
+                </div>
+                <div style={{ textAlign: "left" }}>
+                  <p style={{ fontWeight: 700, color: "#e74c3c", fontSize: 16, letterSpacing: "0.5px", margin: 0 }}>M-Pesa</p>
+                  <p style={{ fontSize: 11, color: "#52525b", margin: "2px 0 0" }}>Brevemente disponível</p>
+                </div>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99,
+                background: "#1c1c1e", color: "#52525b" }}>
+                EM BREVE
+              </span>
+            </div>
+
+            <div style={{ borderRadius: 16, padding: 16, background: "#111", border: "1px solid #1c1c1e" }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(0,212,180,0.1)",
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2, fontSize: 12 }}>
+                  ℹ️
+                </div>
+                <p style={{ fontSize: 12, lineHeight: 1.6, color: "#71717a", margin: 0 }}>
+                  O pagamento é processado pelo gateway seguro <strong style={{ color: "#a1a1aa" }}>Debito Pay</strong>.
+                  Receberás um pedido USSD no teu telemóvel para confirmar com o teu PIN.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (step === "verifying") {
     return (
@@ -344,7 +470,7 @@ function SMSBettingScreen({
             <p style={{ fontSize: 13, color: "#71717a", textAlign: "center", lineHeight: 1.65, maxWidth: 280 }}>
               Um pedido USSD foi enviado para{" "}
               <strong style={{ color: "#a1a1aa" }}>+258 {cleanPhone}</strong>.
-              Introduz o teu <strong style={{ color: "#a1a1aa" }}>PIN e-Mola</strong> para confirmar a aposta.
+              Introduz o teu <strong style={{ color: "#a1a1aa" }}>PIN {provider === "emola" ? "e-Mola" : "M-Pesa"}</strong> para confirmar a aposta.
             </p>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
               style={{ marginTop: 28, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
@@ -403,7 +529,7 @@ function SMSBettingScreen({
             )}
           </motion.div>
           <div className="flex flex-col gap-3 mt-auto pb-10">
-            <button onClick={() => { setInitError(""); setRejectReason(""); setStep("phone"); }}
+            <button onClick={() => { setInitError(""); setRejectReason(""); setStep("wallet"); }}
               className="w-full h-14 rounded-full font-bold flex items-center justify-center gap-2"
               style={{ background: CYAN, color: "#000", fontFamily: "'Syne', sans-serif" }}>
               <RotateCcw style={{ width: 18, height: 18 }} /> Tentar Novamente
@@ -423,12 +549,12 @@ function SMSBettingScreen({
     <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
       <div className="w-full max-w-[430px] flex flex-col min-h-screen">
         <div className="flex items-center justify-between px-5 pt-12 pb-4">
-          <button onClick={() => { setInitError(""); onCancel(); }} className="w-10 h-10 rounded-full flex items-center justify-center"
+          <button onClick={() => { setInitError(""); setStep("wallet"); }} className="w-10 h-10 rounded-full flex items-center justify-center"
             style={{ background: "#1c1c1e" }}>
             <ChevronLeft style={{ width: 18, height: 18, color: "#fff" }} />
           </button>
           <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>
-            Pagar com e-Mola
+            Pagar com {provider === "emola" ? "e-Mola" : "M-Pesa"}
           </p>
           <div className="w-10" />
         </div>
