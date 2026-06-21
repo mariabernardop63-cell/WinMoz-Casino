@@ -5,3 +5,4 @@
 - [Winmoz admin bots data source](winmoz-admin-bots.md) — matches table not in migration SQL, may not exist; bots page now reads from transactions with [bot] marker in description
 - [Winmoz affiliate reward API](winmoz-affiliate-reward.md) — /api/record-bet-reward.ts credits referrers on bet; regular=2.5 MT first bet only, affiliate=5 MT max 5 bets/referred; called fire-and-forget in DamasGame+LudoGame after initial bet inserts
 - [Winmoz OTP bug](winmoz-otp-bug.md) — JS string.includes("") is always true; fix is array.includes("") to check for empty slots; was preventing OTP auto-verify
+- [Winmoz Debito Pay integration](winmoz-debito-pay.md) — C2B USSD push via Debito Pay; API key in SLACK_LIVE_API_KEY env var; only e-Mola active; webhook at /api/debito/webhook

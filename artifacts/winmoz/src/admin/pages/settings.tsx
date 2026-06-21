@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Settings as SettingsIcon, Bell, Shield, Globe, Database,
   Bot, Lock, Mail, Key, Eye, EyeOff, CheckCircle, AlertCircle,
-  Save, Wrench, Smartphone, Copy, Link2, Phone, LayoutTemplate,
+  Save, Wrench, Smartphone, Copy, Link2, Phone, LayoutTemplate, Zap,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useGetPlatformSettings, useUpdatePlatformSetting } from "@/admin/lib/supabase-api";
@@ -122,6 +122,181 @@ function SectionCard({
       </div>
       {children}
     </div>
+  );
+}
+
+/* ── Debito Pay Section (self-contained) ── */
+function DebitoPaySection() {
+  const updateSetting = useUpdatePlatformSetting();
+  const { data: platformSettings = {} } = useGetPlatformSettings();
+
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [showWS, setShowWS] = useState(false);
+  const [savingWS, setSavingWS] = useState(false);
+
+  const [publicId, setPublicId] = useState("");
+  const [savingPID, setSavingPID] = useState(false);
+
+  const [apiBaseUrl, setApiBaseUrl] = useState("");
+  const [savingBase, setSavingBase] = useState(false);
+
+  const [copiedWH, setCopiedWH] = useState(false);
+
+  useEffect(() => {
+    if (platformSettings["debito_public_id"]) setPublicId(platformSettings["debito_public_id"]);
+    if (platformSettings["debito_api_base_url"]) setApiBaseUrl(platformSettings["debito_api_base_url"]);
+  }, [platformSettings]);
+
+  const webhookUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/api/debito/webhook`;
+
+  const copyWebhook = () => {
+    navigator.clipboard.writeText(webhookUrl).catch(() => {});
+    setCopiedWH(true);
+    setTimeout(() => setCopiedWH(false), 2000);
+  };
+
+  const saveKey = async (key: string, value: string, setSaving: (v: boolean) => void, label: string) => {
+    if (!value.trim()) { toast.error(`Insere ${label}`); return; }
+    setSaving(true);
+    try {
+      await updateSetting.mutateAsync({ key, value: value.trim() });
+      toast.success(`${label} guardado`);
+    } catch { toast.error("Erro ao guardar"); }
+    setSaving(false);
+  };
+
+  const CYAN_COLOR = "#00D4B4";
+  const spinStyle = { width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(0,0,0,0.2)", borderTopColor: "#000", animation: "spin 0.8s linear infinite" } as const;
+  const inputBox = (borderColor = "rgba(0,212,180,0.2)") => ({
+    flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
+    borderRadius: 12, background: "var(--gz-bg-subtle)", border: `1.5px solid ${borderColor}`,
+  } as const);
+  const saveBtn = (active: boolean, saving: boolean, color = CYAN_COLOR) => ({
+    padding: "10px 14px", borderRadius: 12, border: "none", cursor: active && !saving ? "pointer" : "default",
+    background: active && !saving ? `linear-gradient(135deg, ${color}, ${color}cc)` : "var(--gz-bg-subtle)",
+    color: active && !saving ? "#000" : "var(--gz-text-tertiary)",
+    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
+  } as const);
+
+  return (
+    <SectionCard title="Debito Pay (Gateway)" icon={Zap} color="#00D4B4" bg="rgba(0,212,180,0.1)">
+      <div style={{ paddingTop: 12, display: "flex", flexDirection: "column", gap: 20 }}>
+
+        {/* Webhook URL */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+            URL do Webhook Debito Pay
+          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(0,212,180,0.05)", border: "1.5px solid rgba(0,212,180,0.2)" }}>
+            <span style={{ flex: 1, fontSize: 11, color: CYAN_COLOR, fontFamily: "monospace", overflowX: "auto", whiteSpace: "nowrap" }}>
+              {webhookUrl}
+            </span>
+            <button onClick={copyWebhook}
+              style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                background: copiedWH ? "rgba(0,212,180,0.2)" : "rgba(0,212,180,0.1)",
+                color: CYAN_COLOR, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, fontFamily: "inherit" }}>
+              {copiedWH ? <CheckCircle style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
+              {copiedWH ? "Copiado!" : "Copiar"}
+            </button>
+          </div>
+          <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
+            Configura esta URL no painel <strong>Debito Pay → Webhooks</strong>. Marca todos os eventos: <code style={{ fontFamily: "monospace", background: "rgba(0,212,180,0.08)", padding: "1px 5px", borderRadius: 4 }}>payment.completed</code>, <code style={{ fontFamily: "monospace", background: "rgba(0,212,180,0.08)", padding: "1px 5px", borderRadius: 4 }}>payment.failed</code>.
+          </p>
+        </div>
+
+        {/* API Key info */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 12, background: "rgba(0,212,180,0.05)", border: "1px solid rgba(0,212,180,0.15)" }}>
+          <Key style={{ width: 14, height: 14, color: CYAN_COLOR, flexShrink: 0, marginTop: 2 }} />
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", marginBottom: 4 }}>API Key (SLACK_LIVE_API_KEY)</p>
+            <p style={{ fontSize: 11, color: "var(--gz-text-muted)", lineHeight: 1.5 }}>
+              A API Key está configurada como variável de ambiente <code style={{ fontFamily: "monospace", background: "rgba(0,212,180,0.08)", padding: "1px 5px", borderRadius: 4 }}>SLACK_LIVE_API_KEY</code> no painel do Vercel. Não é necessário inserir aqui.
+            </p>
+          </div>
+        </div>
+
+        {/* Public ID */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+            ID Público (Public Identifier)
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={inputBox()}>
+              <Shield style={{ width: 14, height: 14, color: CYAN_COLOR, flexShrink: 0 }} />
+              <input type="text" value={publicId} onChange={e => setPublicId(e.target.value)}
+                placeholder="1e4d1d55-d740-447f-8cb4-8c8ce1bb0a0c"
+                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace" }} />
+            </div>
+            <button onClick={() => saveKey("debito_public_id", publicId, setSavingPID, "Public ID")}
+              disabled={!publicId.trim() || savingPID} style={saveBtn(!!publicId.trim(), savingPID)}>
+              {savingPID ? <div style={spinStyle} /> : <Save style={{ width: 14, height: 14 }} />}
+            </button>
+          </div>
+          <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
+            O identificador público visível no painel Debito Pay. Pré-preenchido com o valor por defeito.
+          </p>
+        </div>
+
+        {/* Webhook Secret */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+            Webhook Secret
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={inputBox()}>
+              <Key style={{ width: 14, height: 14, color: CYAN_COLOR, flexShrink: 0 }} />
+              <input type={showWS ? "text" : "password"} value={webhookSecret}
+                onChange={e => setWebhookSecret(e.target.value)}
+                placeholder="Segredo fornecido pelo Debito Pay"
+                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
+              <button onClick={() => setShowWS(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gz-text-tertiary)", padding: 0 }}>
+                {showWS ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
+              </button>
+            </div>
+            <button onClick={() => saveKey("debito_webhook_secret", webhookSecret, setSavingWS, "Webhook Secret")}
+              disabled={!webhookSecret.trim() || savingWS} style={saveBtn(!!webhookSecret.trim(), savingWS)}>
+              {savingWS ? <div style={spinStyle} /> : <Save style={{ width: 14, height: 14 }} />}
+            </button>
+          </div>
+          <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
+            Encontras o Webhook Secret no painel Debito Pay em <strong>Webhooks → Webhook Secret</strong>. Guarda aqui para validação de segurança.
+          </p>
+        </div>
+
+        {/* API Base URL */}
+        <div>
+          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+            URL Base da API (opcional)
+          </label>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={inputBox()}>
+              <Link2 style={{ width: 14, height: 14, color: CYAN_COLOR, flexShrink: 0 }} />
+              <input type="url" value={apiBaseUrl} onChange={e => setApiBaseUrl(e.target.value)}
+                placeholder="https://api.debitopay.co.mz"
+                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace" }} />
+            </div>
+            <button onClick={() => saveKey("debito_api_base_url", apiBaseUrl, setSavingBase, "URL Base")}
+              disabled={!apiBaseUrl.trim() || savingBase} style={saveBtn(!!apiBaseUrl.trim(), savingBase)}>
+              {savingBase ? <div style={spinStyle} /> : <Save style={{ width: 14, height: 14 }} />}
+            </button>
+          </div>
+          <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
+            Deixa em branco para usar o padrão: <code style={{ fontFamily: "monospace" }}>https://api.debitopay.co.mz</code>. Só altera se o Debito Pay fornecer uma URL diferente.
+          </p>
+        </div>
+
+        {/* Status indicators */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 99, background: "rgba(52,211,153,0.12)", color: "#34d399", fontWeight: 600 }}>
+            ✓ e-Mola Activo
+          </span>
+          <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 99, background: "rgba(255,255,255,0.04)", color: "#52525b", fontWeight: 600 }}>
+            ⏳ M-Pesa Em Breve
+          </span>
+        </div>
+
+      </div>
+    </SectionCard>
   );
 }
 
@@ -788,6 +963,9 @@ export default function Settings() {
 
           </div>
         </SectionCard>
+
+        {/* Debito Pay Gateway */}
+        <DebitoPaySection />
 
         {/* Security Gate Password */}
         <SectionCard title="Senha da Porta de Segurança" icon={Lock} color="#8b5cf6" bg="rgba(139,92,246,0.1)">
