@@ -856,75 +856,72 @@ function MatchmakingScreen({
     return (
       <div className="min-h-screen w-full flex items-center justify-center" style={{ background: "#080810" }}>
         <motion.div
-          initial={{ opacity: 0, scale: 0.82 }} animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "spring", stiffness: 240, damping: 20 }}
-          style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 32px", width: "100%", maxWidth: 400 }}>
+          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 260, damping: 22 }}
+          style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "0 28px", width: "100%", maxWidth: 400 }}>
 
-          {/* Success badge */}
+          {/* Success icon */}
           <motion.div
-            initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1, type: "spring", stiffness: 300, damping: 22 }}
-            style={{ width: 88, height: 88, borderRadius: "50%", marginBottom: 28,
-              background: "linear-gradient(135deg, #22c55e, #16a34a)",
+            initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.08, type: "spring", stiffness: 320, damping: 20 }}
+            style={{ width: 76, height: 76, marginBottom: 24, background: "#22c55e",
               display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 0 0 12px rgba(34,197,94,0.12), 0 8px 32px rgba(34,197,94,0.4)" }}>
-            <CheckCircle2 style={{ width: 44, height: 44, color: "#fff" }} strokeWidth={2.5}/>
+              boxShadow: "0 0 0 16px rgba(34,197,94,0.08)" }}>
+            <CheckCircle2 style={{ width: 38, height: 38, color: "#fff" }} strokeWidth={2.5}/>
           </motion.div>
 
-          {/* Title */}
-          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 26,
-            color: "#fff", marginBottom: 6, textAlign: "center", wordBreak: "break-word" }}>
+          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 24,
+            color: "#fff", marginBottom: 4, textAlign: "center" }}>
             Adversário Encontrado!
           </p>
-          <p style={{ fontSize: 13.5, color: "#71717a", marginBottom: 32, textAlign: "center" }}>
+          <p style={{ fontSize: 13, color: "#52525b", marginBottom: 28, textAlign: "center" }}>
             A sincronizar os jogadores…
           </p>
 
           {/* Players bar */}
-          <div style={{ display: "flex", alignItems: "center", gap: 20, width: "100%",
-            background: "#131320", borderRadius: 20, padding: "18px 24px",
-            border: "1px solid #1e1e3a", marginBottom: 28 }}>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%",
-                background: `linear-gradient(135deg, ${VIOLET}, #6d28d9)`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: `0 0 18px ${VIOLET}44` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%",
+            border: "1px solid #1c1c2e", marginBottom: 24 }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+              padding: "18px 12px", borderRight: "1px solid #1c1c2e" }}>
+              <div style={{ width: 48, height: 48, background: VIOLET,
+                display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: "#fff" }}>
                   {displayName.charAt(0).toUpperCase() || "T"}
                 </span>
               </div>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#a1a1aa", maxWidth: 80,
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#a1a1aa", maxWidth: 80,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center",
+                letterSpacing: "0.3px" }}>
                 {displayName}
               </span>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 18,
-                color: "#fff", letterSpacing: "2px", textShadow: `0 0 20px ${VIOLET}88` }}>VS</span>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e" }} className="animate-pulse"/>
+            <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 16,
+                color: "#fff", letterSpacing: "3px" }}>VS</span>
+              <div style={{ width: 5, height: 5, background: "#22c55e" }} className="animate-pulse"/>
             </div>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%",
-                background: "linear-gradient(135deg, #2c1810, #4a2010)",
-                border: "2px solid rgba(255,200,50,0.3)",
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+              padding: "18px 12px", borderLeft: "1px solid #1c1c2e" }}>
+              <div style={{ width: 48, height: 48,
+                background: botInfo ? "#92400e" : "#22c55e",
                 display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: "#FFD700" }}>
-                  {botInfo ? botInfo.name.charAt(0) : <CheckCircle2 style={{ width: 22, height: 22, color: "#22c55e" }}/>}
-                </span>
+                {botInfo
+                  ? <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: "#fbbf24" }}>{botInfo.name.charAt(0)}</span>
+                  : <CheckCircle2 style={{ width: 22, height: 22, color: "#fff" }}/>
+                }
               </div>
-              <span style={{ fontSize: 11.5, fontWeight: 600, color: "#22c55e", maxWidth: 80,
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#22c55e", maxWidth: 80,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center",
+                letterSpacing: "0.3px" }}>
                 {botInfo ? botInfo.name.split(" ")[0] : "Pronto"}
               </span>
             </div>
           </div>
 
-          {/* Loading indicator */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 20, height: 20, borderRadius: "50%",
-              border: "2.5px solid rgba(34,197,94,0.25)", borderTopColor: "#22c55e" }}
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 18, height: 18, border: "2px solid rgba(34,197,94,0.2)", borderTopColor: "#22c55e" }}
               className="animate-spin"/>
-            <span style={{ fontSize: 12.5, color: "#52525b" }}>A iniciar o jogo…</span>
+            <span style={{ fontSize: 12, color: "#52525b" }}>A iniciar o jogo…</span>
           </div>
         </motion.div>
       </div>
@@ -934,97 +931,110 @@ function MatchmakingScreen({
   return (
     <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
       <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
+
+        {/* Header */}
         <div className="flex items-center justify-between pt-12 pb-4">
-          <button onClick={onCancel} className="w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ background: "#1c1c1e" }}>
-            <X style={{ width: 18, height: 18, color: "#fff" }} />
+          <button onClick={onCancel} className="w-9 h-9 flex items-center justify-center"
+            style={{ background: "#1c1c1e", border: "none", cursor: "pointer" }}>
+            <X style={{ width: 16, height: 16, color: "#fff" }} />
           </button>
-          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>A Procurar Adversário</p>
-          <div className="w-10" />
+          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14,
+            color: "#fff", letterSpacing: "0.2px" }}>A Procurar Adversário</p>
+          <div className="w-9" />
         </div>
 
-        <motion.div className="flex flex-col items-center pt-6 pb-8"
+        {/* Timer */}
+        <motion.div className="flex flex-col items-center pt-8 pb-6"
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <div className="relative" style={{ width: 88, height: 88, marginBottom: 12 }}>
-            <svg width={88} height={88} style={{ position: "absolute", inset: 0 }}>
-              <circle cx={44} cy={44} r={38} fill="none" stroke="#1c1c1e" strokeWidth={5} />
-              <motion.circle cx={44} cy={44} r={38} fill="none"
-                stroke={remaining < 30 ? "#e74c3c" : VIOLET}
-                strokeWidth={5} strokeLinecap="round"
-                strokeDasharray={2 * Math.PI * 38}
-                strokeDashoffset={2 * Math.PI * 38 * (1 - progress / 100)}
-                transform="rotate(-90 44 44)"
+          <div className="relative" style={{ width: 96, height: 96, marginBottom: 12 }}>
+            <svg width={96} height={96} style={{ position: "absolute", inset: 0 }}>
+              <circle cx={48} cy={48} r={40} fill="none" stroke="#1c1c1e" strokeWidth={5} />
+              <motion.circle cx={48} cy={48} r={40} fill="none"
+                stroke={remaining < 30 ? "#ef4444" : VIOLET}
+                strokeWidth={5} strokeLinecap="square"
+                strokeDasharray={2 * Math.PI * 40}
+                strokeDashoffset={2 * Math.PI * 40 * (1 - progress / 100)}
+                transform="rotate(-90 48 48)"
                 style={{ transition: "stroke-dashoffset 1s linear, stroke 0.5s" }} />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 18,
-                color: remaining < 30 ? "#e74c3c" : "#fff", lineHeight: 1 }}>{mins}:{secs}</span>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20,
+                color: remaining < 30 ? "#ef4444" : "#fff", lineHeight: 1 }}>{mins}:{secs}</span>
+              <span style={{ fontSize: 9.5, color: "#52525b", letterSpacing: "0.5px", marginTop: 3 }}>TEMPO</span>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: VIOLET }} />
-            <span style={{ fontSize: 12, color: "#71717a", letterSpacing: "0.5px" }}>A procurar em tempo real</span>
+            <div className="w-1.5 h-1.5 animate-pulse" style={{ background: VIOLET }} />
+            <span style={{ fontSize: 11.5, color: "#52525b", letterSpacing: "0.4px" }}>A procurar em tempo real</span>
           </div>
         </motion.div>
 
-        <motion.div className="flex items-center justify-center gap-6 py-8"
-          initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.25, type: "spring", stiffness: 200, damping: 18 }}>
-          <div className="flex flex-col items-center gap-2">
-            <div style={{ width: 80, height: 80, borderRadius: "50%",
-              background: `linear-gradient(135deg, ${VIOLET}, #6d28d9)`,
-              border: `3px solid ${VIOLET}66`, display: "flex", alignItems: "center", justifyContent: "center",
-              overflow: "hidden", boxShadow: `0 0 28px ${VIOLET}44` }}>
-              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: "#fff" }}>
-                {displayName.charAt(0).toUpperCase() || "E"}
+        {/* Players VS */}
+        <motion.div style={{ display: "flex", alignItems: "center", gap: 0, border: "1px solid #1c1c2e", marginBottom: 20 }}
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.22, type: "spring", stiffness: 220, damping: 20 }}>
+          {/* You */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+            padding: "20px 12px", borderRight: "1px solid #1c1c2e" }}>
+            <div style={{ width: 72, height: 72, background: VIOLET,
+              display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 26, color: "#fff" }}>
+                {displayName.charAt(0).toUpperCase() || "T"}
               </span>
             </div>
-            <span style={{ fontSize: 11, color: "#8e8e93", fontWeight: 600 }}>Tu</span>
+            <span style={{ fontSize: 10.5, color: "#71717a", fontWeight: 700, letterSpacing: "1px",
+              textTransform: "uppercase" }}>Tu</span>
           </div>
-          <div className="flex flex-col items-center">
-            <motion.div animate={{ scale: [1, 1.08, 1] }}
+          {/* VS */}
+          <div style={{ padding: "0 14px", display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+            <motion.span animate={{ opacity: [1, 0.4, 1] }}
               transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-              style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 26, color: "#fff",
-                letterSpacing: "2px", textShadow: `0 0 24px ${VIOLET}88` }}>
+              style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 20,
+                color: "#fff", letterSpacing: "4px" }}>
               VS
-            </motion.div>
+            </motion.span>
           </div>
-          <div className="flex flex-col items-center gap-2">
-            <div style={{ position: "relative", width: 80, height: 80 }}>
+          {/* Opponent */}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+            padding: "20px 12px", borderLeft: "1px solid #1c1c2e" }}>
+            <div style={{ position: "relative", width: 72, height: 72 }}>
               <motion.div animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "3px dashed #71717a" }} />
-              <div style={{ position: "absolute", inset: 6, borderRadius: "50%", background: "#1c1c1e",
+                transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                style={{ position: "absolute", inset: 0, border: "2px dashed #3a3a3e" }} />
+              <div style={{ position: "absolute", inset: 8, background: "#141418",
                 border: "1px solid #2c2c2e", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ width: 28, height: 28, borderRadius: "50%",
-                  border: "2.5px solid #71717a33", borderTopColor: "#71717a" }} className="animate-spin" />
+                <div style={{ width: 24, height: 24, border: "2.5px solid #2c2c2e", borderTopColor: "#71717a" }}
+                  className="animate-spin" />
               </div>
             </div>
-            <span style={{ fontSize: 11, color: "#8e8e93", fontWeight: 600 }}>Adversário</span>
+            <span style={{ fontSize: 10.5, color: "#52525b", fontWeight: 700, letterSpacing: "1px",
+              textTransform: "uppercase" }}>Adversário</span>
           </div>
         </motion.div>
 
-        <motion.div className="flex flex-col items-center gap-3 px-4"
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px",
-            background: "rgba(124,58,237,0.1)", borderRadius: 99, border: `1px solid ${VIOLET}33` }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: VIOLET }} className="animate-pulse" />
-            <span style={{ fontSize: 12, color: VIOLET, fontWeight: 600 }}>A procurar jogadores com o mesmo valor…</span>
+        {/* Info */}
+        <motion.div className="flex flex-col items-center gap-2 px-2"
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.38 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 18px",
+            background: `rgba(124,58,237,0.08)`, border: `1px solid ${VIOLET}22` }}>
+            <div style={{ width: 5, height: 5, background: VIOLET }} className="animate-pulse" />
+            <span style={{ fontSize: 11.5, color: VIOLET, fontWeight: 600 }}>A procurar jogadores com o mesmo valor…</span>
           </div>
-          <p style={{ fontSize: 11.5, color: "#52525b", textAlign: "center", lineHeight: 1.6 }}>
-            Se nenhum adversário for encontrado em {mins}:{secs}, o teu valor será devolvido automaticamente.
+          <p style={{ fontSize: 11, color: "#3a3a3e", textAlign: "center", lineHeight: 1.7 }}>
+            Sem adversário em {mins}:{secs}? O teu valor é devolvido automaticamente.
           </p>
         </motion.div>
 
-
         <div className="flex-1" />
 
+        {/* Cancel */}
         <div className="pb-10">
           <button onClick={onCancel}
-            className="w-full h-14 rounded-full flex items-center justify-center gap-2"
-            style={{ background: "#1c1c1e", color: "#8e8e93",
-              fontFamily: "'Syne', sans-serif", fontSize: 14, border: "1px solid #2c2c2e", cursor: "pointer" }}>
-            <X style={{ width: 16, height: 16 }} /> Cancelar e Devolver Valor
+            className="w-full flex items-center justify-center gap-2"
+            style={{ height: 52, background: "#1c1c1e", color: "#71717a", border: "1px solid #2c2c2e",
+              fontFamily: "'Syne', sans-serif", fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+              letterSpacing: "0.3px" }}>
+            <X style={{ width: 15, height: 15 }} /> Cancelar e Devolver Valor
           </button>
         </div>
       </div>
@@ -1833,20 +1843,6 @@ export default function Apostar() {
               ]}
             />
 
-            {/* Phone number field when Carteira Móvel is selected */}
-            <AnimatePresence>
-              {payMethod === "carteira" && (
-                <motion.div
-                  key="phone-field"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.25 }}
-                  style={{ overflow: "hidden" }}>
-                  <MobileWalletPhoneField phone={mobilePhone} onChange={setMobilePhone} />
-                </motion.div>
-              )}
-            </AnimatePresence>
           </motion.div>
 
           {/* Start Button */}

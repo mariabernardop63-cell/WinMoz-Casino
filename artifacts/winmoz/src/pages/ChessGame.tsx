@@ -5,6 +5,51 @@ import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
+// ─── Sound helpers ────────────────────────────────────────────────────────────
+function playChessMove() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = "triangle"; osc.frequency.value = 350;
+    const t = ctx.currentTime;
+    gain.gain.setValueAtTime(0.18, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+    osc.start(t); osc.stop(t + 0.18);
+  } catch {}
+}
+function playChessCapture() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
+    const freqs = [180, 240];
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sawtooth"; osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.03;
+      gain.gain.setValueAtTime(0.16, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      osc.start(t); osc.stop(t + 0.25);
+    });
+  } catch {}
+}
+function playChessVictory() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine"; osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.13;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.38, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+      osc.start(t); osc.stop(t + 0.6);
+    });
+  } catch {}
+}
+
 // ─── Types ──────────────────────────────────────────────────────────────────────
 type PType = "K"|"Q"|"R"|"B"|"N"|"P";
 type PColor = "w"|"b";
@@ -980,6 +1025,8 @@ export default function ChessGame(){
   const[captured,setCaptured]=useState<Record<PColor,PType[]>>(_savedChess?.captured??{w:[],b:[]});
   const[status,setStatus]=useState<GameStatus>(_savedChess?.status??"playing");
   const[winner,setWinner]=useState<PColor|null>(null);
+
+  useEffect(()=>{ if(winner) playChessVictory(); },[winner]);
   const[winReason,setWinReason]=useState("");
   const[promotionPending,setPromotionPending]=useState<{from:Sq;to:Sq}|null>(null);
   const[timers,setTimers]=useState<Record<PColor,number>>({w:600,b:600});
@@ -1223,6 +1270,8 @@ export default function ChessGame(){
   }
 
   function executeMove(from:Sq,to:Sq,prom:PType){
+    const isCapture = !!boardRef.current[to[0]][to[1]];
+    if(isCapture) playChessCapture(); else playChessMove();
     // Game has definitively started — credit referral reward now (player's own first move)
     if(BET>0&&!rewardFiredRef.current){
       rewardFiredRef.current=true;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import {
@@ -7,10 +7,11 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ value, onChange, locked }: { value: boolean; onChange: (v: boolean) => void; locked?: boolean }) {
   return (
-    <button onClick={() => onChange(!value)} className="flex-shrink-0 relative transition-colors"
-      style={{ width: 46, height: 26, borderRadius: 13, background: value ? "#000" : "#d1d5db", border: "none", cursor: "pointer" }}>
+    <button onClick={() => !locked && onChange(!value)} className="flex-shrink-0 relative transition-colors"
+      style={{ width: 46, height: 26, borderRadius: 13, background: value ? "#000" : "#d1d5db", border: "none",
+        cursor: locked ? "default" : "pointer", opacity: locked ? 0.6 : 1 }}>
       <motion.div animate={{ x: value ? 22 : 2 }}
         transition={{ type: "spring", stiffness: 400, damping: 30 }}
         style={{ position: "absolute", top: 3, width: 20, height: 20, borderRadius: "50%", background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
@@ -18,11 +19,11 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
   );
 }
 
-function Row({ icon: Icon, label, desc, value, onChange, onPress, badge }: any) {
+function Row({ icon: Icon, label, desc, value, onChange, onPress, badge, locked }: any) {
   const isToggle = onChange !== undefined;
   const Tag = isToggle ? "div" : "button" as any;
   return (
-    <Tag onClick={isToggle ? () => onChange(!value) : onPress}
+    <Tag onClick={isToggle ? () => !locked && onChange(!value) : onPress}
       className="flex items-center gap-3.5 py-4 w-full text-left border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors cursor-pointer"
       style={{ background: "none" }}>
       <div className="w-9 h-9 flex items-center justify-center flex-shrink-0"
@@ -34,7 +35,7 @@ function Row({ icon: Icon, label, desc, value, onChange, onPress, badge }: any) 
         {desc && <p style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1, lineHeight: 1.4 }}>{desc}</p>}
       </div>
       {isToggle
-        ? <Toggle value={value} onChange={onChange} />
+        ? <Toggle value={value} onChange={onChange} locked={locked} />
         : badge
         ? <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: "#f1f5f9", color: "#64748b" }}>{badge}</span>
         : <ChevronRight style={{ width: 16, height: 16, color: "#d1d5db" }} />
@@ -52,7 +53,6 @@ export default function Definicoes() {
 
   const [notifDepositos,  setNotifDepositos]  = useState(true);
   const [notifApostas,    setNotifApostas]    = useState(true);
-  const [notifPromos,     setNotifPromos]     = useState(false);
   const [notifSons,       setNotifSons]       = useState(true);
   const [notifVibracao,   setNotifVibracao]   = useState(true);
   const [darkMode,        setDarkMode]        = useState(false);
@@ -61,6 +61,23 @@ export default function Definicoes() {
   const [lang,            setLang]            = useState("Português");
   const [currency,        setCurrency]        = useState("MZN — Metical");
   const [version]         = useState("1.0.0");
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+      document.body.style.background = "#0a0a0a";
+      document.body.style.color = "#fff";
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.body.style.background = "";
+      document.body.style.color = "";
+    }
+    return () => {
+      document.documentElement.classList.remove("dark");
+      document.body.style.background = "";
+      document.body.style.color = "";
+    };
+  }, [darkMode]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -73,7 +90,7 @@ export default function Definicoes() {
       items: [
         { icon: Bell,     label: "Depósitos e Levamentos", desc: "Alertas de movimentos na conta",         value: notifDepositos, onChange: setNotifDepositos },
         { icon: Bell,     label: "Apostas e Resultados",   desc: "Notificações de partidas e torneios",   value: notifApostas,   onChange: setNotifApostas },
-        { icon: Bell,     label: "Promoções",              desc: "Bónus, eventos e ofertas especiais",    value: notifPromos,    onChange: setNotifPromos },
+        { icon: Bell,     label: "Promoções",              desc: "Bónus, eventos e ofertas especiais",    value: true,           onChange: () => {}, locked: true },
         { icon: Volume2,  label: "Sons",                   desc: "Toques e sons de notificação",          value: notifSons,      onChange: setNotifSons },
         { icon: Vibrate,  label: "Vibração",               desc: "Vibração ao receber notificações",      value: notifVibracao,  onChange: setNotifVibracao },
       ],
@@ -90,14 +107,14 @@ export default function Definicoes() {
       items: [
         { icon: CreditCard, label: "Moeda",               desc: "Moeda preferida para exibição",       onPress: () => setCurrModal(true), badge: currency.split(" ")[0] },
         { icon: CreditCard, label: "Métodos de pagamento", desc: "Gere os teus métodos de depósito",   onPress: () => {} },
-        { icon: CreditCard, label: "Limite de apostas",    desc: "Define limites de gastos diários",   onPress: () => {} },
+        { icon: CreditCard, label: "Limite de apostas",    desc: "Define limites de gastos diários",   onPress: () => setLocation("/apostar") },
       ],
     },
     {
       title: "Aplicação",
       items: [
         { icon: Info,   label: "Versão",                   desc: `WinMoz v${version}`,                    onPress: () => {}, badge: version },
-        { icon: Info,   label: "Termos de serviço",        desc: "Lê os nossos termos",                   onPress: () => {} },
+        { icon: Info,   label: "Termos de serviço",        desc: "Lê os nossos termos",                   onPress: () => setLocation("/termos") },
         { icon: Info,   label: "Política de privacidade",  desc: "Sabe como usamos os teus dados",        onPress: () => setLocation("/privacidade") },
         { icon: LogOut, label: "Terminar sessão",          desc: "Sair da conta actual",                  onPress: handleSignOut },
       ],
@@ -105,17 +122,17 @@ export default function Definicoes() {
   ];
 
   return (
-    <div className="min-h-screen bg-white w-full flex justify-center">
-      <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col">
-        <div className="flex items-center gap-3 px-5 pt-12 pb-6 border-b border-slate-100">
+    <div className="min-h-screen bg-white w-full flex justify-center" style={{ background: darkMode ? "#0a0a0a" : "#fff" }}>
+      <div className="w-full max-w-[430px] min-h-screen flex flex-col" style={{ background: darkMode ? "#0a0a0a" : "#fff" }}>
+        <div className="flex items-center gap-3 px-5 pt-12 pb-6 border-b" style={{ borderColor: darkMode ? "#1c1c1e" : "#f1f5f9" }}>
           <button onClick={() => setLocation("/perfil")}
-            className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors"
+            className="w-9 h-9 flex items-center justify-center transition-colors"
             style={{ borderRadius: 0 }}>
-            <ArrowLeft style={{ width: 22, height: 22, color: "#111" }} />
+            <ArrowLeft style={{ width: 22, height: 22, color: darkMode ? "#fff" : "#111" }} />
           </button>
           <div>
-            <h1 className="font-syne font-bold text-xl text-[#0a0a0a]">Definições</h1>
-            <p className="text-[12px] text-slate-400 mt-0.5">Personaliza a tua experiência</p>
+            <h1 className="font-syne font-bold text-xl" style={{ color: darkMode ? "#fff" : "#0a0a0a" }}>Definições</h1>
+            <p className="text-[12px] mt-0.5" style={{ color: darkMode ? "#6b7280" : "#9ca3af" }}>Personaliza a tua experiência</p>
           </div>
         </div>
 
@@ -127,8 +144,8 @@ export default function Definicoes() {
               <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", marginBottom: 8 }}>
                 {title.toUpperCase()}
               </p>
-              <div style={{ border: "1px solid #e5e7eb" }}>
-                {items.map(item => <Row key={item.label} {...item} />)}
+              <div style={{ border: `1px solid ${darkMode ? "#1c1c1e" : "#e5e7eb"}` }}>
+                {items.map((item: any) => <Row key={item.label} {...item} />)}
               </div>
             </motion.div>
           ))}

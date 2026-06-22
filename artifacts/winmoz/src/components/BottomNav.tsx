@@ -214,6 +214,7 @@ function ResumeModal({ activeGame, onClose }: { activeGame: ActiveGameRecord | n
 
 export default function BottomNav() {
   const [location, setLocation] = useLocation();
+  const { whatsappUrl } = useBrand();
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState("");
   const [showResume, setShowResume] = useState(false);
@@ -386,11 +387,11 @@ export default function BottomNav() {
                   </Link>
                 );
               })}
-              <button onClick={openSearch}
+              <a href={whatsappUrl || "https://wa.me"} target="_blank" rel="noopener noreferrer"
                 className="flex items-center justify-center cursor-pointer select-none rounded-full transition-colors hover:bg-white/8"
                 style={{ width: 36, height: 36 }}>
-                <Search style={{ width: 18, height: 18, color: "#71717a" }} />
-              </button>
+                <MessageCircle style={{ width: 18, height: 18, color: "#25d366" }} />
+              </a>
             </motion.div>
           )}
         </AnimatePresence>

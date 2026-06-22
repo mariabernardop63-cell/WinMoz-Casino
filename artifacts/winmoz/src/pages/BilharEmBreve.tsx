@@ -1,14 +1,14 @@
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
-import { ChevronLeft, Clock, Bell } from "lucide-react";
+import { ArrowLeft, Clock, Bell, CheckCircle } from "lucide-react";
+import { useBrand } from "@/lib/brand-context";
 
 type GameConfig = {
   name: string;
   subtitle: string;
   description: string;
   features: string[];
-  accent: string;
-  accentMuted: string;
+  tag: string;
 };
 
 function getGameConfig(jogo: string): GameConfig {
@@ -17,6 +17,7 @@ function getGameConfig(jogo: string): GameConfig {
       return {
         name: "Carta da Mesa",
         subtitle: "Jogo de Cartas",
+        tag: "CARTAS",
         description:
           "Uma experiência premium de cartas com apostas ao vivo. Blefe, estratégia e sorte num só jogo.",
         features: [
@@ -24,13 +25,12 @@ function getGameConfig(jogo: string): GameConfig {
           "Apostas a partir de 10 MT até 5.000 MT",
           "Torneios semanais com prémios em dinheiro",
         ],
-        accent: "rgba(52,211,153,0.18)",
-        accentMuted: "#34d399",
       };
     case "ravo":
       return {
         name: "Ravo Ravo",
         subtitle: "Jogo de Cartas",
+        tag: "CARTAS",
         description:
           "O jogo de cartas mais popular de Moçambique, agora com apostas em dinheiro real.",
         features: [
@@ -38,13 +38,12 @@ function getGameConfig(jogo: string): GameConfig {
           "Salas públicas e privadas",
           "Ligas mensais com grandes prémios",
         ],
-        accent: "rgba(167,139,250,0.18)",
-        accentMuted: "#a78bfa",
       };
     default:
       return {
         name: "Bilhar Apostado",
         subtitle: "Jogo de Mesa",
+        tag: "MESA",
         description:
           "Precisão, ângulo e estratégia. Uma experiência de bilhar premium com apostas em tempo real.",
         features: [
@@ -52,10 +51,20 @@ function getGameConfig(jogo: string): GameConfig {
           "Apostas de 10 a 5.000 MT",
           "Torneios e ligas semanais",
         ],
-        accent: "rgba(34,211,238,0.14)",
-        accentMuted: "#22d3ee",
       };
   }
+}
+
+function BrandLogo() {
+  const { brandName, brandSubtitle } = useBrand();
+  return (
+    <svg viewBox="0 0 190 46" height="36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M1 2 L11 2 L7 44 L0 44 Z" fill="#0D0D0D" />
+      <path d="M13 2 L20 2 L16 44 L10 44 Z" fill="#0D0D0D" opacity="0.18" />
+      <text x="23" y="27" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="22" letterSpacing="0.5" fill="#0D0D0D">{brandName}</text>
+      <text x="23" y="41" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">{brandSubtitle}</text>
+    </svg>
+  );
 }
 
 export default function BilharEmBreve() {
@@ -67,243 +76,87 @@ export default function BilharEmBreve() {
   const config = getGameConfig(jogo);
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden"
-      style={{ background: "#08080f" }}
-    >
-      {/* Ambient glow */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background: `radial-gradient(ellipse 70% 50% at 50% 20%, ${config.accent} 0%, transparent 70%)`,
-          pointerEvents: "none",
-        }}
-      />
+    <div className="min-h-screen bg-white w-full flex justify-center">
+      <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col px-6 pt-14 pb-10 relative">
 
-      {/* Back button */}
-      <motion.button
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.05 }}
-        onClick={() => setLocation("/")}
-        style={{
-          position: "absolute",
-          top: 20,
-          left: 16,
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          background: "rgba(255,255,255,0.06)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: 99,
-          padding: "8px 16px",
-          color: "rgba(255,255,255,0.7)",
-          fontFamily: "'Syne', sans-serif",
-          fontWeight: 700,
-          fontSize: 13,
-          cursor: "pointer",
-          backdropFilter: "blur(8px)",
-        }}
-      >
-        <ChevronLeft style={{ width: 15, height: 15 }} />
-        Voltar
-      </motion.button>
+        {/* Back button */}
+        <button onClick={() => setLocation("/")}
+          className="absolute top-5 left-5 flex items-center justify-center transition-colors hover:bg-slate-100"
+          style={{ width: 36, height: 36 }}>
+          <ArrowLeft style={{ width: 22, height: 22, color: "#111" }} />
+        </button>
 
-      {/* Main content */}
-      <div className="flex flex-col items-center text-center w-full" style={{ maxWidth: 340 }}>
+        {/* Logo */}
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.32 }}
+          className="flex justify-center mb-10">
+          <BrandLogo />
+        </motion.div>
 
-        {/* Badge */}
-        <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 99,
-            padding: "5px 14px",
-            marginBottom: 28,
-          }}
-        >
-          <Clock style={{ width: 11, height: 11, color: config.accentMuted }} />
-          <span
-            style={{
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.36, delay: 0.07 }}>
+
+          {/* Em Breve tag */}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 14,
+            border: "1px solid #e5e7eb", padding: "5px 12px" }}>
+            <Clock style={{ width: 10, height: 10, color: "#9ca3af" }} />
+            <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 9.5,
+              color: "#9ca3af", letterSpacing: "1.8px", textTransform: "uppercase" }}>
+              Em Breve · {config.tag}
+            </span>
+          </div>
+
+          {/* Title */}
+          <h1 style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 30,
+            color: "#0a0a0a", lineHeight: 1.1, letterSpacing: "-0.6px", marginBottom: 8 }}>
+            {config.name}
+          </h1>
+          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 500, fontSize: 13,
+            color: "#9ca3af", letterSpacing: "0.3px", marginBottom: 20 }}>
+            {config.subtitle}
+          </p>
+
+          {/* Divider */}
+          <div style={{ height: 1, background: "#f1f5f9", marginBottom: 20 }} />
+
+          {/* Description */}
+          <p style={{ fontSize: 14.5, color: "#6b7280", lineHeight: 1.7, marginBottom: 28 }}>
+            {config.description}
+          </p>
+
+          {/* Features */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 0, marginBottom: 32,
+            border: "1px solid #e5e7eb" }}>
+            {config.features.map((feat, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 12,
+                padding: "14px 16px",
+                borderBottom: i < config.features.length - 1 ? "1px solid #f1f5f9" : "none" }}>
+                <CheckCircle style={{ width: 14, height: 14, color: "#0a0a0a", flexShrink: 0, marginTop: 1.5 }} />
+                <span style={{ fontSize: 13.5, color: "#374151", lineHeight: 1.45 }}>{feat}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Notify button */}
+          <button onClick={() => setLocation("/")}
+            style={{ width: "100%", padding: "15px", background: "#000", color: "#fff",
+              fontSize: 14.5, fontWeight: 700, border: "none", borderRadius: 0,
+              cursor: "pointer", letterSpacing: "0.3px",
               fontFamily: "'Syne', sans-serif",
-              fontWeight: 700,
-              fontSize: 10,
-              color: config.accentMuted,
-              letterSpacing: "1.4px",
-              textTransform: "uppercase",
-            }}
-          >
-            Em Breve
-          </span>
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              marginBottom: 12 }}>
+            <Bell style={{ width: 15, height: 15 }} />
+            Notificar quando lançar
+          </button>
+
+          <button onClick={() => setLocation("/")}
+            style={{ width: "100%", padding: "14px", background: "none", color: "#6b7280",
+              fontSize: 13.5, fontWeight: 600, border: "1px solid #e5e7eb", borderRadius: 0,
+              cursor: "pointer", fontFamily: "inherit" }}>
+            Voltar ao início
+          </button>
+
         </motion.div>
-
-        {/* Title */}
-        <motion.h1
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          style={{
-            fontFamily: "'Syne', sans-serif",
-            fontWeight: 800,
-            fontSize: 34,
-            color: "#ffffff",
-            marginBottom: 8,
-            lineHeight: 1.1,
-            letterSpacing: "-0.8px",
-          }}
-        >
-          {config.name}
-        </motion.h1>
-
-        {/* Subtitle */}
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          style={{
-            fontFamily: "'Syne', sans-serif",
-            fontWeight: 600,
-            fontSize: 12,
-            color: config.accentMuted,
-            letterSpacing: "1.6px",
-            textTransform: "uppercase",
-            marginBottom: 20,
-          }}
-        >
-          {config.subtitle}
-        </motion.p>
-
-        {/* Divider */}
-        <motion.div
-          initial={{ scaleX: 0 }}
-          animate={{ scaleX: 1 }}
-          transition={{ delay: 0.22, duration: 0.4 }}
-          style={{
-            width: 40,
-            height: 1.5,
-            background: `linear-gradient(90deg, transparent, ${config.accentMuted}, transparent)`,
-            marginBottom: 24,
-            borderRadius: 99,
-          }}
-        />
-
-        {/* Description */}
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-          style={{
-            fontFamily: "system-ui, sans-serif",
-            fontSize: 15,
-            color: "rgba(255,255,255,0.5)",
-            lineHeight: 1.65,
-            marginBottom: 36,
-          }}
-        >
-          {config.description}
-        </motion.p>
-
-        {/* Features */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.32 }}
-          style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", marginBottom: 40 }}
-        >
-          {config.features.map((feat, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                borderRadius: 12,
-                padding: "13px 16px",
-                textAlign: "left",
-              }}
-            >
-              <div
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: "50%",
-                  background: config.accentMuted,
-                  flexShrink: 0,
-                  boxShadow: `0 0 6px ${config.accentMuted}`,
-                }}
-              />
-              <span
-                style={{
-                  fontFamily: "system-ui, sans-serif",
-                  fontSize: 13,
-                  color: "rgba(255,255,255,0.65)",
-                  lineHeight: 1.4,
-                }}
-              >
-                {feat}
-              </span>
-            </div>
-          ))}
-        </motion.div>
-
-        {/* Notify button */}
-        <motion.button
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.42 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => setLocation("/")}
-          style={{
-            width: "100%",
-            height: 52,
-            borderRadius: 14,
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            color: "#fff",
-            fontFamily: "'Syne', sans-serif",
-            fontWeight: 700,
-            fontSize: 14,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            marginBottom: 12,
-            backdropFilter: "blur(8px)",
-            letterSpacing: "0.2px",
-          }}
-        >
-          <Bell style={{ width: 15, height: 15, color: config.accentMuted }} />
-          Notificar quando lançar
-        </motion.button>
-
-        <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.48 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => setLocation("/")}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "rgba(255,255,255,0.35)",
-            fontFamily: "system-ui, sans-serif",
-            fontSize: 13,
-            cursor: "pointer",
-            padding: "8px 0",
-          }}
-        >
-          Voltar ao início
-        </motion.button>
       </div>
     </div>
   );

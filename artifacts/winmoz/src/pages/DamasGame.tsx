@@ -8,8 +8,43 @@ import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
 import captureSoundUrl from "@assets/som_para_quando_o_peao_é_matado_1781479683373.mp3";
 
 // ─── Sound helpers ────────────────────────────────────────────────────────────
+const _damasCaptureAudio = new Audio(captureSoundUrl);
+_damasCaptureAudio.load();
+
 function playDamasCapture() {
-  try { const a = new Audio(captureSoundUrl); a.volume = 0.65; a.play().catch(()=>{}); } catch {}
+  try { _damasCaptureAudio.currentTime = 0; _damasCaptureAudio.volume = 0.65; _damasCaptureAudio.play().catch(()=>{}); } catch {}
+}
+function playDamasPromotion() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
+    const notes = [523.25, 659.25, 783.99];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine"; osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.1;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.32, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+      osc.start(t); osc.stop(t + 0.5);
+    });
+  } catch {}
+}
+function playDamasVictory() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
+    const notes = [523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine"; osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.13;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.38, t + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+      osc.start(t); osc.stop(t + 0.6);
+    });
+  } catch {}
 }
 function playDamasMove() {
   try {
@@ -751,6 +786,8 @@ export default function DamasGame() {
   // Forbidden direction for king chain captures: prevents reversing along the same diagonal
   const [chainForbiddenDir, setChainForbiddenDir] = useState<[number,number] | null>(null);
   const [winner, setWinner]         = useState<PColor | null>(null);
+
+  useEffect(() => { if (winner) playDamasVictory(); }, [winner]);
   const [winReason, setWinReason]   = useState("");
   const [timers, setTimers]         = useState<Record<PColor, number>>({ w:30, b:30 });
   const [lastMove, setLastMove]     = useState<{ from:Sq; to:Sq } | null>(null);
@@ -857,7 +894,9 @@ export default function DamasGame() {
 
       // Called after the last animation step to resolve game state
       const finalizeBotMove = (finalBoard: Board, hadCapture: boolean) => {
-        if (hadCapture) playDamasCapture(); else playDamasMove();
+        const wasPromoted = !boardRef.current[move.from[0]]?.[move.from[1]]?.isDame && finalBoard[move.to[0]]?.[move.to[1]]?.isDame;
+        if (wasPromoted) playDamasPromotion();
+        else if (hadCapture) playDamasCapture(); else playDamasMove();
         setSelected(null); setValidDests([]); setValidCapDests([]);
         setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]); setChainForbiddenDir(null);
         const myCnt = countPieces(finalBoard, myColor);
@@ -1313,7 +1352,9 @@ export default function DamasGame() {
   // ── Execute a complete move (end of chain or non-capture) ─────────────────
   // finalBoard must already have the move applied (piece at `to`, captures removed)
   function finalizeTurn(from: Sq, to: Sq, captured: Sq[], finalBoard: Board) {
-    if (captured.length > 0) playDamasCapture(); else playDamasMove();
+    const wasPromoted = !boardRef.current[from[0]]?.[from[1]]?.isDame && finalBoard[to[0]]?.[to[1]]?.isDame;
+    if (wasPromoted) playDamasPromotion();
+    else if (captured.length > 0) playDamasCapture(); else playDamasMove();
     // Count opponent's pieces — if 0, I captured them all and win
     const oppCnt = countPieces(finalBoard, opp(turn));
     setBoard(finalBoard); boardRef.current = finalBoard;

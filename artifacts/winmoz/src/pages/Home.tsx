@@ -196,6 +196,7 @@ function AtualizacoesSection() {
         </Link>
       </div>
       <AtualizacoesCards />
+
     </section>
   );
 }
@@ -833,7 +834,7 @@ const SLIDES = [
     badgeText: "#FFFFFF",
     subtitleColor: "rgba(255,255,255,0.82)",
     title: "Conversas\nem Grupo!",
-    subtitle: "Estratégias, amigos e diversão em tempo real.",
+    subtitle: "Agende partidas com amigos, Troque estratégias e muito+",
     cta: "Conversar",
   },
   {

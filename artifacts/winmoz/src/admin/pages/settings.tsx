@@ -426,6 +426,7 @@ export default function Settings() {
   const [footerEmail, setFooterEmail]     = useState("");
   const [footerAppUrl, setFooterAppUrl]   = useState("");
   const [whatsappGroupUrl, setWhatsappGroupUrl] = useState("");
+  const [adScriptHtml, setAdScriptHtml]         = useState("");
   const [savingFooter, setSavingFooter]   = useState(false);
 
   useEffect(() => {
@@ -438,6 +439,7 @@ export default function Settings() {
     if (platformSettings["footer_email"])            setFooterEmail(platformSettings["footer_email"]);
     if (platformSettings["footer_app_download_url"]) setFooterAppUrl(platformSettings["footer_app_download_url"]);
     if (platformSettings["whatsapp_group_url"])      setWhatsappGroupUrl(platformSettings["whatsapp_group_url"]);
+    if (platformSettings["ad_script_html"] !== undefined) setAdScriptHtml(platformSettings["ad_script_html"]);
   }, [platformSettings]);
 
   const handleSaveFooter = async () => {
@@ -448,6 +450,7 @@ export default function Settings() {
       await updateSetting.mutateAsync({ key: "footer_email",            value: footerEmail.trim() });
       await updateSetting.mutateAsync({ key: "footer_app_download_url", value: footerAppUrl.trim() });
       await updateSetting.mutateAsync({ key: "whatsapp_group_url",      value: whatsappGroupUrl.trim() });
+      await updateSetting.mutateAsync({ key: "ad_script_html",          value: adScriptHtml });
       toast.success("Rodapé guardado com sucesso");
     } catch { toast.error("Erro ao guardar rodapé"); }
     setSavingFooter(false);
@@ -691,6 +694,23 @@ export default function Settings() {
                   style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
               </div>
               <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 5 }}>URL exibido no botão "Grupo do WhatsApp" no menu de jogos.</p>
+            </div>
+
+            {/* Ad Script HTML */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
+                Banner Publicitário (HTML)
+              </label>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(139,92,246,0.25)" }}>
+                <textarea
+                  value={adScriptHtml}
+                  onChange={e => setAdScriptHtml(e.target.value)}
+                  placeholder="<script>/* código do banner publicitário */</script>"
+                  rows={4}
+                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace", resize: "vertical", lineHeight: 1.5 }}
+                />
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 5 }}>HTML/script do banner publicitário exibido na página inicial acima da secção de saques.</p>
             </div>
 
             {/* Save button */}

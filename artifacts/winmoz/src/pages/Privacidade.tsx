@@ -6,14 +6,15 @@ import {
   Smartphone, Globe, Trash2
 } from "lucide-react";
 
-function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ value, onChange, locked }: { value: boolean; onChange?: (v: boolean) => void; locked?: boolean }) {
   return (
-    <button onClick={() => onChange(!value)}
+    <button onClick={() => !locked && onChange?.(!value)}
       className="relative flex-shrink-0 transition-colors"
       style={{
         width: 46, height: 26, borderRadius: 13,
         background: value ? "#000" : "#d1d5db",
-        border: "none", cursor: "pointer",
+        border: "none", cursor: locked ? "default" : "pointer",
+        opacity: locked ? 0.55 : 1,
       }}>
       <motion.div animate={{ x: value ? 22 : 2 }}
         transition={{ type: "spring", stiffness: 400, damping: 30 }}
@@ -30,11 +31,12 @@ interface SettingRowProps {
   onChange?: (v: boolean) => void;
   onPress?: () => void;
   danger?: boolean;
+  locked?: boolean;
 }
 
-function SettingRow({ icon: Icon, label, desc, value, onChange, onPress, danger }: SettingRowProps) {
+function SettingRow({ icon: Icon, label, desc, value, onChange, onPress, danger, locked }: SettingRowProps) {
   const Tag = onChange !== undefined ? "div" : "button" as any;
-  const handleClick = onChange !== undefined ? () => onChange?.(!value) : onPress;
+  const handleClick = onChange !== undefined ? () => !locked && onChange?.(!value) : onPress;
   return (
     <Tag onClick={handleClick}
       className="flex items-center gap-3.5 py-4 w-full text-left border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/50 cursor-pointer"
@@ -48,7 +50,7 @@ function SettingRow({ icon: Icon, label, desc, value, onChange, onPress, danger 
         <p style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1, lineHeight: 1.4 }}>{desc}</p>
       </div>
       {onChange !== undefined
-        ? <Toggle value={value!} onChange={onChange} />
+        ? <Toggle value={value!} onChange={onChange} locked={locked} />
         : <ChevronRight style={{ width: 16, height: 16, color: "#d1d5db", flexShrink: 0 }} />
       }
     </Tag>
@@ -60,11 +62,7 @@ export default function Privacidade() {
   const [profileVisible,    setProfileVisible]    = useState(true);
   const [activityVisible,   setActivityVisible]   = useState(false);
   const [analyticsEnabled,  setAnalyticsEnabled]  = useState(true);
-  const [dataSharing,       setDataSharing]       = useState(false);
-  const [locationAccess,    setLocationAccess]    = useState(false);
-  const [biometricLogin,    setBiometricLogin]    = useState(true);
   const [twoFactor,         setTwoFactor]         = useState(false);
-  const [sessionAlerts,     setSessionAlerts]     = useState(true);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   const SECTIONS = [
@@ -79,16 +77,16 @@ export default function Privacidade() {
       title: "Dados e Análise",
       items: [
         { icon: Database,   label: "Análise de uso",         desc: "Ajuda-nos a melhorar com dados anónimos",          value: analyticsEnabled, onChange: setAnalyticsEnabled },
-        { icon: Globe,      label: "Partilha com parceiros", desc: "Permite partilhar dados com parceiros confiáveis", value: dataSharing,      onChange: setDataSharing },
-        { icon: Smartphone, label: "Localização",            desc: "Acesso à localização para funcionalidades locais", value: locationAccess,   onChange: setLocationAccess },
+        { icon: Globe,      label: "Partilha com parceiros", desc: "Não partilhamos dados com terceiros",              value: false,            onChange: () => {}, locked: true },
+        { icon: Smartphone, label: "Localização",            desc: "Localização desactivada por privacidade",          value: false,            onChange: () => {}, locked: true },
       ],
     },
     {
       title: "Segurança da Conta",
       items: [
-        { icon: Lock,       label: "Login biométrico",       desc: "Usa impressão digital ou Face ID para entrar",     value: biometricLogin,   onChange: setBiometricLogin },
+        { icon: Lock,       label: "Login biométrico",       desc: "Impressão digital / Face ID activos",              value: true,             onChange: () => {}, locked: true },
         { icon: Shield,     label: "Verificação em 2 passos",desc: "Código adicional no início de sessão",             value: twoFactor,        onChange: setTwoFactor },
-        { icon: Bell,       label: "Alertas de sessão",      desc: "Notifica quando uma nova sessão é iniciada",       value: sessionAlerts,    onChange: setSessionAlerts },
+        { icon: Bell,       label: "Alertas de sessão",      desc: "Notifica quando uma nova sessão é iniciada",       value: true,             onChange: () => {}, locked: true },
       ],
     },
     {
@@ -103,7 +101,6 @@ export default function Privacidade() {
   return (
     <div className="min-h-screen bg-white w-full flex justify-center">
       <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col">
-        {/* Header */}
         <div className="flex items-center gap-3 px-5 pt-12 pb-6 border-b border-slate-100">
           <button onClick={() => setLocation("/perfil")}
             className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors"
@@ -116,7 +113,6 @@ export default function Privacidade() {
           </div>
         </div>
 
-        {/* GDPR notice */}
         <div className="mx-5 mt-5 p-4" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
           <div className="flex items-start gap-2.5">
             <Shield style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
@@ -142,13 +138,11 @@ export default function Privacidade() {
             </motion.div>
           ))}
 
-          {/* Last updated */}
           <p className="text-center text-[11px] text-slate-300 mt-4">
             Política de privacidade actualizada a 1 de Janeiro de 2026
           </p>
         </div>
 
-        {/* Delete account confirmation overlay */}
         {showConfirmDelete && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
             <motion.div className="w-full max-w-[430px] bg-white p-6"
