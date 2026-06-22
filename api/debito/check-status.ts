@@ -11,8 +11,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { txId } = req.body as { txId: string };
   if (!txId) { res.status(400).json({ error: "txId required" }); return; }
 
-  const supabaseUrl = process.env["SUPABASE_URL"];
-  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  const supabaseUrl = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"];
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"] || process.env["VITE_SUPABASE_SERVICE_ROLE"] || process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"];
   const debitoApiKey = process.env["SLACK_LIVE_API_KEY"];
 
   if (!supabaseUrl || !supabaseServiceKey || !debitoApiKey) {

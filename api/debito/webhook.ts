@@ -57,8 +57,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  const supabaseUrl = process.env["SUPABASE_URL"];
-  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  const supabaseUrl = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"];
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"] || process.env["VITE_SUPABASE_SERVICE_ROLE"] || process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"];
   if (!supabaseUrl || !supabaseServiceKey) {
     console.error("[debito/webhook] Variáveis Supabase em falta");
     res.status(200).json({ ok: true });

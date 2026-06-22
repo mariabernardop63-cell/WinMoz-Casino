@@ -12,8 +12,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const key = req.query["key"] as string | undefined;
   if (!key) { res.status(400).json({ error: "key required" }); return; }
 
-  const supabaseUrl = process.env["SUPABASE_URL"];
-  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  const supabaseUrl = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"];
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"] || process.env["VITE_SUPABASE_SERVICE_ROLE"] || process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"];
 
   if (!supabaseUrl || !supabaseServiceKey) {
     res.status(200).json({ setting: null });
