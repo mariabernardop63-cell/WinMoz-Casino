@@ -27,11 +27,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: existing } = await admin
+    const { data: rows } = await admin
       .from("platform_settings")
       .select("id")
       .eq("key", key)
-      .maybeSingle();
+      .limit(1);
+
+    const existing = rows && rows.length > 0 ? rows[0] : null;
 
     if (existing) {
       const { error } = await admin
