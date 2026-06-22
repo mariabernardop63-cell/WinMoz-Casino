@@ -31,30 +31,30 @@ type GameInfo = {
 
 const GAMES_DATA: Record<string, GameInfo> = {
   damas: {
-    name: "DAMAS",
+    name: "DAMAS MZ",
     sub: "Jogo de Tabuleiro",
     description: "Elimina todas as peças do adversário com movimentos estratégicos no tabuleiro clássico.",
-    image: "/damas-card.jpg",
+    image: "/damas-mz.png",
     imagePos: "center",
     rating: "4.8",
     online: 3847,
     playing: 2412,
   },
   ludo: {
-    name: "LUDO",
+    name: "LUDO CASH",
     sub: "Jogo de Dados",
     description: "Corrida épica de peças. Leva todas ao centro antes do adversário com dados e estratégia.",
-    image: "/ludo-card2.png",
+    image: "/ludo-cash.jpg",
     imagePos: "center 65%",
     rating: "4.9",
     online: 6124,
     playing: 4118,
   },
   xadrez: {
-    name: "XADREZ",
+    name: "XADREZ MZ",
     sub: "Estratégia Real",
     description: "O jogo eterno da inteligência. Controla o tabuleiro e dá Xeque-Mate ao adversário.",
-    image: "/xadrez-card.jpg",
+    image: "/xadrez-mz.jpg",
     imagePos: "center 30%",
     rating: "4.7",
     online: 1843,
@@ -88,7 +88,7 @@ const FALLBACK_GAME: GameInfo = {
   name: "JOGO",
   sub: "Jogo Apostado",
   description: "Jogue e multiplica o teu saldo com apostas seguras e emocionantes.",
-  image: "/damas-card.jpg",
+  image: "/damas-mz.png",
   imagePos: "center",
   rating: "4.8",
   online: 2500,
@@ -98,11 +98,11 @@ const FALLBACK_GAME: GameInfo = {
 const BET_AMOUNTS = [10, 20, 50, 100, 500, 1000, 5000];
 
 const ALL_GAMES = [
-  { id: "damas",  name: "Damas",  image: "/damas-card.jpg",   imagePos: "center",     rating: "4.8", players: "2.4K" },
-  { id: "ludo",   name: "Ludo",   image: "/ludo-card2.png",   imagePos: "center 65%", rating: "4.9", players: "4.1K" },
-  { id: "xadrez", name: "Xadrez", image: "/xadrez-card.jpg",  imagePos: "center 30%", rating: "4.7", players: "1.2K" },
-  { id: "bilhar", name: "Bilhar", image: "/bilhar-card.webp", imagePos: "center",     rating: "4.6", players: "890"  },
-  { id: "roleta", name: "Roleta", image: "/roleta-card.jpg",  imagePos: "center",     rating: "4.5", players: "1.5K" },
+  { id: "damas",  name: "Damas MZ",   image: "/damas-mz.png",    imagePos: "center",     rating: "4.8", players: "2.4K" },
+  { id: "ludo",   name: "Ludo Cash",  image: "/ludo-cash.jpg",   imagePos: "center 65%", rating: "4.9", players: "4.1K" },
+  { id: "xadrez", name: "Xadrez MZ",  image: "/xadrez-mz.jpg",   imagePos: "center 30%", rating: "4.7", players: "1.2K" },
+  { id: "bilhar", name: "Bilhar",     image: "/bilhar-card.webp", imagePos: "center",     rating: "4.6", players: "890"  },
+  { id: "roleta", name: "Roleta",     image: "/roleta-card.jpg",  imagePos: "center",     rating: "4.5", players: "1.5K" },
 ];
 
 function fmtMT(v: number) {

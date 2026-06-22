@@ -201,9 +201,9 @@ const GAME_META: Record<GameType, {
   name: string; color: string; initials: string; image: string | null;
   minMs: number; maxMs: number;
 }> = {
-  damas:  { name:"Damas Clássico",  color:"from-blue-500 to-indigo-700",   initials:"DA", image:"/damas-card.jpg",   minMs:8*60_000,  maxMs:15*60_000  },
-  xadrez: { name:"Xadrez Rápido",   color:"from-violet-500 to-purple-800", initials:"XA", image:"/xadrez-card.jpg",  minMs:8*60_000,  maxMs:15*60_000  },
-  ludo:   { name:"Ludo Turbo",      color:"from-emerald-500 to-teal-700",  initials:"LU", image:"/ludo-card2.png",   minMs:15*60_000, maxMs:25*60_000  },
+  damas:  { name:"Damas MZ",   color:"from-blue-500 to-indigo-700",   initials:"DA", image:"/damas-mz.png",    minMs:8*60_000,  maxMs:15*60_000  },
+  xadrez: { name:"Xadrez MZ",  color:"from-violet-500 to-purple-800", initials:"XA", image:"/xadrez-mz.jpg",   minMs:8*60_000,  maxMs:15*60_000  },
+  ludo:   { name:"Ludo Cash",  color:"from-emerald-500 to-teal-700",  initials:"LU", image:"/ludo-cash.jpg",   minMs:15*60_000, maxMs:25*60_000  },
 };
 
 const BET_POOL = [

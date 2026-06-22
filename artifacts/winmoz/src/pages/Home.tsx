@@ -113,9 +113,9 @@ function SaquesSection() {
 const POSTS = [
   {
     id: 1,
-    image: "/ludo-card2.png",
+    image: "/ludo-cash.jpg",
     imageBg: null as string | null,
-    title: "Nova Temporada de Ludo Online",
+    title: "Nova Temporada de Ludo Cash Online",
     content: "Prémios até 50.000 $MT para os melhores jogadores. Inscreve-te já e garante o teu lugar!",
     time: "04/06/2026",
     likes: 142,
@@ -135,9 +135,9 @@ const POSTS = [
   },
   {
     id: 3,
-    image: "/xadrez-card.jpg",
+    image: "/xadrez-mz.jpg",
     imageBg: null as string | null,
-    title: "Torneio de Xadrez Semanal",
+    title: "Torneio de Xadrez MZ Semanal",
     content: "Compete por 20.000 $MT em prémios nos nossos torneios semanais. Regista-te agora.",
     time: "31/05/2026",
     likes: 213,
@@ -1056,7 +1056,7 @@ function HeroBanner() {
                 onClick={() => {
                   if (slide.cta === "Conversar") setLocation("/grupo-chat");
                   else if (slide.cta === "Jogar Agora") {
-                    if (slide.id === "bilhar") setLocation("/bilhar-em-breve");
+                    if (slide.id === "bilhar") setLocation("/bilhar-em-breve?jogo=bilhar");
                     else if (slide.id === "roleta") setLocation("/roleta");
                     else setLocation(`/apostar/${slide.id}`);
                   }
@@ -1131,34 +1131,34 @@ function HeroBanner() {
 const games = [
   {
     id: "damas",
-    name: "DAMAS",
+    name: "DAMAS MZ",
     sub: "Jogo de Tabuleiro",
     bet: "10–5.000 MT",
     rating: "4.8",
     baseIdx: 0,
-    image: "/damas-card.jpg",
+    image: "/damas-mz.png",
     imageFit: "cover" as const,
     imagePos: "center",
   },
   {
     id: "ludo",
-    name: "LUDO",
+    name: "LUDO CASH",
     sub: "Jogo de Dados",
     bet: "10–5.000 MT",
     rating: "4.9",
     baseIdx: 1,
-    image: "/ludo-card2.png",
+    image: "/ludo-cash.jpg",
     imageFit: "cover" as const,
     imagePos: "center 65%",
   },
   {
     id: "xadrez",
-    name: "XADREZ",
+    name: "XADREZ MZ",
     sub: "Estratégia Real",
     bet: "10–5.000 MT",
     rating: "4.7",
     baseIdx: 2,
-    image: "/xadrez-card.jpg",
+    image: "/xadrez-mz.jpg",
     imageFit: "cover" as const,
     imagePos: "center 30%",
   },
@@ -1191,8 +1191,7 @@ const games = [
     bet: "10–5.000 MT",
     rating: "4.8",
     baseIdx: 7,
-    image: null as null,
-    cardArt: "carta",
+    image: "/cartas-card.jpg" as string | null,
     imageFit: "cover" as const,
     imagePos: "center",
     comingSoon: true,
@@ -1204,8 +1203,7 @@ const games = [
     bet: "10–5.000 MT",
     rating: "4.7",
     baseIdx: 8,
-    image: null as null,
-    cardArt: "ravo",
+    image: "/cartas-card.jpg" as string | null,
     imageFit: "cover" as const,
     imagePos: "center",
     comingSoon: true,
@@ -1226,11 +1224,11 @@ const fadeUp = {
    TOP GAMES
 ───────────────────────────────────────────── */
 const topGames = [
-  { id: "dc", gameRoute: "damas", name: "Damas Clássico", baseIdx: 0, rank: 1, image: "/damas-card.jpg", imagePos: "center", from: "#1D4ED8", to: "#1E3A8A" },
-  { id: "lt", gameRoute: "ludo",  name: "Ludo Turbo",     baseIdx: 1, rank: 2, image: "/ludo-card2.png", imagePos: "center 65%", from: "#059669", to: "#064E3B" },
-  { id: "xr", gameRoute: "xadrez",name: "Xadrez Rápido",  baseIdx: 2, rank: 3, image: "/xadrez-card.jpg", imagePos: "center 30%", from: "#7C3AED", to: "#3B0764" },
-  { id: "bi", gameRoute: "bilhar",name: "Bilhar Apostado", baseIdx: 5, rank: 4, image: "/bilhar-card.webp", imagePos: "center", from: "#0891b2", to: "#164e63" },
-  { id: "ro", gameRoute: "roleta",name: "Roleta da Sorte", baseIdx: 6, rank: 5, image: "/roleta-card.jpg", imagePos: "center", from: "#be185d", to: "#831843" },
+  { id: "dc", gameRoute: "damas",  name: "Damas MZ",       baseIdx: 0, rank: 1, image: "/damas-mz.png",    imagePos: "center",      from: "#1D4ED8", to: "#1E3A8A" },
+  { id: "lt", gameRoute: "ludo",   name: "Ludo Cash",      baseIdx: 1, rank: 2, image: "/ludo-cash.jpg",   imagePos: "center 65%",  from: "#059669", to: "#064E3B" },
+  { id: "xr", gameRoute: "xadrez", name: "Xadrez MZ",      baseIdx: 2, rank: 3, image: "/xadrez-mz.jpg",   imagePos: "center 30%",  from: "#7C3AED", to: "#3B0764" },
+  { id: "bi", gameRoute: "bilhar", name: "Bilhar Apostado", baseIdx: 5, rank: 4, image: "/bilhar-card.webp", imagePos: "center",     from: "#0891b2", to: "#164e63" },
+  { id: "ro", gameRoute: "roleta", name: "Roleta da Sorte", baseIdx: 6, rank: 5, image: "/roleta-card.jpg",  imagePos: "center",     from: "#be185d", to: "#831843" },
 ];
 
 /* ─────────────────────────────────────────────
@@ -1325,7 +1323,7 @@ export default function Home() {
                 variants={fadeUp}
                 onClick={() => {
                   if (!isLoggedIn) { setLocation("/login"); return; }
-                  if (game.id === "bilhar" || (game as any).comingSoon) { setLocation("/bilhar-em-breve"); return; }
+                  if (game.id === "bilhar" || (game as any).comingSoon) { setLocation(`/bilhar-em-breve?jogo=${game.id}`); return; }
                   if (game.id === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.id}`);
                 }}
@@ -1409,7 +1407,7 @@ export default function Home() {
                 variants={fadeUp}
                 onClick={() => {
                   if (!isLoggedIn) { setLocation("/login"); return; }
-                  if (game.gameRoute === "bilhar") { setLocation("/bilhar-em-breve"); return; }
+                  if (game.gameRoute === "bilhar") { setLocation("/bilhar-em-breve?jogo=bilhar"); return; }
                   if (game.gameRoute === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.gameRoute}`);
                 }}

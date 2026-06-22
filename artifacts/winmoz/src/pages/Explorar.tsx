@@ -17,13 +17,13 @@ const GAME_FILTERS = ["Todos", "Damas", "Ludo", "Xadrez"] as const;
 type GameFilter = typeof GAME_FILTERS[number];
 
 const jogosCardsMeta = [
-  { id: "damas",        name: "Damas Clássico",  desc: "Jogo de Tabuleiro • 12 Modos", baseIdx: 0, color: "from-blue-500 to-indigo-700",     initials: "DA", hot: true,  category: "Damas",  image: "/damas-card.jpg"   },
-  { id: "xadrez",       name: "Xadrez Rápido",    desc: "Estratégia Real • 8 Modos",    baseIdx: 2, color: "from-violet-500 to-purple-800",   initials: "XA", hot: false, category: "Xadrez", image: "/xadrez-card.jpg"  },
-  { id: "ludo-classic", name: "Ludo Clássico",    desc: "Jogo de Dados • 3 Modos",      baseIdx: 3, color: "from-pink-500 to-rose-700",       initials: "LC", hot: false, category: "Ludo",   image: "/ludo-card2.png"   },
+  { id: "damas",        name: "Damas MZ",         desc: "Jogo de Tabuleiro • 12 Modos", baseIdx: 0, color: "from-blue-500 to-indigo-700",     initials: "DA", hot: true,  category: "Damas",  image: "/damas-mz.png"     },
+  { id: "xadrez",       name: "Xadrez MZ",        desc: "Estratégia Real • 8 Modos",    baseIdx: 2, color: "from-violet-500 to-purple-800",   initials: "XA", hot: false, category: "Xadrez", image: "/xadrez-mz.jpg"    },
+  { id: "ludo-classic", name: "Ludo Cash",        desc: "Jogo de Dados • 3 Modos",      baseIdx: 3, color: "from-pink-500 to-rose-700",       initials: "LC", hot: false, category: "Ludo",   image: "/ludo-cash.jpg"    },
   { id: "bilhar",       name: "Bilhar Apostado",  desc: "Jogo de Mesa • 5 Modos",       baseIdx: 5, color: "from-cyan-500 to-blue-700",        initials: "BI", hot: false, category: "Xadrez", image: "/bilhar-card.webp" },
   { id: "roleta",       name: "Roleta da Sorte",  desc: "Sorte • 3 Modos",              baseIdx: 6, color: "from-pink-600 to-rose-800",        initials: "RS", hot: true,  category: "Damas",  image: "/roleta-card.jpg"  },
-  { id: "carta",        name: "Carta da Mesa",    desc: "Jogo de Cartas • Em Breve",    baseIdx: 7, color: "from-emerald-600 to-green-900",    initials: "CM", hot: true,  category: "Damas",  image: null, comingSoon: true },
-  { id: "ravo",         name: "Ravo Ravo",        desc: "Jogo de Cartas • Em Breve",    baseIdx: 8, color: "from-violet-600 to-purple-900",   initials: "RR", hot: true,  category: "Ludo",   image: null, comingSoon: true },
+  { id: "carta",        name: "Carta da Mesa",    desc: "Jogo de Cartas • Em Breve",    baseIdx: 7, color: "from-emerald-600 to-green-900",    initials: "CM", hot: true,  category: "Damas",  image: "/cartas-card.jpg", comingSoon: true },
+  { id: "ravo",         name: "Ravo Ravo",        desc: "Jogo de Cartas • Em Breve",    baseIdx: 8, color: "from-violet-600 to-purple-900",   initials: "RR", hot: true,  category: "Ludo",   image: "/cartas-card.jpg", comingSoon: true },
 ];
 
 const fadeUp = {
@@ -42,7 +42,7 @@ function GameCard({ game, tick }: { game: typeof jogosCardsMeta[0]; tick: number
   const count = getLivePlayerCount(game.baseIdx, tick);
   const handlePlay = () => {
     if (!user) { setLocation("/login"); return; }
-    if (game.id === "bilhar" || (game as any).comingSoon) { setLocation("/bilhar-em-breve"); return; }
+    if (game.id === "bilhar" || (game as any).comingSoon) { setLocation(`/bilhar-em-breve?jogo=${game.id}`); return; }
     if (game.id === "roleta") { setLocation("/roleta"); return; }
     setLocation(`/apostar/${betId}`);
   };
@@ -140,15 +140,15 @@ function MatchCard({ match, isAssistirTab }: { match: SimMatch; isAssistirTab?: 
         onClick={handleWatch}
         className="flex items-center p-2.5 bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 group cursor-pointer"
       >
-        <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 relative">
+        <div className="w-9 h-9 rounded-lg flex-shrink-0 relative">
           {match.image ? (
-            <img src={match.image} alt={match.gameName} className="w-full h-full object-cover" />
+            <img src={match.image} alt={match.gameName} className="w-full h-full object-cover rounded-lg" />
           ) : (
-            <div className={`w-full h-full bg-gradient-to-br ${match.color} flex items-center justify-center text-white font-syne font-bold text-xs`}>
+            <div className={`w-full h-full rounded-lg bg-gradient-to-br ${match.color} flex items-center justify-center text-white font-syne font-bold text-xs`}>
               {match.initials}
             </div>
           )}
-          <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border border-white animate-pulse" />
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse" style={{ zIndex: 10 }} />
         </div>
         <div className="ml-2.5 flex-1 min-w-0">
           <p className="font-syne font-semibold text-slate-900 text-[12px] truncate">{match.player1} vs {match.player2}</p>
@@ -196,9 +196,9 @@ interface RoomRecord {
 }
 
 const SALA_GAMES = [
-  { id: "damas",  name: "Damas Clássico", desc: "12 modos de jogo", image: "/damas-card.jpg",   imagePos: "center" },
-  { id: "ludo",   name: "Ludo Turbo",     desc: "4 modos de jogo",  image: "/ludo-card2.png",   imagePos: "center 65%" },
-  { id: "xadrez", name: "Xadrez Rápido",  desc: "8 modos de jogo",  image: "/xadrez-card.jpg",  imagePos: "center 30%" },
+  { id: "damas",  name: "Damas MZ",   desc: "12 modos de jogo", image: "/damas-mz.png",    imagePos: "center" },
+  { id: "ludo",   name: "Ludo Cash",  desc: "4 modos de jogo",  image: "/ludo-cash.jpg",   imagePos: "center 65%" },
+  { id: "xadrez", name: "Xadrez MZ",  desc: "8 modos de jogo",  image: "/xadrez-mz.jpg",   imagePos: "center 30%" },
 ];
 
 const SALA_BET_AMOUNTS = [10, 20, 50, 100, 500, 1000, 5000];
@@ -675,7 +675,7 @@ function SalaTab() {
                   onClick={() => setInputCode(room.code)}
                   className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-100 hover:border-slate-300 hover:shadow-sm transition-all duration-200 text-left w-full group">
                   <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0">
-                    <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-card.jpg"} alt="" className="w-full h-full object-cover" />
+                    <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-mz.png"} alt="" className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-syne font-bold text-slate-900 text-sm">{room.gameName}</p>
@@ -776,7 +776,7 @@ function SalaTab() {
                   }}
                   className={`flex items-center gap-3 p-3 bg-white rounded-xl border shadow-sm transition-all duration-200 ${isReenterable ? "border-violet-200 cursor-pointer hover:border-violet-400 hover:shadow-md" : "border-slate-100"}`}>
                   <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
-                    <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-card.jpg"} alt="" className="w-full h-full object-cover" />
+                    <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-mz.png"} alt="" className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-syne font-semibold text-slate-900 text-sm">{room.gameName}</p>

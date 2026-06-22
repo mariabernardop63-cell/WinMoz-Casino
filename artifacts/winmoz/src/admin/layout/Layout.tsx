@@ -4,6 +4,9 @@ import Sidebar from "./Sidebar";
 import {
   Search, X, Moon, Sun, Menu, LogOut,
   LayoutDashboard, Landmark, InboxIcon, Bell, Settings,
+  PanelLeft, PanelBottom, PanelTop,
+  Gamepad2, Users, ArrowLeftRight, MessageCircle, Flag,
+  Wifi, Wallet, UserX, ShieldCheck, BarChart3, Bot, Star,
 } from "lucide-react";
 import { useAdminTheme } from "@/admin/contexts/AdminThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,7 +24,6 @@ function useAudioWarmup() {
         const AC = window.AudioContext || (window as any).webkitAudioContext;
         if (!AC) return;
         const ctx = new AC();
-        // Create and immediately stop a silent buffer to unlock the context
         const buf = ctx.createBuffer(1, 1, 22050);
         const src = ctx.createBufferSource();
         src.buffer = buf;
@@ -29,7 +31,6 @@ function useAudioWarmup() {
         src.start(0);
         src.stop(0.001);
         if (ctx.state === "suspended") ctx.resume().catch(() => {});
-        // Store globally so the notification hook reuses this context
         (window as any).__adminAudioCtx = ctx;
       } catch { /* noop */ }
     };
@@ -43,6 +44,8 @@ function useAudioWarmup() {
     };
   }, []);
 }
+
+type NavPos = "left" | "bottom" | "top";
 
 const MOBILE_NAV = [
   { href: "/",                  icon: LayoutDashboard, label: "Dashboard"  },
@@ -104,11 +107,89 @@ function MobileBottomNav() {
   );
 }
 
-interface TopBarProps {
-  onMenuClick: () => void;
+const ALL_NAV_ITEMS = [
+  { href: "/",                 icon: LayoutDashboard, label: "Dashboard"    },
+  { href: "/matches",          icon: Gamepad2,        label: "Partidas"     },
+  { href: "/players",          icon: Users,           label: "Jogadores"    },
+  { href: "/transactions",     icon: ArrowLeftRight,  label: "Transações"   },
+  { href: "/messages",         icon: MessageCircle,   label: "Mensagens"    },
+  { href: "/reports",          icon: Flag,            label: "Denúncias"    },
+  { href: "/withdrawals",      icon: Landmark,        label: "Saques"       },
+  { href: "/deposit-requests", icon: InboxIcon,       label: "Depósitos"    },
+  { href: "/notifications",    icon: Bell,            label: "Alertas"      },
+  { href: "/online-users",     icon: Wifi,            label: "Online"       },
+  { href: "/balance",          icon: Wallet,          label: "Saldos"       },
+  { href: "/block-users",      icon: UserX,           label: "Bloqueios"    },
+  { href: "/security",         icon: ShieldCheck,     label: "Segurança"    },
+  { href: "/relatorios",       icon: BarChart3,       label: "Relatórios"   },
+  { href: "/bots",             icon: Bot,             label: "Bots"         },
+  { href: "/affiliates",       icon: Star,            label: "Afiliados"    },
+  { href: "/game-management",  icon: Gamepad2,        label: "Jogos"        },
+  { href: "/settings",         icon: Settings,        label: "Config"       },
+];
+
+/* Horizontal nav bar (for top/bottom desktop positions) */
+function HorizontalSidebar({ onItemClick }: { onItemClick?: () => void }) {
+  const [location] = useLocation();
+  return (
+    <aside
+      className="gz-sidebar flex flex-row items-center w-full overflow-x-auto"
+      style={{
+        height: 58,
+        borderRadius: 0,
+        padding: "0 12px",
+        gap: 2,
+        scrollbarWidth: "none",
+      }}
+    >
+      {ALL_NAV_ITEMS.map((item, i) => {
+        const isActive =
+          location === item.href ||
+          (item.href !== "/" && location.startsWith(item.href));
+        return (
+          <Link key={`${item.href}-${i}`} href={item.href} onClick={onItemClick}>
+            <div
+              className={cn(
+                "gz-nav-item flex flex-col items-center justify-center gap-0.5 h-full px-3 py-1 cursor-pointer flex-shrink-0 rounded-xl",
+                isActive ? "active" : ""
+              )}
+              style={{ minWidth: 52, height: 46 }}
+            >
+              <item.icon
+                style={{
+                  width: 16,
+                  height: 16,
+                  strokeWidth: isActive ? 2.2 : 1.65,
+                  color: isActive ? "#ffffff" : "rgba(255,255,255,.5)",
+                  filter: isActive ? "drop-shadow(0 0 5px rgba(255,255,255,.5))" : "none",
+                }}
+              />
+              <span
+                style={{
+                  fontSize: 9,
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? "#ffffff" : "rgba(255,255,255,.45)",
+                  letterSpacing: "0.01em",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {item.label}
+              </span>
+            </div>
+          </Link>
+        );
+      })}
+    </aside>
+  );
 }
 
-function TopBar({ onMenuClick }: TopBarProps) {
+interface TopBarProps {
+  onMenuClick: () => void;
+  navPos: NavPos;
+  onNavPosChange: (pos: NavPos) => void;
+}
+
+function TopBar({ onMenuClick, navPos, onNavPosChange }: TopBarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const { theme, toggleTheme } = useAdminTheme();
   const { signOut } = useAuth();
@@ -117,6 +198,12 @@ function TopBar({ onMenuClick }: TopBarProps) {
     await signOut();
     window.location.href = "/";
   };
+
+  const navOptions: { pos: NavPos; icon: typeof PanelLeft; title: string }[] = [
+    { pos: "left",   icon: PanelLeft,   title: "Barra Lateral Esquerda" },
+    { pos: "top",    icon: PanelTop,    title: "Barra Superior"         },
+    { pos: "bottom", icon: PanelBottom, title: "Barra Inferior"         },
+  ];
 
   return (
     <div className="gz-topbar h-[56px] flex items-center justify-between px-4 gap-3 flex-shrink-0 sticky top-0 z-40">
@@ -171,6 +258,28 @@ function TopBar({ onMenuClick }: TopBarProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Nav position toggle (desktop only) */}
+        <div className="hidden lg:flex items-center gap-0.5 rounded-xl p-1" style={{ background: "var(--gz-bg-card-btn)" }}>
+          {navOptions.map(({ pos, icon: Icon, title }) => (
+            <button
+              key={pos}
+              onClick={() => onNavPosChange(pos)}
+              title={title}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-95"
+              style={{
+                background: navPos === pos ? "rgba(108,92,231,0.18)" : "transparent",
+                border: navPos === pos ? "1px solid rgba(108,92,231,0.3)" : "1px solid transparent",
+              }}
+            >
+              <Icon
+                className="w-3.5 h-3.5"
+                style={{ color: navPos === pos ? "#6C5CE7" : "#9ca3af" }}
+                strokeWidth={1.8}
+              />
+            </button>
+          ))}
+        </div>
+
         <button
           onClick={toggleTheme}
           className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all active:scale-95"
@@ -203,37 +312,86 @@ function TopBar({ onMenuClick }: TopBarProps) {
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [navPos, setNavPos] = useState<NavPos>(() => {
+    try {
+      return (localStorage.getItem("adminNavPos") as NavPos) || "left";
+    } catch {
+      return "left";
+    }
+  });
   useAudioWarmup();
 
-  return (
-    <div style={{ minHeight: "100vh" }}>
-      {sidebarOpen && (
+  const handleNavPosChange = (pos: NavPos) => {
+    setNavPos(pos);
+    try { localStorage.setItem("adminNavPos", pos); } catch { /* noop */ }
+  };
+
+  /* ── LEFT sidebar layout ── */
+  if (navPos === "left") {
+    return (
+      <div style={{ minHeight: "100vh" }}>
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 lg:hidden"
+            style={{ background: "rgba(0,0,0,0.5)" }}
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
         <div
-          className="fixed inset-0 z-40 lg:hidden"
-          style={{ background: "rgba(0,0,0,0.5)" }}
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <div
-        className={`lg:block transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
-        style={{ position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 50 }}
-      >
-        <div className="h-full" style={{ paddingTop: 12, paddingLeft: 12, paddingBottom: 12 }}>
-          <Sidebar onItemClick={() => setSidebarOpen(false)} />
+          className={`lg:block transition-transform duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+          style={{ position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 50 }}
+        >
+          <div className="h-full" style={{ paddingTop: 12, paddingLeft: 12, paddingBottom: 12 }}>
+            <Sidebar onItemClick={() => setSidebarOpen(false)} />
+          </div>
         </div>
+        <div
+          className="lg:ml-[92px]"
+          style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
+        >
+          <TopBar onMenuClick={() => setSidebarOpen(o => !o)} navPos={navPos} onNavPosChange={handleNavPosChange} />
+          <div style={{ flex: 1, overflowX: "hidden", paddingBottom: 70 }} className="lg:pb-0">
+            {children}
+          </div>
+        </div>
+        <MobileBottomNav />
       </div>
+    );
+  }
 
-      <div
-        className="lg:ml-[92px]"
-        style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
-      >
-        <TopBar onMenuClick={() => setSidebarOpen(o => !o)} />
+  /* ── TOP sidebar layout ── */
+  if (navPos === "top") {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        <TopBar onMenuClick={() => setSidebarOpen(o => !o)} navPos={navPos} onNavPosChange={handleNavPosChange} />
+        <div className="hidden lg:block w-full" style={{ zIndex: 30, borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+          <HorizontalSidebar />
+        </div>
         <div style={{ flex: 1, overflowX: "hidden", paddingBottom: 70 }} className="lg:pb-0">
           {children}
         </div>
+        <MobileBottomNav />
       </div>
+    );
+  }
 
+  /* ── BOTTOM sidebar layout ── */
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      <TopBar onMenuClick={() => setSidebarOpen(o => !o)} navPos={navPos} onNavPosChange={handleNavPosChange} />
+      <div style={{ flex: 1, overflowX: "hidden", paddingBottom: 70 }} className="lg:pb-16">
+        {children}
+      </div>
+      {/* Desktop bottom bar */}
+      <div
+        className="hidden lg:block fixed bottom-0 left-0 right-0 z-50"
+        style={{
+          borderTop: "1px solid rgba(0,0,0,0.08)",
+        }}
+      >
+        <HorizontalSidebar />
+      </div>
+      {/* Mobile bottom nav */}
       <MobileBottomNav />
     </div>
   );

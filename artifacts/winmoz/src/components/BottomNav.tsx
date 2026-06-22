@@ -41,9 +41,9 @@ function NavIcon({ iconKey, color }: { iconKey: string; color: string }) {
 }
 
 const GAME_META: Record<string, { name: string; image: string; imagePos: string }> = {
-  damas:  { name: "Damas Clássico", image: "/damas-card.jpg",   imagePos: "center" },
-  chess:  { name: "Xadrez Rápido",  image: "/xadrez-card.jpg",  imagePos: "center 30%" },
-  ludo:   { name: "Ludo Turbo",     image: "/ludo-card2.png",   imagePos: "center" },
+  damas:  { name: "Damas MZ",  image: "/damas-mz.png",    imagePos: "center" },
+  chess:  { name: "Xadrez MZ", image: "/xadrez-mz.jpg",   imagePos: "center 30%" },
+  ludo:   { name: "Ludo Cash", image: "/ludo-cash.jpg",   imagePos: "center" },
 };
 
 function ResumeModal({ activeGame, onClose }: { activeGame: ActiveGameRecord | null; onClose: () => void }) {
@@ -59,9 +59,9 @@ function ResumeModal({ activeGame, onClose }: { activeGame: ActiveGameRecord | n
   const go = (path: string) => { onClose(); setLocation(path); };
 
   const gameShortcuts = [
-    { id: "damas",  name: "Damas",  image: "/damas-card.jpg",   imagePos: "center" },
-    { id: "ludo",   name: "Ludo",   image: "/ludo-card2.png",   imagePos: "center" },
-    { id: "xadrez", name: "Xadrez", image: "/xadrez-card.jpg",  imagePos: "center 30%" },
+    { id: "damas",  name: "Damas MZ",  image: "/damas-mz.png",    imagePos: "center" },
+    { id: "ludo",   name: "Ludo Cash", image: "/ludo-cash.jpg",   imagePos: "center" },
+    { id: "xadrez", name: "Xadrez MZ", image: "/xadrez-mz.jpg",   imagePos: "center 30%" },
   ];
 
   // ── If there's an active game saved, show the resume screen ──────────────
