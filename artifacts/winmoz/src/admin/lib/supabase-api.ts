@@ -58,28 +58,25 @@ export function useAdminRealtimeSync() {
 }
 
 /* ── Admin DB reset functions ── */
-export async function resetPlatformRevenue() {
-  const res = await fetch("/api/admin/settings/set", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key: "revenue_reset_at", value: new Date().toISOString() }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({ error: "Erro desconhecido" })) as { error?: string };
-    throw new Error(d.error ?? "Erro ao repor receita");
+async function upsertSetting(key: string, value: string) {
+  const { data: rows } = await adminSupabase
+    .from("platform_settings").select("id").eq("key", key).limit(1);
+  const existing = rows && rows.length > 0 ? rows[0] : null;
+  if (existing) {
+    const { error } = await adminSupabase.from("platform_settings").update({ value }).eq("key", key);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await adminSupabase.from("platform_settings").insert({ key, value });
+    if (error) throw new Error(error.message);
   }
 }
 
+export async function resetPlatformRevenue() {
+  await upsertSetting("revenue_reset_at", new Date().toISOString());
+}
+
 export async function resetSaidas() {
-  const res = await fetch("/api/admin/settings/set", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key: "saidas_reset_at", value: new Date().toISOString() }),
-  });
-  if (!res.ok) {
-    const d = await res.json().catch(() => ({ error: "Erro desconhecido" })) as { error?: string };
-    throw new Error(d.error ?? "Erro ao repor saídas");
-  }
+  await upsertSetting("saidas_reset_at", new Date().toISOString());
 }
 
 /* ── Dashboard Stats ── */
@@ -1079,16 +1076,27 @@ export function useUpdatePlatformSetting() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      // Usa o endpoint do api-server (service role no servidor) para garantir que RLS não bloqueia
-      const res = await fetch("/api/admin/settings/set", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key, value }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({ error: "Erro desconhecido" })) as { error?: string };
-        throw new Error(d.error ?? "Erro ao guardar definição");
+      const { data: rows } = await adminSupabase
+        .from("platform_settings")
+        .select("id")
+        .eq("key", key)
+        .limit(1);
+
+      const existing = rows && rows.length > 0 ? rows[0] : null;
+
+      if (existing) {
+        const { error } = await adminSupabase
+          .from("platform_settings")
+          .update({ value })
+          .eq("key", key);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await adminSupabase
+          .from("platform_settings")
+          .insert({ key, value });
+        if (error) throw new Error(error.message);
       }
+
       return { ok: true };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["platform-settings"] }),
