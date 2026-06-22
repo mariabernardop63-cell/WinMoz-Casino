@@ -93,7 +93,7 @@ export default function Depositar() {
   const cleanPhone = phoneInput.replace(/\D/g, "").replace(/^258/, "");
   const isPhoneValid = cleanPhone.length === 9;
 
-  const TIMEOUT_SECS = 120; // 2 minutes
+  const TIMEOUT_SECS = 300; // 5 minutes — e-Mola pode demorar a entregar o USSD
 
   const startPolling = (pid: string, amt: number) => {
     let count = 0;

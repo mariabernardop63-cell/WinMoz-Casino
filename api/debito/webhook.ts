@@ -15,7 +15,7 @@ async function readRawBody(req: VercelRequest): Promise<string> {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "GET") {
-    res.status(200).json({ ok: true, service: "MozBet Webhook", version: "4.0" });
+    res.status(200).json({ ok: true, service: "MozBet Webhook", version: "5.0" });
     return;
   }
   if (req.method === "OPTIONS") {
@@ -28,44 +28,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") { res.status(405).end(); return; }
 
   const rawBody = await readRawBody(req);
-  console.log("[debito/webhook] rawBody recebido:", rawBody.slice(0, 500));
+  console.log("[debito/webhook] rawBody:", rawBody.slice(0, 600));
 
   let body: any = {};
   try {
     body = JSON.parse(rawBody);
   } catch {
-    console.error("[debito/webhook] JSON inválido — mas a responder 200 para evitar retry loop");
+    console.error("[debito/webhook] JSON inválido");
+    // Responder 200 para evitar retry loop de payload inválido
     res.status(200).json({ ok: true });
     return;
   }
 
-  // HMAC-SHA256 — valida apenas se o secret estiver correto
-  // Se DEBITO_WEBHOOK_SECRET não estiver configurado OU estiver incorreto,
-  // registamos o aviso mas NUNCA bloqueamos — evita que um secret errado silencie todos os eventos
+  // HMAC — valida se secret configurado, mas NUNCA bloqueia (evita silenciar todos os eventos)
   const configuredSecret = process.env["DEBITO_WEBHOOK_SECRET"];
   const receivedSig = (req.headers["x-webhook-signature"] as string) || "";
-
   if (configuredSecret && receivedSig) {
     const cleanSig = receivedSig.replace(/^(sha256=|v1=|sha1=|hmac=)/, "");
-    const expectedSig = crypto
-      .createHmac("sha256", configuredSecret)
-      .update(rawBody)
-      .digest("hex");
-
+    const expectedSig = crypto.createHmac("sha256", configuredSecret).update(rawBody).digest("hex");
     if (expectedSig === cleanSig) {
-      console.log("[debito/webhook] ✓ Assinatura HMAC válida");
+      console.log("[debito/webhook] ✓ HMAC válido");
     } else {
-      // AVISO: NÃO rejeitar — continuar a processar mesmo com assinatura inválida
-      // Isto garante que um DEBITO_WEBHOOK_SECRET errado não silencia os eventos
-      // Para ativar rejeição estrita, configura DEBITO_WEBHOOK_STRICT=true na Vercel
-      console.warn("[debito/webhook] ⚠ HMAC mismatch. esperado:", expectedSig, "| recebido:", cleanSig);
+      console.warn("[debito/webhook] ⚠ HMAC mismatch — a processar na mesma (modo permissivo)");
       if (process.env["DEBITO_WEBHOOK_STRICT"] === "true") {
         res.status(401).json({ ok: false, error: "Unauthorized" });
         return;
       }
     }
-  } else if (!configuredSecret) {
-    console.log("[debito/webhook] DEBITO_WEBHOOK_SECRET não configurado — HMAC ignorado");
   }
 
   const supabaseUrl = process.env["SUPABASE_URL"];
@@ -80,55 +69,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Extrair campos do payload real da Debito Pay:
-  // { "id": "uuid-evento", "event": "payment.completed", "data": { "transaction_id": "...", "amount": 100, ... } }
-  // NOTA: o campo real é "transaction_id" dentro de data (não "payment_id" como na documentação)
+  // Payload real da Debito Pay:
+  // { "id": "uuid-evento", "event": "payment.completed", "data": { "transaction_id": "uuid-payment", "amount": 100, ... } }
   const event: string = body?.event || "unknown";
   const data: Record<string, any> = body?.data ?? {};
 
-  // Procurar primeiro em transaction_id (campo real), depois payment_id (fallback documentação)
-  const debitoPaymentId: string | null =
+  // transaction_id = campo REAL no webhook; payment_id = campo da documentação (fallback)
+  const debitoId: string | null =
     data?.transaction_id ?? data?.payment_id ?? body?.id ?? null;
 
-  console.log("[debito/webhook] Evento:", event,
+  console.log("[debito/webhook] event:", event,
     "| transaction_id:", data?.transaction_id,
     "| payment_id:", data?.payment_id,
-    "| id_usado:", debitoPaymentId,
+    "| id_usado:", debitoId,
     "| amount:", data?.amount,
-    "| method:", data?.method);
+    "| reference:", data?.reference);
 
-  // Responder 200 imediatamente (< 5s conforme docs) — a Debito Pay não retenta se receber 200
-  // Continuamos o processamento a seguir
-  res.status(200).json({ ok: true });
-
-  // Ignorar eventos que não são de pagamento
   if (event !== "payment.completed" && event !== "payment.failed") {
-    console.log("[debito/webhook] Evento ignorado (não é pagamento):", event);
+    console.log("[debito/webhook] Evento ignorado:", event);
+    // Responder APÓS decidir não processar — sem trabalho async pendente
+    res.status(200).json({ ok: true });
     return;
   }
 
-  // === ENCONTRAR A TRANSAÇÃO NA BASE DE DADOS ===
+  // === ENCONTRAR A TRANSAÇÃO ===
+  // IMPORTANTE: todo o processamento acontece ANTES de responder 200
+  // Isto garante que o código não é cortado pelo runtime serverless da Vercel
   let tx: any = null;
 
-  // Estratégia 1: match pelo ID do webhook (transaction_id ou payment_id)
-  // O campo real da Debito Pay é "transaction_id"; "payment_id" é fallback da documentação
-  if (debitoPaymentId) {
+  // Estratégia 1: match pelo ID exacto (transaction_id do webhook = payment_id da iniciação)
+  if (debitoId) {
     const { data: results } = await supabase
       .from("transactions")
       .select("id, user_id, amount, description, status")
-      .like("description", `%${debitoPaymentId}%`)
+      .like("description", `%${debitoId}%`)
       .order("created_at", { ascending: false })
       .limit(10);
 
     for (const t of results ?? []) {
       try {
         const d = JSON.parse((t as any).description || "{}");
-        // Comparar com todos os campos onde podemos ter guardado o ID
         if (
-          d.debitoPaymentId    === debitoPaymentId ||
-          d.debitoTransactionId === debitoPaymentId ||
-          d.debitoReference    === debitoPaymentId ||
-          d.sourceId           === debitoPaymentId
+          d.debitoPaymentId     === debitoId ||
+          d.debitoTransactionId === debitoId ||
+          d.debitoReference     === debitoId ||
+          d.sourceId            === debitoId
         ) {
           tx = t;
           console.log("[debito/webhook] Estratégia 1 (ID exato) → tx:", (t as any).id);
@@ -137,14 +122,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch { /* skip */ }
     }
 
-    // Estratégia 1b: ID aparece em algum lugar da description (match parcial)
+    // Estratégia 1b: ID aparece em qualquer lugar da description
     if (!tx && results && results.length > 0) {
       tx = results[0];
-      console.log("[debito/webhook] Estratégia 1b (ID parcial na description) → tx:", (tx as any).id);
+      console.log("[debito/webhook] Estratégia 1b (ID parcial) → tx:", (tx as any).id);
     }
   }
 
-  // Estratégia 2: match por reference (EH2026...) — e-Mola provider reference
+  // Estratégia 2: match pela reference e-Mola (ex: EH2026..., 00804290695)
   if (!tx && data?.reference) {
     const { data: results } = await supabase
       .from("transactions")
@@ -158,27 +143,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const d = JSON.parse((t as any).description || "{}");
         if (d.debitoReference === data.reference || d.providerReference === data.reference) {
           tx = t;
-          console.log("[debito/webhook] Estratégia 2 (reference) → tx:", (t as any).id);
+          console.log("[debito/webhook] Estratégia 2 (reference exata) → tx:", (t as any).id);
           break;
         }
       } catch { /* skip */ }
     }
-
-    // Estratégia 2b: reference aparece parcialmente
     if (!tx && results && results.length > 0) {
       tx = results[0];
       console.log("[debito/webhook] Estratégia 2b (reference parcial) → tx:", (tx as any).id);
     }
   }
 
-  // Estratégia 3: match por montante + pendente recente (últimos 10 min) — fallback robusto
+  // Estratégia 3: match por montante + transação pending recente (últimos 30 min)
+  // Janela alargada para casos onde o utilizador demora a confirmar o PIN
   if (!tx && data?.amount) {
-    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const { data: results } = await supabase
       .from("transactions")
       .select("id, user_id, amount, description, status, created_at")
       .eq("status", "pending")
-      .gte("created_at", tenMinAgo)
+      .gte("created_at", thirtyMinAgo)
       .order("created_at", { ascending: false })
       .limit(50);
 
@@ -186,26 +170,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const candidates = (results ?? []).filter(
       t => Math.abs(Number((t as any).amount) - webhookAmt) < 0.5
     );
-
     if (candidates.length >= 1) {
-      tx = candidates[0]; // mais recente
-      console.log("[debito/webhook] Estratégia 3 (amount+recente) → tx:", (tx as any).id,
-        candidates.length > 1 ? `(${candidates.length} candidatos — escolhido mais recente)` : "");
+      tx = candidates[0];
+      console.log("[debito/webhook] Estratégia 3 (amount+recente, 30min) → tx:", (tx as any).id,
+        candidates.length > 1 ? `(${candidates.length} candidatos)` : "");
     }
   }
 
   if (!tx) {
-    console.error("[debito/webhook] ✗ Transação NÃO encontrada.",
-      "| id_usado:", debitoPaymentId,
-      "| amount:", data?.amount,
-      "| method:", data?.method);
+    console.error("[debito/webhook] ✗ Transação não encontrada. id:", debitoId, "amount:", data?.amount);
+    // Responder 200 (não há mais nada a fazer, e retries não vão ajudar sem a tx)
+    res.status(200).json({ ok: true });
     return;
   }
 
-  // Idempotência — ignorar se já foi resolvido
+  // Idempotência
   const txStatus = (tx as any).status as string;
   if (txStatus === "approved" || txStatus === "rejected") {
-    console.log("[debito/webhook] Transação já resolvida:", txStatus, "— ignorar");
+    console.log("[debito/webhook] Já resolvida:", txStatus, "— ignorar");
+    res.status(200).json({ ok: true });
     return;
   }
 
@@ -215,70 +198,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const paymentType: string = desc.paymentType || "deposit";
 
   if (event === "payment.completed") {
-    // Creditar saldo apenas em depósitos
+    // Creditar saldo em depósitos
     if (paymentType === "deposit") {
       const { data: profile } = await supabase
-        .from("profiles")
-        .select("balance")
-        .eq("id", (tx as any).user_id)
-        .maybeSingle();
+        .from("profiles").select("balance").eq("id", (tx as any).user_id).maybeSingle();
 
       const currentBalance = Number((profile as any)?.balance ?? 0);
       const newBalance = currentBalance + Number((tx as any).amount);
 
       const { error: balErr } = await supabase
-        .from("profiles")
-        .update({ balance: newBalance })
-        .eq("id", (tx as any).user_id);
+        .from("profiles").update({ balance: newBalance }).eq("id", (tx as any).user_id);
 
       if (balErr) {
         console.error("[debito/webhook] Erro ao creditar saldo:", balErr);
+        res.status(200).json({ ok: true });
         return;
       }
-      console.log(`[debito/webhook] ✓ Creditado ${(tx as any).amount} MZN → user ${(tx as any).user_id}. Novo saldo: ${newBalance}`);
+      console.log(`[debito/webhook] ✓ +${(tx as any).amount} MZN → user ${(tx as any).user_id} (novo saldo: ${newBalance})`);
     }
 
     await supabase.from("transactions").update({
       status: "approved",
       description: JSON.stringify({
         ...desc,
-        debitoPaymentId: debitoPaymentId || desc.debitoPaymentId,
-        debitoReference: data?.reference || desc.debitoReference,
-        completedAt: data?.paid_at || new Date().toISOString(),
-        approvedVia: "webhook",
+        debitoPaymentId:      debitoId || desc.debitoPaymentId,
+        debitoReference:      data?.reference || desc.debitoReference,
+        completedAt:          data?.paid_at || new Date().toISOString(),
+        approvedVia:          "webhook",
       }),
     }).eq("id", (tx as any).id);
 
-    console.log(`[debito/webhook] ✓ Transação aprovada: ${(tx as any).id}`);
+    console.log(`[debito/webhook] ✓ TX APROVADA: ${(tx as any).id}`);
 
-  } else if (event === "payment.failed") {
+  } else {
+    // payment.failed
     const failReason = buildFailReason(data);
 
     await supabase.from("transactions").update({
       status: "rejected",
       description: JSON.stringify({
         ...desc,
-        debitoPaymentId: debitoPaymentId || desc.debitoPaymentId,
+        debitoPaymentId: debitoId || desc.debitoPaymentId,
         failReason,
-        rejectedAt: new Date().toISOString(),
-        rejectedVia: "webhook",
+        rejectedAt:      new Date().toISOString(),
+        rejectedVia:     "webhook",
       }),
     }).eq("id", (tx as any).id);
 
-    console.log(`[debito/webhook] ✗ Transação rejeitada: ${(tx as any).id} — ${failReason}`);
+    console.log(`[debito/webhook] ✗ TX REJEITADA: ${(tx as any).id} — ${failReason}`);
   }
+
+  // Responder 200 DEPOIS de todo o processamento estar completo
+  // Garante que o runtime serverless não corta o código a meio
+  res.status(200).json({ ok: true });
 }
 
 function buildFailReason(data: any): string {
   const raw = String(data?.failure_reason || data?.reason || data?.message || "").toLowerCase();
-  if (raw.includes("pin") || raw.includes("wrong") || raw.includes("incorrect")) {
+  if (raw.includes("pin") || raw.includes("wrong") || raw.includes("incorrect"))
     return "PIN incorrecto. Verifica o teu PIN e-Mola e tenta novamente.";
-  }
-  if (raw.includes("insufficient") || raw.includes("balance") || raw.includes("saldo")) {
+  if (raw.includes("insufficient") || raw.includes("balance") || raw.includes("saldo"))
     return "Saldo insuficiente na tua carteira e-Mola.";
-  }
-  if (raw.includes("expired") || raw.includes("timeout") || raw.includes("cancel")) {
+  if (raw.includes("expired") || raw.includes("timeout") || raw.includes("cancel"))
     return "Tempo esgotado. Não confirmaste o PIN a tempo.";
-  }
-  return "Pagamento recusado ou expirado. Verifica o teu saldo e-Mola e tenta novamente.";
+  return "Pagamento recusado. Verifica o teu saldo e-Mola e tenta novamente.";
 }

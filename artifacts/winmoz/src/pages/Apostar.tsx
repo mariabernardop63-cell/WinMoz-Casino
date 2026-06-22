@@ -236,9 +236,9 @@ function SMSBettingScreen({
       const pid = resData?.txId as string;
       setInitiating(false);
       setStep("verifying");
-      setCountdown(120);
+      setCountdown(300);
 
-      const TIMEOUT_SECS = 120;
+      const TIMEOUT_SECS = 300; // 5 min — e-Mola pode demorar a entregar o USSD
       let count = 0;
 
       const stopAll = (ch: ReturnType<typeof supabase.channel>) => {
