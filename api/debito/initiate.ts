@@ -83,7 +83,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const debitoBaseUrl = (settings["debito_api_base_url"] || "https://gyqoaningqhurhvdugne.supabase.co/functions/v1").replace(/\/$/, "");
   // merchant_id: o UUID do merchant no painel Debito Pay → Settings → API
-  const merchantId = settings["debito_public_id"] || process.env["DEBITO_MERCHANT_ID"] || "";
+  const merchantId = (settings["debito_public_id"] || process.env["DEBITO_MERCHANT_ID"] || "1e4d1d55-d740-447f-8cb4-8c8ce1bb0a0c").trim();
   // wallet_code: código PÚBLICO de 5 dígitos (NÃO o UUID interno da carteira)
   // Ordem de prioridade: platform_settings → env var → fallback hardcoded "55291"
   const walletCode = (settings["debito_wallet_code"] || process.env["DEBITO_WALLET_CODE"] || "55291").trim();
@@ -148,7 +148,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     const debitoUrl = `${debitoBaseUrl}/payment-orchestrator`;
-    console.log("[debito/initiate] → Debito Pay:", debitoUrl, JSON.stringify({ ...debitoBody, merchant_id: "***" }));
+    console.log("[debito/initiate] → Debito Pay:", debitoUrl, JSON.stringify({ ...debitoBody, merchant_id: merchantId ? `${merchantId.slice(0,8)}...` : "VAZIO" }));
 
     const debitoRes = await fetch(debitoUrl, {
       method: "POST",
