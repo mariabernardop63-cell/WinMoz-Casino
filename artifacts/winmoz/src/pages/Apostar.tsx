@@ -737,8 +737,29 @@ function MatchmakingScreen({
   const matchedRef = useRef(false);
   const botMatchRef = useRef(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const queueIdRef = useRef<string | null>(null);
   const BOT_ELIGIBLE = (gameType === "damas" || gameType === "xadrez") && [10, 20, 50].includes(betAmount);
   const botThresholdRef = useRef(Math.floor(Math.random() * (45 - 18 + 1)) + 18);
+
+  async function joinQueue() {
+    try {
+      await supabase.from("matchmaking_queue")
+        .delete().eq("user_id", userId).eq("game_type", gameType);
+      const { data } = await supabase
+        .from("matchmaking_queue")
+        .insert({ user_id: userId, display_name: displayName, game_type: gameType, bet_amount: betAmount })
+        .select("id").single();
+      if (data) queueIdRef.current = (data as { id: string }).id;
+    } catch { /* ignore */ }
+  }
+
+  async function leaveQueue() {
+    try {
+      await supabase.from("matchmaking_queue")
+        .delete().eq("user_id", userId).eq("game_type", gameType);
+      queueIdRef.current = null;
+    } catch { /* ignore */ }
+  }
 
   useEffect(() => {
     const channelName = `matchmaking_${gameType}_${betAmount}`;
@@ -760,6 +781,7 @@ function MatchmakingScreen({
       if (payload.blue !== userId && payload.green !== userId) return;
       matchedRef.current = true;
       if (poll) { clearInterval(poll); poll = null; }
+      leaveQueue();
       const myColor: string = payload.blue === userId ? "blue" : "green";
       const oppName: string =
         myColor === "green"
@@ -777,6 +799,7 @@ function MatchmakingScreen({
       if (firstId !== userId) return;
       matchedRef.current = true;
       if (poll) { clearInterval(poll); poll = null; }
+      leaveQueue();
       const gameId = `${[userId, oppId].sort().join("_")}_${Date.now()}`;
       channel.send({
         type: "broadcast",
@@ -789,7 +812,7 @@ function MatchmakingScreen({
 
     channel.subscribe((status) => {
       if (status === "SUBSCRIBED") {
-        // Announce immediately and start the periodic re-announce ONLY after subscribed
+        joinQueue();
         setTimeout(announcePresence, 100);
         if (!poll && !matchedRef.current) {
           poll = setInterval(announcePresence, 2500);
@@ -798,6 +821,7 @@ function MatchmakingScreen({
     });
 
     return () => {
+      leaveQueue();
       if (poll) { clearInterval(poll); poll = null; }
       supabase.removeChannel(channel);
       channelRef.current = null;
@@ -807,12 +831,13 @@ function MatchmakingScreen({
 
   useEffect(() => {
     if (found) return;
-    if (remaining <= 0) { onCancel(); return; }
+    if (remaining <= 0) { leaveQueue(); onCancel(); return; }
     if (BOT_ELIGIBLE && !botMatchRef.current && (TOTAL - remaining) >= botThresholdRef.current) {
       const botsDisabled = localStorage.getItem("wm_bots_disabled") === "true";
       if (!botsDisabled) {
         botMatchRef.current = true;
         matchedRef.current = true;
+        leaveQueue();
         const info = pickBotInfo();
         setBotInfo(info);
         setFound(true);

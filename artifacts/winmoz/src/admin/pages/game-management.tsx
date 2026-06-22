@@ -11,6 +11,7 @@ interface QueueEntry {
   bet: number;
   since: Date;
   status: string;
+  source?: "public" | "private";
 }
 
 function gameLabel(g: string) {
@@ -49,15 +50,39 @@ export default function GameManagement() {
   async function fetchQueue() {
     setLoading(true);
     try {
-      const { data: rooms } = await adminSupabase
-        .from("game_rooms")
-        .select("id, status, game_type, bet_amount, creator_id, created_at")
-        .eq("status", "waiting")
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const [{ data: publicQueue }, { data: privateRooms }] = await Promise.all([
+        adminSupabase
+          .from("matchmaking_queue")
+          .select("id, user_id, display_name, game_type, bet_amount, created_at")
+          .order("created_at", { ascending: false })
+          .limit(50),
+        adminSupabase
+          .from("game_rooms")
+          .select("id, status, game_type, bet_amount, creator_id, created_at")
+          .eq("status", "waiting")
+          .order("created_at", { ascending: false })
+          .limit(50),
+      ]);
 
-      if (rooms && rooms.length > 0) {
-        const creatorIds = [...new Set(rooms.map((r: any) => r.creator_id).filter(Boolean))];
+      const entries: QueueEntry[] = [];
+
+      if (publicQueue && publicQueue.length > 0) {
+        publicQueue.forEach((r: any) => {
+          entries.push({
+            id: `mq_${r.id}`,
+            playerId: r.user_id ?? "",
+            playerName: r.display_name ?? "Utilizador",
+            game: r.game_type ?? "damas",
+            bet: parseFloat(r.bet_amount ?? 0),
+            since: new Date(r.created_at),
+            status: "waiting",
+            source: "public",
+          });
+        });
+      }
+
+      if (privateRooms && privateRooms.length > 0) {
+        const creatorIds = [...new Set(privateRooms.map((r: any) => r.creator_id).filter(Boolean))];
         const { data: profiles } = await adminSupabase
           .from("profiles")
           .select("id, full_name, phone")
@@ -66,22 +91,23 @@ export default function GameManagement() {
         const profileMap: Record<string, any> = {};
         (profiles ?? []).forEach((p: any) => { profileMap[p.id] = p; });
 
-        const entries: QueueEntry[] = rooms.map((r: any) => {
+        privateRooms.forEach((r: any) => {
           const profile = profileMap[r.creator_id] ?? {};
-          return {
-            id: r.id,
+          entries.push({
+            id: `gr_${r.id}`,
             playerId: r.creator_id ?? "",
             playerName: profile.full_name ?? profile.phone ?? "Utilizador",
             game: r.game_type ?? "damas",
             bet: parseFloat(r.bet_amount ?? 0),
             since: new Date(r.created_at),
             status: r.status,
-          };
+            source: "private",
+          });
         });
-        setQueue(entries);
-      } else {
-        setQueue([]);
       }
+
+      entries.sort((a, b) => b.since.getTime() - a.since.getTime());
+      setQueue(entries);
     } catch {
       setQueue([]);
     }
@@ -94,11 +120,8 @@ export default function GameManagement() {
 
     channelRef.current = adminSupabase
       .channel("matchmaking-queue-watch")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "game_rooms" },
-        () => fetchQueue()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "game_rooms" }, () => fetchQueue())
+      .on("postgres_changes", { event: "*", schema: "public", table: "matchmaking_queue" }, () => fetchQueue())
       .subscribe();
 
     const ticker = setInterval(() => setTick(t => t + 1), 1000);
@@ -238,10 +261,20 @@ export default function GameManagement() {
                   </div>
 
                   {/* Status */}
-                  <div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
                       À espera
                     </span>
+                    {entry.source === "private" && (
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 20, background: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.25)", textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                        Sala
+                      </span>
+                    )}
+                    {entry.source === "public" && (
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 20, background: "rgba(34,197,94,0.1)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.2)", textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                        Público
+                      </span>
+                    )}
                   </div>
                 </motion.div>
               );
