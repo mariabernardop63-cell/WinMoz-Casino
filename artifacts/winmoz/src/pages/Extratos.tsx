@@ -85,7 +85,16 @@ export default function Extratos() {
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error || !data) { setLoading(false); return; }
-        const mapped: Tx[] = data.map((t: any) => {
+        const visible = data.filter((t: any) => {
+          if (t.status === "pending" && (t.type === "deposit" || t.type === "manual_deposit")) {
+            try {
+              const d = JSON.parse(t.description || "{}");
+              return d.paymentGateway !== "debitopay";
+            } catch { return true; }
+          }
+          return true;
+        });
+        const mapped: Tx[] = visible.map((t: any) => {
           const displayType = mapType(t.type);
           const rawDate = new Date(t.created_at);
           const rawDesc: string = t.description || "";
@@ -93,12 +102,16 @@ export default function Extratos() {
             .replace(/\s*\[bot\]\s*/gi, " ")
             .replace(/\s*\[bot-fim\]\s*/gi, "")
             .trim();
-          if (t.type === "withdrawal" && rawDesc.startsWith("{")) {
+          if (rawDesc.startsWith("{")) {
             try {
               const meta = JSON.parse(rawDesc);
-              const method = meta.method ?? "M-Pesa";
-              const phone  = meta.phone  ? String(meta.phone) : null;
-              cleanDesc = phone ? `Levantamento via ${method} · ${phone}` : `Levantamento via ${method}`;
+              if (meta.paymentGateway === "debitopay") {
+                const method = meta.paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola";
+                cleanDesc = `Depósito via ${method}`;
+              } else if (t.type === "withdrawal" && meta.method) {
+                const phone = meta.phone ? String(meta.phone) : null;
+                cleanDesc = phone ? `Levantamento via ${meta.method} · ${phone}` : `Levantamento via ${meta.method}`;
+              }
             } catch { /* keep cleanDesc */ }
           }
           return {

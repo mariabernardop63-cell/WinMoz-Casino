@@ -7,6 +7,7 @@ import HomeFooter from "@/components/HomeFooter";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSyntheticUser, generateWithdrawalAmount, getWithdrawalInterval, shouldBootWithdrawal, getLivePlayerCount, formatPlayerCount } from "@/lib/simulation";
 import { useBrand } from "@/lib/brand-context";
+import { useGetUserNotifications } from "@/admin/lib/supabase-api";
 
 /* ─────────────────────────────────────────────
    SAQUES 24 HORAS — realistic, time-aware
@@ -674,6 +675,60 @@ function LudoBannerImage({ size = 136 }: { size?: number }) {
 }
 
 /* ─────────────────────────────────────────────
+   CARTA DA MESA CARD ART
+───────────────────────────────────────────── */
+function CartaMesaCardArt() {
+  return (
+    <div className="w-full h-full relative overflow-hidden" style={{ background: "linear-gradient(160deg, #064e3b 0%, #065f46 50%, #047857 100%)" }}>
+      <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(circle, rgba(255,255,255,0.035) 1px, transparent 1px)", backgroundSize:"12px 12px" }}/>
+      <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-62%,-54%) rotate(-10deg)", width:50, height:70, background:"#fff", borderRadius:6, boxShadow:"0 4px 18px rgba(0,0,0,0.65)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2 }}>
+        <span style={{ fontSize:10, fontWeight:900, color:"#111", lineHeight:1 }}>A</span>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="#111"><path d="M12 2C8 8 2 10 2 15a10 10 0 0020 0c0-5-6-7-10-13z"/></svg>
+        <span style={{ fontSize:10, fontWeight:900, color:"#111", lineHeight:1, transform:"rotate(180deg)" }}>A</span>
+      </div>
+      <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-38%,-48%) rotate(5deg)", width:50, height:70, background:"#fff", borderRadius:6, boxShadow:"0 4px 16px rgba(0,0,0,0.55)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:2 }}>
+        <span style={{ fontSize:10, fontWeight:900, color:"#e11d48", lineHeight:1 }}>K</span>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="#e11d48"><path d="M12 21.593c-5.63-5.539-11-10.297-11-14.402 0-3.791 3.068-5.191 5.281-5.191 1.312 0 4.151.501 5.719 4.457 1.59-3.968 4.464-4.447 5.726-4.447 2.54 0 5.274 1.621 5.274 5.181 0 4.069-5.136 8.625-11 14.402z"/></svg>
+        <span style={{ fontSize:10, fontWeight:900, color:"#e11d48", lineHeight:1, transform:"rotate(180deg)" }}>K</span>
+      </div>
+      <div style={{ position:"absolute", top:"50%", left:"50%", transform:"translate(-18%,-44%) rotate(17deg)", width:50, height:70, background:"linear-gradient(135deg,#1e40af,#1d4ed8)", borderRadius:6, boxShadow:"0 4px 14px rgba(0,0,0,0.5)", border:"1.5px solid rgba(255,255,255,0.18)" }}>
+        <div style={{ margin:3, height:"calc(100% - 6px)", border:"1.5px solid rgba(255,255,255,0.22)", borderRadius:4 }}/>
+      </div>
+      <div style={{ position:"absolute", bottom:0, left:"50%", transform:"translateX(-50%)", width:"80%", height:36, background:"radial-gradient(ellipse, rgba(52,211,153,0.35) 0%, transparent 70%)", filter:"blur(8px)" }}/>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   RAVO RAVO CARD ART
+───────────────────────────────────────────── */
+function RavoRavoCardArt() {
+  const cards = [
+    { rot:-28, left:"18%", bg:"#dc2626", suit:"♥", sc:"#fff", label:"J" },
+    { rot:-14, left:"28%", bg:"#14532d", suit:"♠", sc:"#fff", label:"Q" },
+    { rot:0,   left:"38%", bg:"#fff",   suit:"♦", sc:"#dc2626", label:"K" },
+    { rot:14,  left:"48%", bg:"#1e3a8a", suit:"♣", sc:"#fff", label:"A" },
+    { rot:28,  left:"58%", bg:"#7c2d12", suit:"♥", sc:"#fca5a5", label:"10" },
+  ];
+  return (
+    <div className="w-full h-full relative overflow-hidden" style={{ background: "linear-gradient(160deg,#1e1b4b 0%,#312e81 50%,#4c1d95 100%)" }}>
+      <div style={{ position:"absolute", inset:0, backgroundImage:"radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize:"10px 10px" }}/>
+      {cards.map((c,i)=>(
+        <div key={i} style={{ position:"absolute", top:"22%", left:c.left, width:38, height:56, background:c.bg, borderRadius:5, boxShadow:"0 3px 12px rgba(0,0,0,0.65)", transform:`rotate(${c.rot}deg)`, border:"1px solid rgba(255,255,255,0.2)", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:1 }}>
+          <span style={{ fontSize:8, fontWeight:900, color:c.sc, lineHeight:1 }}>{c.label}</span>
+          <span style={{ fontSize:16, color:c.sc, lineHeight:1 }}>{c.suit}</span>
+        </div>
+      ))}
+      <div style={{ position:"absolute", bottom:10, left:"50%", transform:"translateX(-50%)", display:"flex", gap:4 }}>
+        {[0,1,2].map(i=>(
+          <div key={i} style={{ width:13, height:13, borderRadius:"50%", background:"linear-gradient(135deg,#fbbf24,#d97706)", boxShadow:"0 2px 6px rgba(251,191,36,0.5)", border:"1px solid #f59e0b" }}/>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    SKELETON COMPONENTS — Airbnb-style shimmer
 ───────────────────────────────────────────── */
 
@@ -1092,10 +1147,10 @@ const games = [
     bet: "10–5.000 MT",
     rating: "4.9",
     baseIdx: 1,
-    image: "/ludo-card2.png",
+    image: null as null,
+    cardArt: "ludo",
     imageFit: "cover" as const,
-    imagePos: "center 40%",
-    cardBg: "#0d2218",
+    imagePos: "center",
   },
   {
     id: "xadrez",
@@ -1130,6 +1185,32 @@ const games = [
     imageFit: "cover" as const,
     imagePos: "center",
   },
+  {
+    id: "carta",
+    name: "CARTA DA MESA",
+    sub: "Jogo de Cartas",
+    bet: "10–5.000 MT",
+    rating: "4.8",
+    baseIdx: 7,
+    image: null as null,
+    cardArt: "carta",
+    imageFit: "cover" as const,
+    imagePos: "center",
+    comingSoon: true,
+  },
+  {
+    id: "ravo",
+    name: "RAVO RAVO",
+    sub: "Jogo de Cartas",
+    bet: "10–5.000 MT",
+    rating: "4.7",
+    baseIdx: 8,
+    image: null as null,
+    cardArt: "ravo",
+    imageFit: "cover" as const,
+    imagePos: "center",
+    comingSoon: true,
+  },
 ];
 
 const stagger = {
@@ -1163,6 +1244,9 @@ export default function Home() {
   const { user, profile } = useAuth();
   const isLoggedIn = !!user;
 
+  const { data: notifications = [] } = useGetUserNotifications(user?.id ?? null, profile?.created_at ?? null);
+  const hasUnread = (notifications as any[]).some((n: any) => !n.isRead);
+
   useEffect(() => {
     const t = setTimeout(() => setGamesReady(true), 350);
     return () => clearTimeout(t);
@@ -1185,7 +1269,7 @@ export default function Home() {
               {/* Notification Bell */}
               <button onClick={() => setLocation("/notificacoes")} className="relative flex items-center justify-center w-9 h-9 rounded-full bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all duration-200 shadow-sm">
                 <Bell className="w-4 h-4 text-slate-600" />
-                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />
+                {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />}
               </button>
               {/* Profile Icon */}
               <button
@@ -1242,7 +1326,7 @@ export default function Home() {
                 variants={fadeUp}
                 onClick={() => {
                   if (!isLoggedIn) { setLocation("/login"); return; }
-                  if (game.id === "bilhar") { setLocation("/bilhar-em-breve"); return; }
+                  if (game.id === "bilhar" || (game as any).comingSoon) { setLocation("/bilhar-em-breve"); return; }
                   if (game.id === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.id}`);
                 }}
@@ -1252,7 +1336,13 @@ export default function Home() {
                   className="h-28 w-full relative overflow-hidden"
                   style={{ background: (game as any).cardBg || "#E2E8F0" }}
                 >
-                  {game.image ? (
+                  {(game as any).cardArt === "ludo" ? (
+                    <LudoCardArt />
+                  ) : (game as any).cardArt === "carta" ? (
+                    <CartaMesaCardArt />
+                  ) : (game as any).cardArt === "ravo" ? (
+                    <RavoRavoCardArt />
+                  ) : game.image ? (
                     <>
                       <img
                         src={game.image}
@@ -1279,6 +1369,11 @@ export default function Home() {
                     <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400"/>
                     <span className="text-[10px] font-bold text-white">{game.rating}</span>
                   </div>
+                  {(game as any).comingSoon && (
+                    <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm rounded-full px-2 py-0.5">
+                      <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wide">Em Breve</span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-3 flex flex-col flex-1">

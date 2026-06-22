@@ -81,6 +81,10 @@ function parseTxDescription(raw: string | null, type: string): string {
   if (!raw) return mapTxType(type);
   try {
     const p = JSON.parse(raw);
+    if (p.paymentGateway === "debitopay") {
+      const method = p.paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola";
+      return `Depósito via ${method}`;
+    }
     if (p.mode === "deposit") return "Depósito via M-Pesa/e-Mola";
     if (p.mode === "bet")     return "Aposta via Carteira Móvel";
     if (p.confirmationMsg)   return mapTxType(type) + " manual";
@@ -147,12 +151,21 @@ export default function Perfil() {
         .select("*")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
-        .limit(3)
+        .limit(20)
     ).then(({ data }) => {
         if (cancelled) return;
         clearTimeout(timer);
         if (data && data.length > 0) {
-          const mapped: Tx[] = data.map((t: any) => {
+          const visible = data.filter((t: any) => {
+            if (t.status === "pending" && (t.type === "deposit" || t.type === "manual_deposit")) {
+              try {
+                const d = JSON.parse(t.description || "{}");
+                return d.paymentGateway !== "debitopay";
+              } catch { return true; }
+            }
+            return true;
+          });
+          const mapped: Tx[] = visible.slice(0, 3).map((t: any) => {
             const { icon, color } = mapTxIcon(t.type);
             const sign = mapTxSign(t.type);
             const amt = Math.abs(parseFloat(String(t.amount)));

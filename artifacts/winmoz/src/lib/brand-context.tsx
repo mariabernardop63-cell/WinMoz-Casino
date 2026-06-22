@@ -31,6 +31,12 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<BrandConfig>(defaults);
 
   useEffect(() => {
+    document.title = config.isPokerWinner
+      ? "Poker Winner - Jogos e Apostas"
+      : "MozBet - Jogos e Apostas";
+  }, [config.isPokerWinner]);
+
+  useEffect(() => {
     adminSupabase
       .from("platform_settings")
       .select("key, value")

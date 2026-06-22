@@ -18,11 +18,12 @@ type GameFilter = typeof GAME_FILTERS[number];
 
 const jogosCardsMeta = [
   { id: "damas",        name: "Damas Clássico",  desc: "Jogo de Tabuleiro • 12 Modos", baseIdx: 0, color: "from-blue-500 to-indigo-700",     initials: "DA", hot: true,  category: "Damas",  image: "/damas-card.jpg"   },
-  { id: "ludo",         name: "Ludo Turbo",       desc: "Jogo de Dados • 4 Modos",      baseIdx: 1, color: "from-emerald-500 to-teal-700",    initials: "LU", hot: true,  category: "Ludo",   image: "/ludo-card2.png"   },
   { id: "xadrez",       name: "Xadrez Rápido",    desc: "Estratégia Real • 8 Modos",    baseIdx: 2, color: "from-violet-500 to-purple-800",   initials: "XA", hot: false, category: "Xadrez", image: "/xadrez-card.jpg"  },
   { id: "ludo-classic", name: "Ludo Clássico",    desc: "Jogo de Dados • 3 Modos",      baseIdx: 3, color: "from-pink-500 to-rose-700",       initials: "LC", hot: false, category: "Ludo",   image: "/ludo-card2.png"   },
   { id: "bilhar",       name: "Bilhar Apostado",  desc: "Jogo de Mesa • 5 Modos",       baseIdx: 5, color: "from-cyan-500 to-blue-700",        initials: "BI", hot: false, category: "Xadrez", image: "/bilhar-card.webp" },
   { id: "roleta",       name: "Roleta da Sorte",  desc: "Sorte • 3 Modos",              baseIdx: 6, color: "from-pink-600 to-rose-800",        initials: "RS", hot: true,  category: "Damas",  image: "/roleta-card.jpg"  },
+  { id: "carta",        name: "Carta da Mesa",    desc: "Jogo de Cartas • Em Breve",    baseIdx: 7, color: "from-emerald-600 to-green-900",    initials: "CM", hot: true,  category: "Damas",  image: null, comingSoon: true },
+  { id: "ravo",         name: "Ravo Ravo",        desc: "Jogo de Cartas • Em Breve",    baseIdx: 8, color: "from-violet-600 to-purple-900",   initials: "RR", hot: true,  category: "Ludo",   image: null, comingSoon: true },
 ];
 
 const fadeUp = {
@@ -41,7 +42,7 @@ function GameCard({ game, tick }: { game: typeof jogosCardsMeta[0]; tick: number
   const count = getLivePlayerCount(game.baseIdx, tick);
   const handlePlay = () => {
     if (!user) { setLocation("/login"); return; }
-    if (game.id === "bilhar") { setLocation("/bilhar-em-breve"); return; }
+    if (game.id === "bilhar" || (game as any).comingSoon) { setLocation("/bilhar-em-breve"); return; }
     if (game.id === "roleta") { setLocation("/roleta"); return; }
     setLocation(`/apostar/${betId}`);
   };

@@ -19,6 +19,7 @@ import {
   InboxIcon,
   Bot,
   Star,
+  Gamepad2 as GamepadIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRef, useState, useEffect } from "react";
@@ -38,8 +39,9 @@ const navItems = [
   { href: "/block-users",   icon: UserX,             label: "Bloquear Usuários"  },
   { href: "/security",      icon: ShieldCheck,       label: "Segurança"          },
   { href: "/relatorios",    icon: BarChart3,         label: "Relatórios"         },
-  { href: "/bots",          icon: Bot,               label: "Gestão de Bots"     },
-  { href: "/affiliates",    icon: Star,              label: "Afiliados"           },
+  { href: "/bots",             icon: Bot,          label: "Gestão de Bots"     },
+  { href: "/affiliates",       icon: Star,         label: "Afiliados"           },
+  { href: "/game-management",  icon: GamepadIcon,  label: "Gestão de Jogos"    },
 ];
 
 function Tooltip({ label }: { label: string }) {

@@ -104,34 +104,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // source_id used for our own reference tracking
   const sourceId = `MOZBET-${type.toUpperCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-  // Create pending transaction in our DB first
-  const { data: txRow, error: txError } = await supabase
-    .from("transactions")
-    .insert({
-      user_id: userId,
-      type: type === "deposit" ? "deposit" : "manual_bet",
-      amount,
-      status: "pending",
-      description: JSON.stringify({
-        paymentMethod,
-        phone: fullPhone,
-        sourceId,
-        debitoPaymentId: null,
-        paymentType: type,
-        paymentGateway: "debitopay",
-        initiatedAt: new Date().toISOString(),
-      }),
-    })
-    .select("id")
-    .single();
-
-  if (txError || !txRow) {
-    console.error("[debito/initiate] Supabase insert error:", txError);
-    res.status(500).json({ error: "Erro ao criar registo de pagamento. Tenta novamente." });
-    return;
-  }
-
-  const txId = (txRow as any).id as string;
+  // NOTE: We only create the transaction record AFTER Debito Pay confirms the payment
+  // was successfully initiated — so it never appears in the user's history until real
 
   try {
     // Build request body exactly as per Debito Pay API documentation
@@ -167,19 +141,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log("[debito/initiate] ← Debito Pay status:", debitoRes.status, "body:", JSON.stringify(debitoData));
 
     if (!debitoRes.ok) {
-      await supabase
-        .from("transactions")
-        .update({
-          status: "rejected",
-          description: JSON.stringify({
-            paymentMethod, phone: fullPhone, sourceId, paymentGateway: "debitopay",
-            error: debitoData?.error || debitoData?.message || "Erro do gateway",
-            httpStatus: debitoRes.status,
-            rejectedAt: new Date().toISOString(),
-          }),
-        })
-        .eq("id", txId);
-
       const userMessage = parseDebitoError(debitoData, debitoRes.status);
       res.status(400).json({ error: userMessage });
       return;
@@ -226,28 +187,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         "O webhook vai usar fallback por montante+tempo. Verifica os logs acima.");
     }
 
-    // Guardar TODOS os identificadores — o webhook tenta cada um para encontrar a transação
-    await supabase
+    // Criar registo da transação APENAS após confirmação do Debito Pay
+    const { data: txRow, error: txError } = await supabase
       .from("transactions")
-      .update({
+      .insert({
+        user_id: userId,
+        type: type === "deposit" ? "deposit" : "manual_bet",
+        amount,
+        status: "pending",
         description: JSON.stringify({
           paymentMethod,
           phone: fullPhone,
           sourceId,
           debitoPaymentId,
-          debitoTransactionId,   // ← campo real enviado no webhook
+          debitoTransactionId,
           debitoReference,
           paymentType: type,
           paymentGateway: "debitopay",
           initiatedAt: new Date().toISOString(),
         }),
       })
-      .eq("id", txId);
+      .select("id")
+      .single();
+
+    if (txError) {
+      console.error("[debito/initiate] Supabase insert error (post-success):", txError);
+    }
+
+    const txId = (txRow as any)?.id ?? null;
+    console.log("[debito/initiate] TX criada após confirmação Debito Pay:", txId);
 
     res.status(200).json({ ok: true, txId, paymentId: debitoPaymentId, sourceId });
   } catch (err: any) {
     console.error("[debito/initiate] Network/fetch error:", err);
-    await supabase.from("transactions").update({ status: "rejected" }).eq("id", txId);
     res.status(500).json({ error: "Erro de ligação ao gateway de pagamento. Tenta novamente." });
   }
 }
