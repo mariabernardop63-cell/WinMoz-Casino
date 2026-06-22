@@ -10,15 +10,56 @@ import rollSoundUrl from "@assets/som_para_quando_o_user_girar_no_dado__17814796
 import captureSoundUrl from "@assets/som_para_quando_o_peao_é_matado_1781479683373.mp3";
 
 // ─── Sound helpers ────────────────────────────────────────────────────────────
-// Pre-load audio so it plays instantly with zero network delay
-const _rollAudio = new Audio(rollSoundUrl);
-const _captureAudio = new Audio(captureSoundUrl);
-_rollAudio.load();
-_captureAudio.load();
+// Web Audio API with pre-decoded buffers — zero-latency playback on any device
+let _audioCtx: AudioContext | null = null;
+let _rollBuffer: AudioBuffer | null = null;
+let _captureBuffer: AudioBuffer | null = null;
+let _audioLoading = false;
+let _audioReady = false;
 
-function playAudio(audio: HTMLAudioElement, volume = 0.65) {
-  try { audio.currentTime = 0; audio.volume = volume; audio.play().catch(()=>{}); } catch {}
+function _getCtx(): AudioContext {
+  if (!_audioCtx) {
+    _audioCtx = new (window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+  }
+  return _audioCtx;
 }
+
+async function _loadAudioBuffers() {
+  if (_audioReady || _audioLoading) return;
+  _audioLoading = true;
+  try {
+    const ctx = _getCtx();
+    const [ab1, ab2] = await Promise.all([
+      fetch(rollSoundUrl).then(r => r.arrayBuffer()),
+      fetch(captureSoundUrl).then(r => r.arrayBuffer()),
+    ]);
+    [_rollBuffer, _captureBuffer] = await Promise.all([
+      ctx.decodeAudioData(ab1),
+      ctx.decodeAudioData(ab2),
+    ]);
+    _audioReady = true;
+  } catch { /* silent fail — game works without sound */ }
+  _audioLoading = false;
+}
+
+function _playBuffer(buf: AudioBuffer | null, volume = 0.65) {
+  if (!buf) return;
+  try {
+    const ctx = _getCtx();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const gain = ctx.createGain();
+    gain.gain.value = volume;
+    src.connect(gain);
+    gain.connect(ctx.destination);
+    src.start(0);
+  } catch {}
+}
+
+function playRollSound()    { _playBuffer(_rollBuffer); }
+function playCaptureSound() { _playBuffer(_captureBuffer); }
 function playVictoryChime() {
   try {
     const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
@@ -159,9 +200,10 @@ const SAFE_COORDS = new Set<string>(
 );
 
 // ─── Sizing — GPS pin pawn size ────────────────────────────────────────────────
-// Reduced so the pin fits within its cell (cell ≈ 27px, pin height = size×1.4)
-const PIECE_BOX  = 26;  // px — click/hit area
-const PAWN_SIZE  = 16;  // px — single-piece size (height ≈ 22px, fits in 27px cell)
+// PIECE_BOX = click/hit area, PAWN_SIZE controls visual size
+// Cell is SZ/15 = 40px. Pawn height = size×1.93. Size=13 → h≈25px — fits cleanly centered
+const PIECE_BOX  = 24;  // px — click/hit area (smaller than cell so it never overlaps)
+const PAWN_SIZE  = 13;  // px — single-piece size (height ≈ 25px, perfectly centered in cell)
 
 // ─── getPieceCoord: stretch entered after pos 50 (arrow cell) ──────────────────
 function getPieceCoord(p: GamePiece): [number,number] {
@@ -1337,6 +1379,9 @@ export default function LudoGame() {
   const winCreditedRef = useRef(false);
   const rewardFiredRef = useRef(false);
 
+  // Pre-load audio buffers on first render so sounds play instantly
+  useEffect(() => { _loadAudioBuffers(); }, []);
+
   useEffect(()=>{piecesRef.current=pieces;},[pieces]);
   useEffect(()=>{phaseRef.current=phase;},[phase]);
   useEffect(()=>{movableRef.current=movable;},[movable]);
@@ -1464,7 +1509,7 @@ export default function LudoGame() {
         if(pr===mr&&pc===mc && !SAFE_COORDS.has(`${pr},${pc}`)){
           captured = true;
           captureAnimRef.current = true;
-          playAudio(_captureAudio);
+          playCaptureSound();
           const capturerName=mover.player===myColor?playerName.split(" ")[0]:opponentName;
           setMsg(`${capturerName} capturou uma peça! +1 jogada`);
           let pos=p.pos;
@@ -1658,7 +1703,7 @@ export default function LudoGame() {
   // ── Roll my color dice — uses weighted algorithm + broadcasts ───────────────
   const doRoll=useCallback(()=>{
     if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current||captureAnimRef.current) return;
-    playAudio(_rollAudio, 0.55);
+    playRollSound();
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
     const oppPieces = piecesRef.current.filter(p=>p.player!==myColor);

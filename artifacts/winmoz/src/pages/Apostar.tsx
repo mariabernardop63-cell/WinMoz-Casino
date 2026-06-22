@@ -10,6 +10,7 @@ import { supabase, getSessionWithRefresh, isSessionExpiredError } from "@/lib/su
 import { useAuth } from "@/contexts/AuthContext";
 import { getLivePlayerCount, getSalaOnlineCount } from "@/lib/simulation";
 import { API_BASE } from "@/lib/apiBase";
+import AdBanner from "@/components/AdBanner";
 
 /* ── Theme ── */
 const VIOLET = "#7c3aed";
@@ -1833,20 +1834,10 @@ export default function Apostar() {
               ]}
             />
 
-            {/* Phone number field when Carteira Móvel is selected */}
-            <AnimatePresence>
-              {payMethod === "carteira" && (
-                <motion.div
-                  key="phone-field"
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.25 }}
-                  style={{ overflow: "hidden" }}>
-                  <MobileWalletPhoneField phone={mobilePhone} onChange={setMobilePhone} />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {/* Ad banner below payment toggle */}
+            <div style={{ marginTop: 12 }}>
+              <AdBanner />
+            </div>
           </motion.div>
 
           {/* Start Button */}

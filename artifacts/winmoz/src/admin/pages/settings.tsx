@@ -421,6 +421,9 @@ export default function Settings() {
   const [copiedWebhook, setCopiedWebhook] = useState(false);
 
   // Footer settings
+  const [adBannerScript, setAdBannerScript] = useState("");
+  const [savingAdScript, setSavingAdScript] = useState(false);
+
   const [footerTagline, setFooterTagline] = useState("Joga. Aposta. Vence.");
   const [footerPhone, setFooterPhone]     = useState("");
   const [footerEmail, setFooterEmail]     = useState("");
@@ -429,6 +432,7 @@ export default function Settings() {
   const [savingFooter, setSavingFooter]   = useState(false);
 
   useEffect(() => {
+    if (platformSettings["ad_banner_script"])        setAdBannerScript(platformSettings["ad_banner_script"]);
     if (platformSettings["sms_mpesa_number"]) setMpesaNum(platformSettings["sms_mpesa_number"]);
     if (platformSettings["sms_emola_number"]) setEmolaNum(platformSettings["sms_emola_number"]);
     if (platformSettings["sms_mpesa_name"])   setMpesaName(platformSettings["sms_mpesa_name"]);
@@ -439,6 +443,15 @@ export default function Settings() {
     if (platformSettings["footer_app_download_url"]) setFooterAppUrl(platformSettings["footer_app_download_url"]);
     if (platformSettings["whatsapp_group_url"])      setWhatsappGroupUrl(platformSettings["whatsapp_group_url"]);
   }, [platformSettings]);
+
+  const handleSaveAdScript = async () => {
+    setSavingAdScript(true);
+    try {
+      await updateSetting.mutateAsync({ key: "ad_banner_script", value: adBannerScript.trim() });
+      toast.success("Script de anúncio guardado com sucesso");
+    } catch { toast.error("Erro ao guardar script de anúncio"); }
+    setSavingAdScript(false);
+  };
 
   const handleSaveFooter = async () => {
     setSavingFooter(true);
@@ -990,6 +1003,49 @@ export default function Settings() {
 
           </div>
         </SectionCard>
+
+        {/* Ad Banner Script — full width */}
+        <div style={{ gridColumn: "1 / -1" }}>
+          <SectionCard title="Banner de Anúncios" icon={LayoutTemplate} color="#f59e0b" bg="rgba(245,158,11,0.1)">
+            <div style={{ paddingTop: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                Script do Anúncio (Banner de Apostas &amp; Home)
+              </label>
+              <textarea
+                value={adBannerScript}
+                onChange={e => setAdBannerScript(e.target.value)}
+                placeholder={`<script>\n  atOptions = { 'key': '...', 'format': 'iframe', 'height': 50, 'width': 320 };\n</script>\n<script src="https://...invoke.js"></script>`}
+                rows={6}
+                style={{
+                  width: "100%", background: "var(--gz-bg-subtle)",
+                  border: "1.5px solid rgba(245,158,11,0.25)", borderRadius: 12,
+                  padding: "12px 14px", resize: "vertical", outline: "none",
+                  fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace",
+                  lineHeight: 1.6, boxSizing: "border-box",
+                }}
+              />
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
+                Cola aqui o script completo do anúncio (ex: Adsterra, Google AdSense). O banner será exibido automaticamente na tela de Apostas e acima dos Saques 24h na Home.
+              </p>
+              <button
+                onClick={handleSaveAdScript}
+                disabled={savingAdScript}
+                style={{
+                  marginTop: 14, padding: "11px 20px", borderRadius: 12, border: "none",
+                  background: adBannerScript.trim() ? "linear-gradient(135deg, #f59e0b, #d97706)" : "var(--gz-bg-subtle)",
+                  color: adBannerScript.trim() ? "#000" : "var(--gz-text-tertiary)",
+                  fontWeight: 700, fontSize: 13,
+                  display: "flex", alignItems: "center", gap: 8,
+                  cursor: adBannerScript.trim() && !savingAdScript ? "pointer" : "default",
+                  fontFamily: "inherit",
+                }}
+              >
+                {savingAdScript ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(0,0,0,0.2)", borderTopColor: "#000", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                Guardar Script de Anúncio
+              </button>
+            </div>
+          </SectionCard>
+        </div>
 
         {/* Debito Pay Gateway */}
         <DebitoPaySection />

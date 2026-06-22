@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp, Bell, User } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import HomeFooter from "@/components/HomeFooter";
+import AdBanner from "@/components/AdBanner";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSyntheticUser, generateWithdrawalAmount, getWithdrawalInterval, shouldBootWithdrawal, getLivePlayerCount, formatPlayerCount } from "@/lib/simulation";
 import { useBrand } from "@/lib/brand-context";
@@ -1456,6 +1457,9 @@ export default function Home() {
         </section>
 
         {/* SAQUES 24 HORAS */}
+        <div className="px-4 pb-2">
+          <AdBanner />
+        </div>
         <SaquesSection />
 
         {/* ATUALIZAÇÕES */}
