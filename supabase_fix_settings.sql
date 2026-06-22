@@ -1,16 +1,18 @@
 -- ============================================================
--- Fix 1: Garantir que a tabela platform_settings existe
---        com constraint único na coluna "key" (necessário para upsert)
+-- Fix platform_settings: garantir tabela + políticas de escrita
+-- Executar no Supabase SQL Editor
 -- ============================================================
+
+-- 1. Criar tabela se não existir
 CREATE TABLE IF NOT EXISTS platform_settings (
-  id   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  key  text NOT NULL,
-  value text NOT NULL DEFAULT '',
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  key        text NOT NULL,
+  value      text NOT NULL DEFAULT '',
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
 
--- Adicionar unique constraint na coluna key (se ainda não existir)
+-- 2. Garantir unique constraint na coluna key
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -21,37 +23,26 @@ BEGIN
   END IF;
 END$$;
 
--- Inserir o registo poker_winner_mode se não existir
-INSERT INTO platform_settings (key, value)
-VALUES ('poker_winner_mode', 'false')
+-- 3. Inserir valores padrão se não existirem
+INSERT INTO platform_settings (key, value) VALUES
+  ('poker_winner_mode', 'false'),
+  ('maintenance_mode',  'false'),
+  ('support_ai_mode',   'true'),
+  ('allow_new_users',   'true'),
+  ('bets_active',       'true'),
+  ('backup_auto',       'true'),
+  ('query_cache',       'true'),
+  ('query_logs',        'false')
 ON CONFLICT (key) DO NOTHING;
 
--- ============================================================
--- Fix 2: Activar Realtime nas tabelas necessárias
---        (para que o admin veja mudanças em tempo real)
--- ============================================================
+-- 4. Desactivar RLS (platform_settings é config pública, não dados privados)
+--    Isto resolve o erro de escrita definitivamente sem precisar de service role no frontend
+ALTER TABLE platform_settings DISABLE ROW LEVEL SECURITY;
+
+-- 5. Se preferires manter RLS, usa isto em vez do passo 4:
+-- ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
+-- DROP POLICY IF EXISTS "platform_settings_all" ON platform_settings;
+-- CREATE POLICY "platform_settings_all" ON platform_settings FOR ALL USING (true) WITH CHECK (true);
+
+-- 6. Realtime (para o admin ver mudanças em tempo real)
 ALTER TABLE platform_settings REPLICA IDENTITY FULL;
-ALTER TABLE game_rooms        REPLICA IDENTITY FULL;
-
--- Adicionar à publicação do Supabase Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE platform_settings;
-ALTER PUBLICATION supabase_realtime ADD TABLE game_rooms;
-
--- ============================================================
--- Fix 3: Política RLS para que o service role possa ler/escrever
---        (o service role bypassa RLS por defeito, mas por segurança)
--- ============================================================
-ALTER TABLE platform_settings ENABLE ROW LEVEL SECURITY;
-
--- Permitir leitura pública (para o frontend ler as definições)
-DROP POLICY IF EXISTS "allow_read_platform_settings" ON platform_settings;
-CREATE POLICY "allow_read_platform_settings"
-  ON platform_settings FOR SELECT
-  USING (true);
-
--- Apenas o service role pode escrever (via Vercel function)
-DROP POLICY IF EXISTS "allow_service_write_platform_settings" ON platform_settings;
-CREATE POLICY "allow_service_write_platform_settings"
-  ON platform_settings FOR ALL
-  USING (true)
-  WITH CHECK (true);

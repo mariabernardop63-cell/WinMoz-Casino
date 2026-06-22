@@ -351,9 +351,10 @@ export default function Settings() {
     try {
       await updateSetting.mutateAsync({ key, value: val ? "true" : "false" });
       toast.success(val ? "Activado com sucesso" : "Desactivado com sucesso");
-    } catch {
+    } catch (err) {
       setSettings(prev => ({ ...prev, [key]: !val }));
-      toast.error("Erro ao guardar definição");
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error("Erro: " + msg);
     }
   };
 
