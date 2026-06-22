@@ -188,87 +188,171 @@ const PAWN_PAL: Record<PawnColor,{s:string;m:string;d:string}> = {
   yellow: { s:"#FDE68A", m:"#EAB308", d:"#713F12" },
 };
 
-// ─── 3D GPS-pin pawn (map-pin style, professional & 3D) ────────────────────────
+// ─── Classic Ludo Pawn (extracted from tournament SVG design) ──────────────────
 function PinPawn({ color, size=PAWN_SIZE, glow=false }: {
   color:PawnColor; size?:number; glow?:boolean;
 }) {
-  const pal: Record<PawnColor,{main:string;light:string;dark:string;xlight:string}> = {
-    blue:   { main:"#2563EB", light:"#93C5FD", dark:"#1E3A8A", xlight:"#DBEAFE" },
-    green:  { main:"#16A34A", light:"#86EFAC", dark:"#14532D", xlight:"#DCFCE7" },
-    red:    { main:"#DC2626", light:"#FCA5A5", dark:"#7F1D1D", xlight:"#FEE2E2" },
-    yellow: { main:"#CA8A04", light:"#FDE68A", dark:"#78350F", xlight:"#FEF9C3" },
+  const uid = `ludo_${color}`;
+
+  // Color palettes derived from the SVG's gradient definitions
+  const pal: Record<PawnColor,{
+    headLight:string; headMid:string; headDark:string;
+    bodyTop:string; bodyBot:string;
+    belt:string; outline:string; shadow:string;
+  }> = {
+    blue: {
+      headLight:"#A8CCE7", headMid:"#4E93CB", headDark:"#0245A3",
+      bodyTop:"#124092",   bodyBot:"#0761AE",
+      belt:"#103066",      outline:"#0D3580",  shadow:"rgba(2,45,130,0.55)",
+    },
+    green: {
+      headLight:"#72D48A", headMid:"#27A84A", headDark:"#0C6A26",
+      bodyTop:"#0C6A27",   bodyBot:"#209242",
+      belt:"#004E1A",      outline:"#0A5C22",  shadow:"rgba(8,90,30,0.55)",
+    },
+    red: {
+      headLight:"#F4A0A0", headMid:"#E03030", headDark:"#8B0000",
+      bodyTop:"#8B1A1A",   bodyBot:"#C22020",
+      belt:"#6B0000",      outline:"#7A1010",  shadow:"rgba(120,0,0,0.55)",
+    },
+    yellow: {
+      headLight:"#FFE57A", headMid:"#D4A800", headDark:"#8A6A00",
+      bodyTop:"#8A6A00",   bodyBot:"#C8A000",
+      belt:"#6A5000",      outline:"#7A6000",  shadow:"rgba(100,75,0,0.55)",
+    },
   };
-  const c   = pal[color] ?? pal.blue;
-  const w   = size;
-  const h   = Math.round(w * 1.4);
-  const uid = `gps_${color}`;
+
+  const c = pal[color] ?? pal.blue;
+  // Pawn aspect: width=27 height=52 (matches the SVG extraction)
+  const w = size;
+  const h = Math.round(size * 1.93);
+
   return (
     <div style={{
       display:"flex", flexShrink:0, width:w, height:h,
       filter: glow
-        ? `drop-shadow(0 0 ${Math.round(w*0.32)}px ${c.main}CC) drop-shadow(0 2px 5px rgba(0,0,0,0.75))`
-        : "drop-shadow(0 2px 5px rgba(0,0,0,0.65)) drop-shadow(0 1px 2px rgba(0,0,0,0.4))",
+        ? `drop-shadow(0 0 ${Math.round(w*0.35)}px ${c.bodyBot}DD) drop-shadow(0 3px 6px rgba(0,0,0,0.80))`
+        : `drop-shadow(0 3px 6px rgba(0,0,0,0.70)) drop-shadow(0 1px 2px rgba(0,0,0,0.45))`,
     }}>
-      <svg viewBox="0 0 28 38" width={w} height={h} xmlns="http://www.w3.org/2000/svg">
+      <svg viewBox="0 0 27 52" width={w} height={h} xmlns="http://www.w3.org/2000/svg">
         <defs>
-          {/* Inner circle — 3D sphere gradient */}
-          <radialGradient id={`${uid}_inner`} cx="36%" cy="28%" r="72%">
-            <stop offset="0%"   stopColor={c.xlight}/>
-            <stop offset="38%"  stopColor={c.light}/>
-            <stop offset="72%"  stopColor={c.main}/>
-            <stop offset="100%" stopColor={c.dark}/>
+          {/* Head — 3D radial gradient (top-left highlight → dark bottom) */}
+          <radialGradient id={`${uid}_head`}
+            gradientTransform={`matrix(13 -12.3 13.1 15.7 -0.7 4)`}
+            gradientUnits="userSpaceOnUse">
+            <stop offset="1%"   stopColor={c.headLight} stopOpacity="0.9"/>
+            <stop offset="6%"   stopColor={c.headMid}/>
+            <stop offset="23%"  stopColor={c.headDark}/>
           </radialGradient>
-          {/* Outer body — white pearl gradient */}
-          <radialGradient id={`${uid}_body`} cx="32%" cy="22%" r="82%">
-            <stop offset="0%"   stopColor="#FFFFFF"/>
-            <stop offset="55%"  stopColor="#E8EEF4"/>
-            <stop offset="100%" stopColor="#C8D5E3"/>
-          </radialGradient>
-          {/* Base ring gradient */}
-          <radialGradient id={`${uid}_ring`} cx="50%" cy="35%" r="65%">
-            <stop offset="0%"   stopColor={c.light}/>
-            <stop offset="100%" stopColor={c.main}/>
-          </radialGradient>
+          {/* Body — vertical linear gradient */}
+          <linearGradient id={`${uid}_body`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="43%"  stopColor={c.bodyTop}/>
+            <stop offset="100%" stopColor={c.bodyBot}/>
+          </linearGradient>
+          {/* Belt highlight — horizontal */}
+          <linearGradient id={`${uid}_belt`} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop stopColor={c.belt}/>
+            <stop offset="40%" stopColor="white" stopOpacity="0.46"/>
+            <stop offset="74%" stopColor="white" stopOpacity="0.04"/>
+          </linearGradient>
+          {/* Body shine — vertical white streak */}
+          <linearGradient id={`${uid}_shine`} x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop stopColor="white"/>
+            <stop offset="15%" stopColor="white"/>
+            <stop offset="68%" stopColor="#C8B5B5"/>
+            <stop offset="100%" stopColor="white" stopOpacity="0"/>
+          </linearGradient>
         </defs>
 
         {/* ── Drop shadow under base ── */}
-        <ellipse cx="14" cy="36.5" rx="5.8" ry="1.4" fill="rgba(0,0,0,0.32)"/>
+        <ellipse cx="13.5" cy="50.5" rx="8" ry="1.8" fill="rgba(0,0,0,0.38)"/>
 
-        {/* ── Base colored platform ring ── */}
-        <ellipse cx="14" cy="34.8" rx="6.2" ry="2.1" fill={c.main} opacity="0.90"/>
-        <ellipse cx="14" cy="34.3" rx="5.0" ry="1.5" fill={`url(#${uid}_ring)`} opacity="0.55"/>
-        <ellipse cx="14" cy="33.8" rx="3.2" ry="0.9" fill="rgba(255,255,255,0.38)"/>
-
-        {/* ── Outer white pin body (teardrop) ── */}
+        {/* ── HEAD: rounded egg-shape (classic ludo pawn head) ── */}
         <path
-          d="M14,33 C9.5,27 2.2,20.5 2.2,11.5 A11.8,11.8 0 0,1 25.8,11.5 C25.8,20.5 18.5,27 14,33 Z"
-          fill={`url(#${uid}_body)`}
-          stroke={c.dark}
-          strokeWidth="0.9"
-          strokeLinejoin="round"
+          d={`M22.6 4.95
+              C25.13 9.08 24.59 14.93 21.26 18.45
+              C19.62 20.18 17.92 19.38 14.34 19.38
+              C10.37 19.38 8.45 20.45 6.59 17.87
+              C4.07 14.37 3.5 9.47 5.54 5.67
+              C7.36 2.27 10.62 0 14.34 0
+              C17.79 0 20.78 1.95 22.6 4.95 Z`}
+          fill={`url(#${uid}_head)`}
         />
-        {/* Left body highlight */}
+        {/* Head outline */}
         <path
-          d="M7,7 C6,11 5,16 6.5,21"
+          d={`M14.34 0.5
+              C17.59 0.5 20.43 2.33 22.18 5.21
+              C24.59 9.15 24.06 14.75 20.9 18.1
+              C20.54 18.49 20.18 18.72 19.81 18.86
+              C19.44 19.0 19.03 19.06 18.52 19.06
+              C18.0 19.07 17.43 19.03 16.73 18.98
+              C16.04 18.93 15.25 18.88 14.34 18.88
+              C13.33 18.88 12.44 18.95 11.68 19.01
+              C10.9 19.07 10.26 19.12 9.7 19.09
+              C9.14 19.07 8.68 18.97 8.26 18.75
+              C7.84 18.54 7.43 18.18 7.0 17.58
+              C4.58 14.22 4.04 9.52 5.98 5.91
+              C7.73 2.64 10.83 0.5 14.34 0.5 Z`}
           fill="none"
-          stroke="rgba(255,255,255,0.55)"
-          strokeWidth="1.5"
-          strokeLinecap="round"
+          stroke={c.outline}
+          strokeWidth="0.5"
         />
 
-        {/* ── Inner colored circle (3D sphere) ── */}
-        <circle cx="14" cy="11.5" r="8.2" fill={`url(#${uid}_inner)`}/>
-        {/* Rim depth ring */}
-        <circle cx="14" cy="11.5" r="8.2" fill="none" stroke={c.dark} strokeWidth="0.5" opacity="0.45"/>
+        {/* ── BODY / TORSO (tapered trapezoid) ── */}
+        <path
+          d={`M7.57 18L14.44 18.84L20.58 18.17L27 40.83
+              V40.91 C27 45.0 24.25 48.6 20.23 49.3
+              C17.77 49.72 15.08 50.06 12.98 49.99
+              C11.09 49.93 8.88 49.64 6.83 49.28
+              C2.78 48.58 0 44.96 0 40.85
+              V40.33 L7.57 18 Z`}
+          fill={`url(#${uid}_body)`}
+        />
+        {/* Body outline */}
+        <path
+          d={`M14.38 18.83L14.44 18.84L14.5 18.83
+              L20.21 18.21L26.5 40.91
+              C26.5 44.77 23.9 48.15 20.14 48.8
+              C17.69 49.23 15.05 49.56 12.99 49.49
+              C11.14 49.43 8.96 49.14 6.91 48.79
+              C3.13 48.13 0.5 44.74 0.5 40.85
+              V40.42 L7.92 18.55 L14.38 18.83 Z`}
+          fill="none"
+          stroke={c.outline}
+          strokeWidth="0.5"
+        />
 
-        {/* ── Specular highlight on sphere ── */}
-        <ellipse
-          cx="11" cy="8.8" rx="2.6" ry="1.7"
-          fill="rgba(255,255,255,0.62)"
-          transform="rotate(-25 11 8.8)"
+        {/* ── BELT / WAIST highlight ── */}
+        <path
+          d={`M4.14 38 C4.14 38 8.95 39.71 12.18 39.88
+              C15.55 40.06 20.7 38.78 20.7 38.78
+              L20.63 40.28
+              C20.63 40.28 15.48 41.56 12.11 41.38
+              C8.88 41.2 4.07 39.5 4.07 39.5 L4.14 38 Z`}
+          fill={`url(#${uid}_belt)`}
+        />
+
+        {/* ── BODY SHINE (vertical light streak) ── */}
+        <path
+          d={`M10.14 20H16L20 39.37L12.14 40L4 39.37L10.14 20 Z`}
+          fill="white"
+          fillOpacity="0.18"
+        />
+
+        {/* ── BODY right-side shine ── */}
+        <path
+          d={`M14.93 19.34L16.98 19.29L21.15 45.19L15.27 45.48L14.93 19.34 Z`}
+          fill={`url(#${uid}_shine)`}
+          fillOpacity="0.20"
+        />
+
+        {/* ── Head specular highlight (top-left glint) ── */}
+        <ellipse cx="10" cy="5.5" rx="3.5" ry="2.2"
+          fill="rgba(255,255,255,0.55)"
+          transform="rotate(-20 10 5.5)"
         />
         {/* Tiny secondary glint */}
-        <circle cx="10.2" cy="7.6" r="0.9" fill="rgba(255,255,255,0.40)"/>
+        <circle cx="8.8" cy="4.0" r="1.2" fill="rgba(255,255,255,0.38)"/>
       </svg>
     </div>
   );
