@@ -49,23 +49,35 @@ export default function GameManagement() {
   async function fetchQueue() {
     setLoading(true);
     try {
-      const { data } = await adminSupabase
+      const { data: rooms } = await adminSupabase
         .from("game_rooms")
-        .select("id, status, game_type, bet_amount, creator_id, created_at, creator:profiles!creator_id(full_name, phone)")
+        .select("id, status, game_type, bet_amount, creator_id, created_at")
         .eq("status", "waiting")
         .order("created_at", { ascending: false })
         .limit(50);
 
-      if (data && data.length > 0) {
-        const entries: QueueEntry[] = data.map((r: any) => ({
-          id: r.id,
-          playerId: r.creator_id ?? "",
-          playerName: r.creator?.full_name ?? r.creator?.phone ?? "Utilizador",
-          game: r.game_type ?? "damas",
-          bet: parseFloat(r.bet_amount ?? 0),
-          since: new Date(r.created_at),
-          status: r.status,
-        }));
+      if (rooms && rooms.length > 0) {
+        const creatorIds = [...new Set(rooms.map((r: any) => r.creator_id).filter(Boolean))];
+        const { data: profiles } = await adminSupabase
+          .from("profiles")
+          .select("id, full_name, phone")
+          .in("id", creatorIds);
+
+        const profileMap: Record<string, any> = {};
+        (profiles ?? []).forEach((p: any) => { profileMap[p.id] = p; });
+
+        const entries: QueueEntry[] = rooms.map((r: any) => {
+          const profile = profileMap[r.creator_id] ?? {};
+          return {
+            id: r.id,
+            playerId: r.creator_id ?? "",
+            playerName: profile.full_name ?? profile.phone ?? "Utilizador",
+            game: r.game_type ?? "damas",
+            bet: parseFloat(r.bet_amount ?? 0),
+            since: new Date(r.created_at),
+            status: r.status,
+          };
+        });
         setQueue(entries);
       } else {
         setQueue([]);

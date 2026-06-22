@@ -1194,9 +1194,14 @@ router.post("/admin/settings/set", async (req, res) => {
 
   try {
     const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
-    const { error } = await admin.from("platform_settings")
-      .upsert({ key, value }, { onConflict: "key" });
-    if (error) { res.status(500).json({ error: error.message }); return; }
+    const { data: existing } = await admin.from("platform_settings").select("id").eq("key", key).maybeSingle();
+    if (existing) {
+      const { error } = await admin.from("platform_settings").update({ value }).eq("key", key);
+      if (error) { res.status(500).json({ error: error.message }); return; }
+    } else {
+      const { error } = await admin.from("platform_settings").insert({ key, value });
+      if (error) { res.status(500).json({ error: error.message }); return; }
+    }
     res.json({ ok: true });
   } catch (err) {
     req.log.error({ err }, "settings/set error");
