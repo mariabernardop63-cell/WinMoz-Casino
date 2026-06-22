@@ -82,14 +82,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const debitoBaseUrl = (settings["debito_api_base_url"] || "https://gyqoaningqhurhvdugne.supabase.co/functions/v1").replace(/\/$/, "");
-  // merchant_id: the merchant UUID from Debito Pay Settings → API
+  // merchant_id: o UUID do merchant no painel Debito Pay → Settings → API
   const merchantId = settings["debito_public_id"] || process.env["DEBITO_MERCHANT_ID"] || "";
-  // wallet_code: the 5-digit public wallet code from Debito Pay
-  const walletCode = settings["debito_wallet_code"] || process.env["DEBITO_WALLET_CODE"] || "";
+  // wallet_code: código PÚBLICO de 5 dígitos (NÃO o UUID interno da carteira)
+  // Ordem de prioridade: platform_settings → env var → fallback hardcoded "55291"
+  const walletCode = (settings["debito_wallet_code"] || process.env["DEBITO_WALLET_CODE"] || "55291").trim();
 
-  if (!walletCode) {
-    console.error("[debito/initiate] wallet_code not configured — set debito_wallet_code in platform_settings or DEBITO_WALLET_CODE env var");
-    res.status(503).json({ error: "Gateway de pagamento não configurado (wallet). Contacta o suporte." });
+  console.log("[debito/initiate] wallet_code a usar:", walletCode, "| merchant_id:", merchantId ? "ok" : "VAZIO");
+
+  // Validação: wallet_code deve ser numérico e curto (5 dígitos) — nunca um UUID longo
+  if (walletCode.length > 10 || !/^\d+$/.test(walletCode)) {
+    console.error("[debito/initiate] wallet_code inválido:", walletCode, "— deve ser o código de 5 dígitos, não um UUID");
+    res.status(503).json({ error: "Configuração do gateway inválida (wallet_code). Contacta o suporte." });
     return;
   }
 
