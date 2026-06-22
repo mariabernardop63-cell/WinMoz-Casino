@@ -1729,12 +1729,21 @@ export default function LudoGame() {
         // else: multiplayer opponent — piece_selected broadcast will arrive shortly,
         //       doOpponentMove handles animation + ludo_state_sync sets final state
       } else {
-        setMovable(mv); setPhase("select");
-        setMsg(`${plName} — ${val}! ${pl===myColor?"Escolhe uma peça.":""}`);
+        if(pl===myColor||isBot){
+          // My turn or bot: show selectable pieces + enter select phase
+          setMovable(mv); setPhase("select");
+          setMsg(`${plName} — ${val}! ${pl===myColor?"Escolhe uma peça.":""}`);
+        } else {
+          // Multiplayer opponent: only show the message.
+          // Do NOT touch phase/movable — ludo_state_sync from the opponent
+          // is the authoritative state update. Changing phase here would
+          // race with that sync and could freeze the next turn.
+          setMsg(`${plName} — ${val}!`);
+        }
       }
     },800);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[myColor,playerName,opponentName,doSelectPiece]);
+  },[myColor,playerName,opponentName,doSelectPiece,isBot]);
 
   // ── Roll my color dice — uses weighted algorithm + broadcasts ───────────────
   const doRoll=useCallback(()=>{

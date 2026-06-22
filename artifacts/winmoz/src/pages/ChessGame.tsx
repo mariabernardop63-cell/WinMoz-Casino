@@ -1346,6 +1346,12 @@ export default function ChessGame(){
       }
     });
 
+    ch.on("presence",{event:"sync"},()=>{
+      const state=ch.presenceState<{color:string}>();
+      const all=Object.values(state).flat() as Array<{color:string}>;
+      // Reward fires only on first real game move (see executeMove / chess_move handler)
+      void all;
+    });
     ch.subscribe(async(status)=>{
       if(status==="SUBSCRIBED"&&profile?.id){
         if(_savedChess&&gameId!=="local"){
@@ -1366,12 +1372,6 @@ export default function ChessGame(){
         }
         await ch.track({userId:profile.id,color:myColor});
       }
-    });
-    ch.on("presence",{event:"sync"},()=>{
-      const state=ch.presenceState<{color:string}>();
-      const all=Object.values(state).flat() as Array<{color:string}>;
-      // Reward fires only on first real game move (see executeMove / chess_move handler)
-      void all;
     });
     return()=>{supabase.removeChannel(ch);};
   },[gameId,applyMoveToState]);

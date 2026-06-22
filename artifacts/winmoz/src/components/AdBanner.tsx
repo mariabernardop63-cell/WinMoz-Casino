@@ -9,7 +9,8 @@ export default function AdBanner({ className }: { className?: string }) {
     fetch("/api/ad-script")
       .then(r => r.json())
       .then((data: { script?: string | null }) => {
-        if (data?.script?.trim()) setScript(data.script.trim());
+        const s = data?.script?.trim();
+        if (s) setScript(s);
       })
       .catch(() => {});
   }, []);
@@ -29,6 +30,7 @@ export default function AdBanner({ className }: { className?: string }) {
         if (node.src) {
           s.src = node.src;
           s.async = true;
+          s.setAttribute("crossorigin", "anonymous");
         } else {
           s.textContent = node.textContent;
         }
@@ -49,17 +51,12 @@ export default function AdBanner({ className }: { className?: string }) {
       className={className}
       style={{
         width: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        overflow: "hidden",
-        minHeight: 50,
-        maxHeight: 60,
-        borderRadius: 10,
-        background: "rgba(0,0,0,0.03)",
+        display: "block",
+        overflow: "visible",
+        textAlign: "center",
       }}
     >
-      <div ref={containerRef} style={{ display: "flex", alignItems: "center", justifyContent: "center" }} />
+      <div ref={containerRef} style={{ display: "block", width: "100%" }} />
     </div>
   );
 }
