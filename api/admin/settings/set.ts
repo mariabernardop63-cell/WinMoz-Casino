@@ -27,33 +27,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: rows } = await admin
+    const { error } = await admin
       .from("platform_settings")
-      .select("id")
-      .eq("key", key)
-      .limit(1);
+      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
 
-    const existing = rows && rows.length > 0 ? rows[0] : null;
-
-    if (existing) {
-      const { error } = await admin
-        .from("platform_settings")
-        .update({ value })
-        .eq("key", key);
-      if (error) {
-        console.error("settings/set update error:", error);
-        res.status(500).json({ error: error.message });
-        return;
-      }
-    } else {
-      const { error } = await admin
-        .from("platform_settings")
-        .insert({ key, value });
-      if (error) {
-        console.error("settings/set insert error:", error);
-        res.status(500).json({ error: error.message });
-        return;
-      }
+    if (error) {
+      console.error("settings/set upsert error:", error);
+      res.status(500).json({ error: error.message });
+      return;
     }
 
     res.status(200).json({ ok: true });

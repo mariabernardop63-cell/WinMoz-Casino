@@ -59,16 +59,10 @@ export function useAdminRealtimeSync() {
 
 /* ── Admin DB reset functions ── */
 async function upsertSetting(key: string, value: string) {
-  const { data: rows } = await adminSupabase
-    .from("platform_settings").select("id").eq("key", key).limit(1);
-  const existing = rows && rows.length > 0 ? rows[0] : null;
-  if (existing) {
-    const { error } = await adminSupabase.from("platform_settings").update({ value }).eq("key", key);
-    if (error) throw new Error(error.message);
-  } else {
-    const { error } = await adminSupabase.from("platform_settings").insert({ key, value });
-    if (error) throw new Error(error.message);
-  }
+  const { error } = await adminSupabase
+    .from("platform_settings")
+    .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
+  if (error) throw new Error(error.message);
 }
 
 export async function resetPlatformRevenue() {
@@ -1076,27 +1070,10 @@ export function useUpdatePlatformSetting() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const { data: rows } = await adminSupabase
+      const { error } = await adminSupabase
         .from("platform_settings")
-        .select("id")
-        .eq("key", key)
-        .limit(1);
-
-      const existing = rows && rows.length > 0 ? rows[0] : null;
-
-      if (existing) {
-        const { error } = await adminSupabase
-          .from("platform_settings")
-          .update({ value })
-          .eq("key", key);
-        if (error) throw new Error(error.message);
-      } else {
-        const { error } = await adminSupabase
-          .from("platform_settings")
-          .insert({ key, value });
-        if (error) throw new Error(error.message);
-      }
-
+        .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
+      if (error) throw new Error(error.message);
       return { ok: true };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["platform-settings"] }),
