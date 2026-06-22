@@ -1147,10 +1147,9 @@ const games = [
     bet: "10–5.000 MT",
     rating: "4.9",
     baseIdx: 1,
-    image: null as null,
-    cardArt: "ludo",
+    image: "/ludo-card2.png",
     imageFit: "cover" as const,
-    imagePos: "center",
+    imagePos: "center 65%",
   },
   {
     id: "xadrez",

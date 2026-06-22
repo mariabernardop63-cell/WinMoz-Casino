@@ -50,17 +50,17 @@ export default function GameManagement() {
     setLoading(true);
     try {
       const { data } = await adminSupabase
-        .from("matches")
-        .select("id, status, game_type, bet_amount, player1_id, created_at, player1:profiles!player1_id(full_name, email)")
-        .in("status", ["waiting", "searching", "open", "pending"])
+        .from("game_rooms")
+        .select("id, status, game_type, bet_amount, creator_id, created_at, creator:profiles!creator_id(full_name, phone)")
+        .eq("status", "waiting")
         .order("created_at", { ascending: false })
         .limit(50);
 
       if (data && data.length > 0) {
         const entries: QueueEntry[] = data.map((r: any) => ({
           id: r.id,
-          playerId: r.player1_id ?? "",
-          playerName: r.player1?.full_name ?? r.player1?.email?.split("@")[0] ?? "Utilizador",
+          playerId: r.creator_id ?? "",
+          playerName: r.creator?.full_name ?? r.creator?.phone ?? "Utilizador",
           game: r.game_type ?? "damas",
           bet: parseFloat(r.bet_amount ?? 0),
           since: new Date(r.created_at),
@@ -84,7 +84,7 @@ export default function GameManagement() {
       .channel("matchmaking-queue-watch")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "matches" },
+        { event: "*", schema: "public", table: "game_rooms" },
         () => fetchQueue()
       )
       .subscribe();
