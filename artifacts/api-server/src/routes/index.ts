@@ -134,6 +134,30 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 
+/* ── Public ad script — reads platform_settings using admin key, bypasses RLS ── */
+router.get("/ad-script", async (req, res) => {
+  try {
+    const supabaseUrl     = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "";
+    const supabaseService = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"] ?? "";
+
+    if (!supabaseUrl || !supabaseService) {
+      res.json({ script: null });
+      return;
+    }
+
+    const admin = buildAdminClient(supabaseUrl, supabaseService);
+    const { data } = await admin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "ad_banner_script")
+      .maybeSingle();
+
+    res.json({ script: (data as { value?: string } | null)?.value ?? null });
+  } catch {
+    res.json({ script: null });
+  }
+});
+
 router.post("/complete-registration", async (req, res) => {
   try {
     const { user_id, full_name, phone, invite_code_used } = req.body as {

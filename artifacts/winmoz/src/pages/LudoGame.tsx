@@ -80,6 +80,40 @@ function playVictoryChime() {
   } catch {}
 }
 
+function playWinFanfare() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
+    const melody = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50, 1318.51];
+    melody.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.11;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.45, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      osc.start(t); osc.stop(t + 0.55);
+    });
+  } catch {}
+}
+
+function playMoveSound() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.value = 520;
+    const t = ctx.currentTime;
+    gain.gain.setValueAtTime(0.22, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    osc.start(t); osc.stop(t + 0.12);
+  } catch {}
+}
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type Player  = "blue" | "green";
 type PieceId = "B0"|"B1"|"B2"|"B3"|"G0"|"G1"|"G2"|"G3";
@@ -1533,6 +1567,7 @@ export default function LudoGame() {
     const baseMover = ps.find(p=>p.id===pieceId);
     const mover: GamePiece = baseMover ? {...baseMover, pos: finalPos} : {id:pieceId, player:currentTurn, pos:finalPos};
     const captured = captureAtPos(mover);
+    if (!captured) playMoveSound();
     // Build updated snapshot that includes this piece at its new position
     const updatedPs = ps.map(p => p.id===pieceId ? mover : p);
 
@@ -1561,6 +1596,7 @@ export default function LudoGame() {
 
     if(finishedCount(updatedPs,currentTurn)===4){
       setWinner(currentTurn); setPhase("done");
+      if(currentTurn===myColor) playWinFanfare();
       broadcastSync(currentTurn,"done",100,currentTurn);
       return;
     }

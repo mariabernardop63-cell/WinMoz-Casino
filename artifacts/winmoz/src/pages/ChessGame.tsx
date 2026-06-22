@@ -4,6 +4,40 @@ import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import captureSoundUrl from "@assets/som_para_quando_o_peao_é_matado_1781479683373.mp3";
+
+// ─── Sound helpers ─────────────────────────────────────────────────────────────
+function playChessCapture() {
+  try { const a = new Audio(captureSoundUrl); a.volume = 0.65; a.play().catch(()=>{}); } catch {}
+}
+function playChessMove() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
+    const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = "sine"; osc.frequency.value = 420;
+    const t = ctx.currentTime;
+    gain.gain.setValueAtTime(0.22, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    osc.start(t); osc.stop(t + 0.2);
+  } catch {}
+}
+function playChessVictory() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
+    const melody = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50, 1318.51];
+    melody.forEach((freq, i) => {
+      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "triangle"; osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.11;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.42, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      osc.start(t); osc.stop(t + 0.55);
+    });
+  } catch {}
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 type PType = "K"|"Q"|"R"|"B"|"N"|"P";
@@ -860,7 +894,7 @@ interface BoardProps {
 }
 
 function ChessBoard({board,selected,legalDests,lastMove,checkSquare,myColor,onSquareClick}:BoardProps){
-  const LIGHT="#D4A017";const DARK="#1A1008";
+  const LIGHT="#D4A850";const DARK="#7A4E18";
   const rows=myColor==="w"?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
   const cols=myColor==="w"?[0,1,2,3,4,5,6,7]:[7,6,5,4,3,2,1,0];
   function sqEq(a:Sq|null,b:Sq):boolean{return!!a&&a[0]===b[0]&&a[1]===b[1];}
@@ -1158,6 +1192,7 @@ export default function ChessGame(){
   // ── Apply a move to local state ───────────────────────────────────────────────
   const applyMoveToState=useCallback((b:Board,from:Sq,to:Sq,prom:PType,currentEp:Sq|null,currentTurn:PColor)=>{
     const result=applyMove(b,from,to,prom);
+    if(result.captured) playChessCapture(); else playChessMove();
     const nextTurn:PColor=currentTurn==="w"?"b":"w";
     const newStatus=getStatus(result.board,nextTurn,result.ep);
 
@@ -1177,6 +1212,7 @@ export default function ChessGame(){
     setStatus(newStatus);
 
     if(newStatus==="checkmate"){
+      if(currentTurn===myColor) setTimeout(playChessVictory, 120);
       setWinner(currentTurn);
       setWinReason("Xeque-Mate!");
     }else if(newStatus==="stalemate"||newStatus==="draw"){

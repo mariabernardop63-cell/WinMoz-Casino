@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
 
 export default function AdBanner({ className }: { className?: string }) {
   const [script, setScript] = useState<string | null>(null);
@@ -7,14 +6,12 @@ export default function AdBanner({ className }: { className?: string }) {
   const injectedRef = useRef(false);
 
   useEffect(() => {
-    supabase
-      .from("platform_settings")
-      .select("value")
-      .eq("key", "ad_banner_script")
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.value?.trim()) setScript(data.value.trim());
-      });
+    fetch("/api/ad-script")
+      .then(r => r.json())
+      .then((data: { script?: string | null }) => {
+        if (data?.script?.trim()) setScript(data.script.trim());
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
