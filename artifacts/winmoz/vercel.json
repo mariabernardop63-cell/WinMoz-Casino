@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/ad-banner.html", "destination": "/ad-banner.html" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
