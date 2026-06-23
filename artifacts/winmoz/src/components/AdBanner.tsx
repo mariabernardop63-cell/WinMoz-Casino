@@ -1,62 +1,49 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
+
+const AD_SCRIPT_INLINE = `atOptions = {
+  'key' : 'ee2e54a091a2ed3089fa43f7b0d711a0',
+  'format' : 'iframe',
+  'height' : 50,
+  'width' : 320,
+  'params' : {}
+};`;
+
+const AD_SCRIPT_SRC = "https://www.highperformanceformat.com/ee2e54a091a2ed3089fa43f7b0d711a0/invoke.js";
 
 export default function AdBanner({ className }: { className?: string }) {
-  const [script, setScript] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const injectedRef = useRef(false);
 
   useEffect(() => {
-    fetch("/api/ad-script")
-      .then(r => r.json())
-      .then((data: { script?: string | null }) => {
-        const s = data?.script?.trim();
-        if (s) setScript(s);
-      })
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (!script || !containerRef.current || injectedRef.current) return;
+    if (!containerRef.current || injectedRef.current) return;
     injectedRef.current = true;
     const container = containerRef.current;
-    container.innerHTML = "";
 
-    const temp = document.createElement("div");
-    temp.innerHTML = script;
+    // 1. Inline script — sets atOptions synchronously
+    const inline = document.createElement("script");
+    inline.textContent = AD_SCRIPT_INLINE;
+    container.appendChild(inline);
 
-    Array.from(temp.childNodes).forEach(node => {
-      if (node instanceof HTMLScriptElement) {
-        const s = document.createElement("script");
-        if (node.src) {
-          s.src = node.src;
-          s.async = true;
-          s.setAttribute("crossorigin", "anonymous");
-        } else {
-          s.textContent = node.textContent;
-        }
-        Array.from(node.attributes).forEach(attr => {
-          if (attr.name !== "src") s.setAttribute(attr.name, attr.value);
-        });
-        container.appendChild(s);
-      } else {
-        container.appendChild(node.cloneNode(true));
-      }
-    });
-  }, [script]);
-
-  if (!script) return null;
+    // 2. External script — reads atOptions, creates the ad iframe
+    const ext = document.createElement("script");
+    ext.src = AD_SCRIPT_SRC;
+    ext.async = false;
+    container.appendChild(ext);
+  }, []);
 
   return (
     <div
       className={className}
       style={{
         width: "100%",
-        display: "block",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         overflow: "visible",
-        textAlign: "center",
+        minHeight: 50,
       }}
     >
-      <div ref={containerRef} style={{ display: "block", width: "100%" }} />
+      <div ref={containerRef} />
     </div>
   );
 }
