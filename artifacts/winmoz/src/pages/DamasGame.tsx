@@ -5,6 +5,7 @@ import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
+import AdBanner from "@/components/AdBanner";
 import captureSoundUrl from "@assets/som_para_quando_o_peao_é_matado_1781479683373.mp3";
 
 // ─── Sound helpers ────────────────────────────────────────────────────────────
@@ -1731,13 +1732,18 @@ export default function DamasGame() {
         </div>
 
         {/* My panel */}
-        <div style={{ padding:"4px 10px 8px", flexShrink:0 }}>
+        <div style={{ padding:"4px 10px 3px", flexShrink:0 }}>
           <PlayerCard
             color={myColor} name={playerName} balance={playerBal} isMe={true}
             isActive={myTurn && !winner}
             piecesLeft={myPieces} damesLeft={myDames}
             timeLeft={timers[myColor]} lives={lives[myColor]}
           />
+        </div>
+
+        {/* Ad banner */}
+        <div style={{ padding:"0 10px 5px", flexShrink:0 }}>
+          <AdBanner compact />
         </div>
 
       </div>

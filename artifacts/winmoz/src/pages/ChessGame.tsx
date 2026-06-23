@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import AdBanner from "@/components/AdBanner";
 import captureSoundUrl from "@assets/som_para_quando_o_peao_é_matado_1781479683373.mp3";
 
 // ─── Sound helpers ─────────────────────────────────────────────────────────────
@@ -1531,7 +1532,7 @@ export default function ChessGame(){
         </div>
 
         {/* My panel (bottom) */}
-        <div style={{padding:"4px 10px 8px",flexShrink:0}}>
+        <div style={{padding:"4px 10px 3px",flexShrink:0}}>
           <PlayerPanel
             name={playerName} isMe={true} isActive={turn===myColor}
             color={myColor} timer={myTimer}
@@ -1539,8 +1540,13 @@ export default function ChessGame(){
           />
         </div>
 
+        {/* Ad banner */}
+        <div style={{padding:"0 10px 3px",flexShrink:0}}>
+          <AdBanner compact />
+        </div>
+
         {/* Turn indicator */}
-        <div style={{padding:"3px 10px 8px",display:"flex",justifyContent:"center",flexShrink:0}}>
+        <div style={{padding:"2px 10px 5px",display:"flex",justifyContent:"center",flexShrink:0}}>
           <motion.div animate={{opacity:[0.6,1,0.6]}} transition={{duration:1.8,repeat:Infinity}}
             style={{display:"flex",alignItems:"center",gap:4,background:"rgba(5,12,32,0.65)",
               border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,padding:"3px 10px"}}>

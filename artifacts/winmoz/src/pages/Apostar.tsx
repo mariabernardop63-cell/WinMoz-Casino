@@ -1032,12 +1032,7 @@ function MatchmakingScreen({
         {/* Info */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.38 }}
           style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "0 8px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px",
-            background: "rgba(124,58,237,0.07)", borderRadius: 99,
-            border: "1px solid rgba(124,58,237,0.18)" }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: VIOLET }} className="animate-pulse" />
-            <span style={{ fontSize: 12, color: VIOLET, fontWeight: 700 }}>A procurar jogadores com o mesmo valor…</span>
-          </div>
+          <AdBanner />
           <p style={{ fontSize: 12, color: "#9CA3AF", textAlign: "center", lineHeight: 1.65 }}>
             Se nenhum adversário for encontrado em {mins}:{secs}, o teu valor será devolvido automaticamente.
           </p>

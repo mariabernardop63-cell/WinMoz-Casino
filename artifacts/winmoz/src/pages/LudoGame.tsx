@@ -5,6 +5,7 @@ import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
+import AdBanner from "@/components/AdBanner";
 import bgImg from "@assets/Gemini_Generated_Image_grc2w7grc2w7grc2_1780220609974.png";
 import rollSoundUrl from "@assets/som_para_quando_o_user_girar_no_dado__1781479690378.mp3";
 import captureSoundUrl from "@assets/som_para_quando_o_peao_é_matado_1781479683373.mp3";
@@ -2429,7 +2430,7 @@ export default function LudoGame() {
         </div>
 
         {/* ── Blue panel */}
-        <div style={{ padding:"2px 10px 7px", flexShrink:0 }}>
+        <div style={{ padding:"2px 10px 3px", flexShrink:0 }}>
           <PlayerPanel
             player="blue"
             name={myColor==="blue" ? playerName : opponentName}
@@ -2440,6 +2441,11 @@ export default function LudoGame() {
             finished={blueFinished} lives={lives.blue}
             timeLeft={myColor==="blue" ? timeLeft : opponentTimeLeft} isMe={myColor==="blue"}
           />
+        </div>
+
+        {/* ── Ad banner */}
+        <div style={{ padding:"0 10px 5px", flexShrink:0 }}>
+          <AdBanner compact />
         </div>
 
       </div>
