@@ -193,7 +193,7 @@ export default function Definicoes() {
               {t("APARÊNCIA E IDIOMA", "APPEARANCE & LANGUAGE")}
             </p>
             <div style={{ border: "1px solid #e5e7eb" }}>
-              <Row icon={Moon}  label={t("Modo escuro", "Dark mode", "Mode sombre", "Modo oscuro")} desc={t("Interface com fundo escuro", "Dark background interface")} value={darkMode} onChange={setDarkMode} />
+              <Row icon={Moon}  label={t("Modo escuro", "Dark mode", "Mode sombre", "Modo oscuro")} desc={t("Interface com fundo escuro", "Dark background interface")} value={false} locked />
               <Row icon={Globe} label={t("Idioma", "Language", "Langue", "Idioma")}                 desc={t("Língua da aplicação", "App language")} onPress={() => setLangModal(true)} badge={language.split(" ")[0]} />
             </div>
           </motion.div>
@@ -204,7 +204,7 @@ export default function Definicoes() {
               {t("CONTA E PAGAMENTO", "ACCOUNT & PAYMENT")}
             </p>
             <div style={{ border: "1px solid #e5e7eb" }}>
-              <Row icon={CreditCard}  label={t("Moeda", "Currency")}                desc={rateStr || t("Moeda preferida para exibição", "Preferred display currency")}   onPress={() => setCurrModal(true)}  badge={currency} />
+              <Row icon={CreditCard}  label={t("Moeda", "Currency")}                desc={t("Metical Moçambicano (MT)", "Mozambican Metical (MT)")}   badge="MZN" locked />
               <Row icon={Smartphone}  label={t("Métodos de pagamento", "Payment methods")} desc={`${paymentMethods.length}/3 ${t("números configurados", "numbers set up")}`} onPress={() => setPaymModal(true)} />
               <Row icon={TrendingDown} label={t("Limite de apostas", "Betting limit")} desc={bettingLimits.enabled ? `${bettingLimits.dailyLimit} MT/dia — ${bettingLimits.todaySpent} MT ${t("gastos", "spent")}` : t("Sem limite definido", "No limit set")} onPress={() => setLimModal(true)} />
             </div>
@@ -218,7 +218,7 @@ export default function Definicoes() {
             <div style={{ border: "1px solid #e5e7eb" }}>
               <Row icon={Info}    label={t("Versão", "Version")}                     desc={`WinMoz v${appVersion}`}                                   onPress={() => {}} badge={appVersion} />
               <Row icon={Info}    label={t("Termos de serviço", "Terms of Service")} desc={t("Lê os nossos termos", "Read our terms")}                 onPress={() => setLocation("/termos")} />
-              <Row icon={Info}    label={t("Política de privacidade", "Privacy Policy")} desc={t("Sabe como usamos os teus dados", "See how we use your data")} onPress={() => setLocation("/privacidade")} />
+              <Row icon={Info}    label={t("Política de privacidade", "Privacy Policy")} desc={t("Sabe como usamos os teus dados", "See how we use your data")} onPress={() => setLocation("/politica-privacidade")} />
               <Row icon={Star}    label={t("Programa de afiliados", "Affiliate program")} desc={t("Ganha referindo amigos", "Earn by referring friends")} onPress={() => setLocation("/afiliados")} />
               <Row icon={LogOut}  label={t("Terminar sessão", "Sign out")}            desc={t("Sair da conta actual", "Sign out of current account")}    onPress={handleSignOut} />
             </div>

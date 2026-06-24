@@ -74,9 +74,9 @@ const AppSettingsContext = createContext<AppSettings | null>(null);
 export function AppSettingsProvider({ children }: { children: ReactNode }) {
   const saved = loadSettings();
 
-  const [darkMode, setDarkModeState] = useState<boolean>(saved?.darkMode ?? false);
+  const [darkMode, setDarkModeState] = useState<boolean>(false);
   const [language, setLanguageState] = useState<Language>((saved as any)?.language ?? "Português");
-  const [currency, setCurrencyState] = useState<Currency>((saved as any)?.currency ?? "MZN");
+  const [currency, setCurrencyState] = useState<Currency>("MZN");
   const [exchangeRates, setExchangeRates] = useState<ExchangeRates>((saved as any)?.exchangeRates ?? FALLBACK_RATES);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>((saved as any)?.paymentMethods ?? []);
   const [bettingLimits, setBettingLimitsState] = useState<BettingLimits>(

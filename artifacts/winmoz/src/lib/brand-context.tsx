@@ -17,13 +17,18 @@ const defaults: BrandConfig = {
 
 const BrandContext = createContext<BrandConfig>(defaults);
 
+function ensureAbsoluteUrl(url: string): string {
+  if (!url) return "";
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
 function buildConfig(map: Record<string, string>): BrandConfig {
   const isPW = map["poker_winner_mode"] === "true";
   return {
     isPokerWinner: isPW,
     brandName: isPW ? "POKER" : "MOZBET",
     brandSubtitle: isPW ? "Winner Online" : "MOZAMBIQUE",
-    whatsappUrl: map["whatsapp_group_url"] ?? "",
+    whatsappUrl: ensureAbsoluteUrl(map["whatsapp_group_url"] ?? ""),
   };
 }
 

@@ -112,7 +112,7 @@ export default function HomeFooter() {
         {/* App download button */}
         {s.footer_app_download_url && (
           <a
-            href={s.footer_app_download_url}
+            href={/^https?:\/\//i.test(s.footer_app_download_url) ? s.footer_app_download_url : `https://${s.footer_app_download_url}`}
             target="_blank"
             rel="noopener noreferrer"
             style={{

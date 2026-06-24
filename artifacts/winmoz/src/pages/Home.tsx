@@ -192,7 +192,7 @@ function AtualizacoesSection() {
     <section className="px-4 pt-2 pb-4">
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-syne font-bold text-base text-slate-900">Atualizações</h2>
-        <Link href="/explorar">
+        <Link href="/explorar?tab=Novidades">
           <button className="text-xs font-semibold text-violet-700 hover:underline font-syne">Ver mais</button>
         </Link>
       </div>
@@ -1296,7 +1296,7 @@ export default function Home() {
         <section className="px-4 py-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-syne font-bold text-base text-slate-900">Jogos em Destaque</h2>
-            <Link href="/jogos" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center">
+            <Link href="/explorar" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center">
               Ver Todos <ChevronRight className="w-3 h-3 ml-0.5"/>
             </Link>
           </div>
@@ -1396,7 +1396,7 @@ export default function Home() {
         <section className="px-4 py-4 mb-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-syne font-bold text-base text-slate-900">Populares Agora</h2>
-            <Link href="/top" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center">
+            <Link href="/explorar" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center">
               Ver Todos <ChevronRight className="w-3 h-3 ml-0.5"/>
             </Link>
           </div>

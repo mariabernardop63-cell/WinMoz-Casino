@@ -23,6 +23,7 @@ import ConvidarAmigos from "@/pages/ConvidarAmigos";
 import Extratos from "@/pages/Extratos";
 import Reportar from "@/pages/Reportar";
 import Privacidade from "@/pages/Privacidade";
+import PoliticaPrivacidade from "@/pages/PoliticaPrivacidade";
 import Definicoes from "@/pages/Definicoes";
 import Suporte from "@/pages/Suporte";
 import Notificacoes from "@/pages/Notificacoes";
@@ -163,6 +164,9 @@ function Router() {
       </Route>
       <Route path="/privacidade">
         <ProtectedRoute><Privacidade /></ProtectedRoute>
+      </Route>
+      <Route path="/politica-privacidade">
+        <ProtectedRoute><PoliticaPrivacidade /></ProtectedRoute>
       </Route>
       <Route path="/termos">
         <ProtectedRoute><TermosServico /></ProtectedRoute>

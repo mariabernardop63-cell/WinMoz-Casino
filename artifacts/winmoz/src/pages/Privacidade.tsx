@@ -5,15 +5,18 @@ import {
   ArrowLeft, Shield, Eye, Bell, Database, Lock, ChevronRight,
   Smartphone, Globe, Trash2
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
-function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ value, locked }: { value: boolean; locked?: boolean }) {
   return (
-    <button onClick={() => onChange(!value)}
-      className="relative flex-shrink-0 transition-colors"
+    <button
+      disabled
       style={{
         width: 46, height: 26, borderRadius: 13,
         background: value ? "#000" : "#d1d5db",
-        border: "none", cursor: "pointer",
+        border: "none", cursor: locked ? "default" : "pointer",
+        flexShrink: 0, position: "relative",
       }}>
       <motion.div animate={{ x: value ? 22 : 2 }}
         transition={{ type: "spring", stiffness: 400, damping: 30 }}
@@ -27,28 +30,31 @@ interface SettingRowProps {
   label: string;
   desc: string;
   value?: boolean;
-  onChange?: (v: boolean) => void;
   onPress?: () => void;
   danger?: boolean;
+  locked?: boolean;
 }
 
-function SettingRow({ icon: Icon, label, desc, value, onChange, onPress, danger }: SettingRowProps) {
-  const Tag = onChange !== undefined ? "div" : "button" as any;
-  const handleClick = onChange !== undefined ? () => onChange?.(!value) : onPress;
+function SettingRow({ icon: Icon, label, desc, value, onPress, danger, locked }: SettingRowProps) {
+  const isToggle = value !== undefined;
+  const Tag = (!isToggle && onPress) ? "button" as any : "div" as any;
   return (
-    <Tag onClick={handleClick}
-      className="flex items-center gap-3.5 py-4 w-full text-left border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/50 cursor-pointer"
-      style={{ background: "none" }}>
+    <Tag onClick={(!isToggle && onPress) ? onPress : undefined}
+      className="flex items-center gap-3.5 py-4 w-full text-left border-b border-slate-100 last:border-0 transition-colors"
+      style={{ background: "none", cursor: (!isToggle && onPress) ? "pointer" : "default" }}>
       <div className="w-9 h-9 flex items-center justify-center flex-shrink-0"
         style={{ background: danger ? "#fef2f2" : "#f8fafc", border: danger ? "1px solid #fecaca" : "1px solid #e5e7eb" }}>
         <Icon style={{ width: 16, height: 16, color: danger ? "#dc2626" : "#374151" }} />
       </div>
       <div className="flex-1 min-w-0">
-        <p style={{ fontSize: 13.5, fontWeight: 600, color: danger ? "#dc2626" : "#111" }}>{label}</p>
+        <div className="flex items-center gap-1.5">
+          <p style={{ fontSize: 13.5, fontWeight: 600, color: danger ? "#dc2626" : "#111" }}>{label}</p>
+          {locked && <Lock style={{ width: 11, height: 11, color: "#9ca3af" }} />}
+        </div>
         <p style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 1, lineHeight: 1.4 }}>{desc}</p>
       </div>
-      {onChange !== undefined
-        ? <Toggle value={value!} onChange={onChange} />
+      {isToggle
+        ? <Toggle value={value!} locked={locked} />
         : <ChevronRight style={{ width: 16, height: 16, color: "#d1d5db", flexShrink: 0 }} />
       }
     </Tag>
@@ -57,44 +63,69 @@ function SettingRow({ icon: Icon, label, desc, value, onChange, onPress, danger 
 
 export default function Privacidade() {
   const [, setLocation] = useLocation();
-  const [profileVisible,    setProfileVisible]    = useState(true);
-  const [activityVisible,   setActivityVisible]   = useState(false);
-  const [analyticsEnabled,  setAnalyticsEnabled]  = useState(true);
-  const [dataSharing,       setDataSharing]       = useState(false);
-  const [locationAccess,    setLocationAccess]    = useState(false);
-  const [biometricLogin,    setBiometricLogin]    = useState(true);
-  const [twoFactor,         setTwoFactor]         = useState(false);
-  const [sessionAlerts,     setSessionAlerts]     = useState(true);
+  const { user } = useAuth();
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExportData() {
+    if (!user) return;
+    setExporting(true);
+    try {
+      const { data: txs } = await supabase
+        .from("transactions")
+        .select("id, type, amount, status, description, created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      const rows = txs ?? [];
+      const header = "ID,Tipo,Valor (MT),Estado,Descrição,Data\n";
+      const body = rows.map(r =>
+        `${r.id},${r.type},${r.amount},${r.status},"${(r.description ?? "").replace(/"/g, '""')}",${new Date(r.created_at).toLocaleString("pt-PT")}`
+      ).join("\n");
+
+      const blob = new Blob(["\uFEFF" + header + body], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `mozbet-extratos-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const SECTIONS = [
     {
       title: "Visibilidade do Perfil",
       items: [
-        { icon: Eye,        label: "Perfil público",         desc: "Outros utilizadores podem ver o teu perfil",       value: profileVisible,   onChange: setProfileVisible },
-        { icon: Globe,      label: "Actividade visível",     desc: "Mostrar o teu estado de jogo a outros",            value: activityVisible,  onChange: setActivityVisible },
+        { icon: Eye,        label: "Perfil público",         desc: "Outros utilizadores podem ver o teu perfil",       value: true,  locked: true },
+        { icon: Globe,      label: "Actividade visível",     desc: "Mostrar o teu estado de jogo a outros",            value: true,  locked: true },
       ],
     },
     {
       title: "Dados e Análise",
       items: [
-        { icon: Database,   label: "Análise de uso",         desc: "Ajuda-nos a melhorar com dados anónimos",          value: analyticsEnabled, onChange: setAnalyticsEnabled },
-        { icon: Globe,      label: "Partilha com parceiros", desc: "Permite partilhar dados com parceiros confiáveis", value: dataSharing,      onChange: setDataSharing },
-        { icon: Smartphone, label: "Localização",            desc: "Acesso à localização para funcionalidades locais", value: locationAccess,   onChange: setLocationAccess },
+        { icon: Database,   label: "Análise de uso",         desc: "Ajuda-nos a melhorar com dados anónimos",          value: true,  locked: true },
+        { icon: Globe,      label: "Partilha com parceiros", desc: "Permite partilhar dados com parceiros confiáveis", value: true,  locked: true },
+        { icon: Smartphone, label: "Localização",            desc: "Acesso à localização para funcionalidades locais", value: false, locked: true },
       ],
     },
     {
       title: "Segurança da Conta",
       items: [
-        { icon: Lock,       label: "Login biométrico",       desc: "Usa impressão digital ou Face ID para entrar",     value: biometricLogin,   onChange: setBiometricLogin },
-        { icon: Shield,     label: "Verificação em 2 passos",desc: "Código adicional no início de sessão",             value: twoFactor,        onChange: setTwoFactor },
-        { icon: Bell,       label: "Alertas de sessão",      desc: "Notifica quando uma nova sessão é iniciada",       value: sessionAlerts,    onChange: setSessionAlerts },
+        { icon: Lock,       label: "Login biométrico",       desc: "Usa impressão digital ou Face ID para entrar",     value: false, locked: true },
+        { icon: Shield,     label: "Verificação em 2 passos",desc: "Código adicional no início de sessão",             value: false, locked: true },
+        { icon: Bell,       label: "Alertas de sessão",      desc: "Notifica quando uma nova sessão é iniciada",       value: true,  locked: true },
       ],
     },
     {
       title: "Gestão de Dados",
       items: [
-        { icon: Database,   label: "Exportar os meus dados", desc: "Descarrega uma cópia de todos os teus dados",      onPress: () => alert("A preparar exportação…") },
+        { icon: Database,   label: "Exportar os meus dados", desc: "Descarrega uma cópia de todos os teus extratos",   onPress: handleExportData, danger: false },
         { icon: Trash2,     label: "Eliminar conta",         desc: "Remove permanentemente a tua conta e dados",       onPress: () => setShowConfirmDelete(true), danger: true },
       ],
     },
@@ -103,7 +134,6 @@ export default function Privacidade() {
   return (
     <div className="min-h-screen bg-white w-full flex justify-center">
       <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col">
-        {/* Header */}
         <div className="flex items-center gap-3 px-5 pt-12 pb-6 border-b border-slate-100">
           <button onClick={() => setLocation("/perfil")}
             className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors"
@@ -116,7 +146,6 @@ export default function Privacidade() {
           </div>
         </div>
 
-        {/* GDPR notice */}
         <div className="mx-5 mt-5 p-4" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
           <div className="flex items-start gap-2.5">
             <Shield style={{ width: 15, height: 15, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
@@ -142,13 +171,15 @@ export default function Privacidade() {
             </motion.div>
           ))}
 
-          {/* Last updated */}
+          {exporting && (
+            <p className="text-center text-sm text-slate-400 mt-2">A preparar o teu extrato…</p>
+          )}
+
           <p className="text-center text-[11px] text-slate-300 mt-4">
-            Política de privacidade actualizada a 1 de Janeiro de 2026
+            Definições de privacidade actualizadas a 1 de Janeiro de 2026
           </p>
         </div>
 
-        {/* Delete account confirmation overlay */}
         {showConfirmDelete && (
           <div className="fixed inset-0 z-50 flex items-end justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
             <motion.div className="w-full max-w-[430px] bg-white p-6"

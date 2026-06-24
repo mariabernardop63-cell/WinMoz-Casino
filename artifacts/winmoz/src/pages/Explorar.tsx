@@ -888,7 +888,11 @@ function ChatTab() {
 }
 
 export default function Explorar() {
-  const [activeTab, setActiveTab] = useState<Tab>("Jogos");
+  const [activeTab, setActiveTab] = useState<Tab>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab") as Tab | null;
+    return tab && (["Jogos", "Assistir", "Sala", "Novidades", "Chat"] as const).includes(tab as Tab) ? tab : "Jogos";
+  });
   const [query, setQuery] = useState("");
   const [gameFilter, setGameFilter] = useState<GameFilter>("Todos");
   const [filterOpen, setFilterOpen] = useState(false);
