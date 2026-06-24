@@ -1087,12 +1087,25 @@ export default function ChessGame(){
 
   // Persist game state for reconnection
   useEffect(()=>{
-    if(gameId==="local"||isBot||winner||status==="checkmate"||status==="stalemate")return;
-    try{
-      sessionStorage.setItem(`wm_chess_${gameId}`,JSON.stringify({
-        board:boardRef.current,turn,ep:epRef.current,history,captured,status,
-      }));
-    }catch{/* ignore */}
+    if(gameId==="local"||winner||status==="checkmate"||status==="stalemate")return;
+    // sessionStorage reconnect state — only for multiplayer (non-bot)
+    if(!isBot){
+      try{
+        sessionStorage.setItem(`wm_chess_${gameId}`,JSON.stringify({
+          board:boardRef.current,turn,ep:epRef.current,history,captured,status,
+        }));
+      }catch{/* ignore */}
+    }
+    // Keep wm_active_game always current so Resume works even on native back-swipe
+    if(BET>0){
+      try{
+        localStorage.setItem("wm_active_game", JSON.stringify({
+          gameId, gameType:"chess", betAmount:BET,
+          opponentName, savedAt:Date.now(), ttlMs:30*60_000,
+          playerColor:myColor, playerName,
+        }));
+      }catch{/* ignore */}
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[board,turn,history]);
 

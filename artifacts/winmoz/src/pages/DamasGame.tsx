@@ -795,6 +795,16 @@ export default function DamasGame() {
         board: boardRef.current, turn, seq: seqRef.current,
       }));
     } catch { /* ignore */ }
+    // Keep wm_active_game always current so Resume works even on native back-swipe
+    if (BET > 0) {
+      try {
+        localStorage.setItem("wm_active_game", JSON.stringify({
+          gameId, gameType: "damas", betAmount: BET,
+          opponentName, savedAt: Date.now(), ttlMs: 30 * 60_000,
+          playerColor: myColor, playerName,
+        }));
+      } catch { /* ignore */ }
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [board, turn]);
 

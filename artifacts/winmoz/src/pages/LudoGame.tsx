@@ -1408,6 +1408,16 @@ export default function LudoGame() {
         lives,
       }));
     }catch{/* ignore */}
+    // Keep wm_active_game always current so Resume works even on native back-swipe
+    if(BET_AMOUNT > 0){
+      try{
+        localStorage.setItem("wm_active_game", JSON.stringify({
+          gameId, gameType: "ludo", betAmount: BET_AMOUNT,
+          opponentName, savedAt: Date.now(), ttlMs: 30 * 60_000,
+          playerColor: myColor, playerName,
+        }));
+      }catch{/* ignore */}
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[pieces,turn,phase,lives]);
 
