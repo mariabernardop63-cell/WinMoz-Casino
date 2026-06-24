@@ -1577,43 +1577,40 @@ export default function DamasGame() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div style={{ height:"100vh", width:"100%", overflow:"hidden",
-      background:"linear-gradient(180deg,#0B1A0B 0%,#162716 50%,#0B1A0B 100%)",
+      background:"#fff",
       display:"flex", justifyContent:"center" }}>
       <div style={{ width:"100%", maxWidth:430, height:"100vh", overflow:"hidden",
-        display:"flex", flexDirection:"column", position:"relative", zIndex:1 }}>
+        display:"flex", flexDirection:"column", position:"relative" }}>
 
         {/* Header */}
         <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
-          padding:"10px 14px 8px", borderBottom:"1px solid rgba(255,255,255,0.07)",
-          background:"rgba(5,12,5,0.9)", flexShrink:0 }}>
-          <button onClick={handleBack} style={{ width:34, height:34, borderRadius:9,
-            background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)",
+          padding:"10px 14px 8px", borderBottom:"1px solid #e5e7eb",
+          background:"#fff", flexShrink:0 }}>
+          <button onClick={handleBack} style={{ width:34, height:34,
+            background:"none", border:"1px solid #e5e7eb",
             display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
-            <ArrowLeft style={{ width:16, height:16, color:"#9BB4E8" }}/>
+            <ArrowLeft style={{ width:16, height:16, color:"#374151" }}/>
           </button>
           <div style={{ textAlign:"center" }}>
             <p style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:17,
-              color:"#E8F0FF", lineHeight:1, letterSpacing:5,
-              textShadow:"0 0 20px rgba(212,163,90,0.5)" }}>DAMAS</p>
+              color:"#0a0a0a", lineHeight:1, letterSpacing:5 }}>DAMAS</p>
             {kingsOnlyCount > 0
-              ? <p style={{ fontSize:9, color:"rgba(212,163,90,0.85)", marginTop:1, letterSpacing:1.5, fontWeight:700 }}>
+              ? <p style={{ fontSize:9, color:"#b45309", marginTop:1, letterSpacing:1.5, fontWeight:700 }}>
                   👑 SÓ DAMAS — {30 - kingsOnlyCount} JOGADAS
                 </p>
-              : <p style={{ fontSize:9, color:"rgba(255,255,255,0.28)", marginTop:1, letterSpacing:2.5, fontWeight:700 }}>1 VS 1</p>
+              : <p style={{ fontSize:9, color:"#9ca3af", marginTop:1, letterSpacing:2.5, fontWeight:700 }}>1 VS 1</p>
             }
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:6 }}>
             {!winner && gameId !== "local" && (
-              <button onClick={handleForfeit} style={{ width:34, height:34, borderRadius:9,
-                background:"rgba(239,68,68,0.12)", border:"1px solid rgba(239,68,68,0.25)",
+              <button onClick={handleForfeit} style={{ width:34, height:34,
+                background:"#fef2f2", border:"1px solid #fecaca",
                 display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
                 <LogOut style={{ width:15, height:15, color:"#EF4444" }}/>
               </button>
             )}
-            <div style={{ padding:"4px 10px",
-              background:"linear-gradient(135deg,rgba(212,163,90,0.15),rgba(212,163,90,0.06))",
-              border:"1px solid rgba(212,163,90,0.25)", borderRadius:8 }}>
-              <span style={{ fontSize:10, color:"#D4A35A", fontWeight:700, fontFamily:"'Syne',sans-serif" }}>
+            <div style={{ padding:"4px 10px", background:"#fefce8", border:"1px solid #fde68a" }}>
+              <span style={{ fontSize:10, color:"#92400e", fontWeight:700, fontFamily:"'Syne',sans-serif" }}>
                 {BET > 0 ? `${BET} MT` : "Demo"}
               </span>
             </div>
@@ -1722,7 +1719,7 @@ export default function DamasGame() {
         {/* Turn indicator */}
         <div style={{ padding:"2px 10px", flexShrink:0, textAlign:"center" }}>
           <span style={{ fontSize:11, fontWeight:600,
-            color: myTurn ? "#D4A35A" : "rgba(255,255,255,0.35)" }}>
+            color: myTurn ? "#b45309" : "#9ca3af" }}>
             {winner ? `Jogo terminado — ${winner === myColor ? "Venceste!" : "Perdeste"}` :
               chainPiece ? "Captura em cadeia! Continua a capturar." :
               myTurn ? `${playerName.split(" ")[0]} — faz o teu movimento` : `A aguardar ${opponentName}…`}

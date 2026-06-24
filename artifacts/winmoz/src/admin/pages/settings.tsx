@@ -3,6 +3,7 @@ import {
   Settings as SettingsIcon, Bell, Shield, Globe, Database,
   Bot, Lock, Mail, Key, Eye, EyeOff, CheckCircle, AlertCircle,
   Save, Wrench, Smartphone, Copy, Link2, Phone, LayoutTemplate, Zap,
+  Tag, FileText, BookOpen,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useGetPlatformSettings, useUpdatePlatformSetting } from "@/admin/lib/supabase-api";
@@ -420,6 +421,16 @@ export default function Settings() {
   const [savingWebhookToken, setSavingWebhookToken] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
 
+  // Version control
+  const [appVersion, setAppVersion]     = useState("1.0.0");
+  const [savingVersion, setSavingVersion] = useState(false);
+
+  // Terms & Privacy content editors
+  const [termsContent,   setTermsContent]   = useState("");
+  const [privacyContent, setPrivacyContent] = useState("");
+  const [savingTerms,    setSavingTerms]    = useState(false);
+  const [savingPrivacy,  setSavingPrivacy]  = useState(false);
+
   // Footer settings
   const [adBannerScript, setAdBannerScript] = useState("");
   const [savingAdScript, setSavingAdScript] = useState(false);
@@ -432,6 +443,9 @@ export default function Settings() {
   const [savingFooter, setSavingFooter]   = useState(false);
 
   useEffect(() => {
+    if (platformSettings["app_version"])             setAppVersion(platformSettings["app_version"]);
+    if (platformSettings["terms_of_service_content"]) setTermsContent(platformSettings["terms_of_service_content"]);
+    if (platformSettings["privacy_policy_content"])  setPrivacyContent(platformSettings["privacy_policy_content"]);
     if (platformSettings["ad_banner_script"])        setAdBannerScript(platformSettings["ad_banner_script"]);
     if (platformSettings["sms_mpesa_number"]) setMpesaNum(platformSettings["sms_mpesa_number"]);
     if (platformSettings["sms_emola_number"]) setEmolaNum(platformSettings["sms_emola_number"]);
@@ -443,6 +457,34 @@ export default function Settings() {
     if (platformSettings["footer_app_download_url"]) setFooterAppUrl(platformSettings["footer_app_download_url"]);
     if (platformSettings["whatsapp_group_url"])      setWhatsappGroupUrl(platformSettings["whatsapp_group_url"]);
   }, [platformSettings]);
+
+  const handleSaveVersion = async () => {
+    if (!appVersion.trim()) { toast.error("Insere uma versão"); return; }
+    setSavingVersion(true);
+    try {
+      await updateSetting.mutateAsync({ key: "app_version", value: appVersion.trim() });
+      toast.success("Versão actualizada");
+    } catch { toast.error("Erro ao guardar versão"); }
+    setSavingVersion(false);
+  };
+
+  const handleSaveTerms = async () => {
+    setSavingTerms(true);
+    try {
+      await updateSetting.mutateAsync({ key: "terms_of_service_content", value: termsContent.trim() });
+      toast.success("Termos de Serviço guardados");
+    } catch { toast.error("Erro ao guardar Termos"); }
+    setSavingTerms(false);
+  };
+
+  const handleSavePrivacy = async () => {
+    setSavingPrivacy(true);
+    try {
+      await updateSetting.mutateAsync({ key: "privacy_policy_content", value: privacyContent.trim() });
+      toast.success("Política de Privacidade guardada");
+    } catch { toast.error("Erro ao guardar Política"); }
+    setSavingPrivacy(false);
+  };
 
   const handleSaveAdScript = async () => {
     setSavingAdScript(true);
@@ -1095,6 +1137,94 @@ export default function Settings() {
             </p>
           </div>
         </SectionCard>
+
+        {/* Version Control */}
+        <SectionCard title="Controlo de Versão" icon={Tag} color="#6366F1" bg="rgba(99,102,241,0.1)">
+          <div style={{ paddingTop: 12, display: "flex", flexDirection: "column", gap: 16 }}>
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                Versão da Aplicação
+              </label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(99,102,241,0.2)" }}>
+                  <Tag style={{ width: 14, height: 14, color: "#6366F1", flexShrink: 0 }} />
+                  <input type="text" value={appVersion} onChange={e => setAppVersion(e.target.value)}
+                    placeholder="1.0.0"
+                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "monospace" }} />
+                </div>
+                <button onClick={handleSaveVersion} disabled={!appVersion.trim() || savingVersion}
+                  style={{ padding: "10px 14px", borderRadius: 12, border: "none",
+                    cursor: appVersion.trim() && !savingVersion ? "pointer" : "default",
+                    background: appVersion.trim() ? "linear-gradient(135deg, #6366F1, #4f46e5)" : "var(--gz-bg-subtle)",
+                    color: appVersion.trim() ? "#fff" : "var(--gz-text-tertiary)",
+                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
+                  {savingVersion ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
+                Versão exibida nas Definições do utilizador e no rodapé do admin. Use o formato <code style={{ fontFamily: "monospace" }}>MAJOR.MINOR.PATCH</code>.
+              </p>
+            </div>
+          </div>
+        </SectionCard>
+
+        {/* Terms of Service Editor */}
+        <div style={{ gridColumn: "1 / -1" }}>
+          <SectionCard title="Termos de Serviço" icon={FileText} color="#0ea5e9" bg="rgba(14,165,233,0.1)">
+            <div style={{ paddingTop: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                Conteúdo dos Termos de Serviço (texto ou Markdown)
+              </label>
+              <textarea value={termsContent} onChange={e => setTermsContent(e.target.value)}
+                placeholder={"# Termos de Serviço\n\n**1. Aceitação dos Termos**\nAo aceder à plataforma WinMoz...\n\n**2. Elegibilidade**\nTens de ter 18 anos ou mais..."}
+                rows={12}
+                style={{ width: "100%", background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(14,165,233,0.25)",
+                  borderRadius: 12, padding: "12px 14px", resize: "vertical", outline: "none",
+                  fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace",
+                  lineHeight: 1.6, boxSizing: "border-box" }} />
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
+                O conteúdo é exibido na página <strong>/termos</strong>. Suporta Markdown básico (**negrito**, # título, • listas).
+              </p>
+              <button onClick={handleSaveTerms} disabled={savingTerms}
+                style={{ marginTop: 12, padding: "11px 20px", borderRadius: 12, border: "none",
+                  background: termsContent.trim() ? "linear-gradient(135deg, #0ea5e9, #0284c7)" : "var(--gz-bg-subtle)",
+                  color: termsContent.trim() ? "#fff" : "var(--gz-text-tertiary)", fontWeight: 700, fontSize: 13,
+                  display: "flex", alignItems: "center", gap: 8, cursor: termsContent.trim() && !savingTerms ? "pointer" : "default", fontFamily: "inherit" }}>
+                {savingTerms ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                Guardar Termos de Serviço
+              </button>
+            </div>
+          </SectionCard>
+        </div>
+
+        {/* Privacy Policy Editor */}
+        <div style={{ gridColumn: "1 / -1" }}>
+          <SectionCard title="Política de Privacidade" icon={BookOpen} color="#10b981" bg="rgba(16,185,129,0.1)">
+            <div style={{ paddingTop: 12 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
+                Conteúdo da Política de Privacidade (texto ou Markdown)
+              </label>
+              <textarea value={privacyContent} onChange={e => setPrivacyContent(e.target.value)}
+                placeholder={"# Política de Privacidade\n\n**Última actualização:** Junho 2025\n\n**1. Dados Recolhidos**\nRecolhemos os seguintes dados..."}
+                rows={12}
+                style={{ width: "100%", background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(16,185,129,0.25)",
+                  borderRadius: 12, padding: "12px 14px", resize: "vertical", outline: "none",
+                  fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace",
+                  lineHeight: 1.6, boxSizing: "border-box" }} />
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
+                O conteúdo é exibido na página <strong>/privacidade</strong>. Suporta Markdown básico.
+              </p>
+              <button onClick={handleSavePrivacy} disabled={savingPrivacy}
+                style={{ marginTop: 12, padding: "11px 20px", borderRadius: 12, border: "none",
+                  background: privacyContent.trim() ? "linear-gradient(135deg, #10b981, #059669)" : "var(--gz-bg-subtle)",
+                  color: privacyContent.trim() ? "#fff" : "var(--gz-text-tertiary)", fontWeight: 700, fontSize: 13,
+                  display: "flex", alignItems: "center", gap: 8, cursor: privacyContent.trim() && !savingPrivacy ? "pointer" : "default", fontFamily: "inherit" }}>
+                {savingPrivacy ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                Guardar Política de Privacidade
+              </button>
+            </div>
+          </SectionCard>
+        </div>
 
       </div>
 

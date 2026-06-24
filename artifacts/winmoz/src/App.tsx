@@ -41,6 +41,8 @@ import CookieConsent from "@/components/CookieConsent";
 import { useState, useEffect } from "react";
 import { adminSupabase } from "@/admin/lib/supabase-api";
 import { BrandProvider } from "@/lib/brand-context";
+import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
+import TermosServico from "@/pages/TermosServico";
 
 const queryClient = new QueryClient();
 const ADMIN_EMAIL = "nexialonemz@gmail.com";
@@ -162,6 +164,9 @@ function Router() {
       <Route path="/privacidade">
         <ProtectedRoute><Privacidade /></ProtectedRoute>
       </Route>
+      <Route path="/termos">
+        <ProtectedRoute><TermosServico /></ProtectedRoute>
+      </Route>
       <Route path="/definicoes">
         <ProtectedRoute><Definicoes /></ProtectedRoute>
       </Route>
@@ -226,9 +231,11 @@ function App() {
       <TooltipProvider>
         <AuthProvider>
           <BrandProvider>
+            <AppSettingsProvider>
             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
               <AppContent />
             </WouterRouter>
+            </AppSettingsProvider>
             <Toaster />
           </BrandProvider>
         </AuthProvider>

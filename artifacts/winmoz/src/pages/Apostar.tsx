@@ -1063,18 +1063,19 @@ function SegmentedToggle<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div style={{ display: "flex", background: "#1c1c1e", borderRadius: 99, padding: 4 }}>
+    <div style={{ display: "flex", background: "#f8fafc", border: "1px solid #e5e7eb", padding: 3 }}>
       {options.map((opt) => {
         const active = value === opt.value;
         return (
           <motion.button key={opt.value} onClick={() => onChange(opt.value)} layout
             style={{
-              flex: 1, height: 42, borderRadius: 99, border: "none", cursor: "pointer",
+              flex: 1, height: 42, border: active ? "1px solid #e5e7eb" : "1px solid transparent",
+              cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
               fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13,
-              color: active ? "#0a0a14" : "#71717a",
+              color: active ? "#0a0a0a" : "#9ca3af",
               background: active ? "#ffffff" : "transparent",
-              boxShadow: active ? "0 2px 12px rgba(0,0,0,0.3)" : "none",
+              boxShadow: active ? "0 1px 4px rgba(0,0,0,0.06)" : "none",
               transition: "color 0.2s, background 0.2s",
             }}
             whileTap={{ scale: 0.97 }}>
@@ -1105,17 +1106,17 @@ function MobileWalletPhoneField({
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      style={{ background: "#1c1c1e", borderRadius: 16, border: "1px solid #2c2c2e",
+      style={{ background: "#fff", border: "1px solid #e5e7eb",
         padding: "14px 16px", display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
 
-      <div style={{ width: 38, height: 38, borderRadius: "50%",
-        background: `rgba(0,212,180,0.12)`, border: `1px solid ${CYAN}33`,
+      <div style={{ width: 38, height: 38,
+        background: "#f0fdf9", border: `1px solid ${CYAN}55`,
         display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <Smartphone style={{ width: 17, height: 17, color: CYAN }} />
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 10.5, color: "#52525b", fontWeight: 600,
+        <p style={{ fontSize: 10.5, color: "#9ca3af", fontWeight: 600,
           letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: 2 }}>
           Número Registado
         </p>
@@ -1127,22 +1128,22 @@ function MobileWalletPhoneField({
             placeholder="845 000 000"
             style={{ background: "none", border: "none", outline: "none",
               fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15,
-              color: CYAN, width: "100%" }} />
+              color: "#111", width: "100%" }} />
         ) : (
           <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15,
-            color: phone ? "#fff" : "#52525b" }}>
+            color: phone ? "#111" : "#9ca3af" }}>
             {phone ? `+258 ${formatted}` : "Adicionar número"}
           </p>
         )}
       </div>
 
       <button onClick={() => setEditing(v => !v)}
-        style={{ width: 34, height: 34, borderRadius: 10,
-          background: editing ? `${CYAN}22` : "rgba(255,255,255,0.06)",
-          border: editing ? `1px solid ${CYAN}55` : "1px solid #3c3c3e",
+        style={{ width: 34, height: 34,
+          background: editing ? "#f0fdf9" : "#f8fafc",
+          border: editing ? `1px solid ${CYAN}55` : "1px solid #e5e7eb",
           display: "flex", alignItems: "center", justifyContent: "center",
           cursor: "pointer", flexShrink: 0 }}>
-        <Pencil style={{ width: 14, height: 14, color: editing ? CYAN : "#8e8e93" }} />
+        <Pencil style={{ width: 14, height: 14, color: editing ? CYAN : "#6b7280" }} />
       </button>
     </motion.div>
   );
@@ -1435,36 +1436,36 @@ export default function Apostar() {
   if (screen === "sala-menu") {
     const gameName = ALL_GAMES.find(g => g.id === gameId)?.name ?? gameId;
     return (
-      <div style={{ minHeight: "100vh", background: "#080810", display: "flex", justifyContent: "center" }}>
+      <div style={{ minHeight: "100vh", background: "#fff", display: "flex", justifyContent: "center" }}>
         <div style={{ width: "100%", maxWidth: 430, display: "flex", flexDirection: "column", minHeight: "100vh", padding: "0 20px 40px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 48, paddingBottom: 28 }}>
-            <button onClick={() => setScreen("bet")} style={{ width: 40, height: 40, borderRadius: "50%", background: "#1c1c1e", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <ChevronLeft style={{ width: 20, height: 20, color: "#fff" }} />
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", paddingTop: 48, paddingBottom: 28, borderBottom: "1px solid #e5e7eb", marginBottom: 20 }}>
+            <button onClick={() => setScreen("bet")} style={{ width: 36, height: 36, background: "none", border: "1px solid #e5e7eb", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ChevronLeft style={{ width: 20, height: 20, color: "#111" }} />
             </button>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 17, color: "#fff" }}>Sala Privada</p>
-            <div style={{ width: 40 }} />
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 17, color: "#0a0a0a" }}>Sala Privada</p>
+            <div style={{ width: 36 }} />
           </div>
-          <div style={{ background: "rgba(138,43,226,0.1)", border: "1px solid rgba(138,43,226,0.3)", borderRadius: 16, padding: "14px 18px", marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ background: "#f8fafc", border: "1px solid #e5e7eb", padding: "14px 18px", marginBottom: 28, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <p style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>Jogo · Aposta</p>
-              <p style={{ fontSize: 16, color: "#fff", fontWeight: 800, fontFamily: "'Syne', sans-serif" }}>{gameName} · {fmtMT(selectedBet ?? 0)}</p>
+              <p style={{ fontSize: 11, color: "#9ca3af", fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2 }}>Jogo · Aposta</p>
+              <p style={{ fontSize: 16, color: "#0a0a0a", fontWeight: 800, fontFamily: "'Syne', sans-serif" }}>{gameName} · {fmtMT(selectedBet ?? 0)}</p>
             </div>
           </div>
-          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.4)", marginBottom: 20, lineHeight: 1.6 }}>
+          <p style={{ fontSize: 13, color: "#6b7280", marginBottom: 20, lineHeight: 1.6 }}>
             Joga com quem quiseres. Cria uma sala e partilha o código, ou entra num jogo com o código de um amigo.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <button onClick={() => { setSalaError(""); setScreen("sala-entrar"); }} style={{ width: "100%", height: 68, borderRadius: 20, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", cursor: "pointer", display: "flex", alignItems: "center", gap: 16, padding: "0 20px", textAlign: "left" }}>
-              <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(0,212,180,0.15)", border: "1px solid rgba(0,212,180,0.3)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <button onClick={() => { setSalaError(""); setScreen("sala-entrar"); }} style={{ width: "100%", height: 68, background: "#fff", border: "1px solid #e5e7eb", cursor: "pointer", display: "flex", alignItems: "center", gap: 16, padding: "0 20px", textAlign: "left" }}>
+              <div style={{ width: 44, height: 44, background: "#f0fdf9", border: "1px solid rgba(0,212,180,0.4)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Hash style={{ width: 20, height: 20, color: "#00D4B4" }} />
               </div>
               <div>
-                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff", marginBottom: 2 }}>Entrar numa Sala</p>
-                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Tens um código? Entra no jogo do teu amigo.</p>
+                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#0a0a0a", marginBottom: 2 }}>Entrar numa Sala</p>
+                <p style={{ fontSize: 12, color: "#9ca3af" }}>Tens um código? Entra no jogo do teu amigo.</p>
               </div>
             </button>
-            <button onClick={() => { if (!selectedBet) return; setSalaError(""); handleCriarSala(); }} disabled={salaLoading || !selectedBet} style={{ width: "100%", height: 68, borderRadius: 20, background: `linear-gradient(135deg, ${VIOLET} 0%, #5b21b6 100%)`, border: "none", cursor: salaLoading ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 16, padding: "0 20px", opacity: salaLoading ? 0.7 : 1, textAlign: "left" }}>
-              <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <button onClick={() => { if (!selectedBet) return; setSalaError(""); handleCriarSala(); }} disabled={salaLoading || !selectedBet} style={{ width: "100%", height: 68, background: "#000", border: "none", cursor: salaLoading ? "wait" : "pointer", display: "flex", alignItems: "center", gap: 16, padding: "0 20px", opacity: salaLoading ? 0.7 : 1, textAlign: "left" }}>
+              <div style={{ width: 44, height: 44, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Users style={{ width: 20, height: 20, color: "#fff" }} />
               </div>
               <div>
@@ -1473,7 +1474,7 @@ export default function Apostar() {
               </div>
             </button>
           </div>
-          {salaError ? <p style={{ marginTop: 14, fontSize: 13, color: "#f87171", textAlign: "center" }}>{salaError}</p> : null}
+          {salaError ? <p style={{ marginTop: 14, fontSize: 13, color: "#ef4444", textAlign: "center" }}>{salaError}</p> : null}
         </div>
       </div>
     );
@@ -1482,11 +1483,11 @@ export default function Apostar() {
   /* ── Sala Aguardar (creator waiting) ── */
   if (screen === "sala-aguardar") {
     return (
-      <div style={{ minHeight: "100vh", background: "#080810", display: "flex", justifyContent: "center" }}>
+      <div style={{ minHeight: "100vh", background: "#fff", display: "flex", justifyContent: "center" }}>
         <div style={{ width: "100%", maxWidth: 430, display: "flex", flexDirection: "column", alignItems: "center", padding: "0 20px 40px", textAlign: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", paddingTop: 48, paddingBottom: 32 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", paddingTop: 48, paddingBottom: 20, borderBottom: "1px solid #e5e7eb", marginBottom: 32 }}>
             <div style={{ width: 40 }} />
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 17, color: "#fff" }}>Sala Criada</p>
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 17, color: "#0a0a0a" }}>Sala Criada</p>
             <div style={{ width: 40 }} />
           </div>
           <motion.div animate={{ scale: [1, 1.06, 1], opacity: [0.6, 1, 0.6] }} transition={{ duration: 2.2, repeat: Infinity }}
@@ -1621,39 +1622,39 @@ export default function Apostar() {
   /* ── Timeout ── */
   if (screen === "timeout") {
     return (
-      <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
+      <div className="min-h-screen w-full flex justify-center" style={{ background: "#fff" }}>
         <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
-          <div className="flex items-center justify-between pt-12 pb-8">
-            <button onClick={() => setScreen("bet")} className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: "#1c1c1e" }}>
-              <ChevronLeft style={{ width: 20, height: 20, color: "#fff" }} />
+          <div className="flex items-center justify-between pt-12 pb-6 border-b border-slate-100">
+            <button onClick={() => setScreen("bet")}
+              style={{ width: 36, height: 36, background: "none", border: "1px solid #e5e7eb", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <ChevronLeft style={{ width: 20, height: 20, color: "#111" }} />
             </button>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>Sem Adversário</p>
-            <div className="w-10" />
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#0a0a0a" }}>Sem Adversário</p>
+            <div className="w-9" />
           </div>
-          <div className="flex flex-col items-center pt-8 pb-6">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5 shadow-2xl"
-              style={{ background: "linear-gradient(135deg, #1c1c2e, #2c2c3e)", border: "1.5px solid #3c3c4e" }}>
-              <Clock style={{ width: 36, height: 36, color: "#71717a" }} />
+          <div className="flex flex-col items-center pt-10 pb-6">
+            <div className="w-20 h-20 flex items-center justify-center mb-5"
+              style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+              <Clock style={{ width: 36, height: 36, color: "#9ca3af" }} />
             </div>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: "#fff",
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: "#0a0a0a",
               marginBottom: 10, textAlign: "center" }}>Tempo Esgotado</p>
-            <p style={{ fontSize: 13.5, color: "#71717a", lineHeight: 1.65, textAlign: "center",
+            <p style={{ fontSize: 13.5, color: "#6b7280", lineHeight: 1.65, textAlign: "center",
               maxWidth: 280, marginBottom: 28 }}>
               Não foi possível encontrar um adversário. O teu valor de{" "}
-              <span style={{ color: "#fff", fontWeight: 700 }}>{fmtMT(selectedBet ?? 0)}</span>{" "}
+              <span style={{ color: "#111", fontWeight: 700 }}>{fmtMT(selectedBet ?? 0)}</span>{" "}
               foi devolvido à tua conta.
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 20px",
-              background: "rgba(0,212,180,0.1)", borderRadius: 99, border: `1px solid ${CYAN}33`, marginBottom: 36 }}>
-              <CheckCircle2 style={{ width: 14, height: 14, color: CYAN }} />
-              <span style={{ fontSize: 12, color: CYAN, fontWeight: 600 }}>Valor devolvido com sucesso</span>
+              background: "#f0fdf4", border: "1px solid #86efac", marginBottom: 36 }}>
+              <CheckCircle2 style={{ width: 14, height: 14, color: "#22c55e" }} />
+              <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 600 }}>Valor devolvido com sucesso</span>
             </div>
             <button onClick={() => setScreen("bet")}
-              className="w-full h-14 rounded-full flex items-center justify-center gap-2"
-              style={{ background: `linear-gradient(135deg, ${VIOLET}, #6d28d9)`, color: "#fff",
+              className="w-full h-14 flex items-center justify-center gap-2"
+              style={{ background: "#000", color: "#fff",
                 fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14,
-                maxWidth: 340, cursor: "pointer" }}>
+                maxWidth: 340, cursor: "pointer", border: "none" }}>
               <RotateCcw style={{ width: 17, height: 17 }} /> Tentar Novamente
             </button>
           </div>
@@ -1717,18 +1718,18 @@ export default function Apostar() {
      Bet Screen
   ══════════════════════════════════════════════════ */
   return (
-    <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
+    <div className="min-h-screen w-full flex justify-center" style={{ background: "#fff" }}>
       <div className="w-full max-w-[430px] flex flex-col min-h-screen">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-12 pb-4 flex-shrink-0">
+        <div className="flex items-center justify-between px-5 pt-12 pb-4 flex-shrink-0 border-b border-slate-100">
           <button onClick={() => window.history.back()}
-            className="w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ background: "#1c1c1e" }}>
-            <ChevronLeft style={{ width: 20, height: 20, color: "#fff" }} />
+            className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors"
+            style={{ border: "1px solid #e5e7eb", background: "none", borderRadius: 0, cursor: "pointer" }}>
+            <ChevronLeft style={{ width: 20, height: 20, color: "#111" }} />
           </button>
-          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>Fazer Aposta</p>
-          <div className="w-10" />
+          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#0a0a0a" }}>Fazer Aposta</p>
+          <div className="w-9" />
         </div>
 
         {/* Scrollable content */}
@@ -1738,25 +1739,24 @@ export default function Apostar() {
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             style={{ display: "flex", gap: 14, alignItems: "flex-start", padding: "16px",
-              background: "#1c1c1e", borderRadius: 20, marginBottom: 16,
-              border: "1px solid #2c2c2e", position: "relative" }}>
+              background: "#fff", marginBottom: 16, marginTop: 16,
+              border: "1px solid #e5e7eb", position: "relative" }}>
             <div style={{ position: "absolute", top: 14, right: 14, display: "flex", alignItems: "center", gap: 4,
-              background: "rgba(0,0,0,0.45)", backdropFilter: "blur(8px)",
-              borderRadius: 99, padding: "4px 9px", border: "1px solid rgba(255,255,255,0.08)" }}>
+              background: "#f8fafc", borderRadius: 99, padding: "4px 9px", border: "1px solid #e5e7eb" }}>
               <Star style={{ width: 11, height: 11, color: "#f59e0b", fill: "#f59e0b" }} />
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#fff" }}>{game.rating}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#374151" }}>{game.rating}</span>
             </div>
-            <div style={{ width: 86, height: 86, borderRadius: 14, overflow: "hidden",
-              flexShrink: 0, background: game.cardBg || "#2c2c2e" }}>
+            <div style={{ width: 86, height: 86, overflow: "hidden",
+              flexShrink: 0, background: game.cardBg || "#f1f5f9" }}>
               <img src={game.image} alt={game.name}
                 style={{ width: "100%", height: "100%",
                   objectFit: (game.imageFit as any) || "cover", objectPosition: game.imagePos }} />
             </div>
             <div className="flex-1 min-w-0" style={{ paddingRight: 52 }}>
               <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 20,
-                color: "#fff", letterSpacing: "1px", marginBottom: 2 }}>{game.name}</p>
+                color: "#0a0a0a", letterSpacing: "1px", marginBottom: 2 }}>{game.name}</p>
               <p style={{ fontSize: 12, color: VIOLET, fontWeight: 600, marginBottom: 6 }}>{game.sub}</p>
-              <p style={{ fontSize: 12, color: "#8e8e93", lineHeight: 1.55 }}>{game.description}</p>
+              <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.55 }}>{game.description}</p>
             </div>
           </motion.div>
 
@@ -1765,14 +1765,14 @@ export default function Apostar() {
             transition={{ delay: 0.08, duration: 0.4 }}
             style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
             {[
-              { icon: <Users   style={{ width: 15, height: 15, color: "#e4e4e7" }} />, count: liveOnline.toLocaleString("pt-PT"),  label: "Jogadores online" },
-              { icon: <Gamepad2 style={{ width: 15, height: 15, color: "#e4e4e7" }} />, count: livePlaying.toLocaleString("pt-PT"), label: "Jogando agora" },
+              { icon: <Users   style={{ width: 15, height: 15, color: "#374151" }} />, count: liveOnline.toLocaleString("pt-PT"),  label: "Jogadores online" },
+              { icon: <Gamepad2 style={{ width: 15, height: 15, color: "#374151" }} />, count: livePlaying.toLocaleString("pt-PT"), label: "Jogando agora" },
             ].map((stat, i) => (
-              <div key={i} style={{ background: "#1c1c1e", border: "1px solid #2c2c2e",
-                borderRadius: 16, padding: "14px 16px", display: "flex", flexDirection: "column", gap: 4 }}>
+              <div key={i} style={{ background: "#fff", border: "1px solid #e5e7eb",
+                padding: "14px 16px", display: "flex", flexDirection: "column", gap: 4 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>{stat.icon}</div>
-                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: "#fff", lineHeight: 1.1 }}>{stat.count}</p>
-                <p style={{ fontSize: 11, color: "#71717a" }}>{stat.label}</p>
+                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: "#0a0a0a", lineHeight: 1.1 }}>{stat.count}</p>
+                <p style={{ fontSize: 11, color: "#9ca3af" }}>{stat.label}</p>
               </div>
             ))}
           </motion.div>
@@ -1780,7 +1780,7 @@ export default function Apostar() {
           {/* Bet Amounts */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.14, duration: 0.4 }}>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#a1a1aa",
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#374151",
               letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 12 }}>Valor da Aposta</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 8 }}>
               {BET_AMOUNTS.slice(0, 4).map(amt => {
@@ -1788,16 +1788,14 @@ export default function Apostar() {
                 return (
                   <motion.button key={amt} onClick={() => setSelectedBet(active ? null : amt)}
                     whileTap={{ scale: 0.94 }}
-                    style={{ height: 46, borderRadius: 12,
-                      border: active ? `1.5px solid ${VIOLET}` : "1.5px solid #2c2c2e",
-                      background: active ? `linear-gradient(135deg, ${VIOLET}33, ${VIOLET}22)` : "#1c1c1e",
+                    style={{ height: 46,
+                      border: active ? "1.5px solid #000" : "1.5px solid #e5e7eb",
+                      background: active ? "#000" : "#fff",
                       cursor: "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12.5,
-                      color: active ? "#fff" : "#71717a",
                       display: "flex", flexDirection: "column", alignItems: "center",
-                      justifyContent: "center", gap: 1, transition: "all 0.2s",
-                      boxShadow: active ? `0 0 16px ${VIOLET}33` : "none" }}>
-                    <span style={{ fontSize: 13, fontWeight: 800, color: active ? "#fff" : "#a1a1aa" }}>{amt}</span>
-                    <span style={{ fontSize: 9, color: active ? `${VIOLET}cc` : "#52525b", letterSpacing: "0.5px" }}>MT</span>
+                      justifyContent: "center", gap: 1, transition: "all 0.2s" }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: active ? "#fff" : "#374151" }}>{amt}</span>
+                    <span style={{ fontSize: 9, color: active ? "rgba(255,255,255,0.6)" : "#9ca3af", letterSpacing: "0.5px" }}>MT</span>
                   </motion.button>
                 );
               })}
@@ -1808,18 +1806,16 @@ export default function Apostar() {
                 return (
                   <motion.button key={amt} onClick={() => setSelectedBet(active ? null : amt)}
                     whileTap={{ scale: 0.94 }}
-                    style={{ height: 46, borderRadius: 12,
-                      border: active ? `1.5px solid ${VIOLET}` : "1.5px solid #2c2c2e",
-                      background: active ? `linear-gradient(135deg, ${VIOLET}33, ${VIOLET}22)` : "#1c1c1e",
+                    style={{ height: 46,
+                      border: active ? "1.5px solid #000" : "1.5px solid #e5e7eb",
+                      background: active ? "#000" : "#fff",
                       cursor: "pointer", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 12.5,
-                      color: active ? "#fff" : "#71717a",
                       display: "flex", flexDirection: "column", alignItems: "center",
-                      justifyContent: "center", gap: 1, transition: "all 0.2s",
-                      boxShadow: active ? `0 0 16px ${VIOLET}33` : "none" }}>
-                    <span style={{ fontSize: 12, fontWeight: 800, color: active ? "#fff" : "#a1a1aa" }}>
+                      justifyContent: "center", gap: 1, transition: "all 0.2s" }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: active ? "#fff" : "#374151" }}>
                       {amt >= 1000 ? `${amt / 1000}K` : amt}
                     </span>
-                    <span style={{ fontSize: 9, color: active ? `${VIOLET}cc` : "#52525b", letterSpacing: "0.5px" }}>MT</span>
+                    <span style={{ fontSize: 9, color: active ? "rgba(255,255,255,0.6)" : "#9ca3af", letterSpacing: "0.5px" }}>MT</span>
                   </motion.button>
                 );
               })}
@@ -1829,7 +1825,7 @@ export default function Apostar() {
           {/* Game Mode */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.4 }} style={{ marginBottom: 16 }}>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#a1a1aa",
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#374151",
               letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 12 }}>Modo de Jogo</p>
             <SegmentedToggle
               value={gameMode}
@@ -1844,7 +1840,7 @@ export default function Apostar() {
           {/* Payment Method */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.26, duration: 0.4 }} style={{ marginBottom: 28 }}>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#a1a1aa",
+            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 13, color: "#374151",
               letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 12 }}>Método de Pagamento</p>
             <SegmentedToggle
               value={payMethod}
@@ -1867,49 +1863,46 @@ export default function Apostar() {
             <motion.button onClick={handleStart} disabled={!canStart}
               whileTap={canStart ? { scale: 0.97 } : {}}
               style={{
-                width: "100%", height: 60, borderRadius: 99,
-                border: canStart ? "none" : "1.5px solid #2c2c2e",
+                width: "100%", height: 58,
+                border: canStart ? "none" : "1.5px solid #e5e7eb",
                 cursor: canStart ? "pointer" : "not-allowed",
-                background: canStart
-                  ? `linear-gradient(135deg, ${VIOLET} 0%, #5b21b6 100%)`
-                  : "#141418",
-                color: canStart ? "#fff" : "#3f3f46",
+                background: canStart ? "#000" : "#f8fafc",
+                color: canStart ? "#fff" : "#9ca3af",
                 fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 14,
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "0 18px", transition: "all 0.25s",
-                boxShadow: canStart ? `0 8px 32px ${VIOLET}55, inset 0 1px 0 rgba(255,255,255,0.15)` : "none",
-                letterSpacing: "0.4px",
+                letterSpacing: "0.4px", borderRadius: 0,
               }}>
               {canStart ? (
                 <>
-                  <div style={{ width: 38, height: 38, borderRadius: "50%",
-                    background: "rgba(255,255,255,0.15)", display: "flex",
-                    alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Swords style={{ width: 17, height: 17, color: "#fff" }} />
+                  <div style={{ width: 36, height: 36, display: "flex",
+                    alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    border: "1px solid rgba(255,255,255,0.2)", background: "rgba(255,255,255,0.1)" }}>
+                    <Swords style={{ width: 16, height: 16, color: "#fff" }} />
                   </div>
-                  <span style={{ flex: 1, textAlign: "center", fontSize: 15, fontWeight: 800, letterSpacing: "0.5px" }}>
+                  <span style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 800, letterSpacing: "0.5px" }}>
                     COMEÇAR PARTIDA
                   </span>
-                  <div style={{ background: "rgba(0,0,0,0.28)", borderRadius: 99, padding: "7px 13px", flexShrink: 0 }}>
-                    <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.92)" }}>
+                  <div style={{ background: "rgba(255,255,255,0.12)", padding: "6px 12px", flexShrink: 0 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.95)" }}>
                       {fmtMT(selectedBet!)}
                     </span>
                   </div>
                 </>
               ) : (
                 <>
-                  <div style={{ width: 38, height: 38, borderRadius: "50%",
-                    background: "rgba(255,255,255,0.04)", display: "flex",
-                    alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                    <Zap style={{ width: 16, height: 16, color: "#3f3f46" }} />
+                  <div style={{ width: 36, height: 36, display: "flex",
+                    alignItems: "center", justifyContent: "center", flexShrink: 0,
+                    border: "1px solid #e5e7eb" }}>
+                    <Zap style={{ width: 16, height: 16, color: "#d1d5db" }} />
                   </div>
                   <span style={{ flex: 1, textAlign: "center", fontSize: 13.5 }}>Escolhe o valor da aposta</span>
-                  <div style={{ width: 38 }} />
+                  <div style={{ width: 36 }} />
                 </>
               )}
             </motion.button>
             {!canStart && (
-              <p style={{ textAlign: "center", fontSize: 11.5, color: "#52525b", marginTop: 8 }}>
+              <p style={{ textAlign: "center", fontSize: 11.5, color: "#9ca3af", marginTop: 8 }}>
                 Seleciona um valor de aposta para continuar
               </p>
             )}
@@ -1920,20 +1913,20 @@ export default function Apostar() {
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.38, duration: 0.4 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, color: "#fff" }}>Jogos Recomendados</p>
-              <Trophy style={{ width: 14, height: 14, color: VIOLET }} />
+              <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, color: "#0a0a0a" }}>Jogos Recomendados</p>
+              <Trophy style={{ width: 14, height: 14, color: "#374151" }} />
             </div>
             <div style={{ display: "flex", gap: 10, overflowX: "auto", scrollbarWidth: "none", paddingBottom: 4 }}>
               {recommendedGames.map(g => (
                 <Link key={g.id} href={g.id === "roleta" ? "/roleta" : `/apostar/${g.id}`}>
                   <motion.div whileTap={{ scale: 0.96 }}
-                    style={{ minWidth: 110, background: "#1c1c1e", borderRadius: 16,
-                      overflow: "hidden", border: "1px solid #2c2c2e", cursor: "pointer", flexShrink: 0 }}>
+                    style={{ minWidth: 110, background: "#fff",
+                      overflow: "hidden", border: "1px solid #e5e7eb", cursor: "pointer", flexShrink: 0 }}>
                     <div style={{ height: 72, overflow: "hidden", position: "relative" }}>
                       <img src={g.image} alt={g.name}
                         style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: g.imagePos }} />
                       <div style={{ position: "absolute", inset: 0,
-                        background: "linear-gradient(to top, rgba(0,0,0,0.5), transparent)" }} />
+                        background: "linear-gradient(to top, rgba(0,0,0,0.35), transparent)" }} />
                       <div style={{ position: "absolute", bottom: 6, left: 8,
                         display: "flex", alignItems: "center", gap: 3 }}>
                         <Star style={{ width: 9, height: 9, color: "#f59e0b", fill: "#f59e0b" }} />
@@ -1941,8 +1934,8 @@ export default function Apostar() {
                       </div>
                     </div>
                     <div style={{ padding: "8px 10px" }}>
-                      <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 11.5, color: "#fff", marginBottom: 2 }}>{g.name}</p>
-                      <p style={{ fontSize: 10, color: "#71717a" }}>{g.players} jogando</p>
+                      <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 11.5, color: "#0a0a0a", marginBottom: 2 }}>{g.name}</p>
+                      <p style={{ fontSize: 10, color: "#9ca3af" }}>{g.players} jogando</p>
                     </div>
                   </motion.div>
                 </Link>

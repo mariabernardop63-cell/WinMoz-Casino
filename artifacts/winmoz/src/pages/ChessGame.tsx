@@ -1455,7 +1455,7 @@ export default function ChessGame(){
 
   return(
     <div style={{height:"100vh",width:"100%",overflow:"hidden",
-      background:"linear-gradient(180deg,#0A0F1E 0%,#060B14 100%)",
+      background:"#fff",
       display:"flex",justifyContent:"center"}}>
 
       <div style={{width:"100%",maxWidth:430,height:"100vh",
@@ -1463,32 +1463,30 @@ export default function ChessGame(){
 
         {/* Header */}
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-          padding:"10px 14px 8px",borderBottom:"1px solid rgba(255,255,255,0.07)",
-          background:"rgba(5,12,32,0.9)",flexShrink:0}}>
-          <button onClick={handleBack} style={{width:34,height:34,borderRadius:9,
-            background:"rgba(255,255,255,0.07)",border:"1px solid rgba(255,255,255,0.12)",
+          padding:"10px 14px 8px",borderBottom:"1px solid #e5e7eb",
+          background:"#fff",flexShrink:0}}>
+          <button onClick={handleBack} style={{width:34,height:34,
+            background:"none",border:"1px solid #e5e7eb",
             display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
-            <ArrowLeft style={{width:16,height:16,color:"#9BB4E8"}}/>
+            <ArrowLeft style={{width:16,height:16,color:"#374151"}}/>
           </button>
           <div style={{textAlign:"center"}}>
             <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:17,
-              color:"#E8F0FF",lineHeight:1,letterSpacing:5,
-              textShadow:"0 0 20px rgba(245,200,66,0.5)"}}>XADREZ</p>
-            <p style={{fontSize:9,color:"rgba(255,255,255,0.28)",marginTop:1,letterSpacing:2.5,fontWeight:700}}>
+              color:"#0a0a0a",lineHeight:1,letterSpacing:5}}>XADREZ</p>
+            <p style={{fontSize:9,color:"#9ca3af",marginTop:1,letterSpacing:2.5,fontWeight:700}}>
               1 VS 1
             </p>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6}}>
             {(status==="playing"||status==="check")&&gameId!=="local"&&(
-              <button onClick={handleForfeit} style={{width:34,height:34,borderRadius:9,
-                background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",
+              <button onClick={handleForfeit} style={{width:34,height:34,
+                background:"#fef2f2",border:"1px solid #fecaca",
                 display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
                 <LogOut style={{width:15,height:15,color:"#EF4444"}}/>
               </button>
             )}
-            <div style={{padding:"4px 10px",background:"linear-gradient(135deg,rgba(245,200,66,0.15),rgba(245,200,66,0.06))",
-              border:"1px solid rgba(245,200,66,0.25)",borderRadius:8}}>
-              <span style={{fontSize:10,color:"#F5C842",fontWeight:700,fontFamily:"'Syne',sans-serif"}}>
+            <div style={{padding:"4px 10px",background:"#fefce8",border:"1px solid #fde68a"}}>
+              <span style={{fontSize:10,color:"#92400e",fontWeight:700,fontFamily:"'Syne',sans-serif"}}>
                 {BET>0?`${BET} MT`:"Demo"}
               </span>
             </div>
@@ -1539,13 +1537,12 @@ export default function ChessGame(){
         {/* Turn indicator */}
         <div style={{padding:"2px 10px 5px",display:"flex",justifyContent:"center",flexShrink:0}}>
           <motion.div animate={{opacity:[0.6,1,0.6]}} transition={{duration:1.8,repeat:Infinity}}
-            style={{display:"flex",alignItems:"center",gap:4,background:"rgba(5,12,32,0.65)",
-              border:"1px solid rgba(255,255,255,0.08)",borderRadius:20,padding:"3px 10px"}}>
+            style={{display:"flex",alignItems:"center",gap:4,background:"#f8fafc",
+              border:"1px solid #e5e7eb",borderRadius:20,padding:"3px 10px"}}>
             <div style={{width:4.5,height:4.5,borderRadius:"50%",
-              background:turn==="w"?"#F5C842":"#6366F1",
-              boxShadow:turn==="w"?"0 0 4px #F5C842":"0 0 4px #6366F1"}}/>
+              background:turn==="w"?"#b45309":"#6366F1"}}/>
             <span style={{fontSize:9,fontWeight:700,letterSpacing:0.8,textTransform:"uppercase",
-              color:turn==="w"?"#F5C842":"#6366F1"}}>
+              color:turn==="w"?"#b45309":"#6366F1"}}>
               {turn===myColor?`Tua vez — ${playerName.split(" ")[0]}`:`Vez de ${opponentName}`}
             </span>
           </motion.div>

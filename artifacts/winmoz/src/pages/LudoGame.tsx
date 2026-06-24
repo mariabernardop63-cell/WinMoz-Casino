@@ -2266,66 +2266,56 @@ export default function LudoGame() {
   return (
     <div style={{
       height:"100vh", width:"100%", overflow:"hidden",
-      backgroundImage:`url(${bgImg})`,
-      backgroundSize:"320px auto",
-      backgroundRepeat:"repeat",
+      background:"#fff",
       display:"flex", justifyContent:"center",
     }}>
-      {/* Dark overlay */}
-      <div style={{
-        position:"fixed", inset:0,
-        background:"rgba(4,10,28,0.82)",
-        pointerEvents:"none", zIndex:0,
-      }}/>
 
       <div style={{
         width:"100%", maxWidth:430,
         height:"100vh", overflow:"hidden",
         display:"flex", flexDirection:"column",
-        position:"relative", zIndex:1,
+        position:"relative",
       }}>
 
         {/* ── Header */}
         <div style={{
           display:"flex", alignItems:"center", justifyContent:"space-between",
           padding:"10px 14px 8px",
-          borderBottom:"1px solid rgba(255,255,255,0.07)",
-          background:"rgba(5,12,32,0.85)",
+          borderBottom:"1px solid #e5e7eb",
+          background:"#fff",
           flexShrink:0,
         }}>
           <button onClick={handleBack} style={{
-            width:34, height:34, borderRadius:9,
-            background:"rgba(255,255,255,0.07)",
-            border:"1px solid rgba(255,255,255,0.12)",
+            width:34, height:34,
+            background:"none",
+            border:"1px solid #e5e7eb",
             display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer",
           }}>
-            <ArrowLeft style={{ width:16, height:16, color:"#9BB4E8" }}/>
+            <ArrowLeft style={{ width:16, height:16, color:"#374151" }}/>
           </button>
           <div style={{ textAlign:"center" }}>
             <p style={{
               fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:17,
-              color:"#E8F0FF", lineHeight:1, letterSpacing:5,
-              textShadow:"0 0 20px rgba(99,179,255,0.45)",
+              color:"#0a0a0a", lineHeight:1, letterSpacing:5,
             }}>LUDO</p>
-            <p style={{ fontSize:9, color:"rgba(255,255,255,0.28)", marginTop:1, letterSpacing:2.5, fontWeight:700 }}>
+            <p style={{ fontSize:9, color:"#9ca3af", marginTop:1, letterSpacing:2.5, fontWeight:700 }}>
               1 VS 1
             </p>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6}}>
             {!winner&&phase!=="done"&&gameId!=="local"&&(
-              <button onClick={handleForfeit} style={{width:34,height:34,borderRadius:9,
-                background:"rgba(239,68,68,0.12)",border:"1px solid rgba(239,68,68,0.25)",
+              <button onClick={handleForfeit} style={{width:34,height:34,
+                background:"#fef2f2",border:"1px solid #fecaca",
                 display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer"}}>
                 <LogOut style={{width:15,height:15,color:"#EF4444"}}/>
               </button>
             )}
             <div style={{
               padding:"4px 10px",
-              background:"linear-gradient(135deg,rgba(255,215,0,0.12),rgba(255,215,0,0.06))",
-              border:"1px solid rgba(255,215,0,0.22)",
-              borderRadius:8,
+              background:"#fefce8",
+              border:"1px solid #fde68a",
             }}>
-              <span style={{ fontSize:10, color:"#FFD700", fontWeight:700, fontFamily:"'Syne',sans-serif" }}>
+              <span style={{ fontSize:10, color:"#92400e", fontWeight:700, fontFamily:"'Syne',sans-serif" }}>
                 {BET_AMOUNT>0?`${BET_AMOUNT} MT`:"Demo"}
               </span>
             </div>
@@ -2355,7 +2345,7 @@ export default function LudoGame() {
               style={{textAlign:"center"}}>
               <p style={{
                 fontSize:10.5, fontWeight:600,
-                color:"rgba(200,215,255,0.6)", letterSpacing:0.2, lineHeight:1,
+                color:"#6b7280", letterSpacing:0.2, lineHeight:1,
               }}>{msg}</p>
             </motion.div>
           </AnimatePresence>
@@ -2379,8 +2369,8 @@ export default function LudoGame() {
             transition={{ duration:1.8, repeat:Infinity }}
             style={{
               display:"flex", alignItems:"center", gap:4,
-              background:"rgba(5,12,32,0.65)",
-              border:"1px solid rgba(255,255,255,0.08)",
+              background:"#f8fafc",
+              border:"1px solid #e5e7eb",
               borderRadius:20, padding:"3px 10px",
             }}>
             <div style={{
@@ -2390,7 +2380,7 @@ export default function LudoGame() {
             }}/>
             <span style={{
               fontSize:9, fontWeight:700, letterSpacing:0.8, textTransform:"uppercase",
-              color:turn==="blue"?"#4F8EF7":"#34D469",
+              color:turn==="blue"?"#3b82f6":"#22c55e",
             }}>
               {turn===myColor
                 ?`Tua vez — ${playerName.split(" ")[0]}`
