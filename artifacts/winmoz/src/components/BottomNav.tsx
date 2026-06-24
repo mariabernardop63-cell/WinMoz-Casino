@@ -258,13 +258,32 @@ export default function BottomNav() {
     e.preventDefault();
     if (!user) { setLocation("/login"); return; }
 
+    // Always re-read localStorage on click (handles race condition when user
+    // just navigated back from a game and the 5s poll hasn't fired yet)
+    let currentGame = activeGame;
+    try {
+      const raw = localStorage.getItem("wm_active_game");
+      if (raw) {
+        const rec = JSON.parse(raw) as ActiveGameRecord;
+        if (Date.now() > rec.savedAt + rec.ttlMs) {
+          localStorage.removeItem("wm_active_game");
+          currentGame = null;
+        } else {
+          currentGame = rec;
+          setActiveGame(rec);
+        }
+      } else {
+        currentGame = null;
+      }
+    } catch { /* use existing state */ }
+
     // Verify match is still active in DB before showing resume modal
-    if (activeGame?.gameId && activeGame.gameId !== "local") {
+    if (currentGame?.gameId && currentGame.gameId !== "local") {
       try {
         const { data } = await supabase
           .from("matches")
           .select("status")
-          .eq("id", activeGame.gameId)
+          .eq("id", currentGame.gameId)
           .single();
         if (!data || data.status === "finished" || data.status === "cancelled") {
           localStorage.removeItem("wm_active_game");

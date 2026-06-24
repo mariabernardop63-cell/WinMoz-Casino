@@ -331,9 +331,9 @@ export default function Depositar() {
                 cursor: "pointer",
               }}>
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 flex items-center justify-center"
+                <div className="w-12 h-12 flex items-center justify-center overflow-hidden"
                   style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
-                  <span style={{ fontSize: 22 }}>💳</span>
+                  <img src="/emola-logo.png" alt="e-Mola" style={{ width: 40, height: 40, objectFit: "contain" }} />
                 </div>
                 <div className="text-left">
                   <p style={{ fontWeight: 700, color: EMOLA_GREEN, fontSize: 15, letterSpacing: "0.5px", fontFamily: "'Syne', sans-serif" }}>e-Mola</p>
@@ -359,9 +359,9 @@ export default function Depositar() {
                 cursor: "not-allowed",
               }}>
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 flex items-center justify-center"
+                <div className="w-12 h-12 flex items-center justify-center overflow-hidden"
                   style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
-                  <span style={{ fontSize: 22 }}>📱</span>
+                  <img src="/mpesa-logo.jpg" alt="M-Pesa" style={{ width: 40, height: 40, objectFit: "contain" }} />
                 </div>
                 <div className="text-left">
                   <p style={{ fontWeight: 700, color: MPESA_RED, fontSize: 15, letterSpacing: "0.5px", fontFamily: "'Syne', sans-serif" }}>M-Pesa</p>

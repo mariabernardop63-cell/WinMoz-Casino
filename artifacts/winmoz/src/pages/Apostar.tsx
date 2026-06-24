@@ -4,7 +4,7 @@ import { useRoute, useLocation, Link } from "wouter";
 import {
   ChevronLeft, Star, Wifi, Gamepad2, Zap, Trophy,
   XCircle, RotateCcw, AlertTriangle, Swords, Users,
-  CreditCard, Smartphone, CheckCircle2, Clock, X, Pencil, Phone, Copy, Hash,
+  CreditCard, Smartphone, CheckCircle2, Clock, X, Pencil, Phone, Copy, Hash, Loader2,
 } from "lucide-react";
 import { supabase, getSessionWithRefresh, isSessionExpiredError } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -335,96 +335,96 @@ function SMSBettingScreen({
   // Tela de seleção de carteira
   if (step === "wallet") {
     return (
-      <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
-        <div className="w-full max-w-[430px] flex flex-col min-h-screen">
-          <div className="flex items-center justify-between px-5 pt-12 pb-4">
-            <button onClick={() => { onCancel(); }} className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: "#1c1c1e" }}>
-              <ChevronLeft style={{ width: 18, height: 18, color: "#fff" }} />
+      <div className="min-h-screen bg-white w-full flex justify-center">
+        <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col">
+          <div className="flex items-center justify-between px-5 pt-12 pb-4 border-b border-slate-100">
+            <button onClick={() => { onCancel(); }}
+              className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors">
+              <ChevronLeft style={{ width: 18, height: 18, color: "#111" }} />
             </button>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>
-              Escolher Carteira
-            </p>
-            <div className="w-10" />
+            <p className="font-syne font-bold text-[#0a0a0a] text-base">Escolher Carteira</p>
+            <div className="w-9" />
           </div>
 
-          <div className="flex-1 px-5 pb-10">
-            <div className="flex items-center justify-center mb-8">
-              <div className="px-5 py-2 rounded-full" style={{ background: "#1c1c1e", border: `1.5px solid ${CYAN}22` }}>
-                <span style={{ fontSize: 13, color: "#8e8e93" }}>Aposta: </span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: CYAN }}>{fmtMT(amount)} MZN</span>
+          <motion.div className="flex-1 px-5 pt-6 pb-10"
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}>
+
+            <div className="flex items-center justify-center mb-7">
+              <div className="px-5 py-2" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+                <span style={{ fontSize: 12.5, color: "#6b7280" }}>A apostar: </span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0a0a0a" }}>{fmtMT(amount)} MZN</span>
               </div>
             </div>
 
-            <p style={{ fontSize: 11, fontWeight: 600, marginBottom: 14, letterSpacing: "0.08em",
-              color: "#636366", textTransform: "uppercase" }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 12 }}>
               Selecciona a tua carteira móvel
             </p>
 
             {/* e-Mola — ACTIVO */}
             <motion.button
-              whileTap={{ scale: 0.97 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => { setProvider("emola"); setStep("phone"); }}
+              className="w-full p-5 mb-3 flex items-center justify-between transition-all"
               style={{
-                width: "100%", background: "rgba(52,211,153,0.08)",
-                border: "2px solid #34d399", borderRadius: 16, padding: "20px",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                cursor: "pointer", marginBottom: 12,
+                background: "#fff",
+                border: "1.5px solid #16a34a",
+                borderRadius: 0,
+                cursor: "pointer",
               }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(52,211,153,0.15)",
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
-                  💳
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 flex items-center justify-center overflow-hidden"
+                  style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+                  <img src="/emola-logo.png" alt="e-Mola" style={{ width: 40, height: 40, objectFit: "contain" }} />
                 </div>
-                <div style={{ textAlign: "left" }}>
-                  <p style={{ fontWeight: 700, color: "#34d399", fontSize: 16, letterSpacing: "0.5px", margin: 0 }}>e-Mola</p>
-                  <p style={{ fontSize: 11, color: "#71717a", margin: "2px 0 0" }}>Pagamento instantâneo via USSD</p>
+                <div className="text-left">
+                  <p style={{ fontWeight: 700, color: "#16a34a", fontSize: 15, letterSpacing: "0.5px", fontFamily: "'Syne', sans-serif" }}>e-Mola</p>
+                  <p style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>Pagamento instantâneo via USSD</p>
                 </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99,
-                  background: "rgba(52,211,153,0.15)", color: "#34d399" }}>
+              <div className="flex flex-col items-end gap-1">
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#f0fdf4", color: "#16a34a", letterSpacing: "0.5px" }}>
                   ACTIVO
                 </span>
-                <CheckCircle2 style={{ width: 16, height: 16, color: "#34d399" }} />
+                <CheckCircle2 style={{ width: 16, height: 16, color: "#16a34a" }} />
               </div>
             </motion.button>
 
             {/* M-Pesa — EM BREVE */}
-            <div style={{
-              width: "100%", background: "#111", border: "2px solid #2c2c2e", borderRadius: 16,
-              padding: "20px", display: "flex", alignItems: "center", justifyContent: "space-between",
-              opacity: 0.5, cursor: "not-allowed", marginBottom: 32,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(231,76,60,0.1)",
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>
-                  📱
+            <div
+              className="w-full p-5 mb-8 flex items-center justify-between"
+              style={{
+                background: "#fafafa",
+                border: "1.5px solid #e5e7eb",
+                borderRadius: 0,
+                opacity: 0.5,
+                cursor: "not-allowed",
+              }}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 flex items-center justify-center overflow-hidden"
+                  style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+                  <img src="/mpesa-logo.jpg" alt="M-Pesa" style={{ width: 40, height: 40, objectFit: "contain" }} />
                 </div>
-                <div style={{ textAlign: "left" }}>
-                  <p style={{ fontWeight: 700, color: "#e74c3c", fontSize: 16, letterSpacing: "0.5px", margin: 0 }}>M-Pesa</p>
-                  <p style={{ fontSize: 11, color: "#52525b", margin: "2px 0 0" }}>Brevemente disponível</p>
+                <div className="text-left">
+                  <p style={{ fontWeight: 700, color: "#dc2626", fontSize: 15, letterSpacing: "0.5px", fontFamily: "'Syne', sans-serif" }}>M-Pesa</p>
+                  <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Brevemente disponível</p>
                 </div>
               </div>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 10px", borderRadius: 99,
-                background: "#1c1c1e", color: "#52525b" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#f1f5f9", color: "#9ca3af", letterSpacing: "0.5px" }}>
                 EM BREVE
               </span>
             </div>
 
-            <div style={{ borderRadius: 16, padding: 16, background: "#111", border: "1px solid #1c1c1e" }}>
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                <div style={{ width: 28, height: 28, borderRadius: "50%", background: "rgba(0,212,180,0.1)",
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 2, fontSize: 12 }}>
-                  ℹ️
-                </div>
-                <p style={{ fontSize: 12, lineHeight: 1.6, color: "#71717a", margin: 0 }}>
-                  O pagamento é processado pelo gateway seguro <strong style={{ color: "#a1a1aa" }}>Debito Pay</strong>.
-                  Receberás um pedido USSD no teu telemóvel para confirmar com o teu PIN.
+            <div className="p-4" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+              <div className="flex items-start gap-3">
+                <span style={{ fontSize: 14, marginTop: 1 }}>ℹ️</span>
+                <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
+                  O pagamento é processado pelo gateway seguro <strong style={{ color: "#374151" }}>Debito Pay</strong>.
+                  Receberás um pedido USSD no teu telemóvel para confirmar com o teu PIN e-Mola.
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     );
@@ -432,59 +432,57 @@ function SMSBettingScreen({
 
   if (step === "verifying") {
     return (
-      <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
-        <div className="w-full max-w-[430px] flex flex-col items-center justify-center min-h-screen px-8">
-          <motion.div className="flex flex-col items-center"
-            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}>
-            <div className="relative flex items-center justify-center mb-10" style={{ width: 120, height: 120 }}>
-              {[1, 0.7, 0.45].map((scale, i) => (
-                <motion.div key={i}
-                  animate={{ scale: [scale, scale + 0.18, scale], opacity: [0.3, 0, 0.3] }}
-                  transition={{ duration: 2.2, repeat: Infinity, delay: i * 0.55, ease: "easeOut" }}
-                  style={{ position: "absolute", width: 120, height: 120, borderRadius: "50%",
-                    border: `1.5px solid ${CYAN}`, transformOrigin: "center" }} />
-              ))}
-              <div style={{ width: 72, height: 72, borderRadius: "50%", background: `rgba(0,212,180,0.08)`,
-                border: `1.5px solid ${CYAN}44`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <div style={{ width: 36, height: 36, borderRadius: "50%",
-                  border: `3px solid ${CYAN}33`, borderTopColor: CYAN }} className="animate-spin" />
+      <div className="min-h-screen bg-white w-full flex justify-center">
+        <div className="w-full max-w-[430px] flex flex-col items-center justify-center min-h-screen px-6">
+          <motion.div className="flex flex-col items-center w-full"
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.38 }}>
+
+            <div className="relative flex items-center justify-center mb-8" style={{ width: 96, height: 96 }}>
+              <div className="absolute inset-0 rounded-full border animate-spin"
+                style={{ borderColor: "#e5e7eb", borderTopColor: "#0a0a0a" }} />
+              <div className="w-16 h-16 flex items-center justify-center"
+                style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+                <Phone style={{ width: 22, height: 22, color: "#374151" }} />
               </div>
             </div>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 20, color: "#fff",
-              marginBottom: 10, textAlign: "center" }}>
-              Aguarda o USSD no telemóvel
-            </p>
-            <p style={{ fontSize: 13, color: "#71717a", textAlign: "center", lineHeight: 1.65, maxWidth: 280 }}>
+
+            <h1 className="font-syne font-bold text-[22px] text-[#0a0a0a] text-center mb-2">
+              Aguarda o USSD
+            </h1>
+            <p style={{ fontSize: 13, color: "#6b7280", textAlign: "center", lineHeight: 1.65, maxWidth: 300, marginBottom: 24 }}>
               Um pedido USSD foi enviado para{" "}
-              <strong style={{ color: "#a1a1aa" }}>+258 {cleanPhone}</strong>.
-              Introduz o teu <strong style={{ color: "#a1a1aa" }}>PIN {provider === "emola" ? "e-Mola" : "M-Pesa"}</strong> para confirmar a aposta.
+              <strong style={{ color: "#0a0a0a" }}>+258 {cleanPhone}</strong>.
+              Introduz o teu <strong style={{ color: "#0a0a0a" }}>PIN {provider === "emola" ? "e-Mola" : "M-Pesa"}</strong> para confirmar a aposta.
             </p>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
-              style={{ marginTop: 28, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px",
-                background: `rgba(0,212,180,0.12)`, borderRadius: 99, border: `1px solid ${CYAN}33` }}>
-                <div style={{ width: 6, height: 6, borderRadius: "50%", background: CYAN }} className="animate-pulse" />
-                <span style={{ fontSize: 11, color: CYAN, fontWeight: 600, letterSpacing: "0.5px" }}>A AGUARDAR CONFIRMAÇÃO DO PIN…</span>
+
+            <div className="w-full p-4 mb-4" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+              <div className="flex items-center gap-3 justify-center mb-3">
+                <div className="w-2 h-2 bg-[#0a0a0a] animate-pulse" />
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#374151", letterSpacing: "0.8px" }}>A AGUARDAR CONFIRMAÇÃO DO PIN…</span>
               </div>
               {countdown > 0 ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 12, color: countdown <= 30 ? "#f59e0b" : "#52525b" }}>Expira em</span>
+                <div className="flex items-center gap-2 justify-center">
+                  <span style={{ fontSize: 12, color: "#9ca3af" }}>Expira em</span>
                   <span style={{
                     fontSize: 14, fontWeight: 700, fontFamily: "monospace",
-                    color: countdown <= 30 ? "#f59e0b" : "#8e8e93",
+                    color: countdown <= 30 ? "#ef4444" : "#0a0a0a",
                     minWidth: 36, textAlign: "center",
                   }}>
                     {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, "0")}
                   </span>
                 </div>
               ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#f59e0b" }} className="animate-pulse" />
+                <div className="flex items-center gap-2 justify-center">
+                  <div className="w-2 h-2 bg-amber-500 animate-pulse" />
                   <span style={{ fontSize: 12, color: "#f59e0b" }}>A verificar confirmação do banco…</span>
                 </div>
               )}
-            </motion.div>
+            </div>
+
+            <p style={{ fontSize: 11.5, color: "#9ca3af", textAlign: "center", lineHeight: 1.6 }}>
+              Não feches esta janela. O processo é automático após confirmares o PIN.
+            </p>
           </motion.div>
         </div>
       </div>
@@ -493,45 +491,43 @@ function SMSBettingScreen({
 
   if (step === "rejected") {
     return (
-      <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
+      <div className="min-h-screen bg-white w-full flex justify-center">
         <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
           <div className="flex items-center justify-between pt-12 pb-6">
-            <button onClick={onCancel} className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: "#1c1c1e" }}>
-              <ChevronLeft style={{ width: 20, height: 20, color: "#fff" }} />
+            <button onClick={onCancel}
+              className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors">
+              <ChevronLeft style={{ width: 18, height: 18, color: "#111" }} />
             </button>
-            <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>Pagamento Falhado</p>
-            <div className="w-10" />
+            <p className="font-syne font-bold text-[#0a0a0a] text-base">Pagamento Falhado</p>
+            <div className="w-9" />
           </div>
           <motion.div className="flex flex-col items-center pt-4 mb-8"
             initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
             transition={{ type: "spring", stiffness: 280, damping: 20 }}>
-            <div className="w-24 h-24 rounded-full flex items-center justify-center shadow-2xl mb-6"
-              style={{ background: "linear-gradient(135deg, #c0392b, #e74c3c)" }}>
-              <XCircle className="w-12 h-12 text-white" strokeWidth={2.5} />
+            <div className="w-20 h-20 flex items-center justify-center mb-6"
+              style={{ background: "#fef2f2", border: "1.5px solid #fecaca" }}>
+              <XCircle className="w-10 h-10" style={{ color: "#dc2626" }} strokeWidth={2.5} />
             </div>
-            <p style={{ color: "#fff", fontSize: "1.3rem", fontWeight: 600, textAlign: "center", fontFamily: "'Syne', sans-serif" }}>
-              Pagamento não concluído
-            </p>
+            <p className="font-syne font-bold text-[22px] text-[#0a0a0a] text-center mb-2">Pagamento não concluído</p>
             {rejectReason ? (
-              <p style={{ fontSize: 13, color: "#f59e0b", textAlign: "center", marginTop: 8, lineHeight: 1.6, maxWidth: 260, fontWeight: 500 }}>
+              <p style={{ fontSize: 13, color: "#f59e0b", textAlign: "center", marginTop: 4, lineHeight: 1.6, maxWidth: 280, fontWeight: 500 }}>
                 {rejectReason}
               </p>
             ) : (
-              <p style={{ fontSize: 13, color: "#71717a", textAlign: "center", marginTop: 8, lineHeight: 1.6, maxWidth: 260 }}>
+              <p style={{ fontSize: 13, color: "#6b7280", textAlign: "center", marginTop: 4, lineHeight: 1.6, maxWidth: 280 }}>
                 PIN incorrecto, saldo insuficiente ou tempo esgotado. Verifica e tenta novamente.
               </p>
             )}
           </motion.div>
           <div className="flex flex-col gap-3 mt-auto pb-10">
             <button onClick={() => { setInitError(""); setRejectReason(""); setStep("wallet"); }}
-              className="w-full h-14 rounded-full font-bold flex items-center justify-center gap-2"
-              style={{ background: CYAN, color: "#000", fontFamily: "'Syne', sans-serif" }}>
-              <RotateCcw style={{ width: 18, height: 18 }} /> Tentar Novamente
+              className="w-full h-14 font-syne font-bold text-sm flex items-center justify-center gap-2"
+              style={{ background: "#0a0a0a", color: "#fff", border: "none", borderRadius: 0 }}>
+              <RotateCcw style={{ width: 16, height: 16 }} /> Tentar Novamente
             </button>
             <button onClick={onCancel}
-              className="w-full h-14 rounded-full"
-              style={{ background: "#1c1c1e", color: "#8e8e93", fontFamily: "'Syne', sans-serif", cursor: "pointer" }}>
+              className="w-full h-14 font-syne font-semibold text-sm"
+              style={{ background: "#f8fafc", color: "#6b7280", border: "1px solid #e5e7eb", borderRadius: 0, cursor: "pointer" }}>
               Cancelar Aposta
             </button>
           </div>
@@ -540,75 +536,105 @@ function SMSBettingScreen({
     );
   }
 
+  const providerColor = provider === "emola" ? "#16a34a" : "#dc2626";
   return (
-    <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
-      <div className="w-full max-w-[430px] flex flex-col min-h-screen">
-        <div className="flex items-center justify-between px-5 pt-12 pb-4">
-          <button onClick={() => { setInitError(""); setStep("wallet"); }} className="w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ background: "#1c1c1e" }}>
-            <ChevronLeft style={{ width: 18, height: 18, color: "#fff" }} />
+    <div className="min-h-screen bg-white w-full flex justify-center">
+      <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col">
+        <div className="flex items-center justify-between px-5 pt-12 pb-4 border-b border-slate-100">
+          <button onClick={() => { setInitError(""); setStep("wallet"); }}
+            className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors">
+            <ChevronLeft style={{ width: 18, height: 18, color: "#111" }} />
           </button>
-          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>
-            Pagar com {provider === "emola" ? "e-Mola" : "M-Pesa"}
+          <p className="font-syne font-bold text-[#0a0a0a] text-base">
+            Número {provider === "emola" ? "e-Mola" : "M-Pesa"}
           </p>
-          <div className="w-10" />
+          <div className="w-9" />
         </div>
 
-        <div className="flex-1 px-5 pb-10 overflow-y-auto">
-          <div className="flex items-center justify-center mb-6">
-            <div className="px-5 py-2 rounded-full" style={{ background: "#1c1c1e", border: `1.5px solid ${CYAN}22` }}>
-              <span style={{ fontSize: 13, color: "#8e8e93" }}>Aposta: </span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: CYAN }}>{fmtMT(amount)} MZN</span>
+        <motion.div className="flex-1 px-5 pt-6 pb-10"
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}>
+
+          <div className="flex items-center justify-center mb-7">
+            <div className="px-5 py-2" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+              <span style={{ fontSize: 12.5, color: "#6b7280" }}>A apostar: </span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0a0a0a" }}>{fmtMT(amount)} MZN</span>
             </div>
           </div>
 
-          <div className="rounded-2xl p-5 mb-6" style={{ background: "rgba(52,211,153,0.06)", border: "1.5px solid #34d39944" }}>
+          <div className="mb-5 p-5" style={{ border: `1.5px solid ${providerColor}22`, background: "#fafafa" }}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(52,211,153,0.15)" }}>
-                <Phone style={{ width: 18, height: 18, color: "#34d399" }} />
+              <div className="w-9 h-9 flex items-center justify-center"
+                style={{ background: provider === "emola" ? "#f0fdf4" : "#fef2f2", border: `1px solid ${providerColor}33` }}>
+                <Phone style={{ width: 16, height: 16, color: providerColor }} />
               </div>
               <div>
-                <p style={{ fontWeight: 700, fontSize: 14, color: "#34d399" }}>Número de e-Mola</p>
-                <p style={{ fontSize: 11, color: "#71717a" }}>Número que vai receber o USSD</p>
+                <p style={{ fontWeight: 700, fontSize: 13, color: providerColor, fontFamily: "'Syne', sans-serif" }}>
+                  Número de {provider === "emola" ? "e-Mola" : "M-Pesa"}
+                </p>
+                <p style={{ fontSize: 11.5, color: "#9ca3af" }}>O número que vai efectuar o pagamento</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl px-4 py-3.5"
-              style={{ background: "#1c1c1e", border: isPhoneValid ? "1.5px solid #34d399" : "1.5px solid #2c2c2e" }}>
-              <div className="flex items-center gap-2 flex-shrink-0 border-r pr-3" style={{ borderColor: "#2c2c2e" }}>
+
+            <div className="flex items-center gap-3 px-4 py-3.5 bg-white"
+              style={{ border: isPhoneValid ? `1.5px solid ${providerColor}` : "1.5px solid #d1d5db" }}>
+              <div className="flex items-center gap-2 flex-shrink-0 border-r pr-3" style={{ borderColor: "#e5e7eb" }}>
                 <span style={{ fontSize: 16 }}>🇲🇿</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "#8e8e93" }}>+258</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>+258</span>
               </div>
-              <input type="tel" inputMode="numeric" value={phoneInput}
+              <input
+                type="tel"
+                inputMode="numeric"
+                value={phoneInput}
                 onChange={e => { setPhoneInput(e.target.value.replace(/\D/g, "").slice(0, 9)); setPhoneError(""); setInitError(""); }}
-                placeholder="86X XXX XXX" autoFocus
-                style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 16, fontWeight: 700,
-                  color: "#fff", caretColor: "#34d399", letterSpacing: "1px", fontFamily: "system-ui" }} />
-              {isPhoneValid && <CheckCircle2 style={{ width: 16, height: 16, color: "#34d399", flexShrink: 0 }} />}
+                placeholder="8X XXX XXXX"
+                autoFocus
+                className="flex-1 bg-transparent outline-none text-sm font-semibold"
+                style={{ color: "#0a0a0a", caretColor: providerColor, letterSpacing: "1px", fontFamily: "system-ui" }}
+              />
+              {isPhoneValid && (
+                <CheckCircle2 style={{ width: 16, height: 16, color: providerColor, flexShrink: 0 }} />
+              )}
             </div>
-            {phoneError && <p style={{ fontSize: 12, color: "#e74c3c", marginTop: 8 }}>⚠ {phoneError}</p>}
-            {initError && <p style={{ fontSize: 12, color: "#e74c3c", marginTop: 8, lineHeight: 1.5 }}>⚠ {initError}</p>}
+            {phoneError && <p style={{ fontSize: 11.5, color: "#ef4444", marginTop: 8 }}>⚠ {phoneError}</p>}
+            {initError && <p style={{ fontSize: 11.5, color: "#ef4444", marginTop: 8, lineHeight: 1.5 }}>⚠ {initError}</p>}
           </div>
 
-          <motion.button
+          <div className="p-4 mb-7" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 10 }}>Como funciona</p>
+            {[
+              "Introduz o teu número e-Mola e prime «Pagar»",
+              "Recebes um pedido USSD no teu telemóvel",
+              "Confirma com o teu PIN e-Mola",
+              "A aposta é registada automaticamente",
+            ].map((s, i) => (
+              <div key={i} className="flex items-start gap-3 mb-2.5 last:mb-0">
+                <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 mt-0.5"
+                  style={{ background: "#0a0a0a" }}>
+                  <span style={{ fontSize: 9, color: "#fff", fontWeight: 700 }}>{i + 1}</span>
+                </div>
+                <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>{s}</p>
+              </div>
+            ))}
+          </div>
+
+          <button
             onClick={handleInitiate}
             disabled={!isPhoneValid || initiating}
-            whileTap={isPhoneValid && !initiating ? { scale: 0.97 } : {}}
+            className="w-full h-14 font-syne font-bold text-sm flex items-center justify-center gap-2 transition-all"
             style={{
-              width: "100%", height: 58, borderRadius: 99, fontWeight: 800, fontSize: 15,
-              background: isPhoneValid && !initiating ? `linear-gradient(135deg, ${CYAN}, #00b89c)` : "#1c1c1e",
-              color: isPhoneValid && !initiating ? "#000" : "#3a3a3c",
-              fontFamily: "'Syne', sans-serif", border: "none",
-              cursor: isPhoneValid && !initiating ? "pointer" : "default",
-              transition: "background 0.2s",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              boxShadow: isPhoneValid && !initiating ? `0 8px 24px ${CYAN}44` : "none",
+              background: isPhoneValid && !initiating ? "#0a0a0a" : "#f1f5f9",
+              color: isPhoneValid && !initiating ? "#fff" : "#9ca3af",
+              borderRadius: 0,
+              border: "none",
+              letterSpacing: "0.3px",
             }}>
             {initiating
-              ? <><div style={{ width: 18, height: 18, borderRadius: "50%", border: "2.5px solid rgba(0,0,0,0.2)", borderTopColor: "#000" }} className="animate-spin" /> A iniciar…</>
-              : "Pagar com e-Mola"
+              ? <><Loader2 style={{ width: 16, height: 16 }} className="animate-spin" /><span>A iniciar pagamento…</span></>
+              : `Pagar com ${provider === "emola" ? "e-Mola" : "M-Pesa"}`
             }
-          </motion.button>
-        </div>
+          </button>
+        </motion.div>
       </div>
     </div>
   );
