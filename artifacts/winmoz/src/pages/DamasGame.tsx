@@ -578,55 +578,55 @@ function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQui
 }) {
   if (!isWinner) return (
     <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-      style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.88)",
-        backdropFilter:"blur(14px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.82)",
+        backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <motion.div initial={{scale:0.6,opacity:0,y:40}} animate={{scale:1,opacity:1,y:0}}
         transition={{type:"spring",stiffness:220,damping:22}}
-        style={{borderRadius:26,maxWidth:310,width:"88%",overflow:"hidden",
-          boxShadow:"0 32px 80px rgba(0,0,0,0.75),0 0 60px rgba(239,68,68,0.15)",
-          border:"1px solid rgba(255,255,255,0.08)"}}>
-        <div style={{background:"linear-gradient(145deg,#1a0a0a,#2a0f0f)",padding:"28px 24px 22px",textAlign:"center"}}>
+        style={{background:"#fff",maxWidth:310,width:"88%",overflow:"hidden",
+          boxShadow:"0 24px 64px rgba(0,0,0,0.4)",border:"1px solid #e5e7eb"}}>
+        <div style={{background:"#fef2f2",padding:"28px 24px 22px",textAlign:"center",borderBottom:"1px solid #fecaca"}}>
           <div style={{display:"flex",justifyContent:"center",marginBottom:14}}>
-            <svg width={72} height={72} viewBox="0 0 72 72" fill="none">
-              <circle cx="36" cy="36" r="34" fill="rgba(239,68,68,0.1)" stroke="rgba(239,68,68,0.3)" strokeWidth="1.5"/>
-              <path d="M22 22 L50 50 M50 22 L22 50" stroke="#EF4444" strokeWidth="5" strokeLinecap="round"/>
-            </svg>
+            <div style={{width:64,height:64,background:"#fef2f2",border:"1px solid #fecaca",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <svg width={32} height={32} viewBox="0 0 32 32" fill="none">
+                <path d="M8 8 L24 24 M24 8 L8 24" stroke="#DC2626" strokeWidth="3" strokeLinecap="round"/>
+              </svg>
+            </div>
           </div>
           <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
-            color:"rgba(255,100,100,0.8)",marginBottom:6}}>DERROTA</p>
-          <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:18,
-            color:"rgba(255,255,255,0.65)",lineHeight:1.2,marginBottom:4}}>Perdeste para</p>
-          <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#fff",lineHeight:1.1}}>{winnerName}</p>
+            color:"#9ca3af",marginBottom:6}}>DERROTA</p>
+          <p style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,
+            color:"#6b7280",lineHeight:1.2,marginBottom:4}}>Perdeste para</p>
+          <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#0a0a0a",lineHeight:1.1}}>{winnerName}</p>
         </div>
-        <div style={{background:"rgba(255,255,255,0.04)",borderTop:"1px solid rgba(255,255,255,0.08)",padding:"20px 24px 22px"}}>
+        <div style={{background:"#fff",padding:"20px 24px 22px"}}>
           {betAmount > 0 && (
-            <div style={{background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.2)",
-              borderRadius:14,padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <div style={{background:"#fef2f2",border:"1px solid #fecaca",
+              padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
               <div>
-                <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",color:"rgba(255,255,255,0.4)",marginBottom:4}}>PERDIDO</p>
-                <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:20,color:"#EF4444",lineHeight:1}}>
+                <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",color:"#9ca3af",marginBottom:4}}>PERDIDO</p>
+                <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:20,color:"#DC2626",lineHeight:1}}>
                   -{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
-              <div style={{width:40,height:40,borderRadius:10,background:"rgba(239,68,68,0.12)",
-                border:"1px solid rgba(239,68,68,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{width:40,height:40,background:"#fef2f2",border:"1px solid #fecaca",
+                display:"flex",alignItems:"center",justifyContent:"center"}}>
                 <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                  <path d="M3 17 L9 11 L13 15 L21 7" stroke="#EF4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M17 7 L21 7 L21 11" stroke="#EF4444" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3 17 L9 11 L13 15 L21 7" stroke="#DC2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M17 7 L21 7 L21 11" stroke="#DC2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
             </div>
           )}
           <div style={{display:"flex",gap:10}}>
-            <button onClick={onReplay} style={{flex:1,background:"rgba(239,68,68,0.15)",color:"#EF4444",
-              borderRadius:14,padding:"14px 0",border:"1px solid rgba(239,68,68,0.3)",
+            <button onClick={onReplay} style={{flex:1,background:"#0a0a0a",color:"#fff",
+              padding:"14px 0",border:"none",
               fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",
               display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
               <RotateCcw style={{width:13,height:13}}/>Revanche
             </button>
-            <button onClick={onQuit} style={{flex:1,background:"rgba(255,255,255,0.06)",
-              border:"1px solid rgba(255,255,255,0.12)",color:"rgba(255,255,255,0.65)",
-              borderRadius:14,padding:"14px 0",fontFamily:"'Syne',sans-serif",fontWeight:700,
+            <button onClick={onQuit} style={{flex:1,background:"#f8fafc",
+              border:"1px solid #e5e7eb",color:"#374151",
+              padding:"14px 0",fontFamily:"'Syne',sans-serif",fontWeight:700,
               fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
               <LogOut style={{width:13,height:13}}/>Sair
             </button>
@@ -638,69 +638,67 @@ function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQui
 
   return (
     <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-      style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.88)",
-        backdropFilter:"blur(14px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.82)",
+        backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
       <motion.div initial={{scale:0.6,opacity:0,y:40}} animate={{scale:1,opacity:1,y:0}}
         transition={{type:"spring",stiffness:220,damping:22}}
-        style={{borderRadius:26,maxWidth:310,width:"88%",overflow:"hidden",
-          boxShadow:"0 32px 80px rgba(0,0,0,0.75),0 0 60px rgba(212,163,90,0.2)",
-          border:"1px solid rgba(255,255,255,0.08)"}}>
-        <div style={{background:"linear-gradient(145deg,#5A3A10,#3A2008)",padding:"28px 24px 22px",textAlign:"center"}}>
-          <motion.div animate={{y:[0,-5,0]}} transition={{duration:2,repeat:Infinity,ease:"easeInOut"}}
+        style={{background:"#fff",maxWidth:310,width:"88%",overflow:"hidden",
+          boxShadow:"0 24px 64px rgba(0,0,0,0.4)",border:"1px solid #e5e7eb"}}>
+        <div style={{background:"#f8fafc",padding:"28px 24px 22px",textAlign:"center",borderBottom:"1px solid #e5e7eb"}}>
+          <motion.div animate={{y:[0,-4,0]}} transition={{duration:2,repeat:Infinity,ease:"easeInOut"}}
             style={{display:"flex",justifyContent:"center",marginBottom:14}}>
-            <svg width={72} height={72} viewBox="0 0 100 100" fill="none">
+            <svg width={68} height={68} viewBox="0 0 100 100" fill="none">
               <defs>
-                <linearGradient id="dwtg" x1="25%" y1="0%" x2="75%" y2="100%">
+                <linearGradient id="dwtg2" x1="25%" y1="0%" x2="75%" y2="100%">
                   <stop offset="0%" stopColor="#FFE566"/>
                   <stop offset="50%" stopColor="#FFD700"/>
                   <stop offset="100%" stopColor="#B8860B"/>
                 </linearGradient>
               </defs>
-              <path d="M28 12 L72 12 L68 52 Q65 64 50 68 Q35 64 32 52 Z" fill="url(#dwtg)"/>
+              <path d="M28 12 L72 12 L68 52 Q65 64 50 68 Q35 64 32 52 Z" fill="url(#dwtg2)"/>
               <path d="M28 16 Q14 16 14 32 Q14 44 28 44" stroke="#FFD700" strokeWidth="4.5" fill="none" strokeLinecap="round"/>
               <path d="M72 16 Q86 16 86 32 Q86 44 72 44" stroke="#FFD700" strokeWidth="4.5" fill="none" strokeLinecap="round"/>
-              <rect x="44" y="68" width="12" height="12" fill="url(#dwtg)" rx="2"/>
-              <rect x="30" y="80" width="40" height="7" fill="url(#dwtg)" rx="3.5"/>
+              <rect x="44" y="68" width="12" height="12" fill="url(#dwtg2)" rx="2"/>
+              <rect x="30" y="80" width="40" height="7" fill="url(#dwtg2)" rx="3.5"/>
               <ellipse cx="38" cy="30" rx="7" ry="12" fill="rgba(255,255,255,0.2)" transform="rotate(-18 38 30)"/>
             </svg>
           </motion.div>
           <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
-            color:"rgba(255,215,0,0.7)",marginBottom:6}}>VENCEDOR</p>
-          <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#fff",lineHeight:1.1}}>{winnerName}</p>
+            color:"#9ca3af",marginBottom:6}}>VENCEDOR</p>
+          <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#0a0a0a",lineHeight:1.1}}>{winnerName}</p>
         </div>
-        <div style={{background:"rgba(255,255,255,0.04)",borderTop:"1px solid rgba(255,255,255,0.08)",padding:"20px 24px 22px"}}>
+        <div style={{background:"#fff",padding:"20px 24px 22px"}}>
           {betAmount > 0 && (
-            <div style={{background:"linear-gradient(135deg,rgba(255,215,0,0.15),rgba(255,215,0,0.05))",
-              border:"1px solid rgba(255,215,0,0.3)",borderRadius:14,padding:"14px 16px",
+            <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",padding:"14px 16px",
               display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
               <div>
-                <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",color:"rgba(255,255,255,0.4)",marginBottom:4}}>GANHOS</p>
-                <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#FFD700",lineHeight:1}}>
+                <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",color:"#9ca3af",marginBottom:4}}>GANHOS</p>
+                <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#16a34a",lineHeight:1}}>
                   +{Math.floor(betAmount * 2 * 0.90).toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
-              <div style={{width:44,height:44,borderRadius:12,background:"rgba(255,215,0,0.12)",
-                border:"1px solid rgba(255,215,0,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{width:44,height:44,background:"#f0fdf4",border:"1px solid #bbf7d0",
+                display:"flex",alignItems:"center",justifyContent:"center"}}>
                 <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="#FFD700" strokeWidth="1.5"/>
-                  <path d="M12 6v6l4 2" stroke="#FFD700" strokeWidth="1.8" strokeLinecap="round"/>
+                  <circle cx="12" cy="12" r="10" stroke="#16a34a" strokeWidth="1.5"/>
+                  <path d="M12 6v6l4 2" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round"/>
                 </svg>
               </div>
             </div>
           )}
-          <p style={{fontSize:12,color:"rgba(255,255,255,0.4)",textAlign:"center",marginBottom:16}}>
-            <span style={{color:"rgba(255,255,255,0.65)",fontWeight:600}}>{loserName}</span> foi eliminado
+          <p style={{fontSize:12,color:"#9ca3af",textAlign:"center",marginBottom:16}}>
+            <span style={{color:"#374151",fontWeight:600}}>{loserName}</span> foi eliminado
           </p>
           <div style={{display:"flex",gap:10}}>
-            <button onClick={onReplay} style={{flex:1,background:"linear-gradient(135deg,#D4A35A,#B8860B)",
-              color:"#fff",borderRadius:14,padding:"14px 0",border:"none",
+            <button onClick={onReplay} style={{flex:1,background:"#0a0a0a",color:"#fff",
+              padding:"14px 0",border:"none",
               fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",
               display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
               <RotateCcw style={{width:13,height:13}}/>Jogar Novamente
             </button>
-            <button onClick={onQuit} style={{flex:1,background:"rgba(255,255,255,0.06)",
-              border:"1px solid rgba(255,255,255,0.12)",color:"rgba(255,255,255,0.65)",
-              borderRadius:14,padding:"14px 0",fontFamily:"'Syne',sans-serif",fontWeight:700,
+            <button onClick={onQuit} style={{flex:1,background:"#f8fafc",
+              border:"1px solid #e5e7eb",color:"#374151",
+              padding:"14px 0",fontFamily:"'Syne',sans-serif",fontWeight:700,
               fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
               <LogOut style={{width:13,height:13}}/>Sair
             </button>

@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { useLocation } from "wouter";
 import {
-  ChevronLeft, Bell, Delete,
-  CheckCircle2, XCircle, AlertTriangle, Smartphone, Pencil, Info,
+  ChevronLeft, Bell,
+  CheckCircle2, XCircle, AlertTriangle, Smartphone, Pencil, Info, Loader2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,29 +34,29 @@ function SwipeToConfirm({ onConfirm, disabled }: { onConfirm: () => void; disabl
 
   return (
     <div ref={containerRef}
-      className="relative rounded-full overflow-hidden flex items-center"
-      style={{ height: 64, background: "#1c1c1e", margin: "0 0" }}>
+      className="relative overflow-hidden flex items-center"
+      style={{ height: 64, background: "#f8fafc", border: "1px solid #e5e7eb", margin: "0 0" }}>
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <p className="text-white/40 text-sm font-medium tracking-wide select-none">
+        <p style={{ color: "#9ca3af", fontSize: 13, fontWeight: 500, letterSpacing: "0.3px" }} className="select-none">
           Deslizar para confirmar
         </p>
-        <span className="absolute right-5 text-white/30 font-bold select-none">»</span>
+        <span className="absolute right-5 select-none" style={{ color: "#d1d5db", fontWeight: 700 }}>»</span>
       </div>
       <motion.div
         drag="x"
         dragConstraints={containerRef}
         dragElastic={0.05}
         dragMomentum={false}
-        style={{ x, marginLeft: 6, width: 52, height: 52, background: CYAN, borderRadius: "50%" }}
+        style={{ x, marginLeft: 6, width: 52, height: 52, background: "#0a0a0a", borderRadius: 0 }}
         onDragEnd={(_, info) => {
           const cw = containerRef.current?.offsetWidth ?? 340;
           if (info.offset.x > cw * 0.65) { if (!disabled) onConfirm(); }
           else { x.set(0); }
         }}
         onClick={() => !disabled && onConfirm()}
-        className="flex items-center justify-center cursor-grab active:cursor-grabbing z-10 flex-shrink-0 shadow-lg"
+        className="flex items-center justify-center cursor-grab active:cursor-grabbing z-10 flex-shrink-0"
         whileTap={{ scale: 0.92 }}>
-        <ChevronRightIcon className="w-7 h-7 text-black" />
+        <ChevronRightIcon className="w-6 h-6 text-white" />
       </motion.div>
     </div>
   );
@@ -66,7 +66,6 @@ export default function Levantar() {
   const [, setLocation] = useLocation();
   const { user, profile, refreshProfile } = useAuth();
 
-  // Always read balance fresh from Supabase — never trust the stale context cache
   const [freshBalance, setFreshBalance] = useState<number | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(true);
 
@@ -116,7 +115,6 @@ export default function Levantar() {
 
   const canProceed = amountVal >= MIN_WITHDRAW && amountVal <= MAX_WITHDRAW;
 
-  // Poll withdrawal status in realtime until it's no longer pending
   const startPolling = (wId: string) => {
     if (pollingRef.current) clearInterval(pollingRef.current);
     pollingRef.current = setInterval(async () => {
@@ -141,7 +139,6 @@ export default function Levantar() {
     }, 3000);
   };
 
-  // Read balance directly from Supabase (bypasses stale sessionStorage cache)
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -153,11 +150,9 @@ export default function Levantar() {
           if (active && data) {
             const freshBal = parseFloat(String(data.balance ?? "0")) || 0;
             setFreshBalance(freshBal);
-            // Sync the context cache so all other pages show the real balance
             await refreshProfile();
           }
         } else {
-          // Fallback: refresh context
           await refreshProfile();
           setFreshBalance(parseFloat(String(profile?.balance ?? "0")) || 0);
         }
@@ -183,7 +178,6 @@ export default function Levantar() {
         return;
       }
 
-      // Try API server first; fall back to direct Supabase if unavailable
       let withdrawalId: string | null = null;
       let apiSuccess = false;
 
@@ -210,7 +204,6 @@ export default function Levantar() {
       } catch { /* fall through to direct Supabase */ }
 
       if (!apiSuccess) {
-        // Direct Supabase path (API server unavailable)
         const { data: profileData } = await supabase
           .from("profiles").select("balance").eq("id", user.id).single();
         const currentBalance = parseFloat(String(profileData?.balance ?? "0")) || 0;
@@ -241,8 +234,7 @@ export default function Levantar() {
           }).select("id").single();
 
         if (txErr || !txRow) {
-          // Restore balance on failure
-          await supabase.from("profiles").update({ balance: currentBalance }).eq("id", user.id);
+          await supabase.from("profiles").update({ balance: amountVal + 5 + (parseFloat(String((await supabase.from("profiles").select("balance").eq("id", user.id).single()).data?.balance ?? "0")) || 0) }).eq("id", user.id);
           setProcessingConfirm(false);
           setScreen("rejected");
           return;
@@ -267,44 +259,44 @@ export default function Levantar() {
   // ─── Amount Screen ────────────────────────────────────────────────────────
   if (screen === "amount") {
     return (
-      <div className="min-h-screen w-full flex justify-center" style={{ background: "#000" }}>
-        <div className="w-full max-w-[430px] flex flex-col min-h-screen">
+      <div className="min-h-screen bg-white w-full flex justify-center">
+        <div className="w-full max-w-[430px] flex flex-col min-h-screen bg-white">
 
-          <div className="flex items-center justify-between px-5 pt-12 pb-4">
+          <div className="flex items-center justify-between px-5 pt-12 pb-4 border-b border-slate-100">
             <button onClick={() => setLocation("/perfil")}
-              className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#1c1c1e" }}>
-              <ChevronLeft className="w-5 h-5 text-white" />
+              className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors">
+              <ChevronLeft className="w-5 h-5 text-[#111]" />
             </button>
-            <p className="font-semibold text-white text-base">Levantamento</p>
-            <button className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#1c1c1e" }}>
-              <Bell className="w-4 h-4 text-white" />
+            <p className="font-syne font-bold text-[#0a0a0a] text-base">Levantamento</p>
+            <button className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors">
+              <Bell className="w-4 h-4 text-[#374151]" />
             </button>
           </div>
 
-          <div className="flex flex-col gap-2 px-5 mb-4">
-            <div className="flex items-center justify-between px-4 py-3 rounded-2xl" style={{ background: "#1c1c1e" }}>
+          <div className="flex flex-col gap-2 px-5 pt-4 mb-2">
+            <div className="flex items-center justify-between px-4 py-3" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
               <div className="flex items-center gap-2">
-                <Smartphone style={{ width: 16, height: 16, color: CYAN }} />
-                <span className="text-white text-sm font-medium">{METHOD_NAME}</span>
+                <Smartphone style={{ width: 15, height: 15, color: "#374151" }} />
+                <span style={{ fontSize: 13, fontWeight: 600, color: "#374151" }}>{METHOD_NAME}</span>
               </div>
               <div className="flex items-center gap-2">
-                {!editingPhone && <span className="text-white/50 text-sm">{phoneDisplay}</span>}
+                {!editingPhone && <span style={{ fontSize: 13, color: "#9ca3af" }}>{phoneDisplay}</span>}
                 <button onClick={() => { setEditingPhone(e => !e); setEditPhoneVal(profile?.phone ?? ""); }}
                   style={{ background: "transparent", border: "none", cursor: "pointer", padding: 0 }}>
-                  <Pencil style={{ width: 13, height: 13, color: CYAN }} />
+                  <Pencil style={{ width: 13, height: 13, color: "#374151" }} />
                 </button>
               </div>
             </div>
             {editingPhone && (
-              <div className="flex items-center gap-2 px-4 py-3 rounded-2xl" style={{ background: "#1c1c1e" }}>
-                <span className="text-white/50 text-sm flex-shrink-0">+258</span>
+              <div className="flex items-center gap-2 px-4 py-3" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+                <span style={{ fontSize: 13, color: "#9ca3af", flexShrink: 0 }}>+258</span>
                 <input
                   type="tel" inputMode="numeric" maxLength={9}
                   value={editPhoneVal}
                   onChange={e => setEditPhoneVal(e.target.value.replace(/\D/g, ""))}
                   placeholder="84XXXXXXX"
-                  className="flex-1 bg-transparent text-white text-sm outline-none"
-                  style={{ caretColor: CYAN }}
+                  className="flex-1 bg-transparent outline-none text-sm"
+                  style={{ color: "#0a0a0a", caretColor: "#0a0a0a" }}
                 />
                 <button
                   disabled={savingPhone || editPhoneVal.length < 9}
@@ -318,74 +310,79 @@ export default function Levantar() {
                     } catch { /* silently ignore */ }
                     setSavingPhone(false);
                   }}
-                  className="px-3 py-1 rounded-xl text-xs font-bold transition-all"
-                  style={{ background: editPhoneVal.length >= 9 ? CYAN : "#3a3a3c", color: editPhoneVal.length >= 9 ? "#000" : "#666", cursor: editPhoneVal.length >= 9 ? "pointer" : "default" }}>
+                  className="px-3 py-1 text-xs font-bold transition-all"
+                  style={{ background: editPhoneVal.length >= 9 ? "#0a0a0a" : "#e5e7eb", color: editPhoneVal.length >= 9 ? "#fff" : "#9ca3af", cursor: editPhoneVal.length >= 9 ? "pointer" : "default", borderRadius: 0 }}>
                   {savingPhone ? "…" : "Guardar"}
                 </button>
               </div>
             )}
           </div>
 
-          <div className="flex flex-col items-center justify-center px-5 py-6">
-            <p className="text-white/40 text-xs mb-3 uppercase tracking-widest">Valor a Levantar</p>
+          <div className="flex flex-col items-center px-5 py-6 border-b border-slate-100">
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 12 }}>
+              Valor a Levantar
+            </p>
             <div className="flex items-end gap-2 mb-1">
-              <span className="text-white font-light" style={{ fontSize: "4rem", lineHeight: 1, fontFamily: "system-ui" }}>
+              <span style={{ fontSize: "3.8rem", lineHeight: 1, fontFamily: "system-ui", fontWeight: 200, color: "#0a0a0a" }}>
                 {amountStr || "0"}
               </span>
-              <span className="text-white/40 text-xl mb-3">MZN</span>
+              <span style={{ fontSize: 18, color: "#9ca3af", marginBottom: 8 }}>MZN</span>
             </div>
-            <p className="text-white/30 text-xs mb-5">
+            <p style={{ fontSize: 12, color: "#9ca3af", marginBottom: 16 }}>
               Saldo disponível:{" "}
               {balanceLoading
-                ? <span style={{ color: CYAN }}>a carregar…</span>
-                : <span style={{ color: CYAN }}>{fmtMZN(balance)} MZN</span>
+                ? <span style={{ color: "#374151" }}>a carregar…</span>
+                : <span style={{ color: "#0a0a0a", fontWeight: 600 }}>{fmtMZN(balance)} MZN</span>
               }
             </p>
 
-            <div className="flex gap-2 mb-6">
+            <div className="flex gap-2">
               {[0.25, 0.5, 0.75, 1].map(pct => (
                 <button key={pct} onClick={() => handleSetPercent(pct)}
-                  className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all"
-                  style={{ background: "#1c1c1e", color: CYAN, border: `1px solid ${CYAN}40` }}>
+                  className="px-3 py-1.5 text-xs font-semibold transition-all"
+                  style={{ background: "#f8fafc", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 0 }}>
                   {pct * 100}%
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="px-5">
+          <div className="px-5 pt-4">
             <div className="grid grid-cols-3 gap-2 mb-4">
               {["1","2","3","4","5","6","7","8","9",".","0","⌫"].map(d => (
                 <button key={d}
                   onClick={() => d === "⌫" ? handleDelete() : handleDigit(d)}
-                  className="h-14 rounded-2xl font-syne font-bold text-xl text-white flex items-center justify-center transition-all active:scale-95"
-                  style={{ background: d === "⌫" ? "#1c1c1e" : "#111" }}>
-                  {d === "⌫" ? <Delete style={{ width: 20, height: 20 }} /> : d}
+                  className="h-14 font-syne font-bold text-xl flex items-center justify-center transition-all active:scale-95"
+                  style={{ background: "#f8fafc", border: "1px solid #f1f5f9", borderRadius: 0, color: "#0a0a0a" }}>
+                  {d === "⌫" ? <span style={{ fontSize: 18, color: "#374151" }}>⌫</span> : d}
                 </button>
               ))}
             </div>
 
             {amountVal > 0 && amountVal < MIN_WITHDRAW && (
-              <div className="flex items-center gap-2 p-3 rounded-xl mb-3" style={{ background: "#1c1c1e" }}>
-                <Info style={{ width: 14, height: 14, color: "#f59e0b" }} />
-                <p className="text-xs" style={{ color: "#f59e0b" }}>Valor mínimo de levantamento: {fmtMZN(MIN_WITHDRAW)} MZN</p>
+              <div className="flex items-center gap-2 p-3 mb-3" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
+                <Info style={{ width: 13, height: 13, color: "#d97706" }} />
+                <p style={{ fontSize: 12, color: "#92400e" }}>Valor mínimo de levantamento: {fmtMZN(MIN_WITHDRAW)} MZN</p>
               </div>
             )}
-            {amountVal > MAX_WITHDRAW && (
-              <div className="flex items-center gap-2 p-3 rounded-xl mb-3" style={{ background: "#1c1c1e" }}>
-                <Info style={{ width: 14, height: 14, color: "#ef4444" }} />
-                <p className="text-xs" style={{ color: "#ef4444" }}>Saldo insuficiente</p>
+            {amountVal > MAX_WITHDRAW && amountVal > 0 && (
+              <div className="flex items-center gap-2 p-3 mb-3" style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+                <Info style={{ width: 13, height: 13, color: "#dc2626" }} />
+                <p style={{ fontSize: 12, color: "#dc2626" }}>Saldo insuficiente</p>
               </div>
             )}
 
             <button
               onClick={() => !balanceLoading && canProceed && setScreen("confirm")}
               disabled={balanceLoading || !canProceed}
-              className="w-full h-14 rounded-full font-syne font-bold text-base transition-all mb-8"
+              className="w-full h-14 font-syne font-bold text-sm transition-all mb-8"
               style={{
-                background: (!balanceLoading && canProceed) ? CYAN : "#1c1c1e",
-                color: (!balanceLoading && canProceed) ? "#000" : "#3a3a3c",
+                background: (!balanceLoading && canProceed) ? "#0a0a0a" : "#f1f5f9",
+                color: (!balanceLoading && canProceed) ? "#fff" : "#9ca3af",
+                borderRadius: 0,
+                border: "none",
                 cursor: (!balanceLoading && canProceed) ? "pointer" : "default",
+                letterSpacing: "0.3px",
               }}>
               {balanceLoading ? "A verificar saldo…" : "Continuar"}
             </button>
@@ -398,62 +395,69 @@ export default function Levantar() {
   // ─── Confirm Screen ───────────────────────────────────────────────────────
   if (screen === "confirm") {
     return (
-      <div className="min-h-screen w-full flex justify-center" style={{ background: "#000" }}>
-        <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
+      <div className="min-h-screen bg-white w-full flex justify-center">
+        <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5 bg-white">
 
-          <div className="flex items-center justify-between pt-12 pb-8">
+          <div className="flex items-center justify-between pt-12 pb-6 border-b border-slate-100">
             <button onClick={() => setScreen("amount")}
-              className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#1c1c1e" }}>
-              <ChevronLeft className="w-5 h-5 text-white" />
+              className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors">
+              <ChevronLeft className="w-5 h-5 text-[#111]" />
             </button>
-            <p className="font-semibold text-white text-base">Confirmar</p>
-            <div className="w-10" />
+            <p className="font-syne font-bold text-[#0a0a0a] text-base">Confirmar</p>
+            <div className="w-9" />
           </div>
 
-          <div className="flex flex-col items-center mb-8">
-            <p className="text-white/40 text-sm font-medium uppercase tracking-widest mb-1">Levantamento</p>
-            <p className="text-white font-light text-center"
-              style={{ fontSize: "3rem", fontFamily: "system-ui", lineHeight: 1.1 }}>
-              {fmtMZN(amountVal)}<span className="text-2xl text-white/40 ml-1">MZN</span>
+          <motion.div className="flex flex-col items-center py-8"
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.32 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 10 }}>
+              Levantamento
             </p>
-            <div className="flex items-center gap-2 mt-3 px-4 py-2 rounded-full" style={{ background: "#1c1c1e" }}>
-              <Smartphone style={{ width: 14, height: 14, color: CYAN }} />
-              <span className="text-white/70 text-sm">{METHOD_NAME} · {phoneDisplay}</span>
+            <p className="font-syne font-bold text-center" style={{ fontSize: "2.8rem", lineHeight: 1.1, color: "#0a0a0a" }}>
+              {fmtMZN(amountVal)}<span style={{ fontSize: "1.4rem", color: "#9ca3af", marginLeft: 6 }}>MZN</span>
+            </p>
+            <div className="flex items-center gap-2 mt-3 px-4 py-2" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+              <Smartphone style={{ width: 13, height: 13, color: "#374151" }} />
+              <span style={{ fontSize: 12.5, color: "#6b7280" }}>{METHOD_NAME} · {phoneDisplay}</span>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="rounded-2xl overflow-hidden mb-6" style={{ background: "#1c1c1e" }}>
-            <div className="px-4 py-4 border-b" style={{ borderColor: "#2c2c2e" }}>
-              <p className="text-white font-bold text-base">Detalhes do Levantamento</p>
+          <motion.div className="mb-6" style={{ border: "1px solid #e5e7eb" }}
+            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.32 }}>
+            <div className="px-4 py-3.5 border-b border-slate-100">
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase" }}>
+                Detalhes do Levantamento
+              </p>
             </div>
             <div className="px-4 py-3 flex flex-col gap-3.5">
               {[
                 { label: "De",               val: "Saldo Disponível" },
                 { label: "Método",           val: METHOD_NAME },
                 { label: "Estado Estimado",  val: "Pendente (análise manual)" },
-                { label: "Valor a Receber",   val: `${fmtMZN(amountVal)} MZN` },
+                { label: "Valor a Receber",  val: `${fmtMZN(amountVal)} MZN` },
                 { label: "Taxa de Serviço",  val: amountVal >= MIN_WITHDRAW ? "5,00 MZN" : "0,00 MZN" },
                 { label: "Total Debitado",   val: `${fmtMZN(amountVal >= MIN_WITHDRAW ? amountVal + 5 : amountVal)} MZN` },
               ].map(row => (
                 <div key={row.label} className="flex items-center justify-between">
-                  <span className="text-sm" style={{ color: "#8e8e93" }}>{row.label}</span>
-                  <span className="text-sm font-medium text-white">{row.val}</span>
+                  <span style={{ fontSize: 13, color: "#6b7280" }}>{row.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#0a0a0a" }}>{row.val}</span>
                 </div>
               ))}
-              <div className="border-t" style={{ borderColor: "#3a3a3c" }} />
+              <div className="border-t border-slate-100" />
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-white">Você Recebe</span>
-                <span className="text-sm font-bold" style={{ color: CYAN }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#0a0a0a" }}>Você Recebe</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#16a34a" }}>
                   {fmtMZN(amountVal)} MZN
                 </span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           {processingConfirm ? (
-            <div className="h-16 rounded-full flex items-center justify-center gap-3" style={{ background: CYAN }}>
-              <div className="w-5 h-5 rounded-full border-2 border-black/25 border-t-black animate-spin" />
-              <span className="text-black font-semibold text-base">A confirmar…</span>
+            <div className="h-14 flex items-center justify-center gap-3" style={{ background: "#0a0a0a" }}>
+              <Loader2 style={{ width: 16, height: 16, color: "#fff" }} className="animate-spin" />
+              <span style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>A confirmar…</span>
             </div>
           ) : (
             <SwipeToConfirm onConfirm={handleConfirm} />
@@ -463,39 +467,39 @@ export default function Levantar() {
     );
   }
 
-  // ─── Pending Screen (realtime waiting) ────────────────────────────────────
+  // ─── Pending Screen ────────────────────────────────────────────────────────
   if (screen === "pending") {
     return (
-      <div className="min-h-screen w-full flex justify-center" style={{ background: "#000" }}>
-        <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
-          <div className="flex items-center justify-between pt-12 pb-8">
-            <div className="w-10" />
-            <p className="font-semibold text-white text-base">Levantamento</p>
-            <div className="w-10" />
+      <div className="min-h-screen bg-white w-full flex justify-center">
+        <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5 bg-white">
+          <div className="flex items-center justify-between pt-12 pb-6 border-b border-slate-100">
+            <div className="w-9" />
+            <p className="font-syne font-bold text-[#0a0a0a] text-base">Levantamento</p>
+            <div className="w-9" />
           </div>
 
-          <motion.div className="flex flex-col items-center mb-8"
-            initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
+          <motion.div className="flex flex-col items-center py-8"
+            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
             transition={{ type: "spring", stiffness: 280, damping: 20 }}>
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5 shadow-2xl relative"
-              style={{ background: "linear-gradient(135deg, #7c3aed, #4f46e5)" }}>
-              <div className="absolute inset-0 rounded-full border-4 border-transparent animate-spin"
-                style={{ borderTopColor: "#a78bfa" }} />
-              <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+            <div className="w-20 h-20 flex items-center justify-center mb-5 relative"
+              style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+              <div className="absolute inset-0 border-2 border-transparent animate-spin"
+                style={{ borderTopColor: "#0a0a0a" }} />
+              <div className="w-8 h-8 border-2 border-slate-200 border-t-slate-700 animate-spin" style={{ borderRadius: 0 }} />
             </div>
-            <p className="text-white/50 text-sm font-medium uppercase tracking-widest mb-1">A Processar</p>
-            <p className="text-white font-light text-center"
-              style={{ fontSize: "2.8rem", fontFamily: "system-ui", lineHeight: 1.1 }}>
-              {fmtMZN(amountVal)}<span className="text-2xl text-white/40 ml-1">MZN</span>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 8 }}>
+              A Processar
+            </p>
+            <p className="font-syne font-bold text-center" style={{ fontSize: "2.6rem", lineHeight: 1.1, color: "#0a0a0a" }}>
+              {fmtMZN(amountVal)}<span style={{ fontSize: "1.2rem", color: "#9ca3af", marginLeft: 6 }}>MZN</span>
             </p>
           </motion.div>
 
-          <motion.div className="rounded-2xl overflow-hidden mb-5"
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.4 }}
-            style={{ background: "#1c1c1e" }}>
-            <div className="px-4 py-4 border-b" style={{ borderColor: "#2c2c2e" }}>
-              <p className="text-white font-bold text-sm">Detalhes</p>
+          <motion.div className="mb-5" style={{ border: "1px solid #e5e7eb" }}
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.35 }}>
+            <div className="px-4 py-3.5 border-b border-slate-100">
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase" }}>Detalhes</p>
             </div>
             <div className="px-4 py-3 flex flex-col gap-3.5">
               {[
@@ -506,8 +510,8 @@ export default function Levantar() {
                 { label: "Estado",   val: "Em verificação…", highlight: true },
               ].map(row => (
                 <div key={row.label} className="flex items-center justify-between">
-                  <span className="text-sm" style={{ color: "#8e8e93" }}>{row.label}</span>
-                  <span className="text-sm font-medium" style={{ color: (row as any).highlight ? "#a78bfa" : "#fff", maxWidth: 200, textAlign: "right" }}>
+                  <span style={{ fontSize: 13, color: "#6b7280" }}>{row.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: (row as any).highlight ? "#374151" : "#0a0a0a", maxWidth: 200, textAlign: "right", fontStyle: (row as any).highlight ? "italic" : "normal" }}>
                     {row.val}
                   </span>
                 </div>
@@ -515,26 +519,26 @@ export default function Levantar() {
             </div>
           </motion.div>
 
-          <div className="flex items-start gap-2 p-3 rounded-xl mb-6" style={{ background: "#1c1c1e" }}>
-            <Info style={{ width: 14, height: 14, color: "#a78bfa", marginTop: 2, flexShrink: 0 }} />
-            <p className="text-xs" style={{ color: "#8e8e93", lineHeight: 1.5 }}>
+          <div className="flex items-start gap-2 p-3.5 mb-4" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+            <Info style={{ width: 13, height: 13, color: "#374151", marginTop: 2, flexShrink: 0 }} />
+            <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
               O teu pedido foi recebido e está a ser verificado. Aguarda a confirmação — esta página actualiza automaticamente em tempo real.
             </p>
           </div>
 
           <motion.div
-            animate={{ opacity: [0.5, 1, 0.5] }}
+            animate={{ opacity: [0.6, 1, 0.6] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="flex items-center justify-center gap-2 py-3 rounded-xl mb-4"
-            style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.2)" }}>
-            <div className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
-            <span className="text-xs font-semibold text-violet-400">A aguardar aprovação do administrador…</span>
+            className="flex items-center justify-center gap-2 py-3 mb-4"
+            style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+            <div className="w-2 h-2 bg-slate-400 animate-pulse" style={{ borderRadius: 0 }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>A aguardar aprovação do administrador…</span>
           </motion.div>
 
           <button
             onClick={() => setLocation("/perfil")}
-            className="w-full py-4 rounded-2xl font-bold text-sm"
-            style={{ background: "rgba(124,58,237,0.12)", color: "#a78bfa", border: "1px solid rgba(124,58,237,0.25)" }}>
+            className="w-full py-4 font-semibold text-sm transition-all"
+            style={{ background: "#f8fafc", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 0 }}>
             Aguardar no Perfil
           </button>
         </div>
@@ -546,40 +550,45 @@ export default function Levantar() {
   if (screen === "approved") {
     const fee = amountVal >= MIN_WITHDRAW ? 5 : 0;
     return (
-      <div className="min-h-screen w-full flex justify-center" style={{ background: "#000" }}>
-        <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5 pb-10">
-          <div className="flex items-center justify-between pt-12 pb-6">
+      <div className="min-h-screen bg-white w-full flex justify-center">
+        <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5 pb-10 bg-white">
+          <div className="flex items-center justify-between pt-12 pb-4 border-b border-slate-100">
             <button onClick={() => setLocation("/perfil")}
-              className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#1c1c1e" }}>
-              <ChevronLeft className="w-5 h-5 text-white" />
+              className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors">
+              <ChevronLeft className="w-5 h-5 text-[#111]" />
             </button>
-            <p className="font-semibold text-white text-base">Levantamento</p>
-            <div className="w-10" />
+            <p className="font-syne font-bold text-[#0a0a0a] text-base">Levantamento</p>
+            <div className="w-9" />
           </div>
 
-          <motion.div className="flex flex-col items-center mb-6"
-            initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
-            transition={{ type: "spring", stiffness: 280, damping: 20 }}>
-            <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4 shadow-2xl"
-              style={{ background: "linear-gradient(135deg, #00b09b, #00D4B4)" }}>
-              <CheckCircle2 className="w-10 h-10 text-white" strokeWidth={2.5} />
-            </div>
-            <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-1">Pagamento Aprovado</p>
-            <p className="text-white font-light text-center"
-              style={{ fontSize: "2.6rem", fontFamily: "system-ui", lineHeight: 1.1 }}>
-              {fmtMZN(amountVal)}<span className="text-xl text-white/40 ml-1">MZN</span>
+          <motion.div className="flex flex-col items-center py-8"
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.38 }}>
+            <motion.div
+              initial={{ scale: 0 }} animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 260, damping: 18 }}
+              className="w-20 h-20 flex items-center justify-center mb-5"
+              style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+              <CheckCircle2 style={{ width: 36, height: 36, color: "#16a34a" }} strokeWidth={2} />
+            </motion.div>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 8 }}>
+              Pagamento Aprovado
             </p>
-            <p className="text-white/40 text-sm mt-2 text-center">
+            <p className="font-syne font-bold text-center" style={{ fontSize: "2.6rem", lineHeight: 1.1, color: "#0a0a0a" }}>
+              {fmtMZN(amountVal)}<span style={{ fontSize: "1.2rem", color: "#9ca3af", marginLeft: 6 }}>MZN</span>
+            </p>
+            <p style={{ fontSize: 13, color: "#6b7280", marginTop: 8, textAlign: "center" }}>
               O valor foi enviado para o teu {METHOD_NAME}.
             </p>
           </motion.div>
 
-          <motion.div className="rounded-2xl overflow-hidden mb-5"
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15, duration: 0.4 }}
-            style={{ background: "#1c1c1e" }}>
-            <div className="px-4 py-4 border-b" style={{ borderColor: "#2c2c2e" }}>
-              <p className="text-white font-bold text-sm">Recibo do Levantamento</p>
+          <motion.div className="mb-5" style={{ border: "1px solid #e5e7eb" }}
+            initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15, duration: 0.35 }}>
+            <div className="px-4 py-3.5 border-b border-slate-100">
+              <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase" }}>
+                Recibo do Levantamento
+              </p>
             </div>
             <div className="px-4 py-3 flex flex-col gap-3.5">
               {[
@@ -591,16 +600,16 @@ export default function Levantar() {
                 { label: "Total Debitado",   val: `${fmtMZN(amountVal + fee)} MZN` },
               ].map(row => (
                 <div key={row.label} className="flex items-center justify-between">
-                  <span className="text-sm" style={{ color: "#8e8e93" }}>{row.label}</span>
-                  <span className="text-sm font-medium text-white text-right" style={{ maxWidth: 200 }}>
+                  <span style={{ fontSize: 13, color: "#6b7280" }}>{row.label}</span>
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#0a0a0a", textAlign: "right", maxWidth: 200 }}>
                     {row.val}
                   </span>
                 </div>
               ))}
-              <div className="border-t" style={{ borderColor: "#3a3a3c" }} />
+              <div className="border-t border-slate-100" />
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-white">Você Recebeu</span>
-                <span className="text-base font-bold" style={{ color: CYAN }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#0a0a0a" }}>Você Recebeu</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "#16a34a" }}>
                   {fmtMZN(amountVal)} MZN
                 </span>
               </div>
@@ -609,16 +618,16 @@ export default function Levantar() {
 
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
-            className="flex items-center gap-2 p-3 rounded-xl mb-6" style={{ background: "rgba(0,212,180,0.08)", border: `1px solid ${CYAN}22` }}>
-            <CheckCircle2 style={{ width: 14, height: 14, color: CYAN, flexShrink: 0 }} />
-            <p className="text-xs" style={{ color: "#8e8e93", lineHeight: 1.5 }}>
+            className="flex items-center gap-2 p-3.5 mb-6" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+            <CheckCircle2 style={{ width: 13, height: 13, color: "#16a34a", flexShrink: 0 }} />
+            <p style={{ fontSize: 12, color: "#166534", lineHeight: 1.5 }}>
               Transação concluída com sucesso. Guarda este recibo para referência futura.
             </p>
           </motion.div>
 
           <button onClick={() => setLocation("/perfil")}
-            className="w-full h-14 rounded-full font-semibold text-base text-black"
-            style={{ background: CYAN }}>
+            className="w-full h-14 font-syne font-bold text-sm text-white transition-all"
+            style={{ background: "#0a0a0a", borderRadius: 0, border: "none", letterSpacing: "0.3px" }}>
             Voltar ao Perfil
           </button>
         </div>
@@ -628,39 +637,46 @@ export default function Levantar() {
 
   // ─── Rejected Screen ──────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen w-full flex justify-center" style={{ background: "#000" }}>
-      <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
-        <div className="flex items-center justify-between pt-12 pb-8">
+    <div className="min-h-screen bg-white w-full flex justify-center">
+      <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5 bg-white">
+        <div className="flex items-center justify-between pt-12 pb-4 border-b border-slate-100">
           <button onClick={() => setScreen("amount")}
-            className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "#1c1c1e" }}>
-            <ChevronLeft className="w-5 h-5 text-white" />
+            className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors">
+            <ChevronLeft className="w-5 h-5 text-[#111]" />
           </button>
-          <p className="font-semibold text-white text-base">Levantamento</p>
-          <div className="w-10" />
+          <p className="font-syne font-bold text-[#0a0a0a] text-base">Levantamento</p>
+          <div className="w-9" />
         </div>
-        <motion.div className="flex flex-col items-center mb-8"
-          initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "spring", stiffness: 280, damping: 20 }}>
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5 shadow-2xl"
-            style={{ background: "linear-gradient(135deg, #c0392b, #e74c3c)" }}>
-            <XCircle className="w-10 h-10 text-white" strokeWidth={2.5} />
-          </div>
-          <p className="text-white/50 text-sm font-medium uppercase tracking-widest mb-1">Recusado</p>
-          <p className="text-white font-light text-center"
-            style={{ fontSize: "2.8rem", fontFamily: "system-ui", lineHeight: 1.1 }}>
-            {fmtMZN(amountVal)}<span className="text-2xl text-white/40 ml-1">MZN</span>
+
+        <motion.div className="flex flex-col items-center py-8"
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.38 }}>
+          <motion.div
+            initial={{ scale: 0 }} animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 18 }}
+            className="w-20 h-20 flex items-center justify-center mb-5"
+            style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+            <XCircle style={{ width: 36, height: 36, color: "#dc2626" }} strokeWidth={2} />
+          </motion.div>
+          <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 8 }}>
+            Recusado
+          </p>
+          <p className="font-syne font-bold text-center" style={{ fontSize: "2.6rem", lineHeight: 1.1, color: "#0a0a0a" }}>
+            {fmtMZN(amountVal)}<span style={{ fontSize: "1.2rem", color: "#9ca3af", marginLeft: 6 }}>MZN</span>
           </p>
         </motion.div>
-        <div className="flex items-start gap-3 p-3.5 rounded-2xl mb-6" style={{ background: "#1c1c1e" }}>
-          <AlertTriangle style={{ width: 16, height: 16, color: "#f39c12", flexShrink: 0, marginTop: 2 }} />
-          <p className="text-xs leading-relaxed" style={{ color: "#8e8e93" }}>
+
+        <div className="flex items-start gap-3 p-3.5 mb-6" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
+          <AlertTriangle style={{ width: 14, height: 14, color: "#d97706", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: 12, color: "#92400e", lineHeight: 1.5 }}>
             O teu pedido de levantamento foi recusado pelo administrador. O valor foi devolvido ao teu saldo.
           </p>
         </div>
+
         <div className="flex flex-col gap-3">
           <button onClick={() => { setAmountStr(""); setScreen("amount"); }}
-            className="w-full h-14 rounded-full font-semibold text-base text-black"
-            style={{ background: CYAN }}>
+            className="w-full h-14 font-syne font-bold text-sm text-white transition-all"
+            style={{ background: "#0a0a0a", borderRadius: 0, border: "none", letterSpacing: "0.3px" }}>
             Tentar Novamente
           </button>
         </div>
