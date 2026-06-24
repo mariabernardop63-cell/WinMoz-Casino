@@ -277,21 +277,29 @@ export default function BottomNav() {
       }
     } catch { /* use existing state */ }
 
-    // Verify match is still active in DB before showing resume modal
-    if (currentGame?.gameId && currentGame.gameId !== "local") {
+    // Verify match is still active in DB — only for real multiplayer games
+    // Bot games (gameId starts with "bot_") are never stored in the matches table,
+    // so skip the DB check for them entirely to avoid false-clearing.
+    const isRealMultiplayer = currentGame?.gameId
+      && currentGame.gameId !== "local"
+      && !currentGame.gameId.startsWith("bot_");
+
+    if (isRealMultiplayer) {
       try {
         const { data } = await supabase
           .from("matches")
           .select("status")
-          .eq("id", currentGame.gameId)
+          .eq("id", currentGame!.gameId)
           .single();
-        if (!data || data.status === "finished" || data.status === "cancelled") {
+        // Only clear if the server EXPLICITLY says the match ended.
+        // If data is null (record not found), show the resume optimistically.
+        if (data && (data.status === "finished" || data.status === "cancelled")) {
           localStorage.removeItem("wm_active_game");
           setActiveGame(null);
-          setShowResume(true); // shows the "no active game" picker
+          setShowResume(true);
           return;
         }
-      } catch { /* ignore — show resume optimistically */ }
+      } catch { /* network error — show resume optimistically */ }
     }
 
     setShowResume(true);
