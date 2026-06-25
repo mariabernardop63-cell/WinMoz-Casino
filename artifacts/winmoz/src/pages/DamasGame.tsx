@@ -6,11 +6,40 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
 import AdBanner from "@/components/AdBanner";
-import captureSoundUrl from "@assets/som_para_quando_o_peao_é_matado_1781479683373.mp3";
-
 // ─── Sound helpers ────────────────────────────────────────────────────────────
 function playDamasCapture() {
-  try { const a = new Audio(captureSoundUrl); a.volume = 0.65; a.play().catch(()=>{}); } catch {}
+  try {
+    const AC = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new AC();
+    const t = ctx.currentTime;
+
+    // Low thud: filtered noise burst
+    const bufLen = Math.floor(ctx.sampleRate * 0.18);
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const ch = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufLen, 1.8);
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const lpf = ctx.createBiquadFilter();
+    lpf.type = "lowpass"; lpf.frequency.value = 180;
+    const ng = ctx.createGain();
+    ng.gain.setValueAtTime(1.1, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    noise.connect(lpf); lpf.connect(ng); ng.connect(ctx.destination);
+    noise.start(t); noise.stop(t + 0.18);
+
+    // Short tonal impact
+    const osc = ctx.createOscillator();
+    const og = ctx.createGain();
+    osc.type = "sine"; osc.frequency.setValueAtTime(110, t);
+    osc.frequency.exponentialRampToValueAtTime(38, t + 0.09);
+    og.gain.setValueAtTime(0.8, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    osc.connect(og); og.connect(ctx.destination);
+    osc.start(t); osc.stop(t + 0.12);
+
+    setTimeout(() => ctx.close().catch(() => {}), 600);
+  } catch { /* noop */ }
 }
 function playDamasMove() {
   try {

@@ -11,6 +11,8 @@ import {
 import { useAdminTheme } from "@/admin/contexts/AdminThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { adminSupabase } from "@/admin/lib/supabase-api";
+import { playAdminNotificationSound } from "@/admin/hooks/useAdminNotificationSound";
 
 /* Warm up the Web Audio API context on first interaction so notification
    sounds are never blocked by the browser's autoplay policy. */
@@ -42,6 +44,23 @@ function useAudioWarmup() {
       document.removeEventListener("touchstart", warmup);
       document.removeEventListener("keydown",    warmup);
     };
+  }, []);
+}
+
+/* Listen for new pending withdrawal transactions via Supabase Realtime.
+   Fires in every open admin session, not just the withdrawals page. */
+function useWithdrawalNotification() {
+  useEffect(() => {
+    const channel = adminSupabase
+      .channel("admin-layout-wd-watcher-v1")
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .on("postgres_changes" as any, { event: "INSERT", schema: "public", table: "transactions" }, (payload: any) => {
+        if (payload.new?.type === "withdrawal" && payload.new?.status === "pending") {
+          playAdminNotificationSound("withdrawal");
+        }
+      })
+      .subscribe();
+    return () => { adminSupabase.removeChannel(channel); };
   }, []);
 }
 
@@ -320,6 +339,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   });
   useAudioWarmup();
+  useWithdrawalNotification();
 
   const handleNavPosChange = (pos: NavPos) => {
     setNavPos(pos);

@@ -3,6 +3,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminSupabase, useAdminRealtimeSync } from "@/admin/lib/supabase-api";
 import { adminReEnable } from "@/lib/botBrain";
 import { motion, AnimatePresence } from "framer-motion";
+
+// Session-level flag — prevents the auto-disable loop when the admin
+// manually re-enables bots. Cleared on page refresh (intended).
+let _sessionBotOverride = false;
 import {
   AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer,
   BarChart, Bar, Tooltip as RTooltip, XAxis,
@@ -275,6 +279,9 @@ function LossLimitCard({
   const [editing, setEditing] = useState(false);
   const [draft,   setDraft]   = useState(String(limit));
   const pct    = limit > 0 ? Math.min(100, Math.round((currentLoss / limit) * 100)) : 0;
+
+  // Keep draft in sync with external limit changes when not editing
+  useEffect(() => { if (!editing) setDraft(String(limit)); }, [limit, editing]);
   const danger = pct >= 80;
   const color  = pct >= 100 ? T.red : pct >= 80 ? T.amber : T.teal;
 
@@ -284,8 +291,12 @@ function LossLimitCard({
 
   function save() {
     const v = parseInt(draft, 10);
-    if (!isNaN(v) && v > 0) setLimit(v);
-    setEditing(false);
+    if (!isNaN(v) && v > 0) {
+      setLimit(v);
+      setEditing(false);
+    } else {
+      setDraft(""); // clear to signal invalid input visually
+    }
   }
 
   return (
@@ -428,6 +439,8 @@ export default function BotManagement() {
 
   useEffect(() => {
     if (!data) return;
+    // Skip auto-disable if the admin manually re-enabled this session
+    if (_sessionBotOverride) return;
     if (data.autoDisable && localStorage.getItem("wm_bots_autodisabled") !== "true") {
       localStorage.setItem("wm_bots_disabled", "true");
       localStorage.setItem("wm_bots_autodisabled", "true");
@@ -449,6 +462,7 @@ export default function BotManagement() {
     const next = !botsEnabled;
     setToggling(true);
     if (next) {
+      _sessionBotOverride = true; // prevents auto-disable loop this session
       adminReEnable();
       localStorage.removeItem("wm_bots_autodisabled");
       setLimitTriggered(false);

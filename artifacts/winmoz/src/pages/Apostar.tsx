@@ -353,7 +353,7 @@ function SMSBettingScreen({
             <div className="flex items-center justify-center mb-7">
               <div className="px-5 py-2" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
                 <span style={{ fontSize: 12.5, color: "#6b7280" }}>A apostar: </span>
-                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0a0a0a" }}>{fmtMT(amount)} MZN</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0a0a0a" }}>{amount} MZN</span>
               </div>
             </div>
 
@@ -419,8 +419,8 @@ function SMSBettingScreen({
               <div className="flex items-start gap-3">
                 <span style={{ fontSize: 14, marginTop: 1 }}>ℹ️</span>
                 <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
-                  O pagamento é processado pelo gateway seguro <strong style={{ color: "#374151" }}>Debito Pay</strong>.
-                  Receberás um pedido USSD no teu telemóvel para confirmar com o teu PIN e-Mola.
+                  O pagamento é processado por um sistema seguro e encriptado.
+                  Receberás um pedido USSD no teu telemóvel para confirmar com o teu PIN.
                 </p>
               </div>
             </div>
@@ -558,7 +558,7 @@ function SMSBettingScreen({
           <div className="flex items-center justify-center mb-7">
             <div className="px-5 py-2" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
               <span style={{ fontSize: 12.5, color: "#6b7280" }}>A apostar: </span>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0a0a0a" }}>{fmtMT(amount)} MZN</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: "#0a0a0a" }}>{amount} MZN</span>
             </div>
           </div>
 
@@ -765,7 +765,7 @@ function MatchmakingScreen({
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const queueIdRef = useRef<string | null>(null);
   const BOT_ELIGIBLE = (gameType === "damas" || gameType === "xadrez") && [10, 20, 50].includes(betAmount);
-  const botThresholdRef = useRef(Math.floor(Math.random() * (45 - 18 + 1)) + 18);
+  const botThresholdRef = useRef(Math.floor(Math.random() * (30 - 15 + 1)) + 15);
 
   async function joinQueue() {
     try {
