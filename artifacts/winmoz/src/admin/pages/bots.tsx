@@ -271,10 +271,10 @@ async function fetchBotData() {
 
 // ── Loss Limit Card ───────────────────────────────────────────────────────────
 function LossLimitCard({
-  limit, setLimit, currentLoss, botsEnabled, onTrigger,
+  limit, setLimit, currentLoss,
 }: {
   limit: number; setLimit: (v: number) => void;
-  currentLoss: number; botsEnabled: boolean; onTrigger: () => void;
+  currentLoss: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft,   setDraft]   = useState(String(limit));
@@ -284,10 +284,6 @@ function LossLimitCard({
   useEffect(() => { if (!editing) setDraft(String(limit)); }, [limit, editing]);
   const danger = pct >= 80;
   const color  = pct >= 100 ? T.red : pct >= 80 ? T.amber : T.teal;
-
-  useEffect(() => {
-    if (limit > 0 && currentLoss >= limit && botsEnabled) onTrigger();
-  }, [currentLoss, limit, botsEnabled, onTrigger]);
 
   function save() {
     const v = parseInt(draft, 10);
@@ -456,6 +452,18 @@ export default function BotManagement() {
     setLimitTriggered(true);
     qc.invalidateQueries({ queryKey: ["bot-stats-v4"] });
   }
+
+  // ── Loss limit watcher: fires whenever current loss reaches the configured limit ─
+  const limitTriggeredRef = React.useRef(false);
+  useEffect(() => {
+    if (!botsEnabled) { limitTriggeredRef.current = false; return; }
+    if (lossLimit <= 0) return;
+    if (currentLoss >= lossLimit && !limitTriggeredRef.current) {
+      limitTriggeredRef.current = true;
+      handleLossLimitTrigger();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLoss, lossLimit, botsEnabled]);
 
   function handleToggle() {
     if (toggling) return;
@@ -800,8 +808,7 @@ export default function BotManagement() {
             <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
               <LossLimitCard
                 limit={lossLimit} setLimit={setLossLimit}
-                currentLoss={currentLoss} botsEnabled={botsEnabled}
-                onTrigger={handleLossLimitTrigger}
+                currentLoss={currentLoss}
               />
             </motion.div>
 

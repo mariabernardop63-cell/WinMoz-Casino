@@ -280,11 +280,24 @@ function _expandAIMoves(
     nb[cur[0]][cur[1]] = null;
     nb[cap[0]][cap[1]] = null;
     const piece = nb[to[0]][to[1]]!;
-    if (!piece.isDame) {
-      if (piece.color === "w" && to[0] === 0) nb[to[0]][to[1]] = { ...piece, isDame: true };
-      if (piece.color === "b" && to[0] === 7) nb[to[0]][to[1]] = { ...piece, isDame: true };
+    // Check if this move causes promotion (piece reaches far row for the first time)
+    const willPromote = !piece.isDame && (
+      (piece.color === "w" && to[0] === 0) ||
+      (piece.color === "b" && to[0] === 7)
+    );
+    if (willPromote) {
+      nb[to[0]][to[1]] = { ...piece, isDame: true };
+    } else if (!piece.isDame) {
+      // no promotion needed, piece stays normal
     }
     const ne = new Set(excl); ne.add(sqKey(cap[0], cap[1]));
+    // Rule (Damas de Moçambique): when a piece becomes a dame for the first time
+    // in a chain capture, the chain STOPS — it cannot immediately continue
+    // capturing with long-range dame logic in the same turn.
+    if (willPromote) {
+      out.push({ from: orig, to, captured: [...caps, cap] });
+      continue;
+    }
     // King: after moving in direction (dr,dc), the reverse direction is forbidden next
     const mdr = Math.sign(to[0] - cur[0]), mdc = Math.sign(to[1] - cur[1]);
     const nextForbidden: [number,number] | undefined = piece.isDame ? [-mdr as -1|1, -mdc as -1|1] : undefined;
@@ -344,6 +357,7 @@ function aiEval(b: Board, forColor: PColor): number {
 
   const forKings = forPieces.filter(p => p.isDame);
   const oppKings = oppPieces.filter(p => p.isDame);
+  const onlyKingsLeft = forPieces.length === forKings.length && oppPieces.length === oppKings.length;
 
   // ── King endgame: we have kings + opponent has only 1 king left ──────────
   if (oppPieces.length === 1 && oppKings.length === 1 && forPieces.length >= 2 && forKings.length >= 1) {
@@ -368,6 +382,36 @@ function aiEval(b: Board, forColor: PColor): number {
       if (dists[0] <= 3) score += 60;
       if (dists.length >= 2 && dists[1] <= 5) score += 45;
     }
+  } else if (onlyKingsLeft && forKings.length > 0 && oppKings.length > 0) {
+    // ── All-kings endgame (both sides only kings) ──────────────────────────
+    const forMob = getMobility(b, forColor);
+    const oppMob = getMobility(b, oppColor);
+
+    // Mobility advantage is critical in king endgames
+    score += (forMob - oppMob) * 18;
+
+    if (forKings.length > oppKings.length) {
+      // We have more kings: push opponent kings to edges/corners
+      for (const ok of oppKings) {
+        const edgeDist = Math.min(ok.r, 7 - ok.r, ok.c, 7 - ok.c);
+        score += (3 - edgeDist) * 30; // penalise opponent kings near centre
+        // Bring our kings close to each opponent king
+        for (const fk of forKings) {
+          const dist = Math.abs(fk.r - ok.r) + Math.abs(fk.c - ok.c);
+          score -= dist * 10;
+        }
+      }
+      score += (forKings.length - oppKings.length) * 120;
+    } else if (forKings.length === oppKings.length) {
+      // Equal kings: favour diagonal opposition and central control
+      for (const fk of forKings) {
+        const centralBonus = (fk.r >= 2 && fk.r <= 5 && fk.c >= 2 && fk.c <= 5) ? 20 : 0;
+        score += centralBonus;
+      }
+      score += (forMob - oppMob) * 25;
+    }
+    // Restrict opponent mobility
+    score -= oppMob * 12;
   } else if (forKings.length >= 1 || oppKings.length >= 1) {
     // General king/endgame mobility advantage
     const forMob = getMobility(b, forColor);
@@ -414,11 +458,11 @@ function getBestBotMove(b: Board, botColor: PColor, depth: number = AI_DEPTH): A
   if (depth < 4 && Math.random() < 0.45) {
     return moves[Math.floor(Math.random() * Math.min(moves.length, 4))];
   }
-  // Increase depth for king endgame (opponent has single king, we must corner it)
+  // Increase depth for king endgame (any all-kings situation or opponent nearly gone)
   const oppColor = opp(botColor);
   const oppPieces = b.flat().filter(p => p?.color === oppColor);
   const allKingsOnly = b.flat().every(p => p === null || p.isDame);
-  const endgameDepth = (oppPieces.length <= 2 && allKingsOnly) ? Math.max(depth, 10) : depth;
+  const endgameDepth = allKingsOnly ? Math.max(depth, 10) : (oppPieces.length <= 2 ? Math.max(depth, 9) : depth);
 
   let bestMove: AIMove = moves[0];
   let bestVal = -Infinity;
@@ -879,7 +923,14 @@ export default function DamasGame() {
   useEffect(() => {
     if (!isBot || turn !== oppColor || !!winner) return;
     setBotThinking(true);
-    const delay = 900 + Math.random() * 700;
+    // Realistic thinking delay: varies by position complexity so the timer visibly counts down.
+    // Simple positions: 2–5 s. Complex (all-kings or multiple captures): 5–10 s. Never hits 30 s.
+    const currentMoves = aiGetAllMoves(boardRef.current, oppColor);
+    const hasCaptures = currentMoves.some(m => m.captured.length > 0);
+    const allKings = boardRef.current.flat().every(p => p === null || p.isDame);
+    const minDelay = allKings ? 5000 : hasCaptures ? 3500 : 2000;
+    const maxDelay = allKings ? 10000 : hasCaptures ? 8000 : 5000;
+    const delay = minDelay + Math.random() * (maxDelay - minDelay);
     const pendingTimers: ReturnType<typeof setTimeout>[] = [];
 
     const mainTimer = setTimeout(() => {
@@ -1400,12 +1451,21 @@ export default function DamasGame() {
     if (chainPiece) {
       const dest = validCapDests.find(d => d.to[0] === r && d.to[1] === c);
       if (!dest) return;
+      // Check if the piece will be promoted by this capture step
+      const pieceBeforeCapture = boardRef.current[chainPiece[0]][chainPiece[1]];
       const newBoard = applyBoardMove(boardRef.current, chainPiece, dest.to, [dest.cap]);
+      const pieceAfterCapture = newBoard[dest.to[0]][dest.to[1]];
+      const justPromoted = !pieceBeforeCapture?.isDame && pieceAfterCapture?.isDame;
       setBoard(newBoard);
       boardRef.current = newBoard;
       const newExcl = new Set(chainExcl); newExcl.add(sqKey(dest.cap[0], dest.cap[1]));
       const newAllCaptured = [...allCaptured, dest.cap];
       const origFrom = chainFrom ?? chainPiece;
+      // Rule: if piece just became a dame, stop the chain — cannot capture as dame in same turn
+      if (justPromoted) {
+        finalizeTurn(origFrom, dest.to, newAllCaptured, newBoard);
+        return;
+      }
       // Compute forbidden direction for king: cannot reverse the direction just moved
       const movedPiece = newBoard[dest.to[0]][dest.to[1]];
       const mdr = Math.sign(dest.to[0] - chainPiece[0]), mdc = Math.sign(dest.to[1] - chainPiece[1]);
@@ -1434,9 +1494,17 @@ export default function DamasGame() {
       // Try move to destination
       const capDest = validCapDests.find(d => d.to[0] === r && d.to[1] === c);
       if (capDest) {
+        const pieceBeforeFirst = boardRef.current[selected[0]][selected[1]];
         const newBoard = applyBoardMove(boardRef.current, selected, capDest.to, [capDest.cap]);
+        const pieceAfterFirst = newBoard[capDest.to[0]][capDest.to[1]];
+        const firstJustPromoted = !pieceBeforeFirst?.isDame && pieceAfterFirst?.isDame;
         setBoard(newBoard); boardRef.current = newBoard;
         const newExcl = new Set(chainExcl); newExcl.add(sqKey(capDest.cap[0], capDest.cap[1]));
+        // Rule: if piece just became a dame on this capture, stop the chain
+        if (firstJustPromoted) {
+          finalizeTurn(selected, capDest.to, [capDest.cap], newBoard);
+          return;
+        }
         // Forbidden direction for first chain step (king only)
         const firstPiece = newBoard[capDest.to[0]][capDest.to[1]];
         const fdr = Math.sign(capDest.to[0] - selected[0]), fdc = Math.sign(capDest.to[1] - selected[1]);
