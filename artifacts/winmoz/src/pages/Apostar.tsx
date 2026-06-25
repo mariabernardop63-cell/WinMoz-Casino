@@ -698,80 +698,84 @@ function SMSBettingScreen({
   );
 }
 
-/* ── Rejected Screen ── */
+/* ── Rejected Screen (Saldo Insuficiente — Conta Poker) ── */
 function RejectedScreen({
   amount, balance, onRetry, onRecharge,
 }: { amount: number; balance: number; onRetry: () => void; onRecharge: () => void }) {
+  const diff = Math.max(0, amount - balance);
   return (
-    <div className="min-h-screen w-full flex justify-center" style={{ background: "#080810" }}>
+    <div className="min-h-screen bg-white w-full flex justify-center">
       <div className="w-full max-w-[430px] flex flex-col min-h-screen px-5">
-        <div className="flex items-center justify-between pt-12 pb-8">
-          <button onClick={onRetry} className="w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ background: "#1c1c1e" }}>
-            <ChevronLeft style={{ width: 20, height: 20, color: "#fff" }} />
+
+        <div className="flex items-end justify-end pt-12 pb-4">
+          <button onClick={onRetry}
+            className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 transition-colors">
+            <X style={{ width: 18, height: 18, color: "#111" }} />
           </button>
-          <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff" }}>Aposta Recusada</p>
-          <div className="w-10" />
         </div>
 
-        <motion.div className="flex flex-col items-center mb-8"
-          initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1 }}
-          transition={{ type: "spring", stiffness: 280, damping: 20 }}>
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mb-5 shadow-2xl"
-            style={{ background: "linear-gradient(135deg, #c0392b, #e74c3c)" }}>
-            <XCircle className="w-10 h-10 text-white" strokeWidth={2.5} />
-          </div>
-          <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 12, fontWeight: 600,
-            letterSpacing: "2px", textTransform: "uppercase", marginBottom: 4 }}>Recusado</p>
-          <p style={{ color: "#fff", fontFamily: "system-ui", fontWeight: 200, fontSize: "2.6rem", lineHeight: 1.1 }}>
-            {fmtMT(amount)}<span style={{ fontSize: "1.4rem", color: "rgba(255,255,255,0.35)", marginLeft: 4 }}>MZN</span>
+        <motion.div className="flex flex-col items-center mb-8 pt-2"
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.38 }}>
+          <motion.div
+            initial={{ scale: 0 }} animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 18 }}
+            className="w-20 h-20 flex items-center justify-center mb-6"
+            style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+            <XCircle style={{ width: 36, height: 36, color: "#dc2626" }} strokeWidth={2} />
+          </motion.div>
+          <h1 className="font-syne font-bold text-[22px] text-[#0a0a0a] text-center mb-2">
+            Aposta Recusada
+          </h1>
+          <p style={{ fontSize: 13, color: "#6b7280", textAlign: "center", maxWidth: 280, lineHeight: 1.6 }}>
+            O teu saldo na Conta Poker é insuficiente para cobrir o valor da aposta.
           </p>
         </motion.div>
 
-        <motion.div className="rounded-2xl overflow-hidden mb-4"
-          initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.4 }}
-          style={{ background: "#1c1c1e" }}>
-          <div className="px-4 py-4 border-b" style={{ borderColor: "#2c2c2e" }}>
-            <p style={{ color: "#fff", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14 }}>Motivo da Recusa</p>
+        <motion.div className="mb-4" style={{ border: "1px solid #e5e7eb" }}
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15, duration: 0.35 }}>
+          <div className="px-4 py-3.5 border-b border-slate-100">
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase" }}>
+              Detalhes da Recusa
+            </p>
           </div>
           <div className="px-4 py-3 flex flex-col gap-3.5">
             {[
-              { label: "Causa",             val: "Saldo Insuficiente" },
-              { label: "Saldo Actual",       val: `${fmtBalance(balance)} MZN` },
-              { label: "Aposta Solicitada",  val: `${fmtMT(amount)}` },
-              { label: "Diferença",          val: `${fmtBalance(Math.max(0, amount - balance))} MZN`, err: true },
-              { label: "Estado",             val: "Recusado ✗",                                       err: true },
+              { label: "Motivo",            val: "Saldo Insuficiente",           err: false },
+              { label: "Saldo Actual",      val: `${fmtBalance(balance)} MZN`,   err: false },
+              { label: "Aposta Solicitada", val: `${fmtMT(amount)} MZN`,         err: false },
+              { label: "Em Falta",          val: `${fmtBalance(diff)} MZN`,      err: true  },
+              { label: "Estado",            val: "Recusado ✗",                   err: true  },
             ].map(row => (
               <div key={row.label} className="flex items-center justify-between">
-                <span style={{ fontSize: 13, color: "#8e8e93" }}>{row.label}</span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: (row as any).err ? "#e74c3c" : "#fff" }}>{row.val}</span>
+                <span style={{ fontSize: 13, color: "#6b7280" }}>{row.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: row.err ? "#dc2626" : "#0a0a0a" }}>{row.val}</span>
               </div>
             ))}
           </div>
         </motion.div>
 
-        <div className="flex items-start gap-3 p-3.5 rounded-2xl mb-6" style={{ background: "#1c1c1e" }}>
-          <AlertTriangle style={{ width: 15, height: 15, color: "#f39c12", flexShrink: 0, marginTop: 2 }} />
-          <p style={{ fontSize: 12, color: "#8e8e93", lineHeight: 1.6 }}>
-            O valor da aposta excede o teu saldo disponível. Recarrega a conta ou escolhe um valor menor.
+        <div className="flex items-start gap-3 p-3.5 mb-6" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
+          <AlertTriangle style={{ width: 14, height: 14, color: "#d97706", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: 12, color: "#92400e", lineHeight: 1.5 }}>
+            Recarrega a tua Conta Poker com pelo menos <strong>{fmtBalance(diff)} MZN</strong> e tenta novamente. O teu saldo não foi debitado.
           </p>
         </div>
 
-        <div className="flex flex-col gap-3">
-          <button onClick={onRetry}
-            className="w-full h-14 rounded-full flex items-center justify-center gap-2"
-            style={{ background: `linear-gradient(135deg, ${VIOLET}, #6d28d9)`, color: "#fff",
-              fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
-            <RotateCcw style={{ width: 17, height: 17 }} /> Tentar Novamente
-          </button>
+        <div className="flex flex-col gap-3 mt-auto pb-10">
           <button onClick={onRecharge}
-            className="w-full h-14 rounded-full"
-            style={{ background: "#1c1c1e", color: "#8e8e93",
-              fontFamily: "'Syne', sans-serif", fontSize: 14, cursor: "pointer" }}>
-            Recarregar Saldo
+            className="w-full h-14 font-syne font-bold text-sm text-white flex items-center justify-center gap-2 transition-all"
+            style={{ background: "#0a0a0a", borderRadius: 0, border: "none" }}>
+            Recarregar Conta Poker
+          </button>
+          <button onClick={onRetry}
+            className="w-full h-14 font-syne font-semibold text-sm flex items-center justify-center gap-2"
+            style={{ background: "#f8fafc", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 0 }}>
+            <RotateCcw style={{ width: 15, height: 15 }} /> Tentar com outro valor
           </button>
         </div>
+
       </div>
     </div>
   );

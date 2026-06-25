@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, useMotionValue } from "framer-motion";
 import { useLocation } from "wouter";
 import {
-  ChevronLeft, Bell,
+  ChevronLeft, Bell, Clock,
   CheckCircle2, XCircle, AlertTriangle, Smartphone, Pencil, Info, Loader2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -519,17 +519,24 @@ export default function Levantar() {
             </div>
           </motion.div>
 
-          <div className="flex items-start gap-2 p-3.5 mb-4" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+          <div className="flex items-start gap-2 p-3.5 mb-3" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
             <Info style={{ width: 13, height: 13, color: "#374151", marginTop: 2, flexShrink: 0 }} />
             <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
               O teu pedido foi recebido e está a ser verificado. Aguarda a confirmação — esta página actualiza automaticamente em tempo real.
             </p>
           </div>
 
+          <div className="flex items-start gap-2 p-3.5 mb-4" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
+            <Clock style={{ width: 13, height: 13, color: "#d97706", marginTop: 2, flexShrink: 0 }} />
+            <p style={{ fontSize: 12, color: "#92400e", lineHeight: 1.5 }}>
+              O levantamento pode demorar entre <strong>5 a 50 minutos</strong> após a submissão, dependendo do volume de pedidos. Não precisas de ficar nesta página — serás notificado quando aprovado.
+            </p>
+          </div>
+
           <motion.div
             animate={{ opacity: [0.6, 1, 0.6] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="flex items-center justify-center gap-2 py-3 mb-4"
+            className="flex items-center justify-center gap-2 py-3 mb-5"
             style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
             <div className="w-2 h-2 bg-slate-400 animate-pulse" style={{ borderRadius: 0 }} />
             <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>A aguardar aprovação do administrador…</span>
@@ -537,10 +544,14 @@ export default function Levantar() {
 
           <button
             onClick={() => setLocation("/perfil")}
-            className="w-full py-4 font-semibold text-sm transition-all"
-            style={{ background: "#f8fafc", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 0 }}>
-            Aguardar no Perfil
+            className="w-full h-14 font-syne font-bold text-sm flex items-center justify-center gap-2 transition-all"
+            style={{ background: "#0a0a0a", color: "#fff", border: "none", borderRadius: 0 }}>
+            <ChevronLeft style={{ width: 16, height: 16 }} />
+            Voltar ao Perfil
           </button>
+          <p style={{ fontSize: 11, color: "#9ca3af", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
+            O pedido continua em processo mesmo saindo desta página.
+          </p>
         </div>
       </div>
     );
