@@ -3,6 +3,9 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
+const MAX_MESSAGES = 20;
+const MAX_MESSAGE_LENGTH = 1000;
+
 const SYSTEM_PROMPT = `És a "Winner", assistente virtual oficial da Poker Winner (pokerwinner.online).
 
 ⚠️ REGRA ABSOLUTA — LÊ ISTO PRIMEIRO:
@@ -78,9 +81,11 @@ PERSONALIDADE:
 Sê calorosa, próxima e natural. Tom descontraído mas profissional. Usa "tu". Responde em Português de Moçambique. Sem asteriscos, sem markdown. Máximo 3-4 frases por resposta. Emojis com moderação (1-2 por resposta). Nunca inventes dados de utilizadores ou garantas resultados.`;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const allowedOrigin = process.env["ALLOWED_ORIGIN"] || process.env["VITE_APP_URL"] || "*";
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("X-Content-Type-Options", "nosniff");
 
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
@@ -102,6 +107,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // SECURITY: Limit conversation length and message size to prevent API abuse
+  if (messages.length > MAX_MESSAGES) {
+    res.status(400).json({ error: "Conversa demasiado longa" });
+    return;
+  }
+
+  // SECURITY: Validate and sanitize each message
+  for (const msg of messages) {
+    if (!msg || typeof msg !== "object") {
+      res.status(400).json({ error: "Formato de mensagem inválido" });
+      return;
+    }
+    if (!["user", "assistant"].includes(msg.role)) {
+      res.status(400).json({ error: "Papel de mensagem inválido" });
+      return;
+    }
+    if (typeof msg.content !== "string") {
+      res.status(400).json({ error: "Conteúdo de mensagem inválido" });
+      return;
+    }
+    if (msg.content.length > MAX_MESSAGE_LENGTH) {
+      res.status(400).json({ error: "Mensagem demasiado longa" });
+      return;
+    }
+  }
+
+  // SECURITY: Only pass user/assistant messages, stripping any injected system roles
+  const safeMessages = messages
+    .filter(m => m.role === "user" || m.role === "assistant")
+    .map(m => ({ role: m.role, content: m.content.slice(0, MAX_MESSAGE_LENGTH) }));
+
   try {
     const response = await fetch(GROQ_API_URL, {
       method: "POST",
@@ -111,15 +147,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       body: JSON.stringify({
         model: GROQ_MODEL,
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...safeMessages],
         max_tokens: 500,
         temperature: 0.6,
       }),
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("Groq API error:", response.status, errText);
+      // SECURITY: Don't leak API error details to the client
+      console.error("Groq API error:", response.status);
       res.status(200).json({
         reply: "Ocorreu um problema ao processar a tua mensagem. Por favor tenta novamente ou contacta o suporte: +258 86 338 7488.",
       });
@@ -136,7 +172,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     res.status(200).json({ reply });
   } catch (err) {
-    console.error("Support chat error:", err);
+    console.error("Support chat error:", typeof err === "object" && err !== null && "message" in err ? (err as Error).message : "unknown");
     res.status(200).json({
       reply: "Ocorreu um erro interno. Por favor tenta novamente em instantes ou contacta-nos: +258 86 338 7488.",
     });

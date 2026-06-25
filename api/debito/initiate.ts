@@ -4,11 +4,21 @@ import { createClient } from "@supabase/supabase-js";
 export const config = { maxDuration: 120 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const allowedOrigin = process.env["ALLOWED_ORIGIN"] || process.env["VITE_APP_URL"] || "*";
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("X-Content-Type-Options", "nosniff");
   if (req.method === "OPTIONS") { res.status(200).end(); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  // SECURITY: Extract userId from JWT, never trust the request body for userId
+  const authHeader = (req.headers.authorization as string) ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) {
+    res.status(401).json({ error: "Não autenticado" });
+    return;
+  }
 
   let parsedBody: Record<string, any> = {};
   try {
@@ -26,7 +36,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       parsedBody = JSON.parse(Buffer.concat(chunks).toString("utf8"));
     }
   } catch (e) {
-    console.error("[debito/initiate] Body parse error:", e);
     res.status(400).json({ error: "Pedido inválido — não foi possível ler os dados." });
     return;
   }
@@ -35,9 +44,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const phoneRaw: string = String(parsedBody["phone"] ?? "");
   const paymentMethod: string = String(parsedBody["provider"] ?? "emola");
   const type: string = String(parsedBody["type"] ?? "deposit");
-  const userId: string = String(parsedBody["userId"] ?? "");
-
-  console.log("[debito/initiate] Parsed — amount:", amount, "phone:", phoneRaw, "method:", paymentMethod, "type:", type, "userId:", userId ? "ok" : "MISSING");
 
   if (!amount || isNaN(amount) || amount <= 0) {
     res.status(400).json({ error: `Montante inválido (recebido: ${parsedBody["amount"]})` });
@@ -45,10 +51,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (!phoneRaw || phoneRaw.replace(/\D/g, "").length < 9) {
     res.status(400).json({ error: "Número de telefone inválido" });
-    return;
-  }
-  if (!userId || userId === "undefined") {
-    res.status(400).json({ error: "Utilizador não autenticado" });
     return;
   }
 
@@ -69,6 +71,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // SECURITY: Verify token and extract the real userId from Supabase Auth
+  const { data: userData, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !userData?.user) {
+    res.status(401).json({ error: "Sessão inválida. Faz login novamente." });
+    return;
+  }
+  const userId = userData.user.id; // always from JWT, never from body
+
+  console.log("[debito/initiate] auth ok — userId:", userId ? "ok" : "MISSING", "amount:", amount, "method:", paymentMethod);
+
   const { data: settingsRows } = await supabase
     .from("platform_settings")
     .select("key, value")
@@ -85,10 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ? (settings["debito_mpesa_wallet_code"] || process.env["DEBITO_MPESA_WALLET_CODE"] || "58335").trim()
     : (settings["debito_wallet_code"] || process.env["DEBITO_WALLET_CODE"] || "55291").trim();
 
-  console.log("[debito/initiate] provider:", paymentMethod, "| wallet_code:", walletCode, "| merchant_id:", merchantId ? "ok" : "VAZIO");
-
   if (walletCode.length > 10 || !/^\d+$/.test(walletCode)) {
-    console.error("[debito/initiate] wallet_code inválido:", walletCode);
     res.status(503).json({ error: "Configuração do gateway inválida (wallet_code). Contacta o suporte." });
     return;
   }
@@ -98,7 +107,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const sourceId = `MOZBET-${type.toUpperCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-  // Fetch user name for the request (helps M-Pesa USSD display correct name)
   let customerName = "Cliente WinMoz";
   try {
     const { data: profileData } = await supabase
@@ -111,8 +119,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   } catch { /* best-effort */ }
 
-  // === STEP 1: Create PENDING transaction BEFORE calling Debito Pay ===
-  // This ensures we always have a txId to return, even if the API call times out.
   const { data: txRow, error: txError } = await supabase
     .from("transactions")
     .insert({
@@ -143,7 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const txId = (txRow as any).id as string;
-  console.log("[debito/initiate] TX criada (pending) antes da chamada Debito Pay:", txId);
+  console.log("[debito/initiate] TX criada (pending):", txId);
 
   try {
     const debitoBody: Record<string, any> = {
@@ -161,13 +167,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     const debitoUrl = `${debitoBaseUrl}/payment-orchestrator`;
-    console.log("[debito/initiate] → Debito Pay:", debitoUrl, JSON.stringify({ ...debitoBody, merchant_id: merchantId ? `${merchantId.slice(0, 8)}...` : "VAZIO" }));
+    // SECURITY: Never log API keys or auth headers
+    console.log("[debito/initiate] → Debito Pay:", debitoUrl, "provider:", paymentMethod, "amount:", amount);
 
-    // === STEP 2: AbortController — 110s for M-Pesa, 30s for eMola ===
-    // M-Pesa is synchronous: Debito Pay holds the connection until the user enters their PIN (~60-120s).
-    // Cutting the connection early causes Debito Pay to cancel the USSD → "MMI INVALID" on the phone.
-    // maxDuration: 120 is set above so Vercel Pro allows up to 120s; we abort at 110s to leave room.
-    // eMola is async: Debito Pay returns immediately with "pending".
     const timeoutMs = paymentMethod === "mpesa" ? 110_000 : 30_000;
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
@@ -192,16 +194,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       responseText = await debitoRes.text();
       try { debitoData = JSON.parse(responseText); } catch { debitoData = { raw: responseText }; }
 
-      console.log("[debito/initiate] ← Debito Pay status:", debitoRes.status, "body:", JSON.stringify(debitoData));
+      console.log("[debito/initiate] ← Debito Pay status:", debitoRes.status);
     } catch (fetchErr: any) {
       clearTimeout(timeoutHandle);
 
       if (fetchErr?.name === "AbortError") {
-        // === M-Pesa timeout: USSD was sent, waiting for user PIN ===
-        // Return pending — the webhook will fire when user confirms their PIN.
-        console.log("[debito/initiate] M-Pesa AbortError (timeout) — USSD sent, aguardando PIN via webhook. txId:", txId);
+        console.log("[debito/initiate] M-Pesa AbortError (timeout) — USSD sent, aguardando PIN. txId:", txId);
 
-        // Update description to note the timeout (tx stays "pending" for webhook to resolve)
         await supabase.from("transactions").update({
           description: JSON.stringify({
             paymentMethod,
@@ -222,19 +221,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
       }
 
-      // Network error
-      console.error("[debito/initiate] Network/fetch error:", fetchErr?.message || fetchErr);
+      console.error("[debito/initiate] Network/fetch error:", fetchErr?.message || "unknown");
       await supabase.from("transactions").update({ status: "rejected", description: JSON.stringify({ paymentMethod, phone: fullPhone, sourceId, paymentType: type, paymentGateway: "debitopay", failReason: "network_error", initiatedAt: new Date().toISOString() }) }).eq("id", txId);
       res.status(500).json({ error: "Erro de ligação ao gateway de pagamento. Tenta novamente." });
       return;
     }
 
-    // === STEP 3: Handle Debito Pay response ===
     if (!debitoRes.ok) {
       const userMessage = parseDebitoError(debitoData, debitoRes.status, paymentMethod);
-      console.error("[debito/initiate] Debito Pay error:", debitoRes.status, debitoData);
+      console.error("[debito/initiate] Debito Pay error:", debitoRes.status);
 
-      // Update tx to rejected
       await supabase.from("transactions").update({
         status: "rejected",
         description: JSON.stringify({
@@ -245,7 +241,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           paymentGateway: "debitopay",
           failReason: userMessage,
           debitoStatus: debitoRes.status,
-          debitoError: debitoData?.error || debitoData?.message || "unknown",
           initiatedAt: new Date().toISOString(),
         }),
       }).eq("id", txId);
@@ -254,21 +249,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    console.log("[debito/initiate] RESPOSTA COMPLETA Debito Pay:", JSON.stringify(debitoData));
-
-    // Handle cases where Debito Pay returns HTTP 200 but body signals an error
-    // e.g. { "error": "HTTP 408", "sandbox": false }
     if (debitoData?.error && !debitoData?.status && !debitoData?.payment_id && !debitoData?.id) {
       const inferred = typeof debitoData.error === "string" && debitoData.error.includes("408") ? 408 : 400;
       const userMessage = parseDebitoError(debitoData, inferred, paymentMethod);
-      console.error("[debito/initiate] Debito Pay returned 200 with error body:", debitoData);
       await supabase.from("transactions").update({
         status: "rejected",
         description: JSON.stringify({
           paymentMethod, phone: fullPhone, sourceId, paymentType: type,
           paymentGateway: "debitopay", failReason: userMessage,
-          debitoStatus: 200, debitoError: debitoData.error,
-          initiatedAt: new Date().toISOString(),
+          debitoStatus: 200, initiatedAt: new Date().toISOString(),
         }),
       }).eq("id", txId);
       res.status(400).json({ error: userMessage });
@@ -299,12 +288,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       debitoData?.data?.reference ||
       null;
 
-    console.log("[debito/initiate] IDs — payment_id:", debitoPaymentId, "| transaction_id:", debitoTransactionId, "| reference:", debitoReference, "| sourceId:", sourceId);
-
-    // M-Pesa sync: Debito Pay confirmed within the timeout window
     const mpesaSync = paymentMethod === "mpesa" && (debitoData?.status === "success" || debitoData?.success === true);
 
-    // Update the pre-created transaction with the real Debito Pay IDs
     const txStatus = mpesaSync ? "approved" : "pending";
     await supabase.from("transactions").update({
       status: txStatus,
@@ -323,7 +308,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }),
     }).eq("id", txId);
 
-    // M-Pesa sync + deposit → credit balance immediately
     if (mpesaSync && type === "deposit") {
       const { data: profile } = await supabase
         .from("profiles").select("balance").eq("id", userId).maybeSingle();
@@ -334,14 +318,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (balErr) {
         console.error("[debito/initiate] Erro ao creditar saldo M-Pesa:", balErr);
       } else {
-        console.log(`[debito/initiate] ✓ M-Pesa +${amount} MZN → user ${userId} (novo saldo: ${newBalance})`);
+        console.log(`[debito/initiate] ✓ M-Pesa +${amount} MZN → user OK`);
       }
     }
 
-    console.log("[debito/initiate] TX actualizada:", txId, "| status:", txStatus, "| mpesaSync:", mpesaSync);
     res.status(200).json({ ok: true, txId, paymentId: debitoPaymentId, sourceId, mpesaSync });
   } catch (err: any) {
-    console.error("[debito/initiate] Unexpected error:", err);
+    console.error("[debito/initiate] Unexpected error:", err?.message || "unknown");
     await supabase.from("transactions").update({ status: "rejected" }).eq("id", txId);
     res.status(500).json({ error: "Erro inesperado. Tenta novamente." });
   }

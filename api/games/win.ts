@@ -12,10 +12,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const auth = await authenticateUser(req);
   if (!auth) { res.status(401).json({ error: "Não autenticado" }); return; }
 
-  const { gameId, gameType, betAmount } = (req.body ?? {}) as {
+  const { gameId, gameType } = (req.body ?? {}) as {
     gameId?: string;
     gameType?: string;
-    betAmount?: number;
+    betAmount?: number; // accepted but IGNORED — always use DB value for security
   };
 
   if (!gameId || typeof gameId !== "string") {
@@ -26,50 +26,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(400).json({ error: "Tipo de jogo inválido" });
     return;
   }
-  if (!betAmount || typeof betAmount !== "number" || betAmount <= 0) {
-    res.status(400).json({ error: "Montante inválido" });
-    return;
-  }
 
   const admin = getSupabaseAdmin();
 
-  const { data: match, error: matchError } = await admin
+  // SECURITY: Atomically mark the match as finished BEFORE crediting.
+  // The .neq("status","finished") filter ensures only one concurrent call wins —
+  // any duplicate or race-condition call finds status already "finished" and is rejected.
+  const { data: updated, error: updateMatchErr } = await admin
     .from("matches")
-    .select("id, bet_amount, status, winner_id, player1_id, player2_id, game_type")
+    .update({
+      winner_id: auth.userId,
+      status: "finished",
+      completed_at: new Date().toISOString(),
+    })
     .eq("id", gameId)
-    .single();
+    .neq("status", "finished") // atomic idempotency guard
+    .or(`player1_id.eq.${auth.userId},player2_id.eq.${auth.userId}`) // SECURITY: only real participants
+    .select("id, bet_amount, player1_id, player2_id, game_type")
+    .maybeSingle();
 
-  if (matchError || !match) {
-    res.status(404).json({ error: "Partida não encontrada" });
+  if (updateMatchErr) {
+    console.error("[games/win] Erro ao actualizar partida:", updateMatchErr);
+    res.status(500).json({ error: "Erro ao processar vitória" });
     return;
   }
 
-  const m = match as {
+  if (!updated) {
+    // Either match not found, already finished, or caller is not a participant
+    const { data: match } = await admin
+      .from("matches")
+      .select("status, winner_id, player1_id, player2_id")
+      .eq("id", gameId)
+      .maybeSingle();
+
+    if (!match) {
+      res.status(404).json({ error: "Partida não encontrada" });
+      return;
+    }
+    if ((match as { status: string }).status === "finished") {
+      res.status(409).json({ error: "Partida já terminada" });
+      return;
+    }
+    // Caller is not a participant
+    res.status(403).json({ error: "Não és participante desta partida" });
+    return;
+  }
+
+  const m = updated as {
     id: string;
     bet_amount: number;
-    status: string;
-    winner_id: string | null;
     player1_id: string;
     player2_id: string | null;
     game_type: string;
   };
 
-  if (m.status === "finished" && m.winner_id) {
-    res.status(409).json({ error: "Partida já terminada" });
+  // SECURITY: payout is always calculated from the DB's bet_amount, never from client input
+  const verifiedBet = Math.abs(Number(m.bet_amount) || 0);
+  if (verifiedBet <= 0) {
+    res.status(400).json({ error: "Aposta inválida na partida" });
     return;
   }
 
-  const isParticipant =
-    m.player1_id === auth.userId ||
-    m.player2_id === auth.userId ||
-    m.player2_id === null;
-
-  if (!isParticipant) {
-    res.status(403).json({ error: "Não és participante desta partida" });
-    return;
-  }
-
-  const verifiedBet = Math.min(m.bet_amount || betAmount, betAmount);
   const payout = Math.min(Math.floor(verifiedBet * 2 * WIN_RATE), MAX_PAYOUT);
 
   const { data: profile, error: profileError } = await admin
@@ -104,15 +121,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     status: "approved",
     created_at: new Date().toISOString(),
   });
-
-  await admin
-    .from("matches")
-    .update({
-      winner_id: auth.userId,
-      status: "finished",
-      completed_at: new Date().toISOString(),
-    })
-    .eq("id", gameId);
 
   const earningsRecord = {
     match_id: gameId,

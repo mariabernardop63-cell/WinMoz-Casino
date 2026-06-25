@@ -53,13 +53,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const newBalance = Math.round((currentBalance - amount) * 100) / 100;
 
-  const { error: updateError } = await admin
+  // SECURITY: Atomic balance deduction — only succeeds if balance hasn't changed
+  // since we read it (prevents race conditions / double-spend)
+  const { data: updated, error: updateError } = await admin
     .from("profiles")
     .update({ balance: newBalance })
-    .eq("id", auth.userId);
+    .eq("id", auth.userId)
+    .gte("balance", amount) // atomic guard: only deduct if balance is still sufficient
+    .select("balance")
+    .maybeSingle();
 
   if (updateError) {
     res.status(500).json({ error: "Erro ao debitar saldo" });
+    return;
+  }
+
+  if (!updated) {
+    // Balance changed between read and write (race condition blocked)
+    res.status(400).json({ error: "Saldo insuficiente" });
     return;
   }
 
@@ -92,5 +103,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq("player1_id", auth.userId);
   }
 
-  res.json({ ok: true, newBalance });
+  res.json({ ok: true, newBalance: updated.balance });
 }

@@ -2,25 +2,30 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  const allowedOrigin = process.env["ALLOWED_ORIGIN"] || process.env["VITE_APP_URL"] || "*";
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("X-Content-Type-Options", "nosniff");
   if (req.method === "OPTIONS") { res.status(200).end(); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
+  // SECURITY: Require authentication — users can only check their own transactions
+  const authHeader = (req.headers.authorization as string) ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) { res.status(401).json({ error: "Não autenticado" }); return; }
+
   const { txId } = req.body as { txId: string };
-  if (!txId) { res.status(400).json({ error: "txId required" }); return; }
+  if (!txId || typeof txId !== "string") {
+    res.status(400).json({ error: "txId obrigatório" });
+    return;
+  }
 
   const supabaseUrl = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"];
   const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"] || process.env["VITE_SUPABASE_SERVICE_ROLE"] || process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"];
   const debitoApiKey = process.env["SLACK_LIVE_API_KEY"];
 
   if (!supabaseUrl || !supabaseServiceKey || !debitoApiKey) {
-    console.error("[debito/check-status] Variáveis de ambiente em falta:", {
-      hasSupabaseUrl: !!supabaseUrl,
-      hasServiceKey: !!supabaseServiceKey,
-      hasDebitoKey: !!debitoApiKey,
-    });
     res.status(503).json({ error: "Serviço indisponível" });
     return;
   }
@@ -29,6 +34,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // SECURITY: Verify token and get caller's userId
+  const { data: userData, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !userData?.user) {
+    res.status(401).json({ error: "Sessão inválida" });
+    return;
+  }
+  const callerId = userData.user.id;
+
   const { data: tx, error: txErr } = await supabase
     .from("transactions")
     .select("id, status, description, amount, user_id")
@@ -36,7 +49,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .maybeSingle();
 
   if (txErr) {
-    console.error("[debito/check-status] Erro Supabase:", txErr);
     res.status(200).json({ status: "pending" });
     return;
   }
@@ -45,9 +57,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // SECURITY: Only allow users to check their own transactions
+  if ((tx as any).user_id !== callerId) {
+    res.status(403).json({ error: "Acesso negado" });
+    return;
+  }
+
   const currentStatus = (tx as any).status as string;
 
-  // Já resolvida — retornar imediatamente sem chamar a Debito Pay
   if (currentStatus === "approved") {
     res.status(200).json({ status: "approved" });
     return;
@@ -64,23 +81,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const debitoPaymentId: string | null = desc.debitoPaymentId ?? null;
 
-  // Se não temos o payment_id da Debito Pay, não conseguimos fazer check-status na API deles
-  // Retornamos o estado atual e aguardamos o webhook
   if (!debitoPaymentId) {
-    console.warn("[debito/check-status] payment_id não guardado para tx:", txId,
-      "| Aguardando webhook. sourceId:", desc.sourceId);
     res.status(200).json({ status: currentStatus });
     return;
   }
 
-  // Chamar a API da Debito Pay — endpoint correto conforme documentação oficial:
-  // POST /payment-orchestrator com body { "action": "check-status", "payment_id": "uuid" }
-  // NÃO colocar action na URL — vai SEMPRE no body
   const DEBITO_BASE = "https://gyqoaningqhurhvdugne.supabase.co/functions/v1";
   const DEBITO_URL  = `${DEBITO_BASE}/payment-orchestrator`;
 
-  console.log("[debito/check-status] → chamando Debito Pay:", DEBITO_URL,
-    "| payment_id:", debitoPaymentId);
+  // SECURITY: Do NOT log the API key or auth headers
+  console.log("[debito/check-status] → checking payment:", debitoPaymentId.slice(0, 8) + "...");
 
   try {
     const checkRes = await fetch(DEBITO_URL, {
@@ -98,24 +108,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const responseText = await checkRes.text();
     let checkData: any = {};
-    try { checkData = JSON.parse(responseText); } catch { checkData = { raw: responseText }; }
+    try { checkData = JSON.parse(responseText); } catch { checkData = {}; }
 
-    console.log("[debito/check-status] ← Debito Pay status:", checkRes.status, "| body:", JSON.stringify(checkData));
+    // SECURITY: Do not log full response (may contain sensitive data)
+    console.log("[debito/check-status] ← status:", checkRes.status, "| payment status:", checkData?.payment?.status || checkData?.status || "unknown");
 
-    // Resposta conforme docs: { "success": true, "payment": { "id": "...", "status": "success|pending|failed|expired" } }
     const remoteStatus: string =
       checkData?.payment?.status ||
       checkData?.status ||
       "pending";
-
-    console.log("[debito/check-status] status remoto:", remoteStatus);
 
     const isSuccess = ["success", "completed", "paid", "approved", "SUCCESS", "COMPLETED"].includes(remoteStatus);
     const isFailed  = ["failed", "expired", "cancelled", "rejected", "declined",
                        "FAILED", "EXPIRED", "CANCELLED"].includes(remoteStatus);
 
     if (isSuccess && currentStatus === "pending") {
-      // Creditar saldo
       const { data: profile } = await supabase
         .from("profiles").select("balance").eq("id", (tx as any).user_id).maybeSingle();
 
@@ -135,7 +142,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }),
       }).eq("id", txId);
 
-      console.log(`[debito/check-status] ✓ Aprovado via polling. tx: ${txId}, novo saldo: ${newBalance}`);
+      console.log(`[debito/check-status] ✓ Aprovado via polling. tx: ${txId}`);
       res.status(200).json({ status: "approved" });
       return;
     }
@@ -162,11 +169,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    // Ainda pendente
     res.status(200).json({ status: currentStatus });
 
   } catch (err: any) {
-    console.error("[debito/check-status] Erro de rede:", err?.message || err);
+    console.error("[debito/check-status] Erro de rede:", err?.message || "unknown");
     res.status(200).json({ status: currentStatus });
   }
 }
