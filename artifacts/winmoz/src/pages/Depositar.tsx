@@ -237,7 +237,7 @@ export default function Depositar() {
                 <span style={{ opacity: 0.4 }}>|</span>
               </span>
             </div>
-            <p style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 4 }}>Mín: 50 MZN · Máx: 500.000 MZN</p>
+            <p style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 4 }}>Mín: 10 MZN · Máx: 1.000.000 MZN</p>
           </div>
 
           <div className="px-5 pt-5 pb-3">

@@ -233,7 +233,7 @@ function parseDebitoError(data: any, status: number): string {
   if (status === 429) return "Demasiados pedidos ao gateway. Aguarda alguns segundos e tenta novamente.";
   if (status === 400) {
     if (low.includes("phone") || low.includes("msisdn") || low.includes("mobile")) return "Número de telefone inválido para este operador.";
-    if (low.includes("amount") || low.includes("minimum")) return "Montante inválido — mínimo é 10 MZN.";
+    if (low.includes("amount") || low.includes("minimum") || low.includes("mínimo") || low.includes("minimo")) return "Montante inválido — mínimo é 10 MZN.";
     if (low.includes("payment_method") || low.includes("unsupported")) return "Método de pagamento não suportado de momento.";
     if (low.includes("wallet_code") || low.includes("wallet")) return "Código de carteira inválido. Contacta o suporte.";
     if (low.includes("required")) return "Dados em falta no pedido. Contacta o suporte.";
