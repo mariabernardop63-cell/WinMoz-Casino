@@ -4,15 +4,14 @@ import { createClient } from "@supabase/supabase-js";
 import { useEffect } from "react";
 
 const _adminUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "https://placeholder.supabase.co";
-// Use service role key for admin operations — required to bypass RLS and read all users' data
-const _adminKey = (import.meta.env.VITE_SUPABASE_SERVICE_ROLE as string)
-  || (import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY as string)
-  || (import.meta.env.VITE_SUPABASE_ANON_KEY as string)
-  || "placeholder";
+// SECURITY: Do NOT use VITE_SUPABASE_SERVICE_ROLE here — service role keys must stay server-side.
+// Admin reads use the anon key + user JWT (requires proper Supabase RLS for admin role).
+// Sensitive write operations (approve/reject deposits, block users) use /api/admin/* endpoints.
+const _adminKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || "placeholder";
 export const adminSupabase = createClient(_adminUrl, _adminKey, {
   auth: {
-    autoRefreshToken: false,
-    persistSession: false,
+    autoRefreshToken: true,
+    persistSession: true,
     detectSessionInUrl: false,
     storageKey: "sb-admin-isolated",
   },

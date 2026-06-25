@@ -5,6 +5,7 @@ import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
+import { serverBet, serverWin } from "@/lib/gameApi";
 import AdBanner from "@/components/AdBanner";
 // ─── Sound helpers ────────────────────────────────────────────────────────────
 function playDamasCapture() {
@@ -892,28 +893,18 @@ export default function DamasGame() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winner]);
 
-  // ── Bot: deduct bet once on mount (no channel subscription for bot games) ─────
+  // ── Bot: deduct bet once on mount — server-side ──────────────────────────────
   useEffect(() => {
     if (!isBot || !profile?.id || BET <= 0 || betDeductedRef.current) return;
     betDeductedRef.current = true;
     (async () => {
       try {
-        const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-        if (data) {
-          await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
-          await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: `Aposta (Damas) [bot] vs ${opponentName}`, status: "approved" });
-          fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile.id }) }).catch(() => {});
-          try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch {}
-          await supabase.from("matches").upsert({
-            id: gameId, game_type: "dama",
-            player1_id: profile.id, player1_name: playerName,
-            player2_name: opponentName,
-            bet_amount: BET, winner_payout: Math.floor(BET * 2 * 0.90),
-            status: "active", created_at: new Date().toISOString(),
-          }, { onConflict: "id" });
-          await refreshProfile();
-          if (profile?.id) evaluateBotDifficulty(profile.id).catch(() => {});
-        }
+        const result = await serverBet(BET, "damas", `Aposta (Damas) vs ${opponentName}`, gameId);
+        if (!result.ok) { betDeductedRef.current = false; return; }
+        fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile.id }) }).catch(() => {});
+        try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch {}
+        await refreshProfile();
+        if (profile?.id) evaluateBotDifficulty(profile.id).catch(() => {});
       } catch { betDeductedRef.current = false; }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -927,9 +918,9 @@ export default function DamasGame() {
     // Simple positions: 2–5 s. Complex (all-kings or multiple captures): 5–10 s. Never hits 30 s.
     const currentMoves = aiGetAllMoves(boardRef.current, oppColor);
     const hasCaptures = currentMoves.some(m => m.captured.length > 0);
-    const allKings = boardRef.current.flat().every(p => p === null || p.isDame);
-    const minDelay = allKings ? 5000 : hasCaptures ? 3500 : 2000;
-    const maxDelay = allKings ? 10000 : hasCaptures ? 8000 : 5000;
+    const allKingsCurrent = boardRef.current.flat().every(p => p === null || p.isDame);
+    const minDelay = allKingsCurrent ? 5000 : hasCaptures ? 3500 : 2000;
+    const maxDelay = allKingsCurrent ? 10000 : hasCaptures ? 8000 : 5000;
     const delay = minDelay + Math.random() * (maxDelay - minDelay);
     const pendingTimers: ReturnType<typeof setTimeout>[] = [];
 
@@ -1010,49 +1001,17 @@ export default function DamasGame() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turn, winner, isBot]);
 
-  // Credit winner + register match result when game ends
+  // Credit winner + register match result when game ends — server-side
   useEffect(() => {
     if (!winner || !profile?.id || BET <= 0 || (gameId === "local" && !isBot) || winCreditedRef.current) return;
     winCreditedRef.current = true;
-    const payout = Math.floor(BET * 2 * 0.90);
-    const platformFee = BET * 2 - payout;
     const isWinner = winner === myColor;
     (async () => {
       try {
-        // Credit winner's balance — fetch fresh balance to avoid stale read
         if (isWinner) {
-          const { data: freshData } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-          // Use fetched balance if available, fall back to profile context balance
-          const currentBal = freshData
-            ? parseFloat(String(freshData.balance))
-            : parseFloat(String(profile.balance ?? 0));
-          const { error: creditErr } = await supabase
-            .from("profiles").update({ balance: currentBal + payout }).eq("id", profile.id);
-          if (creditErr) throw creditErr; // triggers retry via catch block
-          await supabase.from("transactions").insert({ user_id: profile.id, type: "win", amount: payout, description: `Vitória de jogo (Damas) +${payout} MT`, status: "approved" });
+          const result = await serverWin(gameId, "damas", BET);
+          if (!result.ok) { winCreditedRef.current = false; return; }
           await refreshProfile();
-        } else if (isBot) {
-          // Bot won — insert zero-amount marker so admin panel can detect game ended
-          await supabase.from("transactions").insert({ user_id: profile.id, type: "win", amount: 0, description: `Fim de jogo (Damas) [bot] [bot-fim]`, status: "approved" });
-        }
-        // Update match record as finished (only player "w" to avoid duplicate updates)
-        if (myColor === "w") {
-          await supabase.from("matches").update({
-            status: "finished",
-            winner_name: winner === "w" ? playerName : opponentName,
-            winner_id: winner === "w" ? profile.id : null,
-            completed_at: new Date().toISOString(),
-          }).eq("id", gameId);
-          // Register platform earnings (fee)
-          if (platformFee > 0) {
-            await supabase.from("platform_earnings").insert({
-              amount: platformFee,
-              source: "game_fee",
-              description: `Taxa de jogo (Damas) — aposta ${BET} MT`,
-              reference_id: gameId,
-              created_at: new Date().toISOString(),
-            });
-          }
         }
       } catch { winCreditedRef.current = false; }
     })();
@@ -1309,16 +1268,12 @@ export default function DamasGame() {
     ch.on("broadcast", { event: "rematch_response" }, async ({ payload }) => {
       if (payload.accepted) {
         if (BET > 0 && profile?.id) {
-          const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-          if (!data || parseFloat(String(data.balance)) < BET) {
-            // Requester no longer has enough balance — notify opponent and abort
+          const result = await serverBet(BET, "damas", "Aposta de revanche (Damas)");
+          if (!result.ok) {
             ch.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } }).catch(() => {});
             setRematchPhase("no_balance");
             return;
           }
-          const newBal = parseFloat(String(data.balance)) - BET;
-          await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
-          await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta de revanche (Damas)", status: "approved" });
           await refreshProfile();
         }
         setRematchPhase("idle");
@@ -1353,11 +1308,9 @@ export default function DamasGame() {
         if(BET > 0 && !betDeductedRef.current){
           betDeductedRef.current = true;
           try{
-            const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-            if(data){
-              await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
-              await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta de jogo (Damas)", status: "approved" });
-              // Persiste flag para não re-debitar se o componente remontar (back + resume)
+            const result = await serverBet(BET, "damas", "Aposta de jogo (Damas)", gameId);
+            if(!result.ok){ betDeductedRef.current = false; }
+            else {
               try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch { /* ignore */ }
               await refreshProfile();
             }
@@ -1596,10 +1549,8 @@ export default function DamasGame() {
     if (isBot) {
       if (!profile?.id) return;
       try {
-        const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-        if (!data || parseFloat(String(data.balance)) < BET) { setRematchPhase("no_balance"); return; }
-        await supabase.from("profiles").update({ balance: parseFloat(String(data.balance)) - BET }).eq("id", profile.id);
-        await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta de revanche (Damas) vs bot", status: "approved" });
+        const result = await serverBet(BET, "damas", "Aposta de revanche (Damas) vs bot");
+        if (!result.ok) { setRematchPhase("no_balance"); return; }
         await refreshProfile();
         resetGame();
       } catch { setRematchPhase("no_balance"); }
@@ -1607,46 +1558,24 @@ export default function DamasGame() {
     }
     if (!profile?.id) { setRematchPhase("no_balance"); return; }
     if (!channelRef.current) { setRematchPhase("no_balance"); return; }
-    setRematchPhase("checking");
-    try {
-      const timeout   = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000));
-      const fetchBal  = supabase.from("profiles").select("balance").eq("id", profile.id).single()
-                         .then(r => r.data);
-      const data = await Promise.race([fetchBal, timeout]) as { balance: string | number } | null;
-      if (!data || parseFloat(String(data.balance)) < BET) {
-        setRematchPhase("no_balance"); return;
-      }
-      setRematchPhase("waiting");
-      channelRef.current.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0] } }).catch(() => {});
-    } catch {
-      setRematchPhase("no_balance");
-    }
+    setRematchPhase("waiting");
+    channelRef.current.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0] } }).catch(() => {});
   }
 
   async function handleRematchAccept() {
     if (!profile?.id) return;
-    try {
-      const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 8000));
-      const fetch   = supabase.from("profiles").select("balance").eq("id", profile.id).single()
-                       .then(r => r.data);
-      const data = await Promise.race([fetch, timeout]) as { balance: string | number } | null;
-      if (!data || parseFloat(String(data.balance)) < BET) {
+    if (BET > 0) {
+      const result = await serverBet(BET, "damas", "Aposta de revanche (Damas)").catch(() => null);
+      if (!result?.ok) {
         channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } });
         setRematchPhase("opp_no_balance"); return;
       }
-      if (BET > 0) {
-        const newBal = parseFloat(String(data.balance)) - BET;
-        await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
-        await supabase.from("transactions").insert({ user_id: profile.id, type: "bet", amount: -BET, description: "Aposta de revanche (Damas)", status: "approved" });
-      }
-      channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
-      setRematchPhase("idle");
-      resetGame();
-      betDeductedRef.current = true;
-    } catch {
-      channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } });
-      setRematchPhase("no_balance");
+      await refreshProfile();
     }
+    channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
+    setRematchPhase("idle");
+    resetGame();
+    betDeductedRef.current = true;
   }
 
   function handleRematchDecline() {

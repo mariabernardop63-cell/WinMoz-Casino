@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { serverBet, serverWin } from "@/lib/gameApi";
 import AdBanner from "@/components/AdBanner";
 // ─── Sound helpers ─────────────────────────────────────────────────────────────
 function playChessCapture() {
@@ -1068,27 +1069,17 @@ export default function ChessGame(){
   useEffect(()=>{epRef.current=ep;},[ep]);
   useEffect(()=>{statusRef.current=status;},[status]);
 
-  // ── Bot: deduct bet once on mount ────────────────────────────────────────────
+  // ── Bot: deduct bet once on mount — server-side ───────────────────────────────
   useEffect(()=>{
     if(!isBot||!profile?.id||BET<=0||betDeductedRef.current)return;
     betDeductedRef.current=true;
     (async()=>{
       try{
-        const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
-        if(data){
-          await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
-          await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:`Aposta (Xadrez) [bot] vs ${opponentName}`,status:"approved"});
-          fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:profile.id})}).catch(()=>{});
-          try{sessionStorage.setItem(`wm_bet_deducted_chess_${gameId}`,"1");}catch{}
-          await supabase.from("matches").upsert({
-            id:gameId,game_type:"xadrez",
-            player1_id:profile.id,player1_name:playerName,
-            player2_name:opponentName,
-            bet_amount:BET,winner_payout:Math.floor(BET*2*0.90),
-            status:"active",created_at:new Date().toISOString(),
-          },{onConflict:"id"});
-          await refreshProfile();
-        }
+        const result = await serverBet(BET, "xadrez", `Aposta (Xadrez) vs ${opponentName}`, gameId);
+        if(!result.ok){ betDeductedRef.current=false; return; }
+        fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:profile.id})}).catch(()=>{});
+        try{sessionStorage.setItem(`wm_bet_deducted_chess_${gameId}`,"1");}catch{}
+        await refreshProfile();
       }catch{betDeductedRef.current=false;}
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1145,23 +1136,16 @@ export default function ChessGame(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[winner,status]);
 
-  // Credit winner 83% of total pot when game ends
+  // Credit winner when game ends — server-side
   useEffect(()=>{
     if(!winner||!profile?.id||BET<=0||gameId==="local"||winCreditedRef.current)return;
     winCreditedRef.current=true;
-    const payout=Math.floor(BET*2*0.90);
     (async()=>{
       try{
         if(winner===myColor){
-          const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
-          if(data){
-            await supabase.from("profiles").update({balance:parseFloat(String(data.balance))+payout}).eq("id",profile.id);
-            await supabase.from("transactions").insert({user_id:profile.id,type:"win",amount:payout,description:`Vitória de jogo (Xadrez) +${payout} MT`,status:"approved"});
-            await refreshProfile();
-          }
-        } else if(isBot){
-          // Bot won — insert zero-amount marker so admin panel can detect game ended
-          await supabase.from("transactions").insert({user_id:profile.id,type:"win",amount:0,description:`Fim de jogo (Xadrez) [bot] [bot-fim]`,status:"approved"});
+          const result = await serverWin(gameId, "xadrez", BET);
+          if(!result.ok){ winCreditedRef.current=false; return; }
+          await refreshProfile();
         }
       }catch{winCreditedRef.current=false;}
     })();
@@ -1358,16 +1342,12 @@ export default function ChessGame(){
     ch.on("broadcast",{event:"rematch_response"},async({payload})=>{
       if(payload.accepted){
         if(BET>0&&profile?.id){
-          const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
-          if(!data||parseFloat(String(data.balance))<BET){
-            // Requester no longer has enough balance — notify opponent and abort
+          const result = await serverBet(BET, "xadrez", "Aposta de revanche (Xadrez)");
+          if(!result.ok){
             ch.send({type:"broadcast",event:"rematch_response",payload:{accepted:false,reason:"no_balance"}}).catch(()=>{});
             setRematchPhase("no_balance");
             return;
           }
-          const newBal=parseFloat(String(data.balance))-BET;
-          await supabase.from("profiles").update({balance:newBal}).eq("id",profile.id);
-          await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de revanche (Xadrez)",status:"approved"});
           await refreshProfile();
         }
         setRematchPhase("idle");
@@ -1396,12 +1376,9 @@ export default function ChessGame(){
         if(BET>0&&!betDeductedRef.current){
           betDeductedRef.current=true;
           try{
-            const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
-            if(data){
-              await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET}).eq("id",profile.id);
-              await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de jogo (Xadrez)",status:"approved"});
-              await refreshProfile();
-            }
+            const result = await serverBet(BET, "xadrez", "Aposta de jogo (Xadrez)", gameId);
+            if(!result.ok){ betDeductedRef.current=false; }
+            else { await refreshProfile(); }
           }catch{betDeductedRef.current=false;}
         }
         await ch.track({userId:profile.id,color:myColor});
@@ -1462,27 +1439,18 @@ export default function ChessGame(){
 
   async function handleRematchAccept(){
     if(!profile?.id)return;
-    try {
-      const timeout = new Promise<never>((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000));
-      const fetch   = supabase.from("profiles").select("balance").eq("id",profile.id).single().then(r=>r.data);
-      const data    = await Promise.race([fetch,timeout]) as {balance:string|number}|null;
-      if(!data||parseFloat(String(data.balance))<BET){
+    if(BET>0){
+      const result = await serverBet(BET,"xadrez","Aposta de revanche (Xadrez)").catch(()=>null);
+      if(!result?.ok){
         channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:false,reason:"no_balance"}});
         setRematchPhase("opp_no_balance");return;
       }
-      if(BET>0){
-        const newBal=parseFloat(String(data.balance))-BET;
-        await supabase.from("profiles").update({balance:newBal}).eq("id",profile.id);
-        await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET,description:"Aposta de revanche (Xadrez)",status:"approved"});
-      }
-      channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:true}});
-      setRematchPhase("idle");
-      resetGame();
-      betDeductedRef.current=true;
-    } catch {
-      channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:false,reason:"no_balance"}});
-      setRematchPhase("no_balance");
+      await refreshProfile();
     }
+    channelRef.current?.send({type:"broadcast",event:"rematch_response",payload:{accepted:true}});
+    setRematchPhase("idle");
+    resetGame();
+    betDeductedRef.current=true;
   }
 
   function handleRematchDecline(){

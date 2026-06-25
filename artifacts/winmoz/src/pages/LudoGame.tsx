@@ -5,6 +5,7 @@ import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
+import { serverBet, serverWin, rollLudoDice } from "@/lib/gameApi";
 import AdBanner from "@/components/AdBanner";
 import bgImg from "@assets/Gemini_Generated_Image_grc2w7grc2w7grc2_1780220609974.png";
 import rollSoundUrl from "@assets/som_para_quando_o_user_girar_no_dado__1781479690378.mp3";
@@ -1432,50 +1433,17 @@ export default function LudoGame() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[winner,phase]);
 
-  // Credit winner + register match result when game ends
+  // Credit winner + register match result when game ends (server-side)
   useEffect(()=>{
     if(!winner||!profile?.id||BET_AMOUNT<=0||gameId==="local"||winCreditedRef.current) return;
     winCreditedRef.current = true;
-    const payout = Math.floor(BET_AMOUNT * 2 * 0.90);
-    const platformFee = BET_AMOUNT * 2 - payout;
     const isWinner = winner === myColor;
     (async()=>{
       try {
         if (isWinner) {
-          const { data: freshData } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-          // Use fetched balance if available, fall back to profile context balance
-          const currentBal = freshData
-            ? parseFloat(String(freshData.balance))
-            : parseFloat(String(profile.balance ?? 0));
-          const { error: creditErr } = await supabase
-            .from("profiles").update({ balance: currentBal + payout }).eq("id", profile.id);
-          if (creditErr) throw creditErr; // triggers retry via catch block
-          await supabase.from("transactions").insert({
-            user_id: profile.id,
-            type: "win",
-            amount: payout,
-            description: `Vitória de jogo (Ludo) +${payout} MT`,
-            status: "approved",
-          });
+          const result = await serverWin(gameId, "ludo", BET_AMOUNT);
+          if (!result.ok) { winCreditedRef.current = false; return; }
           await refreshProfile();
-        }
-        // Only "blue" (first player) updates the match record
-        if (myColor === "blue") {
-          await supabase.from("matches").update({
-            status: "finished",
-            winner_name: winner === "blue" ? playerName : opponentName,
-            winner_id: winner === "blue" ? profile.id : null,
-            completed_at: new Date().toISOString(),
-          }).eq("id", gameId);
-          if (platformFee > 0) {
-            await supabase.from("platform_earnings").insert({
-              amount: platformFee,
-              source: "game_fee",
-              description: `Taxa de jogo (Ludo) — aposta ${BET_AMOUNT} MT`,
-              reference_id: gameId,
-              created_at: new Date().toISOString(),
-            });
-          }
         }
       } catch { winCreditedRef.current = false; }
     })();
@@ -1727,21 +1695,16 @@ export default function LudoGame() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[myColor,playerName,opponentName,doSelectPiece,isBot]);
 
-  // ── Roll my color dice — uses weighted algorithm + broadcasts ───────────────
-  const doRoll=useCallback(()=>{
+  // ── Roll my color dice — server-side secure roll + broadcasts ───────────────
+  const doRoll=useCallback(async()=>{
     if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current||captureAnimRef.current) return;
     playRollSound();
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
-    const oppPieces = piecesRef.current.filter(p=>p.player!==myColor);
-    const val = generateWeightedDice(
-      myPieces,
-      oppPieces,
-      myColor,
-      stuckTurnsRef.current[myColor],
-      consecutiveSixesRef.current,
-      gameId,
-    );
+    const allInBase = myPieces.every(p=>p.pos===-1);
+    const stuckTurns = stuckTurnsRef.current[myColor];
+    const consecutiveSixes = consecutiveSixesRef.current;
+    const { value: val } = await rollLudoDice(gameId, allInBase, stuckTurns, consecutiveSixes);
 
     // Game has definitively started — credit referral reward now (player's own first roll)
     if(BET_AMOUNT > 0 && !rewardFiredRef.current){
@@ -1776,31 +1739,18 @@ export default function LudoGame() {
   }
 
   // ── Supabase Realtime channel ──────────────────────────────────────────────
-  // ── Bot: deduct bet + create match on mount ──────────────────────────────────
+  // ── Bot: deduct bet + create match on mount (server-side) ────────────────────
   useEffect(()=>{
     if(!isBot||!profile?.id||BET_AMOUNT<=0||betDeductedRef.current) return;
     betDeductedRef.current=true;
     (async()=>{
       try{
-        const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
-        if(data){
-          await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET_AMOUNT}).eq("id",profile.id);
-          await supabase.from("transactions").insert({
-            user_id:profile.id,type:"bet",amount:-BET_AMOUNT,
-            description:`Aposta (Ludo) vs ${opponentName}`,status:"approved",
-          });
-          fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile.id }) }).catch(() => {});
-          try{sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`,"1");}catch{}
-          await supabase.from("matches").upsert({
-            id:gameId,game_type:"ludo",
-            player1_id:profile.id,player1_name:playerName,
-            player2_name:opponentName,
-            bet_amount:BET_AMOUNT,winner_payout:Math.floor(BET_AMOUNT*2*0.90),
-            status:"active",created_at:new Date().toISOString(),
-          },{onConflict:"id"});
-          await refreshProfile();
-          if(profile?.id) evaluateBotDifficulty(profile.id).catch(()=>{});
-        }
+        const result = await serverBet(BET_AMOUNT, "ludo", `Aposta (Ludo) vs ${opponentName}`, gameId);
+        if(!result.ok){ betDeductedRef.current=false; return; }
+        fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile.id }) }).catch(() => {});
+        try{sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`,"1");}catch{}
+        await refreshProfile();
+        if(profile?.id) evaluateBotDifficulty(profile.id).catch(()=>{});
       }catch{betDeductedRef.current=false;}
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2009,16 +1959,12 @@ export default function LudoGame() {
     channel.on("broadcast",{ event:"rematch_response" },async({ payload })=>{
       if(payload.accepted){
         if(BET_AMOUNT > 0 && profile?.id){
-          const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-          if(!data || parseFloat(String(data.balance)) < BET_AMOUNT){
-            // Requester no longer has enough balance — notify opponent and abort
+          const result = await serverBet(BET_AMOUNT, "ludo", "Aposta de revanche (Ludo)");
+          if(!result.ok){
             channel.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } }).catch(()=>{});
             setRematchPhase("no_balance");
             return;
           }
-          const newBal=parseFloat(String(data.balance))-BET_AMOUNT;
-          await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
-          await supabase.from("transactions").insert({ user_id:profile.id, type:"bet", amount:-BET_AMOUNT, description:"Aposta de revanche (Ludo)", status:"approved" });
           await refreshProfile();
         }
         setRematchPhase("idle");
@@ -2050,22 +1996,13 @@ export default function LudoGame() {
             channel.send({type:"broadcast",event:"ludo_resync_req",payload:{}});
           },800);
         }
-        // Deduct bet from balance when game starts (once per game)
+        // Deduct bet from balance when game starts (once per game) — server-side
         if(BET_AMOUNT > 0 && !betDeductedRef.current){
           betDeductedRef.current = true;
           try {
-            const { data } = await supabase.from("profiles").select("balance").eq("id", profile.id).single();
-            if(data){
-              const newBal = parseFloat(String(data.balance)) - BET_AMOUNT;
-              await supabase.from("profiles").update({ balance: newBal }).eq("id", profile.id);
-              await supabase.from("transactions").insert({
-                user_id: profile.id,
-                type: "bet",
-                amount: -BET_AMOUNT,
-                description: "Aposta de jogo (Ludo)",
-                status: "approved",
-              });
-              // Persiste flag para não re-debitar se o componente remontar (back + resume)
+            const result = await serverBet(BET_AMOUNT, "ludo", "Aposta de jogo (Ludo)", gameId);
+            if(!result.ok){ betDeductedRef.current = false; }
+            else {
               try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`, "1"); } catch { /* ignore */ }
               await refreshProfile();
             }
@@ -2214,10 +2151,8 @@ export default function LudoGame() {
     if(isBot){
       if(!profile?.id) return;
       try{
-        const{data}=await supabase.from("profiles").select("balance").eq("id",profile.id).single();
-        if(!data||parseFloat(String(data.balance))<BET_AMOUNT){ setRematchPhase("no_balance"); return; }
-        await supabase.from("profiles").update({balance:parseFloat(String(data.balance))-BET_AMOUNT}).eq("id",profile.id);
-        await supabase.from("transactions").insert({user_id:profile.id,type:"bet",amount:-BET_AMOUNT,description:"Aposta de revanche (Ludo) vs bot",status:"approved"});
+        const result = await serverBet(BET_AMOUNT, "ludo", "Aposta de revanche (Ludo) vs bot");
+        if(!result.ok){ setRematchPhase("no_balance"); return; }
         await refreshProfile();
         resetGame();
       }catch{ setRematchPhase("no_balance"); }
@@ -2225,44 +2160,24 @@ export default function LudoGame() {
     }
     if(!profile?.id){ setRematchPhase("no_balance"); return; }
     if(!channelRef.current){ setRematchPhase("no_balance"); return; }
-    setRematchPhase("checking");
-    try {
-      const timeout   = new Promise<never>((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000));
-      const fetchBal  = supabase.from("profiles").select("balance").eq("id",profile.id).single().then(r=>r.data);
-      const data      = await Promise.race([fetchBal,timeout]) as {balance:string|number}|null;
-      if(!data||parseFloat(String(data.balance))<BET_AMOUNT){ setRematchPhase("no_balance"); return; }
-      setRematchPhase("waiting");
-      channelRef.current.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0] } }).catch(()=>{});
-    } catch {
-      setRematchPhase("no_balance");
-    }
+    setRematchPhase("waiting");
+    channelRef.current.send({ type:"broadcast", event:"rematch_request", payload:{ name: playerName.split(" ")[0] } }).catch(()=>{});
   }
 
   async function handleRematchAccept(){
     if(!profile?.id) return;
-    try {
-      const timeout = new Promise<never>((_,rej)=>setTimeout(()=>rej(new Error("timeout")),8000));
-      const fetch   = supabase.from("profiles").select("balance").eq("id",profile.id).single().then(r=>r.data);
-      const data    = await Promise.race([fetch,timeout]) as {balance:string|number}|null;
-      if(!data||parseFloat(String(data.balance))<BET_AMOUNT){
+    if(BET_AMOUNT>0){
+      const result = await serverBet(BET_AMOUNT, "ludo", "Aposta de revanche (Ludo)").catch(()=>null);
+      if(!result?.ok){
         channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } });
         setRematchPhase("opp_no_balance"); return;
       }
-      if(BET_AMOUNT>0){
-        const newBal=parseFloat(String(data.balance))-BET_AMOUNT;
-        await supabase.from("profiles").update({ balance: newBal }).eq("id",profile.id);
-        await supabase.from("transactions").insert({ user_id:profile.id, type:"bet", amount:-BET_AMOUNT, description:"Aposta de revanche (Ludo)", status:"approved" });
-        await refreshProfile();
-      }
-      channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
-      setRematchPhase("idle");
-      resetGame();
-      // Prevent channel re-subscribe from deducting the bet a second time
-      betDeductedRef.current = true;
-    } catch {
-      channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:false, reason:"no_balance" } });
-      setRematchPhase("no_balance");
+      await refreshProfile();
     }
+    channelRef.current?.send({ type:"broadcast", event:"rematch_response", payload:{ accepted:true } });
+    setRematchPhase("idle");
+    resetGame();
+    betDeductedRef.current = true;
   }
 
   function handleRematchDecline(){

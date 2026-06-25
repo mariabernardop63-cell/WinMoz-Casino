@@ -46,7 +46,6 @@ import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
 import TermosServico from "@/pages/TermosServico";
 
 const queryClient = new QueryClient();
-const ADMIN_EMAIL = "nexialonemz@gmail.com";
 
 /* ── Maintenance gate — wraps only user-facing routes ── */
 function MaintenanceGate({ children }: { children: React.ReactNode }) {
@@ -103,10 +102,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
   // Still checking
   if (!checked) return null;
 
-  // Admin user bypasses maintenance mode
-  const isAdmin = !authLoading && user?.email === ADMIN_EMAIL;
-
-  if (maintenance && !isAdmin) {
+  if (maintenance) {
     return <MaintenancePage />;
   }
 
