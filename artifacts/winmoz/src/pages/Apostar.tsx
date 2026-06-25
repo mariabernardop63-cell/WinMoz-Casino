@@ -234,9 +234,17 @@ function SMSBettingScreen({
         return;
       }
 
+      // Frontend timeout — evita que o botão fique a carregar indefinidamente
+      const fetchAbort = new AbortController();
+      const fetchTimeout = setTimeout(
+        () => fetchAbort.abort(),
+        isMpesa ? 115_000 : 40_000,
+      );
+
       const res = await fetch("/api/debito/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: fetchAbort.signal,
         body: JSON.stringify({
           amount,
           phone: cleanPhone,
@@ -246,6 +254,7 @@ function SMSBettingScreen({
         }),
       });
 
+      clearTimeout(fetchTimeout);
       const resData = await res.json() as any;
       if (mpesaTimer) clearTimeout(mpesaTimer);
 
@@ -361,9 +370,12 @@ function SMSBettingScreen({
           setStep("rejected");
         }
       }, 3000);
-    } catch {
+    } catch (err) {
       if (mpesaTimer) clearTimeout(mpesaTimer);
-      const errorMsg = "Erro de ligação. Verifica a internet e tenta de novo.";
+      const isAbort = err instanceof DOMException && (err as DOMException).name === "AbortError";
+      const errorMsg = isAbort
+        ? (isMpesa ? "Tempo de espera esgotado. Tenta novamente." : "A ligação demorou demasiado. Verifica a internet e tenta de novo.")
+        : "Erro de ligação. Verifica a internet e tenta de novo.";
       if (screenSwitched) {
         setRejectReason(errorMsg);
         setStep("rejected");

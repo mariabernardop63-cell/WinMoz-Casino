@@ -256,6 +256,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log("[debito/initiate] RESPOSTA COMPLETA Debito Pay:", JSON.stringify(debitoData));
 
+    // Handle cases where Debito Pay returns HTTP 200 but body signals an error
+    // e.g. { "error": "HTTP 408", "sandbox": false }
+    if (debitoData?.error && !debitoData?.status && !debitoData?.payment_id && !debitoData?.id) {
+      const inferred = typeof debitoData.error === "string" && debitoData.error.includes("408") ? 408 : 400;
+      const userMessage = parseDebitoError(debitoData, inferred, paymentMethod);
+      console.error("[debito/initiate] Debito Pay returned 200 with error body:", debitoData);
+      await supabase.from("transactions").update({
+        status: "rejected",
+        description: JSON.stringify({
+          paymentMethod, phone: fullPhone, sourceId, paymentType: type,
+          paymentGateway: "debitopay", failReason: userMessage,
+          debitoStatus: 200, debitoError: debitoData.error,
+          initiatedAt: new Date().toISOString(),
+        }),
+      }).eq("id", txId);
+      res.status(400).json({ error: userMessage });
+      return;
+    }
+
     const debitoPaymentId: string | null =
       debitoData?.payment_id ||
       debitoData?.payment?.id ||
@@ -335,6 +354,9 @@ function parseDebitoError(data: any, status: number, paymentMethod: string): str
   if (status === 401) return "Chave API inválida — contacta o suporte.";
   if (status === 403) return "Domínio não autorizado no gateway de pagamento. Contacta o suporte.";
   if (status === 404) return "Configuração do gateway inválida (wallet_code). Contacta o suporte.";
+  if (status === 408) return paymentMethod === "mpesa"
+    ? "O utilizador não confirmou o PIN M-Pesa a tempo. Abre o menu *155# e confirma o pagamento pendente."
+    : "O utilizador não confirmou o USSD a tempo. Tenta novamente.";
   if (status === 429) return "Demasiados pedidos ao gateway. Aguarda alguns segundos e tenta novamente.";
 
   if (status === 400) {
