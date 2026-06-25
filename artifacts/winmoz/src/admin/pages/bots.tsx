@@ -3,10 +3,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminSupabase, useAdminRealtimeSync } from "@/admin/lib/supabase-api";
 import { adminReEnable } from "@/lib/botBrain";
 import { motion, AnimatePresence } from "framer-motion";
-
-// Session-level flag — prevents the auto-disable loop when the admin
-// manually re-enables bots. Cleared on page refresh (intended).
-let _sessionBotOverride = false;
 import {
   AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer,
   BarChart, Bar, Tooltip as RTooltip, XAxis,
@@ -17,6 +13,10 @@ import {
   Edit3, Check, X, Target, Zap, Flame, Crown, BarChart3,
   ArrowUpRight, ArrowDownRight, Gamepad2,
 } from "lucide-react";
+
+// Session-level flag — prevents the auto-disable loop when the admin
+// manually re-enables bots. Cleared on page refresh (intended).
+let _sessionBotOverride = false;
 
 // ── Design tokens — alinhados com o tema claro do painel admin ────────────────
 const T = {
