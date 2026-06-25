@@ -172,11 +172,23 @@ export default function Depositar() {
     setInitError("");
     setInitiating(true);
 
+    // M-Pesa: muda imediatamente para o ecrã de espera (USSD vai aparecer no telemóvel)
+    const isMpesa = provider === "mpesa";
+    if (isMpesa) {
+      setCountdown(120);
+      setScreen("verifying");
+    }
+
     try {
       const session = await getSessionWithRefresh();
       if (!session) {
-        setPhoneError("Sessão expirada. Volta a entrar na tua conta.");
-        setLocation("/login");
+        if (isMpesa) {
+          setRejectReason("Sessão expirada. Volta a entrar na tua conta.");
+          setScreen("rejected");
+        } else {
+          setPhoneError("Sessão expirada. Volta a entrar na tua conta.");
+          setLocation("/login");
+        }
         setInitiating(false);
         return;
       }
@@ -196,12 +208,18 @@ export default function Depositar() {
       const resData = await res.json() as any;
 
       if (!res.ok) {
-        setInitError(resData?.error || "Erro ao iniciar pagamento. Tenta novamente.");
+        const errorMsg = resData?.error || "Erro ao iniciar pagamento. Tenta novamente.";
+        if (isMpesa) {
+          setRejectReason(errorMsg);
+          setScreen("rejected");
+        } else {
+          setInitError(errorMsg);
+        }
         setInitiating(false);
         return;
       }
 
-      // M-Pesa é síncrono — confirma imediatamente sem USSD de espera
+      // M-Pesa confirmou de forma síncrona (dentro do timeout)
       if (resData?.mpesaSync === true) {
         setSuccessAmount(amountVal);
         setInitiating(false);
@@ -209,13 +227,20 @@ export default function Depositar() {
         return;
       }
 
+      // Pendente (eMola assíncrono ou M-Pesa a aguardar PIN via webhook)
       const pid = resData?.txId as string;
       setPendingId(pid);
       setInitiating(false);
-      setScreen("verifying");
+      if (!isMpesa) setScreen("verifying");
       startPolling(pid, amountVal);
     } catch {
-      setInitError("Erro de ligação. Verifica a internet e tenta de novo.");
+      const errorMsg = "Erro de ligação. Verifica a internet e tenta de novo.";
+      if (isMpesa) {
+        setRejectReason(errorMsg);
+        setScreen("rejected");
+      } else {
+        setInitError(errorMsg);
+      }
       setInitiating(false);
     }
   };

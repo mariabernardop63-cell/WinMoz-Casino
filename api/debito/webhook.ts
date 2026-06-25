@@ -197,6 +197,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const paymentType: string = desc.paymentType || "deposit";
 
+  const paymentMethod: string = desc.paymentMethod || "emola";
+
   if (event === "payment.completed") {
     // Creditar saldo em depósitos
     if (paymentType === "deposit") {
@@ -232,7 +234,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   } else {
     // payment.failed
-    const failReason = buildFailReason(data);
+    const failReason = buildFailReason(data, paymentMethod);
 
     await supabase.from("transactions").update({
       status: "rejected",
@@ -253,13 +255,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.status(200).json({ ok: true });
 }
 
-function buildFailReason(data: any): string {
+function buildFailReason(data: any, paymentMethod = "emola"): string {
   const raw = String(data?.failure_reason || data?.reason || data?.message || "").toLowerCase();
+  const label = paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola";
   if (raw.includes("pin") || raw.includes("wrong") || raw.includes("incorrect"))
-    return "PIN incorrecto. Verifica o teu PIN e-Mola e tenta novamente.";
+    return `PIN incorrecto. Verifica o teu PIN ${label} e tenta novamente.`;
   if (raw.includes("insufficient") || raw.includes("balance") || raw.includes("saldo"))
-    return "Saldo insuficiente na tua carteira e-Mola.";
+    return `Saldo insuficiente na tua carteira ${label}.`;
   if (raw.includes("expired") || raw.includes("timeout") || raw.includes("cancel"))
     return "Tempo esgotado. Não confirmaste o PIN a tempo.";
-  return "Pagamento recusado. Verifica o teu saldo e-Mola e tenta novamente.";
+  if (raw.includes("authentication") || raw.includes("auth"))
+    return `Serviço ${label} temporariamente indisponível. Tenta novamente mais tarde.`;
+  return `Pagamento recusado. Verifica o teu saldo ${label} e tenta novamente.`;
 }

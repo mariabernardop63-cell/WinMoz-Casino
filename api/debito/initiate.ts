@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 
+export const config = { maxDuration: 120 };
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -8,7 +10,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === "OPTIONS") { res.status(200).end(); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
-  // Explicit body parsing — Vercel may deliver body as pre-parsed object or raw string
   let parsedBody: Record<string, any> = {};
   try {
     if (typeof req.body === "string") {
@@ -31,9 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const amount: number = Number(parsedBody["amount"]);
-  // frontend sends field "phone" (9 digits, no country code)
   const phoneRaw: string = String(parsedBody["phone"] ?? "");
-  // frontend sends field "provider" ("emola" | "mpesa")
   const paymentMethod: string = String(parsedBody["provider"] ?? "emola");
   const type: string = String(parsedBody["type"] ?? "deposit");
   const userId: string = String(parsedBody["userId"] ?? "");
@@ -70,7 +69,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // Read merchant settings from platform_settings table
   const { data: settingsRows } = await supabase
     .from("platform_settings")
     .select("key, value")
@@ -82,34 +80,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const debitoBaseUrl = (settings["debito_api_base_url"] || "https://gyqoaningqhurhvdugne.supabase.co/functions/v1").replace(/\/$/, "");
-  // merchant_id: o UUID do merchant no painel Debito Pay → Settings → API
   const merchantId = (settings["debito_public_id"] || process.env["DEBITO_MERCHANT_ID"] || "1e4d1d55-d740-447f-8cb4-8c8ce1bb0a0c").trim();
-  // wallet_code: diferente por provider — e-Mola: 55291, M-Pesa: 58335
   const walletCode = paymentMethod === "mpesa"
     ? (settings["debito_mpesa_wallet_code"] || process.env["DEBITO_MPESA_WALLET_CODE"] || "58335").trim()
     : (settings["debito_wallet_code"] || process.env["DEBITO_WALLET_CODE"] || "55291").trim();
 
-  console.log("[debito/initiate] provider:", paymentMethod, "| wallet_code a usar:", walletCode, "| merchant_id:", merchantId ? "ok" : "VAZIO");
+  console.log("[debito/initiate] provider:", paymentMethod, "| wallet_code:", walletCode, "| merchant_id:", merchantId ? "ok" : "VAZIO");
 
-  // Validação: wallet_code deve ser numérico e curto (5 dígitos) — nunca um UUID longo
   if (walletCode.length > 10 || !/^\d+$/.test(walletCode)) {
-    console.error("[debito/initiate] wallet_code inválido:", walletCode, "— deve ser o código de 5 dígitos, não um UUID");
+    console.error("[debito/initiate] wallet_code inválido:", walletCode);
     res.status(503).json({ error: "Configuração do gateway inválida (wallet_code). Contacta o suporte." });
     return;
   }
 
-  // Build phone in format accepted by Debito Pay: 258XXXXXXXXX
   const cleanPhone = phoneRaw.replace(/\D/g, "").replace(/^258/, "");
   const fullPhone = `258${cleanPhone}`;
 
-  // source_id used for our own reference tracking
   const sourceId = `MOZBET-${type.toUpperCase()}-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-  // NOTE: We only create the transaction record AFTER Debito Pay confirms the payment
-  // was successfully initiated — so it never appears in the user's history until real
+  // Fetch user name for the request (helps M-Pesa USSD display correct name)
+  let customerName = "Cliente WinMoz";
+  try {
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", userId)
+      .maybeSingle();
+    if ((profileData as any)?.full_name) {
+      customerName = (profileData as any).full_name;
+    }
+  } catch { /* best-effort */ }
+
+  // === STEP 1: Create PENDING transaction BEFORE calling Debito Pay ===
+  // This ensures we always have a txId to return, even if the API call times out.
+  const { data: txRow, error: txError } = await supabase
+    .from("transactions")
+    .insert({
+      user_id: userId,
+      type: type === "deposit" ? "deposit" : "manual_bet",
+      amount,
+      status: "pending",
+      description: JSON.stringify({
+        paymentMethod,
+        phone: fullPhone,
+        sourceId,
+        debitoPaymentId: null,
+        debitoTransactionId: null,
+        debitoReference: null,
+        paymentType: type,
+        paymentGateway: "debitopay",
+        initiatedAt: new Date().toISOString(),
+        customerName,
+      }),
+    })
+    .select("id")
+    .single();
+
+  if (txError || !txRow) {
+    console.error("[debito/initiate] Supabase pre-insert error:", txError);
+    res.status(500).json({ error: "Erro ao criar registo de pagamento. Tenta novamente." });
+    return;
+  }
+
+  const txId = (txRow as any).id as string;
+  console.log("[debito/initiate] TX criada (pending) antes da chamada Debito Pay:", txId);
 
   try {
-    // Build request body exactly as per Debito Pay API documentation
     const debitoBody: Record<string, any> = {
       action: "process",
       payment_method: paymentMethod === "mpesa" ? "mpesa" : "emola",
@@ -120,37 +156,105 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       phone: fullPhone,
       source: "gateway",
       source_id: sourceId,
+      customer_name: customerName,
+      customer_phone: `+${fullPhone}`,
     };
 
     const debitoUrl = `${debitoBaseUrl}/payment-orchestrator`;
-    console.log("[debito/initiate] → Debito Pay:", debitoUrl, JSON.stringify({ ...debitoBody, merchant_id: merchantId ? `${merchantId.slice(0,8)}...` : "VAZIO" }));
+    console.log("[debito/initiate] → Debito Pay:", debitoUrl, JSON.stringify({ ...debitoBody, merchant_id: merchantId ? `${merchantId.slice(0, 8)}...` : "VAZIO" }));
 
-    const debitoRes = await fetch(debitoUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${debitoApiKey}`,
-        "Accept": "application/json",
-      },
-      body: JSON.stringify(debitoBody),
-    });
+    // === STEP 2: AbortController — 50s for M-Pesa (safe within Vercel 60s limit), 30s for eMola ===
+    // M-Pesa is synchronous: Debito Pay holds the connection until the user enters their PIN.
+    // eMola is async: Debito Pay returns immediately with "pending".
+    // On AbortError, the transaction stays pending and the webhook confirms when the user enters their PIN.
+    const timeoutMs = paymentMethod === "mpesa" ? 50_000 : 30_000;
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
-    const responseText = await debitoRes.text();
+    let debitoRes: Response;
+    let responseText: string;
     let debitoData: any = {};
-    try { debitoData = JSON.parse(responseText); } catch { debitoData = { raw: responseText }; }
 
-    console.log("[debito/initiate] ← Debito Pay status:", debitoRes.status, "body:", JSON.stringify(debitoData));
+    try {
+      debitoRes = await fetch(debitoUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${debitoApiKey}`,
+          "Accept": "application/json",
+        },
+        body: JSON.stringify(debitoBody),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutHandle);
 
+      responseText = await debitoRes.text();
+      try { debitoData = JSON.parse(responseText); } catch { debitoData = { raw: responseText }; }
+
+      console.log("[debito/initiate] ← Debito Pay status:", debitoRes.status, "body:", JSON.stringify(debitoData));
+    } catch (fetchErr: any) {
+      clearTimeout(timeoutHandle);
+
+      if (fetchErr?.name === "AbortError") {
+        // === M-Pesa timeout: USSD was sent, waiting for user PIN ===
+        // Return pending — the webhook will fire when user confirms their PIN.
+        console.log("[debito/initiate] M-Pesa AbortError (timeout) — USSD sent, aguardando PIN via webhook. txId:", txId);
+
+        // Update description to note the timeout (tx stays "pending" for webhook to resolve)
+        await supabase.from("transactions").update({
+          description: JSON.stringify({
+            paymentMethod,
+            phone: fullPhone,
+            sourceId,
+            debitoPaymentId: null,
+            debitoTransactionId: null,
+            debitoReference: null,
+            paymentType: type,
+            paymentGateway: "debitopay",
+            initiatedAt: new Date().toISOString(),
+            customerName,
+            note: "mpesa_ussd_sent_awaiting_pin",
+          }),
+        }).eq("id", txId);
+
+        res.status(200).json({ ok: true, txId, paymentId: null, sourceId, mpesaSync: false, ussdSent: true });
+        return;
+      }
+
+      // Network error
+      console.error("[debito/initiate] Network/fetch error:", fetchErr?.message || fetchErr);
+      await supabase.from("transactions").update({ status: "rejected", description: JSON.stringify({ paymentMethod, phone: fullPhone, sourceId, paymentType: type, paymentGateway: "debitopay", failReason: "network_error", initiatedAt: new Date().toISOString() }) }).eq("id", txId);
+      res.status(500).json({ error: "Erro de ligação ao gateway de pagamento. Tenta novamente." });
+      return;
+    }
+
+    // === STEP 3: Handle Debito Pay response ===
     if (!debitoRes.ok) {
-      const userMessage = parseDebitoError(debitoData, debitoRes.status);
+      const userMessage = parseDebitoError(debitoData, debitoRes.status, paymentMethod);
+      console.error("[debito/initiate] Debito Pay error:", debitoRes.status, debitoData);
+
+      // Update tx to rejected
+      await supabase.from("transactions").update({
+        status: "rejected",
+        description: JSON.stringify({
+          paymentMethod,
+          phone: fullPhone,
+          sourceId,
+          paymentType: type,
+          paymentGateway: "debitopay",
+          failReason: userMessage,
+          debitoStatus: debitoRes.status,
+          debitoError: debitoData?.error || debitoData?.message || "unknown",
+          initiatedAt: new Date().toISOString(),
+        }),
+      }).eq("id", txId);
+
       res.status(400).json({ error: userMessage });
       return;
     }
 
-    // Log completo da resposta para diagnóstico nos logs da Vercel
     console.log("[debito/initiate] RESPOSTA COMPLETA Debito Pay:", JSON.stringify(debitoData));
 
-    // Extrair payment_id — campo standard da documentação
     const debitoPaymentId: string | null =
       debitoData?.payment_id ||
       debitoData?.payment?.id ||
@@ -159,8 +263,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       debitoData?.id ||
       null;
 
-    // Extrair transaction_id — campo REAL que a Debito Pay envia no webhook
-    // (o campo "payment_id" da doc e o "transaction_id" do webhook podem ser valores diferentes)
     const debitoTransactionId: string | null =
       debitoData?.transaction_id ||
       debitoData?.transactionId ||
@@ -169,7 +271,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       debitoData?.uuid ||
       null;
 
-    // Extrair reference — provider reference (ex: EH2026...)
     const debitoReference: string | null =
       debitoData?.reference ||
       debitoData?.provider_reference ||
@@ -178,53 +279,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       debitoData?.data?.reference ||
       null;
 
-    console.log("[debito/initiate] IDs extraídos — payment_id:", debitoPaymentId,
-      "| transaction_id:", debitoTransactionId,
-      "| reference:", debitoReference,
-      "| sourceId:", sourceId);
+    console.log("[debito/initiate] IDs — payment_id:", debitoPaymentId, "| transaction_id:", debitoTransactionId, "| reference:", debitoReference, "| sourceId:", sourceId);
 
-    if (!debitoPaymentId && !debitoTransactionId) {
-      console.warn("[debito/initiate] AVISO: nem payment_id nem transaction_id encontrados na resposta. " +
-        "O webhook vai usar fallback por montante+tempo. Verifica os logs acima.");
-    }
-
-    // M-Pesa é síncrono — confirma imediatamente se status === "success"
+    // M-Pesa sync: Debito Pay confirmed within the timeout window
     const mpesaSync = paymentMethod === "mpesa" && (debitoData?.status === "success" || debitoData?.success === true);
 
-    // Criar registo da transação APENAS após confirmação do Debito Pay
+    // Update the pre-created transaction with the real Debito Pay IDs
     const txStatus = mpesaSync ? "approved" : "pending";
-    const { data: txRow, error: txError } = await supabase
-      .from("transactions")
-      .insert({
-        user_id: userId,
-        type: type === "deposit" ? "deposit" : "manual_bet",
-        amount,
-        status: txStatus,
-        description: JSON.stringify({
-          paymentMethod,
-          phone: fullPhone,
-          sourceId,
-          debitoPaymentId,
-          debitoTransactionId,
-          debitoReference,
-          paymentType: type,
-          paymentGateway: "debitopay",
-          initiatedAt: new Date().toISOString(),
-          ...(mpesaSync ? { approvedVia: "mpesa_sync", approvedAt: new Date().toISOString() } : {}),
-        }),
-      })
-      .select("id")
-      .single();
+    await supabase.from("transactions").update({
+      status: txStatus,
+      description: JSON.stringify({
+        paymentMethod,
+        phone: fullPhone,
+        sourceId,
+        debitoPaymentId,
+        debitoTransactionId,
+        debitoReference,
+        paymentType: type,
+        paymentGateway: "debitopay",
+        initiatedAt: new Date().toISOString(),
+        customerName,
+        ...(mpesaSync ? { approvedVia: "mpesa_sync", approvedAt: new Date().toISOString() } : {}),
+      }),
+    }).eq("id", txId);
 
-    if (txError) {
-      console.error("[debito/initiate] Supabase insert error (post-success):", txError);
-    }
-
-    const txId = (txRow as any)?.id ?? null;
-    console.log("[debito/initiate] TX criada após confirmação Debito Pay:", txId, "| status:", txStatus, "| mpesaSync:", mpesaSync);
-
-    // M-Pesa síncrono + depósito → creditar saldo imediatamente
-    if (mpesaSync && type === "deposit" && txId) {
+    // M-Pesa sync + deposit → credit balance immediately
+    if (mpesaSync && type === "deposit") {
       const { data: profile } = await supabase
         .from("profiles").select("balance").eq("id", userId).maybeSingle();
       const currentBalance = Number((profile as any)?.balance ?? 0);
@@ -238,28 +318,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    console.log("[debito/initiate] TX actualizada:", txId, "| status:", txStatus, "| mpesaSync:", mpesaSync);
     res.status(200).json({ ok: true, txId, paymentId: debitoPaymentId, sourceId, mpesaSync });
   } catch (err: any) {
-    console.error("[debito/initiate] Network/fetch error:", err);
-    res.status(500).json({ error: "Erro de ligação ao gateway de pagamento. Tenta novamente." });
+    console.error("[debito/initiate] Unexpected error:", err);
+    await supabase.from("transactions").update({ status: "rejected" }).eq("id", txId);
+    res.status(500).json({ error: "Erro inesperado. Tenta novamente." });
   }
 }
 
-function parseDebitoError(data: any, status: number): string {
+function parseDebitoError(data: any, status: number, paymentMethod: string): string {
   const msg: string = data?.message || data?.error || data?.detail || "";
   const low = msg.toLowerCase();
-  if (status === 401) return "API key inválida — verifica a configuração no Vercel.";
+
+  if (status === 401) return "Chave API inválida — contacta o suporte.";
   if (status === 403) return "Domínio não autorizado no gateway de pagamento. Contacta o suporte.";
   if (status === 404) return "Configuração do gateway inválida (wallet_code). Contacta o suporte.";
   if (status === 429) return "Demasiados pedidos ao gateway. Aguarda alguns segundos e tenta novamente.";
+
   if (status === 400) {
+    if (low.includes("authentication") || low.includes("auth")) {
+      if (paymentMethod === "mpesa") {
+        return "Serviço M-Pesa temporariamente indisponível. Usa e-Mola ou tenta mais tarde.";
+      }
+      return "Erro de autenticação no gateway. Contacta o suporte.";
+    }
     if (low.includes("phone") || low.includes("msisdn") || low.includes("mobile")) return "Número de telefone inválido para este operador.";
     if (low.includes("amount") || low.includes("minimum") || low.includes("mínimo") || low.includes("minimo")) return "Montante inválido — mínimo é 10 MZN.";
     if (low.includes("payment_method") || low.includes("unsupported")) return "Método de pagamento não suportado de momento.";
     if (low.includes("wallet_code") || low.includes("wallet")) return "Código de carteira inválido. Contacta o suporte.";
     if (low.includes("required")) return "Dados em falta no pedido. Contacta o suporte.";
+    if (low.includes("timeout") || low.includes("time out")) return "Tempo esgotado — o utilizador não confirmou o PIN a tempo.";
     return msg ? `Erro do gateway: ${msg}` : "Pedido rejeitado pelo gateway. Tenta novamente.";
   }
+
   if (status >= 500) return "Erro temporário do gateway de pagamento. Tenta novamente mais tarde.";
   return msg ? `Erro do gateway: ${msg}` : "Erro ao iniciar pagamento. Tenta novamente.";
 }

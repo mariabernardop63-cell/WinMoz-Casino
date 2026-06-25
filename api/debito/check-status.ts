@@ -141,9 +141,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (isFailed && currentStatus === "pending") {
+      const label = (desc.paymentMethod === "mpesa") ? "M-Pesa" : "e-Mola";
       const failReason = remoteStatus === "expired" || remoteStatus === "EXPIRED"
         ? "Tempo esgotado. Não confirmaste o PIN a tempo."
-        : "Pagamento recusado. Verifica o teu saldo e-Mola e tenta novamente.";
+        : `Pagamento recusado. Verifica o teu saldo ${label} e tenta novamente.`;
 
       await supabase.from("transactions").update({
         status: "rejected",
