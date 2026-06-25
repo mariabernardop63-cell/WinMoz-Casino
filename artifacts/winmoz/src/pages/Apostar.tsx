@@ -204,17 +204,26 @@ function SMSBettingScreen({
     setInitError("");
     setInitiating(true);
 
-    // M-Pesa: muda imediatamente para ecrã de espera (USSD vai aparecer no telemóvel)
     const isMpesa = provider === "mpesa";
+    // Tracks whether the 10s timer already switched the screen to "verifying"
+    let screenSwitched = false;
+    let mpesaTimer: ReturnType<typeof setTimeout> | null = null;
+
     if (isMpesa) {
-      setCountdown(120);
-      setStep("verifying");
+      // Keep button loading while the USSD is being dispatched.
+      // After 10s the USSD should already be on the phone — switch screen then.
+      mpesaTimer = setTimeout(() => {
+        screenSwitched = true;
+        setCountdown(120);
+        setStep("verifying");
+      }, 10_000);
     }
 
     try {
       const session = await getSessionWithRefresh();
       if (!session) {
-        if (isMpesa) {
+        if (mpesaTimer) clearTimeout(mpesaTimer);
+        if (screenSwitched) {
           setRejectReason("Sessão expirada. Volta a entrar na tua conta.");
           setStep("rejected");
         } else {
@@ -238,10 +247,11 @@ function SMSBettingScreen({
       });
 
       const resData = await res.json() as any;
+      if (mpesaTimer) clearTimeout(mpesaTimer);
 
       if (!res.ok) {
         const errorMsg = resData?.error || "Erro ao iniciar pagamento. Tenta novamente.";
-        if (isMpesa) {
+        if (screenSwitched) {
           setRejectReason(errorMsg);
           setStep("rejected");
         } else {
@@ -251,7 +261,7 @@ function SMSBettingScreen({
         return;
       }
 
-      // M-Pesa confirmou de forma síncrona (dentro do timeout)
+      // M-Pesa confirmou de forma síncrona (utilizador confirmou o PIN rapidamente)
       if (resData?.mpesaSync === true) {
         setInitiating(false);
         onSuccess(resData?.txId ?? null);
@@ -260,7 +270,7 @@ function SMSBettingScreen({
 
       const pid = resData?.txId as string;
       setInitiating(false);
-      if (!isMpesa) setStep("verifying");
+      setStep("verifying");
       setCountdown(300);
 
       const TIMEOUT_SECS = 300; // 5 min — e-Mola pode demorar a entregar o USSD
@@ -352,8 +362,9 @@ function SMSBettingScreen({
         }
       }, 3000);
     } catch {
+      if (mpesaTimer) clearTimeout(mpesaTimer);
       const errorMsg = "Erro de ligação. Verifica a internet e tenta de novo.";
-      if (isMpesa) {
+      if (screenSwitched) {
         setRejectReason(errorMsg);
         setStep("rejected");
       } else {

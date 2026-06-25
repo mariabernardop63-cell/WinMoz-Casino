@@ -163,11 +163,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const debitoUrl = `${debitoBaseUrl}/payment-orchestrator`;
     console.log("[debito/initiate] → Debito Pay:", debitoUrl, JSON.stringify({ ...debitoBody, merchant_id: merchantId ? `${merchantId.slice(0, 8)}...` : "VAZIO" }));
 
-    // === STEP 2: AbortController — 50s for M-Pesa (safe within Vercel 60s limit), 30s for eMola ===
-    // M-Pesa is synchronous: Debito Pay holds the connection until the user enters their PIN.
+    // === STEP 2: AbortController — 110s for M-Pesa, 30s for eMola ===
+    // M-Pesa is synchronous: Debito Pay holds the connection until the user enters their PIN (~60-120s).
+    // Cutting the connection early causes Debito Pay to cancel the USSD → "MMI INVALID" on the phone.
+    // maxDuration: 120 is set above so Vercel Pro allows up to 120s; we abort at 110s to leave room.
     // eMola is async: Debito Pay returns immediately with "pending".
-    // On AbortError, the transaction stays pending and the webhook confirms when the user enters their PIN.
-    const timeoutMs = paymentMethod === "mpesa" ? 50_000 : 30_000;
+    const timeoutMs = paymentMethod === "mpesa" ? 110_000 : 30_000;
     const controller = new AbortController();
     const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
 
