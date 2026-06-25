@@ -1709,7 +1709,7 @@ export default function LudoGame() {
     // Game has definitively started — credit referral reward now (player's own first roll)
     if(BET_AMOUNT > 0 && !rewardFiredRef.current){
       rewardFiredRef.current=true;
-      fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:profile?.id})}).catch(()=>{});
+      supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
     }
     const seq = Date.now();
     channelRef.current?.send({
@@ -1747,7 +1747,7 @@ export default function LudoGame() {
       try{
         const result = await serverBet(BET_AMOUNT, "ludo", `Aposta (Ludo) vs ${opponentName}`, gameId);
         if(!result.ok){ betDeductedRef.current=false; return; }
-        fetch("/api/record-bet-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_id: profile.id }) }).catch(() => {});
+        supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
         try{sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`,"1");}catch{}
         await refreshProfile();
         if(profile?.id) evaluateBotDifficulty(profile.id).catch(()=>{});
@@ -1853,7 +1853,7 @@ export default function LudoGame() {
       // Game has definitively started — credit referral reward now (opponent's first move)
       if(BET_AMOUNT > 0 && !rewardFiredRef.current){
         rewardFiredRef.current=true;
-        fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({user_id:profile?.id})}).catch(()=>{});
+        supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
       }
       applyRoll(payload.player as Player, val);
     });

@@ -1337,22 +1337,18 @@ export default function Apostar() {
     if (!user?.id || !selectedBet || salaLoading) return;
     setSalaLoading(true); setSalaError("");
     try {
-      const { data: pd } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
-      const bal = parseFloat(String(pd?.balance ?? "0"));
-      if (bal < selectedBet) { setSalaError("Saldo insuficiente."); setSalaLoading(false); return; }
-      const code = generateRoomCode();
-      await supabase.from("profiles").update({ balance: bal - selectedBet }).eq("id", user.id);
-      await supabase.from("transactions").insert({
-        user_id: user.id, type: "bet", amount: -selectedBet,
-        description: `Sala privada (${gameId}) — código ${code}`, status: "approved",
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { setSalaError("Sessão expirada. Faz login novamente."); setSalaLoading(false); return; }
+      const res = await fetch(`${API_BASE}/rooms/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ betAmount: selectedBet, gameType: gameId }),
       });
-      const { data: room, error: rErr } = await supabase.from("game_rooms")
-        .insert({ code, creator_id: user.id, game_type: gameId, bet_amount: selectedBet, status: "waiting" })
-        .select("id").single();
-      if (rErr || !room) {
-        await supabase.from("profiles").update({ balance: bal }).eq("id", user.id);
-        setSalaError("Erro ao criar sala. Tenta de novo."); setSalaLoading(false); return;
-      }
+      const json = await res.json() as { ok?: boolean; code?: string; roomId?: string; error?: string };
+      if (!res.ok || !json.ok) { setSalaError(json.error ?? "Erro ao criar sala. Tenta de novo."); setSalaLoading(false); return; }
+      const code = json.code!;
+      const room = { id: json.roomId! };
       setSalaCode(code); setSalaRoomId(room.id);
       const ch = supabase.channel(`sala:${code}`);
       ch.on("broadcast", { event: "joiner_ready" }, ({ payload }) => {
@@ -1386,28 +1382,15 @@ export default function Apostar() {
     setSalaLoading(true);
     try {
       if (salaRoomId) {
-        /* Delete first — only refund if delete succeeds and row was in "waiting" */
-        const { data: room } = await supabase
-          .from("game_rooms")
-          .select("status, bet_amount")
-          .eq("id", salaRoomId)
-          .single();
-        if (room?.status === "waiting") {
-          const { error: delErr } = await supabase
-            .from("game_rooms")
-            .delete()
-            .eq("id", salaRoomId)
-            .eq("status", "waiting"); /* atomic guard — only deletes if still waiting */
-          if (!delErr) {
-            const { data: pd } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
-            const refund = Number(room.bet_amount) || selectedBet || 0;
-            await supabase.from("profiles").update({ balance: parseFloat(String(pd?.balance ?? "0")) + refund }).eq("id", user.id);
-            await supabase.from("transactions").insert({
-              user_id: user.id, type: "win", amount: refund,
-              description: `Reembolso: sala cancelada (${gameId})`, status: "approved",
-            });
-            await refreshProfile?.();
-          }
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (token) {
+          await fetch(`${API_BASE}/rooms/cancel`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+            body: JSON.stringify({ roomId: salaRoomId }),
+          });
+          await refreshProfile?.();
         }
       }
       if (salaChannelRef.current) { supabase.removeChannel(salaChannelRef.current); salaChannelRef.current = null; }
@@ -1431,16 +1414,17 @@ export default function Apostar() {
         setSalaError(`Esta sala tem aposta de ${room.bet_amount} MT. Seleciona esse valor.`);
         setSalaLoading(false); return;
       }
-      const { data: pd } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
-      const bal = parseFloat(String(pd?.balance ?? "0"));
-      if (bal < Number(room.bet_amount)) { setSalaError("Saldo insuficiente."); setSalaLoading(false); return; }
-      const gId = `sala_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-      await supabase.from("profiles").update({ balance: bal - Number(room.bet_amount) }).eq("id", user.id);
-      await supabase.from("transactions").insert({
-        user_id: user.id, type: "bet", amount: -Number(room.bet_amount),
-        description: `Sala privada (${room.game_type}) — código ${code}`, status: "approved",
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { setSalaError("Sessão expirada. Faz login novamente."); setSalaLoading(false); return; }
+      const joinRes = await fetch(`${API_BASE}/rooms/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ code, gameType: gameId }),
       });
-      await supabase.from("game_rooms").update({ status: "matched", joiner_id: user.id }).eq("id", room.id);
+      const joinJson = await joinRes.json() as { ok?: boolean; gameId?: string; betAmount?: number; error?: string };
+      if (!joinRes.ok || !joinJson.ok) { setSalaError(joinJson.error ?? "Erro ao entrar na sala."); setSalaLoading(false); return; }
+      const gId = joinJson.gameId!;
       try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gId}`,  "1"); } catch {}
       try { sessionStorage.setItem(`wm_bet_deducted_damas_${gId}`, "1"); } catch {}
       try { sessionStorage.setItem(`wm_bet_deducted_chess_${gId}`, "1"); } catch {}

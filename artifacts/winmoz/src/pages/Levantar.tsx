@@ -204,42 +204,10 @@ export default function Levantar() {
       } catch { /* fall through to direct Supabase */ }
 
       if (!apiSuccess) {
-        const { data: profileData } = await supabase
-          .from("profiles").select("balance").eq("id", user.id).single();
-        const currentBalance = parseFloat(String(profileData?.balance ?? "0")) || 0;
-
-        if (currentBalance < amountVal + 5) {
-          setProcessingConfirm(false);
-          setScreen("rejected");
-          return;
-        }
-
-        const newBalance = Math.round((currentBalance - amountVal - 5) * 100) / 100;
-        const { error: balErr } = await supabase
-          .from("profiles").update({ balance: newBalance }).eq("id", user.id);
-        if (balErr) { setProcessingConfirm(false); setScreen("rejected"); return; }
-
-        const { data: txRow, error: txErr } = await supabase
-          .from("transactions").insert({
-            user_id: user.id,
-            type: "withdrawal",
-            amount: -(amountVal + 5),
-            description: JSON.stringify({
-              method: "M-Pesa",
-              phone: profile?.phone ?? null,
-              userName: profile?.full_name ?? "utilizador",
-            }),
-            status: "pending",
-            created_at: new Date().toISOString(),
-          }).select("id").single();
-
-        if (txErr || !txRow) {
-          await supabase.from("profiles").update({ balance: amountVal + 5 + (parseFloat(String((await supabase.from("profiles").select("balance").eq("id", user.id).single()).data?.balance ?? "0")) || 0) }).eq("id", user.id);
-          setProcessingConfirm(false);
-          setScreen("rejected");
-          return;
-        }
-        withdrawalId = txRow.id;
+        // API endpoint unavailable — show error, do NOT attempt direct DB writes
+        setProcessingConfirm(false);
+        setScreen("rejected");
+        return;
       }
 
       await refreshProfile();
