@@ -233,6 +233,13 @@ function SMSBettingScreen({
         return;
       }
 
+      // M-Pesa é síncrono — confirma imediatamente sem USSD de espera
+      if (resData?.mpesaSync === true) {
+        setInitiating(false);
+        onSuccess(resData?.txId ?? null);
+        return;
+      }
+
       const pid = resData?.txId as string;
       setInitiating(false);
       setStep("verifying");
@@ -390,15 +397,16 @@ function SMSBettingScreen({
               </div>
             </motion.button>
 
-            {/* M-Pesa — EM BREVE */}
-            <div
-              className="w-full p-5 mb-8 flex items-center justify-between"
+            {/* M-Pesa — ACTIVE */}
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              onClick={() => { setProvider("mpesa"); setStep("phone"); }}
+              className="w-full p-5 mb-8 flex items-center justify-between transition-all"
               style={{
-                background: "#fafafa",
-                border: "1.5px solid #e5e7eb",
+                background: "#fff",
+                border: "1.5px solid #dc2626",
                 borderRadius: 0,
-                opacity: 0.5,
-                cursor: "not-allowed",
+                cursor: "pointer",
               }}>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 flex items-center justify-center overflow-hidden"
@@ -407,13 +415,16 @@ function SMSBettingScreen({
                 </div>
                 <div className="text-left">
                   <p style={{ fontWeight: 700, color: "#dc2626", fontSize: 15, letterSpacing: "0.5px", fontFamily: "'Syne', sans-serif" }}>M-Pesa</p>
-                  <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Brevemente disponível</p>
+                  <p style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>Confirmação instantânea</p>
                 </div>
               </div>
-              <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#f1f5f9", color: "#9ca3af", letterSpacing: "0.5px" }}>
-                EM BREVE
-              </span>
-            </div>
+              <div className="flex flex-col items-end gap-1">
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#fef2f2", color: "#dc2626", letterSpacing: "0.5px" }}>
+                  ACTIVO
+                </span>
+                <CheckCircle2 style={{ width: 16, height: 16, color: "#dc2626" }} />
+              </div>
+            </motion.button>
 
             <div className="p-4" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
               <div className="flex items-start gap-3">

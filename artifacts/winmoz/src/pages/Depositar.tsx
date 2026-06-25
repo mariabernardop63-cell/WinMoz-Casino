@@ -201,6 +201,14 @@ export default function Depositar() {
         return;
       }
 
+      // M-Pesa é síncrono — confirma imediatamente sem USSD de espera
+      if (resData?.mpesaSync === true) {
+        setSuccessAmount(amountVal);
+        setInitiating(false);
+        setScreen("success");
+        return;
+      }
+
       const pid = resData?.txId as string;
       setPendingId(pid);
       setInitiating(false);
@@ -237,7 +245,7 @@ export default function Depositar() {
                 <span style={{ opacity: 0.4 }}>|</span>
               </span>
             </div>
-            <p style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 4 }}>Mín: 10 MZN · Máx: 1.000.000 MZN</p>
+            <p style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 4 }}>Mín: 10 MZN (M-Pesa) · 50 MZN (e-Mola) · Máx: 1.000.000 MZN</p>
           </div>
 
           <div className="px-5 pt-5 pb-3">
@@ -348,15 +356,16 @@ export default function Depositar() {
               </div>
             </motion.button>
 
-            {/* M-Pesa — COMING SOON */}
-            <div
-              className="w-full p-5 mb-8 flex items-center justify-between"
+            {/* M-Pesa — ACTIVE */}
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              onClick={() => { setProvider("mpesa"); setScreen("phone"); }}
+              className="w-full p-5 mb-8 flex items-center justify-between transition-all"
               style={{
-                background: "#fafafa",
-                border: "1.5px solid #e5e7eb",
+                background: "#fff",
+                border: `1.5px solid ${MPESA_RED}`,
                 borderRadius: 0,
-                opacity: 0.5,
-                cursor: "not-allowed",
+                cursor: "pointer",
               }}>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 flex items-center justify-center overflow-hidden"
@@ -365,20 +374,23 @@ export default function Depositar() {
                 </div>
                 <div className="text-left">
                   <p style={{ fontWeight: 700, color: MPESA_RED, fontSize: 15, letterSpacing: "0.5px", fontFamily: "'Syne', sans-serif" }}>M-Pesa</p>
-                  <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Brevemente disponível</p>
+                  <p style={{ fontSize: 12, color: "#6b7280", marginTop: 2 }}>Confirmação instantânea</p>
                 </div>
               </div>
-              <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#f1f5f9", color: "#9ca3af", letterSpacing: "0.5px" }}>
-                EM BREVE
-              </span>
-            </div>
+              <div className="flex flex-col items-end gap-1">
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#fef2f2", color: MPESA_RED, letterSpacing: "0.5px" }}>
+                  ACTIVO
+                </span>
+                <CheckCircle2 style={{ width: 16, height: 16, color: MPESA_RED }} />
+              </div>
+            </motion.button>
 
             <div className="p-4" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
               <div className="flex items-start gap-3">
                 <span style={{ fontSize: 14, marginTop: 1 }}>ℹ️</span>
                 <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
                   O pagamento é processado pelo gateway seguro <strong style={{ color: "#374151" }}>Debito Pay</strong>.
-                  Receberás um pedido USSD no teu telemóvel para confirmar com o teu PIN e-Mola.
+                  M-Pesa confirma instantaneamente; e-Mola envia um pedido USSD para confirmares com o teu PIN.
                 </p>
               </div>
             </div>
@@ -462,12 +474,17 @@ export default function Depositar() {
 
             <div className="p-4 mb-7" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
               <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 10 }}>Como funciona</p>
-              {[
+              {(provider === "mpesa" ? [
+                "Introduz o teu número M-Pesa e prime «Pagar»",
+                "Recebes um pedido USSD no teu telemóvel",
+                "Confirma com o teu PIN M-Pesa",
+                "O saldo é creditado instantaneamente",
+              ] : [
                 "Introduz o teu número e-Mola e prime «Pagar»",
                 "Recebes um pedido USSD no teu telemóvel",
                 "Confirma com o teu PIN e-Mola",
                 "O saldo é creditado automaticamente",
-              ].map((step, i) => (
+              ]).map((step, i) => (
                 <div key={i} className="flex items-start gap-3 mb-2.5 last:mb-0">
                   <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 mt-0.5"
                     style={{ background: "#0a0a0a" }}>
@@ -677,12 +694,17 @@ export default function Depositar() {
             </p>
           </div>
           <div className="px-4 py-3 flex flex-col gap-3">
-            {[
+            {(provider === "mpesa" ? [
+              "PIN M-Pesa incorrecto ou cancelaste o pedido USSD",
+              "Saldo insuficiente na carteira M-Pesa",
+              "Tempo de resposta ao USSD esgotado",
+              "Número de telefone não corresponde à carteira M-Pesa",
+            ] : [
               "PIN e-Mola incorrecto ou cancelaste o pedido USSD",
               "Saldo insuficiente na carteira e-Mola",
               "Tempo de resposta ao USSD esgotado",
               "Número de telefone não corresponde à carteira e-Mola",
-            ].map((cause, i) => (
+            ]).map((cause, i) => (
               <div key={i} className="flex items-start gap-3">
                 <div className="w-5 h-5 flex items-center justify-center flex-shrink-0 mt-0.5"
                   style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>

@@ -74,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { data: settingsRows } = await supabase
     .from("platform_settings")
     .select("key, value")
-    .in("key", ["debito_api_base_url", "debito_public_id", "debito_wallet_code"]);
+    .in("key", ["debito_api_base_url", "debito_public_id", "debito_wallet_code", "debito_mpesa_wallet_code"]);
 
   const settings: Record<string, string> = {};
   for (const row of settingsRows ?? []) {
@@ -84,11 +84,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const debitoBaseUrl = (settings["debito_api_base_url"] || "https://gyqoaningqhurhvdugne.supabase.co/functions/v1").replace(/\/$/, "");
   // merchant_id: o UUID do merchant no painel Debito Pay → Settings → API
   const merchantId = (settings["debito_public_id"] || process.env["DEBITO_MERCHANT_ID"] || "1e4d1d55-d740-447f-8cb4-8c8ce1bb0a0c").trim();
-  // wallet_code: código PÚBLICO de 5 dígitos (NÃO o UUID interno da carteira)
-  // Ordem de prioridade: platform_settings → env var → fallback hardcoded "55291"
-  const walletCode = (settings["debito_wallet_code"] || process.env["DEBITO_WALLET_CODE"] || "55291").trim();
+  // wallet_code: diferente por provider — e-Mola: 55291, M-Pesa: 58335
+  const walletCode = paymentMethod === "mpesa"
+    ? (settings["debito_mpesa_wallet_code"] || process.env["DEBITO_MPESA_WALLET_CODE"] || "58335").trim()
+    : (settings["debito_wallet_code"] || process.env["DEBITO_WALLET_CODE"] || "55291").trim();
 
-  console.log("[debito/initiate] wallet_code a usar:", walletCode, "| merchant_id:", merchantId ? "ok" : "VAZIO");
+  console.log("[debito/initiate] provider:", paymentMethod, "| wallet_code a usar:", walletCode, "| merchant_id:", merchantId ? "ok" : "VAZIO");
 
   // Validação: wallet_code deve ser numérico e curto (5 dígitos) — nunca um UUID longo
   if (walletCode.length > 10 || !/^\d+$/.test(walletCode)) {
@@ -187,14 +188,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         "O webhook vai usar fallback por montante+tempo. Verifica os logs acima.");
     }
 
+    // M-Pesa é síncrono — confirma imediatamente se status === "success"
+    const mpesaSync = paymentMethod === "mpesa" && (debitoData?.status === "success" || debitoData?.success === true);
+
     // Criar registo da transação APENAS após confirmação do Debito Pay
+    const txStatus = mpesaSync ? "approved" : "pending";
     const { data: txRow, error: txError } = await supabase
       .from("transactions")
       .insert({
         user_id: userId,
         type: type === "deposit" ? "deposit" : "manual_bet",
         amount,
-        status: "pending",
+        status: txStatus,
         description: JSON.stringify({
           paymentMethod,
           phone: fullPhone,
@@ -205,6 +210,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           paymentType: type,
           paymentGateway: "debitopay",
           initiatedAt: new Date().toISOString(),
+          ...(mpesaSync ? { approvedVia: "mpesa_sync", approvedAt: new Date().toISOString() } : {}),
         }),
       })
       .select("id")
@@ -215,9 +221,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const txId = (txRow as any)?.id ?? null;
-    console.log("[debito/initiate] TX criada após confirmação Debito Pay:", txId);
+    console.log("[debito/initiate] TX criada após confirmação Debito Pay:", txId, "| status:", txStatus, "| mpesaSync:", mpesaSync);
 
-    res.status(200).json({ ok: true, txId, paymentId: debitoPaymentId, sourceId });
+    // M-Pesa síncrono + depósito → creditar saldo imediatamente
+    if (mpesaSync && type === "deposit" && txId) {
+      const { data: profile } = await supabase
+        .from("profiles").select("balance").eq("id", userId).maybeSingle();
+      const currentBalance = Number((profile as any)?.balance ?? 0);
+      const newBalance = currentBalance + Number(amount);
+      const { error: balErr } = await supabase
+        .from("profiles").update({ balance: newBalance }).eq("id", userId);
+      if (balErr) {
+        console.error("[debito/initiate] Erro ao creditar saldo M-Pesa:", balErr);
+      } else {
+        console.log(`[debito/initiate] ✓ M-Pesa +${amount} MZN → user ${userId} (novo saldo: ${newBalance})`);
+      }
+    }
+
+    res.status(200).json({ ok: true, txId, paymentId: debitoPaymentId, sourceId, mpesaSync });
   } catch (err: any) {
     console.error("[debito/initiate] Network/fetch error:", err);
     res.status(500).json({ error: "Erro de ligação ao gateway de pagamento. Tenta novamente." });
