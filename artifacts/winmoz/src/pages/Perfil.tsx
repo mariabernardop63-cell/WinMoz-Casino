@@ -96,7 +96,7 @@ function parseTxDescription(raw: string | null, type: string): string {
   return stripBotMarkers(raw);
 }
 
-const FERRAMENTAS_BASE = [
+const FERRAMENTAS_BASE: Array<{ icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>; label: string; desc: string; route: string | null; danger?: boolean; affiliate?: boolean }> = [
   { icon: UserCog,    label: "Editar Perfil",    desc: "Altera o teu nome, foto e dados",   route: "/editar-perfil"   },
   { icon: UserPlus,   label: "Convidar Amigos",  desc: "Convida e ganha bónus especiais",   route: "/convidar-amigos" },
   { icon: FileText,   label: "Extratos",         desc: "Histórico completo de transações",  route: "/extratos"        },

@@ -129,8 +129,7 @@ export default function TermosServico() {
       .then(({ data }) => {
         if (data?.value) setContent(data.value);
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      }, () => setLoading(false));
   }, []);
 
   const sections = parseSections(content);

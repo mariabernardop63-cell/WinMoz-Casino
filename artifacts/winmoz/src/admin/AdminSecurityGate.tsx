@@ -51,7 +51,7 @@ async function fetchSecurityPassword(): Promise<string> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return "";
-    const res = await fetch("/api/admin/settings/get?key=admin_security_password", {
+    const res = await fetch("/api/admin/settings?key=admin_security_password", {
       headers: { "Authorization": `Bearer ${session.access_token}` },
     });
     if (!res.ok) return "";

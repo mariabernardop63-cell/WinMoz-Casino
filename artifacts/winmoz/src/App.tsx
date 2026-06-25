@@ -62,7 +62,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
 
     // Ler via API server-side (usa service role — nunca bloqueado por RLS)
     const fetchMaintenance = () => {
-      fetch("/api/admin/settings/get?key=maintenance_mode")
+      fetch("/api/admin/settings?key=maintenance_mode")
         .then(r => r.json())
         .then((d: { setting?: { value: string } | null }) => {
           setMaintenance(d?.setting?.value === "true");

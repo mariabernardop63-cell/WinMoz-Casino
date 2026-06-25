@@ -100,8 +100,7 @@ export default function Definicoes() {
   const [appVersion, setAppVersion] = useState("1.0.0");
   useEffect(() => {
     supabase.from("platform_settings").select("value").eq("key", "app_version").maybeSingle()
-      .then(({ data }) => { if (data?.value) setAppVersion(data.value); })
-      .catch(() => {});
+      .then(({ data }) => { if (data?.value) setAppVersion(data.value); }, () => {});
   }, []);
 
   /* Modals */

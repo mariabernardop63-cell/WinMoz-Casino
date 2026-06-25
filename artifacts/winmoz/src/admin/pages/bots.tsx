@@ -428,6 +428,8 @@ export default function BotManagement() {
     staleTime:       10_000,
   });
 
+  const currentLoss = data ? Math.max(0, data.totalBotPerdeu - data.totalBotGanhou) : 0;
+
   function setLossLimit(v: number) {
     setLossLimitState(v);
     localStorage.setItem("wm_bot_loss_limit", String(v));
@@ -483,7 +485,6 @@ export default function BotManagement() {
   }
 
   const isAutoDisabled = !botsEnabled && (data?.autoDisable || autoDisabledFlag || limitTriggered);
-  const currentLoss    = data ? Math.max(0, data.totalBotPerdeu - data.totalBotGanhou) : 0;
   const positive       = (data?.saldoLiquido ?? 0) >= 0;
   const saldoColor     = positive ? T.teal : T.red;
 

@@ -563,7 +563,7 @@ export default function Settings() {
   const [currentSecPw, setCurrentSecPw] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/settings/get?key=admin_security_password")
+    fetch("/api/admin/settings?key=admin_security_password")
       .then(r => r.ok ? r.json() : null)
       .then((data: { setting?: { value: string } | null } | null) => {
         setCurrentSecPw(data?.setting?.value ?? "12345678y");
