@@ -164,6 +164,19 @@ importers:
         specifier: ~5.9.3
         version: 5.9.3
 
+  api:
+    dependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.107.0
+        version: 2.107.0
+    devDependencies:
+      '@vercel/node':
+        specifier: ^5.0.0
+        version: 5.8.12(rollup@4.60.3)
+      typescript:
+        specifier: ~5.9.3
+        version: 5.9.3
+
   artifacts/api-server:
     dependencies:
       '@supabase/supabase-js':
