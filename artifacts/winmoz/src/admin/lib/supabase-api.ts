@@ -1099,6 +1099,12 @@ export function useUpdatePlatformSetting() {
 }
 
 /* ── Notifications ── */
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  return token ? { "Authorization": `Bearer ${token}` } : {};
+}
+
 export function useSendNotification() {
   const qc = useQueryClient();
   return useMutation({
@@ -1112,10 +1118,14 @@ export function useSendNotification() {
       actionButtonLabel?: string;
       actionButtonUrl?: string;
     }) => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
       const res = await fetch("/api/admin/notifications/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           title:               payload.title,
           subtitle:            payload.subtitle ?? null,
@@ -1125,7 +1135,7 @@ export function useSendNotification() {
           imageUrl:            payload.imageUrl ?? null,
           actionButtonLabel:   payload.actionButtonLabel ?? null,
           actionButtonUrl:     payload.actionButtonUrl ?? null,
-          sentBy:              user?.id ?? null,
+          sentBy:              session?.user?.id ?? null,
         }),
       });
       if (!res.ok) {
@@ -1142,13 +1152,12 @@ export function useGetNotificationHistory() {
   return useQuery({
     queryKey: ["notification-history"],
     queryFn: async () => {
-      const { data, error } = await adminSupabase
-        .from("notifications")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
-      if (error) throw error;
-      return data ?? [];
+      const authHeader = await getAuthHeader();
+      const res = await fetch("/api/admin/notifications/history", {
+        headers: authHeader,
+      });
+      if (!res.ok) return [];
+      return res.json();
     },
     refetchInterval: 15000,
     staleTime: 5000,
@@ -1180,64 +1189,12 @@ export function useListSupportConversations() {
   return useQuery({
     queryKey: ["support-conversations"],
     queryFn: async () => {
-      const { data, error } = await adminSupabase
-        .from("support_messages")
-        .select("user_id, user_name, sender, content, created_at")
-        .order("created_at", { ascending: false })
-        .limit(500);
-
-      if (error) throw new Error(error.message);
-
-      // Find when each conversation last had an admin/ai reply
-      const lastAdminReplyTime = new Map<string, string>();
-      (data ?? []).forEach((m: Record<string, unknown>) => {
-        const uid = m.user_id as string;
-        if ((m.sender === "admin" || m.sender === "ai") && !lastAdminReplyTime.has(uid)) {
-          lastAdminReplyTime.set(uid, m.created_at as string);
-        }
+      const authHeader = await getAuthHeader();
+      const res = await fetch("/api/admin/support/conversations", {
+        headers: authHeader,
       });
-
-      const convMap = new Map<string, SupportConversation>();
-      (data ?? []).forEach((m: Record<string, unknown>) => {
-        const uid = m.user_id as string;
-        if (!convMap.has(uid)) {
-          convMap.set(uid, {
-            userId:          uid,
-            userName:        (m.user_name as string) ?? "utilizador",
-            avatarUrl:       null,
-            lastMessage:     (m.content as string) ?? "",
-            lastMessageTime: m.created_at as string,
-            unreadCount:     0,
-            lastSender:      (m.sender as "user" | "admin" | "ai") ?? "user",
-          });
-        }
-        if (m.sender === "user") {
-          const lastReply = lastAdminReplyTime.get(uid);
-          const isUnread = !lastReply || new Date(m.created_at as string) > new Date(lastReply);
-          if (isUnread) {
-            const conv = convMap.get(uid)!;
-            conv.unreadCount++;
-            convMap.set(uid, conv);
-          }
-        }
-      });
-
-      // Enrich with real avatar_url from profiles
-      const userIds = Array.from(convMap.keys());
-      if (userIds.length > 0) {
-        const { data: profiles } = await adminSupabase
-          .from("profiles")
-          .select("id, avatar_url")
-          .in("id", userIds);
-        (profiles ?? []).forEach((p: Record<string, unknown>) => {
-          const conv = convMap.get(p.id as string);
-          if (conv && p.avatar_url) conv.avatarUrl = p.avatar_url as string;
-        });
-      }
-
-      return Array.from(convMap.values()).sort(
-        (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
-      );
+      if (!res.ok) return [];
+      return res.json() as Promise<SupportConversation[]>;
     },
     refetchInterval: 10000,
     staleTime: 3000,
@@ -1249,15 +1206,13 @@ export function useGetSupportMessages(userId: string | null) {
     queryKey: ["support-messages", userId],
     queryFn: async () => {
       if (!userId) return [];
-      const { data, error } = await adminSupabase
-        .from("support_messages")
-        .select("id, user_id, user_name, sender, content, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: true });
-
-      if (error) throw new Error(error.message);
-
-      return (data ?? []).map((m: Record<string, unknown>): SupportMessage => ({
+      const authHeader = await getAuthHeader();
+      const res = await fetch(`/api/admin/support/conversations?userId=${encodeURIComponent(userId)}`, {
+        headers: authHeader,
+      });
+      if (!res.ok) return [];
+      const data = await res.json() as Record<string, unknown>[];
+      return data.map((m): SupportMessage => ({
         id:          m.id as string,
         userId:      m.user_id as string,
         userName:    (m.user_name as string) ?? "utilizador",
@@ -1277,9 +1232,10 @@ export function useSendAdminSupportMessage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, userName, content }: { userId: string; userName: string; content: string }) => {
+      const authHeader = await getAuthHeader();
       const res = await fetch("/api/admin/support/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeader },
         body: JSON.stringify({ userId, userName, content: content.trim() }),
       });
       if (!res.ok) {
