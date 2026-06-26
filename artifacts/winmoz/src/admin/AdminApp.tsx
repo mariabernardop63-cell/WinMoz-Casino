@@ -1,9 +1,12 @@
+import { useEffect } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { ErrorBoundary } from "@/admin/components/ErrorBoundary";
 import { AdminThemeProvider } from "@/admin/contexts/AdminThemeContext";
 import { Toaster } from "@/components/ui/sonner";
 import AdminLayout from "@/admin/layout/Layout";
 import AdminSecurityGate from "@/admin/AdminSecurityGate";
+import { syncAdminSession } from "@/admin/lib/supabase-api";
+import { supabase } from "@/lib/supabase";
 import Dashboard from "@/admin/pages/dashboard";
 import Matches from "@/admin/pages/matches";
 import MatchDetail from "@/admin/pages/matches/detail";
@@ -59,6 +62,17 @@ function AdminRouter() {
   );
 }
 
+function AdminSessionSync() {
+  useEffect(() => {
+    syncAdminSession();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      syncAdminSession();
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+  return null;
+}
+
 export default function AdminApp() {
   return (
     <ErrorBoundary>
@@ -66,6 +80,7 @@ export default function AdminApp() {
         <AdminSecurityGate>
           <WouterRouter base={ADMIN_BASE}>
             <div className="admin-panel-root">
+              <AdminSessionSync />
               <AdminRouter />
               <Toaster position="top-right" richColors />
             </div>

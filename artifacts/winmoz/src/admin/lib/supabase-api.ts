@@ -17,6 +17,25 @@ export const adminSupabase = createClient(_adminUrl, _adminKey, {
   },
 });
 
+/**
+ * Syncs the main Supabase user session into the isolated adminSupabase client.
+ * Must be called after admin login and on every auth state change so that
+ * adminSupabase runs with the admin JWT (not as anonymous) — required for RLS.
+ */
+export async function syncAdminSession(): Promise<void> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token && session?.refresh_token) {
+      await adminSupabase.auth.setSession({
+        access_token:  session.access_token,
+        refresh_token: session.refresh_token,
+      });
+    }
+  } catch (e) {
+    console.warn("[syncAdminSession] failed:", e);
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────
    SUPABASE-BACKED ADMIN API
    Drop-in replacement for mock-api.ts — same hook signatures
