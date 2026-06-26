@@ -1100,6 +1100,7 @@ export function useUpdatePlatformSetting() {
 
 /* ── Notifications ── */
 export function useSendNotification() {
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (payload: {
       title: string;
@@ -1112,20 +1113,28 @@ export function useSendNotification() {
       actionButtonUrl?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await adminSupabase.from("notifications").insert({
-        title:               payload.title,
-        subtitle:            payload.subtitle ?? null,
-        type:                payload.type ?? "notification",
-        target:              payload.target ?? "all",
-        target_user_ids:     payload.targetUserIds ?? null,
-        image_url:           payload.imageUrl ?? null,
-        action_button_label: payload.actionButtonLabel ?? null,
-        action_button_url:   payload.actionButtonUrl ?? null,
-        sent_by:             user?.id ?? null,
+      const res = await fetch("/api/admin/notifications/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title:               payload.title,
+          subtitle:            payload.subtitle ?? null,
+          type:                payload.type ?? "notification",
+          target:              payload.target ?? "all",
+          targetUserIds:       payload.targetUserIds ?? null,
+          imageUrl:            payload.imageUrl ?? null,
+          actionButtonLabel:   payload.actionButtonLabel ?? null,
+          actionButtonUrl:     payload.actionButtonUrl ?? null,
+          sentBy:              user?.id ?? null,
+        }),
       });
-      if (error) throw error;
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? "Erro ao enviar notificação");
+      }
       return { ok: true };
     },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["notification-history"] }),
   });
 }
 
@@ -1268,13 +1277,15 @@ export function useSendAdminSupportMessage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ userId, userName, content }: { userId: string; userName: string; content: string }) => {
-      const { error } = await adminSupabase.from("support_messages").insert({
-        user_id:   userId,
-        user_name: userName,
-        sender:    "admin",
-        content:   content.trim(),
+      const res = await fetch("/api/admin/support/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, userName, content: content.trim() }),
       });
-      if (error) throw new Error(error.message);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? "Erro ao enviar mensagem");
+      }
       return { ok: true };
     },
     onSuccess: (_d, { userId }) => {

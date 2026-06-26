@@ -1286,6 +1286,77 @@ router.post("/admin/update-admin-credentials", async (req, res) => {
   }
 });
 
+/* ── Admin: Send support message (service role — bypasses RLS) ── */
+router.post("/admin/support/send", async (req, res) => {
+  try {
+    const { userId, userName, content } = req.body as {
+      userId?: string; userName?: string; content?: string;
+    };
+    if (!userId || !content?.trim()) {
+      res.status(400).json({ error: "userId e content são obrigatórios" }); return;
+    }
+    const supabaseUrl = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "";
+    const serviceKey  = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? "";
+    if (!supabaseUrl || !serviceKey) {
+      res.status(500).json({ error: "Faltam variáveis de ambiente do servidor." }); return;
+    }
+    const admin = buildAdminClient(supabaseUrl, serviceKey);
+    const { error } = await admin.from("support_messages").insert({
+      user_id:   userId,
+      user_name: userName ?? "Admin",
+      sender:    "admin",
+      content:   content.trim(),
+    });
+    if (error) { res.status(500).json({ error: error.message }); return; }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "admin/support/send error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Admin: Send notification to users (service role — bypasses RLS) ── */
+router.post("/admin/notifications/send", async (req, res) => {
+  try {
+    const {
+      title, subtitle, type, target,
+      targetUserIds, imageUrl, actionButtonLabel, actionButtonUrl, sentBy,
+    } = req.body as {
+      title?: string; subtitle?: string; type?: string; target?: string;
+      targetUserIds?: string[]; imageUrl?: string;
+      actionButtonLabel?: string; actionButtonUrl?: string; sentBy?: string;
+    };
+    if (!title?.trim()) {
+      res.status(400).json({ error: "O campo 'title' é obrigatório." }); return;
+    }
+    const supabaseUrl = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "";
+    const serviceKey  = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? "";
+    if (!supabaseUrl || !serviceKey) {
+      res.status(500).json({ error: "Faltam variáveis de ambiente do servidor." }); return;
+    }
+    const admin = buildAdminClient(supabaseUrl, serviceKey);
+    const { error } = await admin.from("notifications").insert({
+      title:               title.trim(),
+      subtitle:            subtitle ?? null,
+      type:                type ?? "notification",
+      target:              target ?? "all",
+      target_user_ids:     targetUserIds ?? null,
+      image_url:           imageUrl ?? null,
+      action_button_label: actionButtonLabel ?? null,
+      action_button_url:   actionButtonUrl ?? null,
+      sent_by:             sentBy ?? null,
+    });
+    if (error) {
+      req.log.error({ error }, "notifications insert failed");
+      res.status(500).json({ error: error.message }); return;
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "admin/notifications/send error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── SMS Forwarder Webhook ── */
 router.post("/sms/webhook", async (req, res) => {
   const supabaseUrl = process.env["SUPABASE_URL"];
