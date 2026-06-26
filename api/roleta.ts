@@ -10,29 +10,33 @@ function getMozambiqueStartOfDayUTC(): string {
 
 const PAID_SPIN_COST = 5;
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+function setCors(res: VercelResponse) {
   const allowedOrigin = process.env["ALLOWED_ORIGIN"] || process.env["VITE_APP_URL"] || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
   res.setHeader("X-Content-Type-Options", "nosniff");
+}
 
-  if (req.method === "OPTIONS") { res.status(204).end(); return; }
+function getAdminClient() {
+  const supabaseUrl = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"];
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"] || process.env["VITE_SUPABASE_SERVICE_ROLE"] || process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"];
+  if (!supabaseUrl || !supabaseServiceKey) return null;
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+// ─── /api/roleta/spin ────────────────────────────────────────────────────────
+async function handleSpin(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
 
   const authHeader = (req.headers.authorization as string) ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-  const supabaseUrl = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"];
-  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"] || process.env["VITE_SUPABASE_SERVICE_ROLE"] || process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"];
-  if (!supabaseUrl || !supabaseServiceKey) {
-    res.status(500).json({ error: "Serviço indisponível" }); return;
-  }
-
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const supabaseAdmin = getAdminClient();
+  if (!supabaseAdmin) { res.status(500).json({ error: "Serviço indisponível" }); return; }
 
   const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
   if (userError || !userData?.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
@@ -40,7 +44,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { isFree } = (req.body ?? {}) as { isFree?: boolean };
 
-  // ── FREE SPIN ──
   if (isFree) {
     const todayStart = getMozambiqueStartOfDayUTC();
     const { data: rows } = await supabaseAdmin
@@ -65,7 +68,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // ── PAID SPIN ──
   const { data: profileData, error: profileError } = await supabaseAdmin
     .from("profiles").select("balance").eq("id", userId).single();
   if (profileError || !profileData) { res.status(500).json({ error: "Erro ao obter perfil" }); return; }
@@ -120,4 +122,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   res.json({ sectorIndex, prize, newBalance: finalBalance });
+}
+
+// ─── /api/roleta/status ──────────────────────────────────────────────────────
+async function handleStatus(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  const authHeader = (req.headers.authorization as string) ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const supabaseAdmin = getAdminClient();
+  if (!supabaseAdmin) { res.status(500).json({ error: "Serviço indisponível" }); return; }
+
+  const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
+  if (userError || !userData?.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
+  const userId = userData.user.id;
+
+  const todayStart = getMozambiqueStartOfDayUTC();
+  const { data: rows } = await supabaseAdmin
+    .from("transactions").select("id")
+    .eq("user_id", userId).eq("type", "free_spin").gte("created_at", todayStart);
+
+  res.json({ freeSpinAvailable: !rows || rows.length === 0 });
+}
+
+// ─── Main router ─────────────────────────────────────────────────────────────
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCors(res);
+  if (req.method === "OPTIONS") { res.status(204).end(); return; }
+
+  const action = (req.query["_action"] as string) || "";
+
+  switch (action) {
+    case "spin":   return handleSpin(req, res);
+    case "status": return handleStatus(req, res);
+    default:
+      res.status(404).json({ error: "Endpoint não encontrado" });
+  }
 }

@@ -130,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     platform_cut: Math.round(verifiedBet * 2 * (1 - WIN_RATE)),
     created_at: new Date().toISOString(),
   };
-  await admin.from("platform_earnings").insert(earningsRecord).catch(() => {});
+  try { await admin.from("platform_earnings").insert(earningsRecord); } catch { /* best-effort */ }
 
   res.json({ ok: true, payout, newBalance });
 }
