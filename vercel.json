@@ -4,7 +4,7 @@
   "installCommand": "pnpm install",
   "rewrites": [
     { "source": "/ad-banner.html", "destination": "/ad-banner.html" },
-    { "source": "/api/admin/:action", "destination": "/api/admin?_action=:action" },
+    { "source": "/api/admin/:action*", "destination": "/api/admin?_action=:action*" },
     { "source": "/api/debito/:action", "destination": "/api/debito?_action=:action" },
     { "source": "/api/roleta/:action", "destination": "/api/roleta?_action=:action" },
     { "source": "/api/rooms/:action", "destination": "/api/rooms?_action=:action" },
