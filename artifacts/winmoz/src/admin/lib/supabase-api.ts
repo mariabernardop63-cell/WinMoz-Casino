@@ -1088,10 +1088,23 @@ export function useUpdatePlatformSetting() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ key, value }: { key: string; value: string }) => {
-      const { error } = await adminSupabase
-        .from("platform_settings")
-        .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
-      if (error) throw new Error(error.message);
+      /* Escreve via API server-side (service_role). O browser só tem a anon
+         key e a RLS de platform_settings bloqueia escritas anónimas —
+         upsert directo dava "violates row-level security policy". */
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Sessão expirada. Faz login novamente.");
+      const res = await fetch("/api/admin/settings/update", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ key, value }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(data.error ?? `Erro ${res.status}`);
+      }
       return { ok: true };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["platform-settings"] }),

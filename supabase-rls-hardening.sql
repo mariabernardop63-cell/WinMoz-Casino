@@ -499,3 +499,51 @@ DROP FUNCTION IF EXISTS public.__drop_policy_if_exists(text, text);
 --   WHERE schemaname = 'public' ORDER BY tablename;
 -- Todas as linhas devem mostrar rowsecurity = true.
 -- ============================================================================
+
+-- ============================================================================
+-- 16. FIX v3: o trigger protect_profile_columns bloqueava também a
+--     service_role (current_setting('request.jwt.claim.role') não fica
+--     definido em chamadas PostgREST com service key). Correcção: quando a
+--     conexão NÃO tem JWT de utilizador (request.jwt.claims vazio/ausente),
+--     é service_role → permitir.
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.protect_profile_columns()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  old_row jsonb := to_jsonb(OLD);
+  new_row jsonb := to_jsonb(NEW);
+  protected_cols text[] := ARRAY[
+    'balance', 'is_admin', 'is_blocked', 'block_type',
+    'affiliate_pending_earnings', 'affiliate_invite_code'
+  ];
+  col text;
+  claims jsonb;
+  jwt_role text;
+BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    claims := NULLIF(current_setting('request.jwt.claims', true), '')::jsonb;
+    jwt_role := COALESCE(claims->>'role', current_setting('request.jwt.claim.role', true));
+
+    -- service_role (API server-side) e admins podem alterar
+    IF jwt_role = 'service_role'
+       OR current_setting('role') = 'supabase_admin'
+       OR current_setting('role') = 'postgres'
+       OR public.is_platform_admin() THEN
+      RETURN NEW;
+    END IF;
+
+    FOREACH col IN ARRAY protected_cols LOOP
+      IF new_row ? col
+         AND (NOT (old_row ? col) OR new_row -> col IS DISTINCT FROM old_row -> col) THEN
+        RAISE EXCEPTION 'Alteração de campo protegido (%) bloqueada — saldo/admin apenas via API', col;
+      END IF;
+    END LOOP;
+  END IF;
+  RETURN NEW;
+END;
+$$;
