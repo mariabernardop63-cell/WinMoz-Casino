@@ -227,8 +227,8 @@ export default function Depositar() {
     try {
       const session = await getSessionWithRefresh();
       if (!session) {
-        /* forceSessionLogout() já disparou o auto-logout + redirect.
-           Mostra apenas um estado neutro durante o redirect. */
+        /* The session helper preserves the account state and lets the user
+           retry when the browser/network becomes available again. */
         setInitiating(false);
         return;
       }

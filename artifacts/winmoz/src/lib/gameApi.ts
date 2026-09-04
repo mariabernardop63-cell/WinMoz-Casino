@@ -7,8 +7,8 @@ async function getToken(): Promise<string | null> {
   } catch { return null; }
 }
 
-/* 401 de sessão morta numa chamada de jogo → auto-logout imediato,
-   em vez de deixar o jogador preso no ecrã do jogo */
+/* 401 numa chamada de jogo → preserva a sessão local e deixa o ecrã
+   apresentar o erro/repetir, sem logout silencioso */
 function handleAuthError(data: { error?: string } | null) {
   const msg = String(data?.error ?? "");
   if (/não autenticado|sessão inválida|unauthorized/i.test(msg)) {

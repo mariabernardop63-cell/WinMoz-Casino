@@ -368,7 +368,7 @@ export default function Roleta() {
       const session = await getSessionWithRefresh();
       if (!session?.access_token) {
         /* A sessão está morta — o getSessionWithRefresh já disparou
-           o auto-logout e o redirect para o login. */
+           a conta permanece preservada para uma nova tentativa. */
         setLoading(false);
         return;
       }

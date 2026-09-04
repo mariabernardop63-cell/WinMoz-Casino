@@ -8,6 +8,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+    // Keep the Supabase session across tabs and browser restarts. The
+    // default is localStorage, but making it explicit prevents a future
+    // client configuration change from turning this into a tab-only session.
+    storage: window.localStorage,
   },
 });
 
@@ -15,22 +19,18 @@ const REFRESH_TOKEN_DEAD_RE =
   /refresh_token_not_found|Invalid Refresh Token|refresh.?token.*(expired|invalid|revoked|not found)/i;
 
 /**
- * Logout automático quando a sessão está definitivamente morta:
- * limpa a sessão Supabase + cache de perfil e recarrega a app na rota de
- * login. Garante que o utilizador nunca fica preso num ecrã a meio.
+ * Notifica a app that a request could not authenticate without logging out.
+ * A sessão só deve ser encerrada pelo botão explícito "Terminar Sessão".
  */
 export function forceSessionLogout() {
-  supabase.auth.signOut().catch(() => { /* best-effort */ });
-  try { sessionStorage.removeItem("wm_profile_cache"); } catch { /* ignore */ }
   window.dispatchEvent(new CustomEvent("wm:session-invalid"));
 }
 
 /**
  * Returns a valid session, proactively refreshing when the access token is
  * expired or expires in <60 s. Behaviour on failure:
- *  - refresh token dead  → auto-logout + redirect, returns null
- *  - transient/network   → keeps the (possibly stale) session so the UI can
- *    keep showing cached data while retrying in the background
+ *  - refresh failure      → keeps the existing session so the UI can retry
+ *    without silently logging the user out
  */
 export async function getSessionWithRefresh(): Promise<Session | null> {
   try {
@@ -49,6 +49,9 @@ export async function getSessionWithRefresh(): Promise<Session | null> {
 
     const msg = String((refreshErr as any)?.message ?? refreshErr ?? "");
     if (REFRESH_TOKEN_DEAD_RE.test(msg)) {
+      // Do not sign out here. An auth failure can be temporary (offline
+      // device, browser suspension, or a delayed refresh). The provider keeps
+      // the cached account and the next request can retry the refresh.
       forceSessionLogout();
       return null;
     }

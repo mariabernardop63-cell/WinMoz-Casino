@@ -124,7 +124,7 @@ export default function OTP() {
         }
       } catch { /* non-critical — profile update is best-effort */ }
       setVerifying(false);
-      setLocation("/splash");
+      setLocation("/");
     } else if (otpType === "recovery") {
       setVerifying(false);
       if (!data.session?.user) {
@@ -201,7 +201,7 @@ export default function OTP() {
       await supabase.auth.resend({
         type: "signup",
         email,
-        options: { emailRedirectTo: window.location.origin + "/splash" },
+        options: { emailRedirectTo: window.location.origin + "/" },
       });
     }
     setResending(false);

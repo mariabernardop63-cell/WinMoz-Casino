@@ -83,24 +83,9 @@ export default function ProtectedRoute({ children }: Props) {
   }, [user, loading, isBlocked, setLocation]);
 
   if (loading) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "#111111" }}
-      >
-        <div
-          style={{
-            width: 38,
-            height: 38,
-            borderRadius: "50%",
-            border: "3px solid rgba(255,255,255,0.12)",
-            borderTopColor: "#7c3aed",
-            animation: "pr-spin 0.75s linear infinite",
-          }}
-        />
-        <style>{`@keyframes pr-spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
+    // Do not replace the whole page with a processing screen while auth
+    // rehydrates. The persisted profile is restored by AuthContext.
+    return null;
   }
 
   if (isBlocked) return <BlockedScreen />;

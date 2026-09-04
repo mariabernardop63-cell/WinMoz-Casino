@@ -168,7 +168,7 @@ export default function Registar() {
         password,
         options: {
           data: { full_name: nome.trim() },
-          emailRedirectTo: window.location.origin + "/splash",
+          emailRedirectTo: window.location.origin + "/",
         },
       });
 

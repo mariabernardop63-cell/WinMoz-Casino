@@ -23,7 +23,6 @@ const pageLoaders = {
   EsqueceuSenha: () => import("@/pages/EsqueceuSenha"),
   RedefinirSenha: () => import("@/pages/RedefinirSenha"),
   OTP: () => import("@/pages/OTP"),
-  SplashScreen: () => import("@/pages/SplashScreen"),
   Perfil: () => import("@/pages/Perfil"),
   Recarga: () => import("@/pages/Recarga"),
   Levantar: () => import("@/pages/Levantar"),
@@ -57,7 +56,6 @@ const Registar = lazy(pageLoaders.Registar);
 const EsqueceuSenha = lazy(pageLoaders.EsqueceuSenha);
 const RedefinirSenha = lazy(pageLoaders.RedefinirSenha);
 const OTP = lazy(pageLoaders.OTP);
-const SplashScreen = lazy(pageLoaders.SplashScreen);
 const Perfil = lazy(pageLoaders.Perfil);
 const Recarga = lazy(pageLoaders.Recarga);
 const Levantar = lazy(pageLoaders.Levantar);
@@ -89,7 +87,7 @@ function preloadPages() {
   [
     pageLoaders.Login, pageLoaders.Registar, pageLoaders.OTP,
     pageLoaders.EsqueceuSenha, pageLoaders.RedefinirSenha,
-    pageLoaders.SplashScreen, pageLoaders.Explorar,
+    pageLoaders.Explorar,
   ].forEach(loader => { loader().catch(() => {}); });
 
   const rest = () => {
@@ -97,7 +95,7 @@ function preloadPages() {
       .filter(l => ![
         pageLoaders.Login, pageLoaders.Registar, pageLoaders.OTP,
         pageLoaders.EsqueceuSenha, pageLoaders.RedefinirSenha,
-        pageLoaders.SplashScreen, pageLoaders.Explorar,
+        pageLoaders.Explorar,
       ].includes(l))
       .forEach(loader => { loader().catch(() => {}); });
     import("@/admin/AdminApp").catch(() => {});
@@ -108,13 +106,9 @@ function preloadPages() {
 }
 
 function PageFallback() {
-  /* Fundo neutro claro combinado com o branding (páginas auth são brancas).
-     Nunca ecrã preto — e raramente aparece, graças ao preload em idle. */
-  return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-white" aria-busy="true">
-      <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-slate-700" />
-    </div>
-  );
+  // Keep the current surface instead of showing an extra processing screen
+  // during a lazy route transition.
+  return null;
 }
 
 const queryClient = new QueryClient();
@@ -193,7 +187,6 @@ function Router() {
       <Route path="/esqueceu-senha" component={EsqueceuSenha} />
       <Route path="/redefinir-senha" component={RedefinirSenha} />
       <Route path="/otp" component={OTP} />
-      <Route path="/splash" component={SplashScreen} />
 
       {/* Protected routes — require login */}
       <Route path="/perfil">

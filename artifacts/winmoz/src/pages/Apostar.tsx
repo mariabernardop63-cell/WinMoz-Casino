@@ -222,8 +222,8 @@ function SMSBettingScreen({
     try {
       const session = await getSessionWithRefresh();
       if (!session) {
-        /* forceSessionLogout() já disparou o auto-logout + redirect.
-           Mostra apenas um estado neutro durante o redirect. */
+        /* The session helper preserves the account state and lets the user
+           retry when the browser/network becomes available again. */
         setInitiating(false);
         return;
       }
@@ -1332,7 +1332,7 @@ export default function Apostar() {
     setSalaLoading(true); setSalaError("");
     try {
       const session = await getSessionWithRefresh();
-      if (!session) { setSalaLoading(false); return; } /* auto-logout já redireciona */
+      if (!session) { setSalaLoading(false); return; } /* mantém o estado e permite tentar novamente */
       const token = session.access_token;
       const res = await fetch(`${API_BASE}/rooms/create`, {
         method: "POST",
@@ -1409,7 +1409,7 @@ export default function Apostar() {
         setSalaLoading(false); return;
       }
       const session = await getSessionWithRefresh();
-      if (!session) { setSalaLoading(false); return; } /* auto-logout já redireciona */
+      if (!session) { setSalaLoading(false); return; } /* mantém o estado e permite tentar novamente */
       const token = session.access_token;
       const joinRes = await fetch(`${API_BASE}/rooms/join`, {
         method: "POST",
