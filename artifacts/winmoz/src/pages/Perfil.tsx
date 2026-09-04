@@ -157,7 +157,11 @@ export default function Perfil() {
         clearTimeout(timer);
         if (data && data.length > 0) {
           const visible = data.filter((t: any) => {
-            if (t.status === "pending" && (t.type === "deposit" || t.type === "manual_deposit")) {
+            /* Depósitos só aparecem no histórico quando confirmados */
+            if (t.type === "deposit" || t.type === "manual_deposit") {
+              return t.status === "approved";
+            }
+            if (t.status === "pending") {
               try {
                 const d = JSON.parse(t.description || "{}");
                 return d.paymentGateway !== "debitopay";

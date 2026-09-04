@@ -34,16 +34,14 @@ export default function Depositar() {
   const [rejectReason, setRejectReason] = useState("");
   const [initiating, setInitiating] = useState(false);
   const [initError, setInitError] = useState("");
-  const [countdown, setCountdown] = useState(120);
+  const [countdown, setCountdown] = useState(0);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const realtimeRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const txDate = new Date().toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" });
 
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
-      if (countdownRef.current) clearInterval(countdownRef.current);
       if (realtimeRef.current) supabase.removeChannel(realtimeRef.current);
     };
   }, []);
@@ -74,13 +72,22 @@ export default function Depositar() {
 
   const TIMEOUT_SECS = 300;
 
+  /* Countdown central: conta sempre que o ecrã "verifying" está visível.
+     Antes, o interval só arrancava em startPolling — com M-Pesa o ecrã
+     aparecia aos 10s com "2:00" fixo e nunca decrementava. */
+  useEffect(() => {
+    if (screen !== "verifying") return;
+    const iv = setInterval(() => {
+      setCountdown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [screen]);
+
   const startPolling = (pid: string, amt: number) => {
     let count = 0;
-    setCountdown(TIMEOUT_SECS);
 
     const stopAll = (ch: ReturnType<typeof supabase.channel>) => {
       clearInterval(pollRef.current!);
-      clearInterval(countdownRef.current!);
       supabase.removeChannel(ch);
     };
 
@@ -109,22 +116,7 @@ export default function Depositar() {
     realtimeRef.current = channel;
 
     let timedOut = false;
-    countdownRef.current = setInterval(() => {
-      setCountdown(prev => {
-        const next = prev > 1 ? prev - 1 : 0;
-        if (prev === 1 && !timedOut) {
-          timedOut = true;
-          clearInterval(pollRef.current!);
-          clearInterval(countdownRef.current!);
-          supabase.removeChannel(channel);
-          setTimeout(() => {
-            setRejectReason("Tempo esgotado. O pedido USSD expirou. Tenta novamente.");
-            setScreen("rejected");
-          }, 0);
-        }
-        return next;
-      });
-    }, 1000);
+    // (o countdown agora corre no useEffect central, acima)
 
     const maxCycles = Math.ceil(TIMEOUT_SECS / 3);
     pollRef.current = setInterval(async () => {
@@ -163,7 +155,11 @@ export default function Depositar() {
       if (count >= maxCycles && !timedOut) {
         timedOut = true;
         stopAll(channel);
-        setRejectReason("Tempo de espera esgotado. Não respondeste ao USSD a tempo.");
+        setRejectReason(
+          provider === "mpesa"
+            ? "Tempo de espera esgotado. Não confirmaste o PIN M-Pesa (*150#) a tempo. Tenta novamente."
+            : "Tempo de espera esgotado. Não confirmaste o PIN e-Mola (*898#) a tempo. Tenta novamente.",
+        );
         setScreen("rejected");
       }
     }, 3000);
@@ -198,7 +194,7 @@ export default function Depositar() {
       // After 10s the USSD should already be on the phone — switch screen then.
       mpesaTimer = setTimeout(() => {
         screenSwitched = true;
-        setCountdown(120);
+        setCountdown(TIMEOUT_SECS);
         setScreen("verifying");
       }, 10_000);
     }
@@ -263,6 +259,7 @@ export default function Depositar() {
       const pid = resData?.txId as string;
       setPendingId(pid);
       setInitiating(false);
+      setCountdown(TIMEOUT_SECS);
       setScreen("verifying");
       startPolling(pid, amountVal);
     } catch (err) {
@@ -630,8 +627,20 @@ export default function Depositar() {
               )}
             </div>
 
+            {/* Instruções para quem não recebeu o USSD */}
+            <div className="w-full p-4 mb-4" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
+              <p style={{ fontSize: 12, fontWeight: 700, color: "#92400e", marginBottom: 6 }}>
+                Não recebeste o pedido USSD?
+              </p>
+              <p style={{ fontSize: 12, color: "#a16207", lineHeight: 1.6 }}>
+                {provider === "emola"
+                  ? <>Abre o menu <strong>*898#</strong> no teu telemóvel, escolhe a opção de pagamento pendente (ou "Pagar Comerciante") e confirma com o teu PIN e-Mola.</>
+                  : <>Abre o menu <strong>*150#</strong> no teu telemóvel, escolhe a opção de pagamentos pendentes e confirma com o teu PIN M-Pesa.</>}
+              </p>
+            </div>
+
             <p style={{ fontSize: 11.5, color: "#9ca3af", textAlign: "center", maxWidth: 260, lineHeight: 1.5 }}>
-              Se não recebeste o USSD, verifica a cobertura de rede ou volta atrás e tenta de novo.
+              Verifica também a cobertura de rede ou volta atrás e tenta de novo.
             </p>
           </motion.div>
         </div>

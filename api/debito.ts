@@ -418,7 +418,7 @@ function parseDebitoError(data: any, status: number, paymentMethod: string): str
   if (status === 401) return "Chave API inválida — contacta o suporte.";
   if (status === 403) return "Domínio não autorizado no gateway de pagamento. Contacta o suporte.";
   if (status === 404) return "Configuração do gateway inválida (wallet_code). Contacta o suporte.";
-  if (status === 408) return paymentMethod === "mpesa" ? "O utilizador não confirmou o PIN M-Pesa a tempo. Abre o menu *155# e confirma o pagamento pendente." : "O utilizador não confirmou o USSD a tempo. Tenta novamente.";
+  if (status === 408) return paymentMethod === "mpesa" ? "O utilizador não confirmou o PIN M-Pesa a tempo. Abre o menu *150# e confirma o pagamento pendente." : "O utilizador não confirmou o PIN e-Mola a tempo. Abre o menu *898# e confirma o pagamento pendente.";
   if (status === 429) return "Demasiados pedidos ao gateway. Aguarda alguns segundos e tenta novamente.";
   if (status === 400) {
     if (low.includes("authentication") || low.includes("auth")) return paymentMethod === "mpesa" ? "Serviço M-Pesa temporariamente indisponível. Usa e-Mola ou tenta mais tarde." : "Erro de autenticação no gateway. Contacta o suporte.";

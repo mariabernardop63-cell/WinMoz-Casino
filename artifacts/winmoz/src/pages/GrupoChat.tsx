@@ -4,9 +4,13 @@ import { useLocation } from "wouter";
 import { ArrowLeft, Plus, Send, Mic, Smile, Users, CheckCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { useBrand } from "@/lib/brand-context";
 
 const CYAN = "#00D4B4";
 const CHANNEL_NAME = "group_chat_v1";
+/* As mensagens sobrevivem à navegação dentro da plataforma (sessionStorage
+   dura até fechar o separador / sair da app) */
+const MESSAGES_KEY = "wm_group_chat_msgs";
 
 type Msg = {
   id: string;
@@ -19,6 +23,21 @@ type Msg = {
   isMe?: boolean;
   userId?: string;
 };
+
+function loadStoredMessages(): Msg[] {
+  try {
+    const raw = sessionStorage.getItem(MESSAGES_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.slice(-200) : [];
+  } catch { return []; }
+}
+
+function storeMessages(msgs: Msg[]) {
+  try {
+    sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(msgs.slice(-200)));
+  } catch { /* quota — ignora */ }
+}
 
 
 const MEMBERS = [
@@ -42,7 +61,7 @@ function getInitials(name: string): string {
 
 export default function GrupoChat() {
   const [, setLocation] = useLocation();
-  const [messages, setMessages] = useState<Msg[]>([]);
+  const [messages, setMessages] = useState<Msg[]>(loadStoredMessages);
   const [text, setText] = useState("");
   const [showInfo, setShowInfo] = useState(false);
   const [onlineCount, setOnlineCount] = useState(39);
@@ -50,6 +69,7 @@ export default function GrupoChat() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const { user, profile } = useAuth();
+  const { brandName } = useBrand();
 
   const myName = profile?.full_name ?? user?.email?.split("@")[0] ?? "Jogador";
   const myInitials = getInitials(myName);
@@ -69,7 +89,9 @@ export default function GrupoChat() {
     channel.on("broadcast", { event: "msg" }, ({ payload }) => {
       setMessages(prev => {
         if (prev.some(m => m.id === payload.id)) return prev;
-        return [...prev, { ...(payload as Msg), isMe: false }];
+        const next = [...prev, { ...(payload as Msg), isMe: false }];
+        storeMessages(next);
+        return next;
       });
     });
 
@@ -101,7 +123,11 @@ export default function GrupoChat() {
       isMe: true,
       userId: user?.id,
     };
-    setMessages(prev => [...prev, msg]);
+    setMessages(prev => {
+      const next = [...prev, msg];
+      storeMessages(next);
+      return next;
+    });
     setText("");
     channelRef.current?.send({ type: "broadcast", event: "msg", payload: msg });
   };
@@ -131,7 +157,7 @@ export default function GrupoChat() {
                 <span style={{ position: "absolute", bottom: -3, right: -3, width: 12, height: 12, borderRadius: 999, background: "#22c55e", border: "2px solid #18181b" }} />
               </div>
               <div className="flex-1 min-w-0 text-left">
-                <p style={{ color: "#f1f5f9", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14 }}>Grupo Mozbet</p>
+                <p style={{ color: "#f1f5f9", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14 }}>Grupo {brandName}</p>
                 <p style={{ fontSize: 10.5, color: "#71717a", marginTop: 1 }}>125 participantes · {onlineCount} online</p>
               </div>
             </button>

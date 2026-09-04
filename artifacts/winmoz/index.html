@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
 
     <title>Mozbet — Jogos e Apostas Online em Moçambique</title>
+    <script>
+      /* Branding imediato: aplica o modo Poker Winner guardado no localStorage
+         antes de o React carregar, evitando o flash "Mozbet" no primeiro paint */
+      (function () {
+        try {
+          if (localStorage.getItem("wm_brand_poker_winner") === "1") {
+            document.title = "Poker Winner - Jogos e Apostas Online";
+          }
+        } catch (e) { /* storage indisponível */ }
+      })();
+    </script>
     <meta name="description" content="Mozbet é a plataforma de jogos e apostas online número 1 de Moçambique. Joga Damas, Ludo, Xadrez e Roleta. Regista-te grátis e começa a ganhar hoje!" />
     <meta name="keywords" content="mozbet, jogos online moçambique, apostas online moçambique, damas online, ludo online, xadrez online, roleta online, winmoz" />
     <meta name="robots" content="index, follow" />

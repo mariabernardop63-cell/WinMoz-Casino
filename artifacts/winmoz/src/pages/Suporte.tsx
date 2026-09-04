@@ -47,10 +47,15 @@ function nowTime() {
   return new Date().toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" });
 }
 
-const INITIAL: Msg[] = [
+function makeInitial(): Msg[] {
+  const brand = (() => {
+    try { return localStorage.getItem("wm_brand_poker_winner") === "1" ? "Poker Winner" : "Mozbet"; }
+    catch { return "Mozbet"; }
+  })();
+  return [
   {
     id: "i1", from: "support", sender: "ai",
-    text: "Olá! 👋 Bem-vindo ao suporte da Equipa Mozbet. Estou aqui para ajudar.",
+    text: `Olá! 👋 Bem-vindo ao suporte da Equipa ${brand}. Estou aqui para ajudar.`,
     time: nowTime(),
   },
   {
@@ -58,7 +63,8 @@ const INITIAL: Msg[] = [
     text: "Em que posso ajudar hoje? Escreve a tua dúvida ou escolhe um dos temas abaixo:",
     time: nowTime(),
   },
-];
+  ];
+}
 
 const QUICK = [
   "Como depositar?",
@@ -104,7 +110,7 @@ async function isAiModeEnabled(): Promise<boolean> {
 export default function Suporte() {
   const [, setLocation] = useLocation();
   const { user, profile } = useAuth();
-  const [messages, setMessages]   = useState<Msg[]>(INITIAL);
+  const [messages, setMessages]   = useState<Msg[]>(makeInitial());
   const [history, setHistory]     = useState<ChatMsg[]>([]);
   const [text, setText]           = useState("");
   const [typing, setTyping]       = useState(false);
@@ -140,7 +146,7 @@ export default function Suporte() {
           text:   m.content,
           time:   new Date(m.created_at).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }),
         }));
-        setMessages([...INITIAL, ...dbMsgs]);
+        setMessages([...makeInitial(), ...dbMsgs]);
         setShowQuick(false);
 
         const chatHistory: ChatMsg[] = data
