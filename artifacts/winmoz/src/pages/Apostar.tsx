@@ -6,7 +6,7 @@ import {
   XCircle, RotateCcw, AlertTriangle, Swords, Users,
   CreditCard, Smartphone, CheckCircle2, Clock, X, Pencil, Phone, Copy, Hash, Loader2,
 } from "lucide-react";
-import { supabase, getSessionWithRefresh, isSessionExpiredError } from "@/lib/supabase";
+import { supabase, getSessionWithRefresh, isSessionExpiredError, forceSessionLogout } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getLivePlayerCount, getSalaOnlineCount } from "@/lib/simulation";
 import { API_BASE } from "@/lib/apiBase";
@@ -222,14 +222,8 @@ function SMSBettingScreen({
     try {
       const session = await getSessionWithRefresh();
       if (!session) {
-        if (mpesaTimer) clearTimeout(mpesaTimer);
-        if (screenSwitched) {
-          setRejectReason("Sessão expirada. Volta a entrar na tua conta.");
-          setStep("rejected");
-        } else {
-          setPhoneError("Sessão expirada. Volta a entrar na tua conta.");
-          setLocation("/login");
-        }
+        /* forceSessionLogout() já disparou o auto-logout + redirect.
+           Mostra apenas um estado neutro durante o redirect. */
         setInitiating(false);
         return;
       }
@@ -1337,9 +1331,9 @@ export default function Apostar() {
     if (!user?.id || !selectedBet || salaLoading) return;
     setSalaLoading(true); setSalaError("");
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) { setSalaError("Sessão expirada. Faz login novamente."); setSalaLoading(false); return; }
+      const session = await getSessionWithRefresh();
+      if (!session) { setSalaLoading(false); return; } /* auto-logout já redireciona */
+      const token = session.access_token;
       const res = await fetch(`${API_BASE}/rooms/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
@@ -1414,9 +1408,9 @@ export default function Apostar() {
         setSalaError(`Esta sala tem aposta de ${room.bet_amount} MT. Seleciona esse valor.`);
         setSalaLoading(false); return;
       }
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) { setSalaError("Sessão expirada. Faz login novamente."); setSalaLoading(false); return; }
+      const session = await getSessionWithRefresh();
+      if (!session) { setSalaLoading(false); return; } /* auto-logout já redireciona */
+      const token = session.access_token;
       const joinRes = await fetch(`${API_BASE}/rooms/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },

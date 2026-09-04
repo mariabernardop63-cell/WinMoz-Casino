@@ -2,6 +2,16 @@ import { createContext, useContext, useEffect, useState, useRef, ReactNode } fro
 import { supabase } from "@/lib/supabase";
 import { API_BASE } from "@/lib/apiBase";
 
+/* Redirecionamento hard para o login — usado quando a sessão está morta.
+   Um reload completo garante que nenhum ecrã fica em estado zumbi. */
+function hardRedirectToLogin() {
+  const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+  const target = `${base}/login`;
+  if (!window.location.pathname.replace(/\/$/, "").endsWith("/login")) {
+    window.location.replace(target);
+  }
+}
+
 export interface UserProfile {
   id: string;
   full_name: string | null;
@@ -267,6 +277,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* Auto-logout global: qualquer ecrã pode sinalizar "sessão morta" via
+     forceSessionLogout() — o provider limpa o estado e manda o utilizador
+     para o login. Nunca fica preso num ecrã com dados de sessão expirada. */
+  useEffect(() => {
+    const onSessionInvalid = () => {
+      stopHeartbeat();
+      if (realtimeChannelRef.current) { supabase.removeChannel(realtimeChannelRef.current); realtimeChannelRef.current = null; }
+      clearCachedProfile();
+      activeUidRef.current = null;
+      signedInHandledRef.current = false;
+      setUser(null);
+      setProfile(null);
+      setIsBlocked(false);
+      setLoading(false);
+      hardRedirectToLogin();
+    };
+    window.addEventListener("wm:session-invalid", onSessionInvalid);
+    return () => window.removeEventListener("wm:session-invalid", onSessionInvalid);
+  }, []);
+
   // Self-heal: if a user is logged in but the profile is missing (e.g. a
   // failed fetch after an expired token), retry automatically with backoff
   // instead of showing "Utilizador" with no data.
@@ -301,15 +331,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           session = refreshed ?? null;
 
           if (!session?.user && !cancelled) {
-            // Only clear the cache when the refresh token is definitively
+            // Only redirect when the refresh token is definitively
             // dead; a network failure must preserve the cached profile
             const msg = String((refreshErr as any)?.message ?? "");
             if (!refreshErr || isRefreshTokenDead(msg)) {
-              clearCachedProfile();
-              setUser(null);
-              setProfile(null);
-              setLoading(false);
-              setSessionReady(true);
+              // Auto-logout limpo — nunca deixa o user num ecrã a meio
+              hardRedirectToLogin();
               return;
             }
             // Network error → keep cached state, the 60 s poll will retry
@@ -322,11 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const result = await refreshSessionAndFetchProfile();
         if (cancelled) return;
         if (!result) {
-          clearCachedProfile();
-          setUser(null);
-          setProfile(null);
-          setLoading(false);
-          setSessionReady(true);
+          hardRedirectToLogin();
           return;
         }
 

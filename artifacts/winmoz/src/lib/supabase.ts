@@ -11,18 +11,24 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-/** Returns true when the refresh token itself is dead (revoked/expired/unknown).
-    In that case the only option is a clean sign-out. Network errors must NOT
-    log the user out — the token may still be refreshed once connectivity
-    returns. */
-function isRefreshTokenDead(msg: string): boolean {
-  return /refresh_token_not_found|Invalid Refresh Token|refresh.?token.*(expired|invalid|revoked|not found)/i.test(msg);
+const REFRESH_TOKEN_DEAD_RE =
+  /refresh_token_not_found|Invalid Refresh Token|refresh.?token.*(expired|invalid|revoked|not found)/i;
+
+/**
+ * Logout automático quando a sessão está definitivamente morta:
+ * limpa a sessão Supabase + cache de perfil e recarrega a app na rota de
+ * login. Garante que o utilizador nunca fica preso num ecrã a meio.
+ */
+export function forceSessionLogout() {
+  supabase.auth.signOut().catch(() => { /* best-effort */ });
+  try { sessionStorage.removeItem("wm_profile_cache"); } catch { /* ignore */ }
+  window.dispatchEvent(new CustomEvent("wm:session-invalid"));
 }
 
 /**
  * Returns a valid session, proactively refreshing when the access token is
  * expired or expires in <60 s. Behaviour on failure:
- *  - refresh token dead  → clean sign-out, returns null
+ *  - refresh token dead  → auto-logout + redirect, returns null
  *  - transient/network   → keeps the (possibly stale) session so the UI can
  *    keep showing cached data while retrying in the background
  */
@@ -42,8 +48,8 @@ export async function getSessionWithRefresh(): Promise<Session | null> {
     if (refreshed) return refreshed;
 
     const msg = String((refreshErr as any)?.message ?? refreshErr ?? "");
-    if (isRefreshTokenDead(msg)) {
-      await supabase.auth.signOut();
+    if (REFRESH_TOKEN_DEAD_RE.test(msg)) {
+      forceSessionLogout();
       return null;
     }
 

@@ -1,10 +1,19 @@
-import { supabase } from "@/lib/supabase";
+import { supabase, getSessionWithRefresh, forceSessionLogout } from "@/lib/supabase";
 
 async function getToken(): Promise<string | null> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const session = await getSessionWithRefresh();
     return session?.access_token ?? null;
   } catch { return null; }
+}
+
+/* 401 de sessão morta numa chamada de jogo → auto-logout imediato,
+   em vez de deixar o jogador preso no ecrã do jogo */
+function handleAuthError(data: { error?: string } | null) {
+  const msg = String(data?.error ?? "");
+  if (/não autenticado|sessão inválida|unauthorized/i.test(msg)) {
+    forceSessionLogout();
+  }
 }
 
 export interface BetResult {
@@ -44,6 +53,7 @@ export async function serverBet(
   });
   const data = await res.json() as { ok?: boolean; newBalance?: number; error?: string };
   if (!res.ok || !data.ok) {
+    if (res.status === 401) handleAuthError(data);
     return { ok: false, newBalance: 0, error: data.error ?? "Erro ao processar aposta" };
   }
   return { ok: true, newBalance: data.newBalance ?? 0 };
@@ -67,6 +77,7 @@ export async function serverWin(
   });
   const data = await res.json() as { ok?: boolean; payout?: number; newBalance?: number; error?: string };
   if (!res.ok || !data.ok) {
+    if (res.status === 401) handleAuthError(data);
     return { ok: false, payout: 0, newBalance: 0, error: data.error ?? "Erro ao registar vitória" };
   }
   return { ok: true, payout: data.payout ?? 0, newBalance: data.newBalance ?? 0 };

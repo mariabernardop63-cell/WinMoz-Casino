@@ -194,14 +194,8 @@ export default function Depositar() {
     try {
       const session = await getSessionWithRefresh();
       if (!session) {
-        if (mpesaTimer) clearTimeout(mpesaTimer);
-        if (screenSwitched) {
-          setRejectReason("Sessão expirada. Volta a entrar na tua conta.");
-          setScreen("rejected");
-        } else {
-          setPhoneError("Sessão expirada. Volta a entrar na tua conta.");
-          setLocation("/login");
-        }
+        /* forceSessionLogout() já disparou o auto-logout + redirect.
+           Mostra apenas um estado neutro durante o redirect. */
         setInitiating(false);
         return;
       }

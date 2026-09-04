@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, Star, Zap, AlertCircle, Lock } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { getSessionWithRefresh } from "@/lib/supabase";
 import { useLocation } from "wouter";
 
 // ─── Sectors ─────────────────────────────────────────────────────────────────
@@ -282,7 +282,7 @@ export default function Roleta() {
 
   async function checkFreeSpinStatus() {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getSessionWithRefresh();
       if (!session?.access_token) return;
       const res = await fetch("/api/roleta/status", {
         headers: { Authorization: `Bearer ${session.access_token}` },
@@ -365,9 +365,10 @@ export default function Roleta() {
     setLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getSessionWithRefresh();
       if (!session?.access_token) {
-        setError("Sessão expirada. Faz login novamente.");
+        /* A sessão está morta — o getSessionWithRefresh já disparou
+           o auto-logout e o redirect para o login. */
         setLoading(false);
         return;
       }
