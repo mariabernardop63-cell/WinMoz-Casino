@@ -260,7 +260,7 @@ const SAFE_COORDS = new Set<string>(
 // PIECE_BOX = click/hit area, PAWN_SIZE controls visual size
 // Cell is SZ/15 = 40px. Pawn height = size×1.93. Size=13 → h≈25px — fits cleanly centered
 const PIECE_BOX  = 24;  // px — click/hit area (smaller than cell so it never overlaps)
-const PAWN_SIZE  = 13;  // px — single-piece size (height ≈ 25px, perfectly centered in cell)
+const PAWN_SIZE  = 15;  // px — single-piece size (height ≈ 29px, clearly visible on mobile)
 
 // ─── getPieceCoord: stretch entered after pos 50 (arrow cell) ──────────────────
 function getPieceCoord(p: GamePiece): [number,number] {
@@ -272,12 +272,12 @@ function getPieceCoord(p: GamePiece): [number,number] {
 
 // ─── Colors ─────────────────────────────────────────────────────────────────────
 const Q = {
-  red:    { main:"#E8181C", bg:"#C41014" },
-  green:  { main:"#1CBF3C", bg:"#15992E" },
-  blue:   { main:"#1565E8", bg:"#0F50CC" },
-  yellow: { main:"#F5C800", bg:"#D4AA00" },
+  red:    { main:"#E53935", bg:"#C62828" },
+  green:  { main:"#20B56B", bg:"#168957" },
+  blue:   { main:"#2F80ED", bg:"#1D5FC5" },
+  yellow: { main:"#F2B705", bg:"#C68A00" },
 };
-const STRETCH_COL = { red:"#FF5B5B", green:"#1CD44C", blue:"#2E8EFF", yellow:"#FFCC00" };
+const STRETCH_COL = { red:"#FFD6D4", green:"#C8F3DA", blue:"#D6E9FF", yellow:"#FFF0B8" };
 
 type PawnColor = "red"|"green"|"blue"|"yellow";
 const PAWN_PAL: Record<PawnColor,{s:string;m:string;d:string}> = {
@@ -532,7 +532,7 @@ function cellColor(r:number,c:number):string {
   if(r===1 &&c===8) return Q.green.main;
   if(r===6 &&c===1) return Q.red.main;
   if(r===8 &&c===13) return Q.yellow.main;
-  return "#FFFFFF";
+  return "#FBFCFE";
 }
 
 const HOME_DECO: { color:PawnColor; slots:[number,number][] }[] = [
@@ -556,40 +556,54 @@ function BoardSVG({ pieces }:{ pieces:GamePiece[] }) {
     <svg viewBox={`0 0 ${SZ} ${SZ}`} width="100%" height="100%"
       style={{display:"block",position:"absolute",inset:0}}
       preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="ludoBoardBase" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#F8FAFC"/>
+          <stop offset="100%" stopColor="#E8EEF5"/>
+        </linearGradient>
+        <linearGradient id="ludoRedHome" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#F04440"/>
+          <stop offset="100%" stopColor="#C62828"/>
+        </linearGradient>
+        <linearGradient id="ludoGreenHome" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#31C77A"/>
+          <stop offset="100%" stopColor="#168957"/>
+        </linearGradient>
+        <linearGradient id="ludoBlueHome" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#4194F2"/>
+          <stop offset="100%" stopColor="#1D5FC5"/>
+        </linearGradient>
+        <linearGradient id="ludoYellowHome" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FFD04A"/>
+          <stop offset="100%" stopColor="#C68A00"/>
+        </linearGradient>
+      </defs>
       {/* Board background */}
-      <rect x={0} y={0} width={SZ} height={SZ} fill="#101830" rx={4}/>
+      <rect x={0} y={0} width={SZ} height={SZ} fill="url(#ludoBoardBase)" rx={10}/>
       {/* Quadrant fills */}
-      <rect x={0}   y={0}   width={240} height={240} fill={Q.red.main}/>
-      <rect x={360} y={0}   width={240} height={240} fill={Q.green.main}/>
-      <rect x={0}   y={360} width={240} height={240} fill={Q.blue.main}/>
-      <rect x={360} y={360} width={240} height={240} fill={Q.yellow.main}/>
+      <rect x={0}   y={0}   width={240} height={240} fill="url(#ludoRedHome)"/>
+      <rect x={360} y={0}   width={240} height={240} fill="url(#ludoGreenHome)"/>
+      <rect x={0}   y={360} width={240} height={240} fill="url(#ludoBlueHome)"/>
+      <rect x={360} y={360} width={240} height={240} fill="url(#ludoYellowHome)"/>
       {/* Path cells */}
       {pathCells.map(([r,c])=>{
         if(r>=6&&r<=8&&c>=6&&c<=8) return null;
         return <rect key={`${r},${c}`} x={c*CS} y={r*CS} width={CS} height={CS}
-          fill={cellColor(r,c)} stroke="#C0C0C0" strokeWidth="0.6"/>;
+          fill={cellColor(r,c)} stroke="#D6DEE8" strokeWidth="0.8"/>;
       })}
       {/* Center triangles */}
-      <rect x={240} y={240} width={120} height={120} fill="#F5F5F5"/>
+      <rect x={240} y={240} width={120} height={120} fill="#FFFFFF"/>
       <polygon points="240,240 360,240 300,300" fill={Q.green.main}/>
       <polygon points="360,240 360,360 300,300" fill={Q.yellow.main}/>
       <polygon points="360,360 240,360 300,300" fill={Q.blue.main}/>
       <polygon points="240,360 240,240 300,300" fill={Q.red.main}/>
       {/* Center border */}
-      <rect x={240} y={240} width={120} height={120} fill="none" stroke="#AAAAAA" strokeWidth="0.6"/>
-      {/* SVG sphere gradients (shared) */}
-      <defs>
-        {(["blue","green","red","yellow"] as PawnColor[]).map(color=>{
-          const p=PAWN_PAL[color];
-          return (
-            <radialGradient key={color} id={`hs_${color}`} cx="35%" cy="28%" r="72%">
-              <stop offset="0%"   stopColor={p.s}/>
-              <stop offset="50%"  stopColor={p.m}/>
-              <stop offset="100%" stopColor={p.d}/>
-            </radialGradient>
-          );
-        })}
-      </defs>
+      <rect x={240} y={240} width={120} height={120} fill="none" stroke="#B8C4D1" strokeWidth="1"/>
+      {/* Home trays: translucent glass-like panels keep the four slots aligned. */}
+      <rect x={30} y={30}   width={180} height={180} rx={20} fill="#FFFFFF" opacity={0.17} stroke="#FFFFFF" strokeOpacity={0.28} strokeWidth={2}/>
+      <rect x={390} y={30}  width={180} height={180} rx={20} fill="#FFFFFF" opacity={0.17} stroke="#FFFFFF" strokeOpacity={0.28} strokeWidth={2}/>
+      <rect x={30} y={390}  width={180} height={180} rx={20} fill="#FFFFFF" opacity={0.17} stroke="#FFFFFF" strokeOpacity={0.28} strokeWidth={2}/>
+      <rect x={390} y={390} width={180} height={180} rx={20} fill="#FFFFFF" opacity={0.17} stroke="#FFFFFF" strokeOpacity={0.28} strokeWidth={2}/>
       {/* Home slot circles + resting pawns (pin rendered by HTML overlay) */}
       {HOME_DECO.map(({ color, slots })=>
         slots.map(([px,py],i)=>{
@@ -597,32 +611,28 @@ function BoardSVG({ pieces }:{ pieces:GamePiece[] }) {
           const isActive=(color==="blue"&&inHome.blue.has(i))||(color==="green"&&inHome.green.has(i));
           return (
             <g key={`${color}_${i}`}>
-              <circle cx={px} cy={py} r={26} fill={p.d} opacity={isActive ? 0.38 : 0.22}/>
-              <circle cx={px} cy={py} r={26} fill="none" stroke={p.m} strokeWidth={isActive ? 2.8 : 2.0} opacity={isActive ? 0.85 : 0.65}/>
+              <circle cx={px} cy={py} r={27} fill={isActive ? p.s : "#FFFFFF"} opacity={isActive ? 0.72 : 0.9}/>
+              <circle cx={px} cy={py} r={27} fill="none" stroke={isActive ? p.m : "#FFFFFF"} strokeWidth={isActive ? 3.2 : 2.4} opacity={isActive ? 0.98 : 0.82}/>
+              <circle cx={px-7} cy={py-8} r={5} fill="#FFFFFF" opacity={isActive ? 0.2 : 0.45}/>
             </g>
           );
         })
       )}
-      {/* Home rect backgrounds */}
-      <rect x={36} y={36}   width={168} height={168} rx={6} fill="white" opacity={0.15}/>
-      <rect x={396} y={36}  width={168} height={168} rx={6} fill="white" opacity={0.15}/>
-      <rect x={36} y={396}  width={168} height={168} rx={6} fill="white" opacity={0.15}/>
-      <rect x={396} y={396} width={168} height={168} rx={6} fill="white" opacity={0.15}/>
       {/* Stars — original positions restored */}
       {STAR_DISPLAY.map(([sr,sc])=>(
         <g key={`star_${sr},${sc}`}>
           <StarShape cx={(sc+0.5)*CS} cy={(sr+0.5)*CS} r={CS*0.28}
-            fill="rgba(255,210,0,0.15)" stroke="#FFD700" strokeW={1.5} opacity={0.92}/>
+            fill="#FFF4BF" stroke="#D89D00" strokeW={1.5} opacity={0.98}/>
         </g>
       ))}
       {/* Directional arrows */}
       {ARROWS.map(({r,c,s})=>(
         <text key={s} x={(c+0.5)*CS} y={(r+0.5)*CS+6}
-          textAnchor="middle" fill="#555" fontSize={16} fontWeight="bold"
+          textAnchor="middle" fill="#64748B" fontSize={16} fontWeight="bold"
           opacity={0.65} fontFamily="Arial,sans-serif">{s}</text>
       ))}
       {/* Board border */}
-      <rect x={0} y={0} width={SZ} height={SZ} fill="none" stroke="#0A1028" strokeWidth={3} rx={4}/>
+      <rect x={1.5} y={1.5} width={SZ-3} height={SZ-3} fill="none" stroke="#94A3B8" strokeWidth={3} rx={10}/>
     </svg>
   );
 }
@@ -673,8 +683,10 @@ function Board({ pieces, movable, onSelectPiece }:{
   return (
     <div style={{
       position:"relative", width:"100%", aspectRatio:"1",
-      borderRadius:8, overflow:"visible",
-      boxShadow:"0 12px 40px rgba(0,0,0,0.8), 0 2px 8px rgba(0,0,0,0.5)",
+      borderRadius:16, overflow:"visible",
+      background:"#DCE5EF",
+      border:"1px solid #CBD5E1",
+      boxShadow:"0 18px 38px rgba(15,23,42,0.18), 0 4px 10px rgba(15,23,42,0.10)",
     }}>
       <BoardSVG pieces={pieces}/>
 
@@ -864,7 +876,7 @@ function TimerArc({ timeLeft, total=30, size=30 }:{timeLeft:number;total?:number
   return (
     <div style={{position:"relative",width:size,height:size,flexShrink:0}}>
       <svg width={size} height={size} style={{transform:"rotate(-90deg)",display:"block"}}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={3}/>
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#E2E8F0" strokeWidth={3}/>
         <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={col} strokeWidth={3}
           strokeDasharray={circ} strokeDashoffset={circ*(1-fill)} strokeLinecap="round"
           style={{transition:"stroke-dashoffset 0.85s linear, stroke 0.3s"}}/>
@@ -911,9 +923,11 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
   return (
     <div style={{
       display:"flex", alignItems:"center",
-      background:"#FFFFFF",
+      background: isActive
+        ? `linear-gradient(105deg, #FFFFFF 0%, ${accentColor}0D 100%)`
+        : "#FFFFFF",
       borderRadius:14,
-      border:`2px solid ${isActive ? accentColor : "#E2E8F0"}`,
+      border:`1.5px solid ${isActive ? accentColor : "#E2E8F0"}`,
       overflow:"hidden",
       boxShadow: isActive
         ? `0 4px 20px ${accentColor}28, 0 1px 4px rgba(0,0,0,0.06)`
@@ -924,7 +938,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
 
       {/* Left accent bar */}
       <div style={{
-        width:4, alignSelf:"stretch", flexShrink:0,
+         width:5, alignSelf:"stretch", flexShrink:0,
         background: isActive
           ? `linear-gradient(180deg,${accentColor},${accentDark})`
           : "#E2E8F0",
@@ -933,7 +947,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
 
       {/* Pawn avatar */}
       <div style={{
-        width:38, height:38, borderRadius:11, flexShrink:0,
+         width:40, height:40, borderRadius:12, flexShrink:0,
         margin:"0 10px",
         background:`${accentColor}12`,
         border:`2px solid ${isActive ? accentColor+"50" : "#E2E8F0"}`,
@@ -960,7 +974,8 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
             fontSize:9, fontWeight:700, letterSpacing:0.5, textTransform:"uppercase",
             color: isMe ? "#FFFFFF" : "#64748B",
             background: isMe ? accentColor : "#E2E8F0",
-            borderRadius:4, padding:"2px 6px", flexShrink:0,
+             borderRadius:999, padding:"3px 7px", flexShrink:0,
+             border:`1px solid ${isMe ? accentColor+"55" : "#E2E8F0"}`,
           }}>{isMe?"Tu":"Rival"}</span>
         </div>
         {/* Row 2: balance + lives dots */}
@@ -980,8 +995,8 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
                 transition={{ duration:0.22 }}
                 style={{
                   width:6, height:6, borderRadius:"50%",
-                  background: i < lives ? "#4ade80" : "#ef4444",
-                  boxShadow: i < lives ? "0 0 4px #4ade8066" : "none",
+                   background: i < lives ? accentColor : "#E2E8F0",
+                   boxShadow: i < lives ? `0 0 4px ${accentColor}66` : "none",
                   transition:"background 0.3s, box-shadow 0.3s",
                   flexShrink:0,
                 }}/>
@@ -997,8 +1012,8 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
       }}>
         <TimerArc timeLeft={timeLeft} size={24}/>
         <div style={{
-          background: isActive ? "#F8FAFC" : "#F1F5F9",
-          borderRadius:10, padding:"4px",
+           background: isActive ? `${accentColor}12` : "#F8FAFC",
+           borderRadius:12, padding:"4px",
           border:`1.5px solid ${isActive ? accentColor+"60" : "#E2E8F0"}`,
           transition:"border-color 0.3s, background 0.3s",
         }}>
