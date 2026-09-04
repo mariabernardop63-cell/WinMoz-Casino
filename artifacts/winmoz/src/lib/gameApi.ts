@@ -7,12 +7,12 @@ async function getToken(): Promise<string | null> {
   } catch { return null; }
 }
 
-/* 401 numa chamada de jogo → preserva a sessão local e deixa o ecrã
-   apresentar o erro/repetir, sem logout silencioso */
+/* 401 numa chamada de jogo prova que o token já não é aceite. Limpar a
+   sessão evita continuar a jogar com nome/saldo de um perfil inválido. */
 function handleAuthError(data: { error?: string } | null) {
   const msg = String(data?.error ?? "");
-  if (/não autenticado|sessão inválida|unauthorized/i.test(msg)) {
-    forceSessionLogout();
+  if (/não autenticado|sessão inválida|unauthorized|invalid jwt|token/i.test(msg)) {
+    forceSessionLogout("api_unauthorized");
   }
 }
 
@@ -91,8 +91,7 @@ export async function rollLudoDice(
 ): Promise<DiceResult> {
   const token = await getToken();
   if (!token) {
-    const val = Math.floor(Math.random() * 6) + 1;
-    return { value: val };
+    return { value: 0, error: "Não autenticado" };
   }
 
   try {
@@ -106,12 +105,11 @@ export async function rollLudoDice(
     });
     const data = await res.json() as { value?: number; error?: string };
     if (!res.ok || !data.value) {
-      const fallback = Math.floor(Math.random() * 6) + 1;
-      return { value: fallback };
+      if (res.status === 401) handleAuthError(data);
+      return { value: 0, error: data.error ?? "Erro ao rolar o dado" };
     }
     return { value: data.value };
   } catch {
-    const fallback = Math.floor(Math.random() * 6) + 1;
-    return { value: fallback };
+    return { value: 0, error: "Erro de ligação ao servidor" };
   }
 }

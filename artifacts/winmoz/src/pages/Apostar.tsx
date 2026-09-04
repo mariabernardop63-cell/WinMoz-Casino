@@ -118,50 +118,7 @@ function fmtBalance(v: number) {
 
 type GameMode  = "solo" | "squad";
 type PayMethod = "poker" | "carteira";
-type Screen    = "bet" | "processing" | "rejected" | "matchmaking" | "matched" | "timeout" | "pin-confirmation" | "sala-menu" | "sala-aguardar" | "sala-entrar";
-
-/* ── Processing Screen (Conta Poker only) ── */
-function ProcessingScreen() {
-  return (
-    <div className="min-h-screen w-full flex justify-center" style={{ background: "#F4F6FB" }}>
-      <div className="w-full max-w-[430px] flex flex-col items-center justify-center min-h-screen px-8">
-        <motion.div className="flex flex-col items-center"
-          initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.35 }}>
-
-          {/* Icon card */}
-          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-            style={{ width: 96, height: 96, borderRadius: 30, background: "#fff",
-              boxShadow: "0 6px 32px rgba(124,58,237,0.14), 0 1px 4px rgba(0,0,0,0.06)",
-              border: "1.5px solid rgba(124,58,237,0.12)",
-              display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 34 }}>
-            <div style={{ width: 44, height: 44, borderRadius: "50%",
-              border: `3.5px solid rgba(124,58,237,0.15)`, borderTopColor: VIOLET }}
-              className="animate-spin" />
-          </motion.div>
-
-          <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
-            style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 22, color: "#0D0D0D",
-              marginBottom: 10, textAlign: "center" }}>
-            A verificar saldo…
-          </motion.p>
-          <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.28 }}
-            style={{ fontSize: 13.5, color: "#64748B", textAlign: "center", lineHeight: 1.65, maxWidth: 270 }}>
-            A validar o saldo da tua Conta Poker. Este processo é rápido e seguro.
-          </motion.p>
-
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.46 }}
-            style={{ marginTop: 30, display: "flex", alignItems: "center", gap: 8, padding: "9px 20px",
-              background: "rgba(124,58,237,0.07)", borderRadius: 99,
-              border: "1px solid rgba(124,58,237,0.2)" }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: VIOLET }} className="animate-pulse" />
-            <span style={{ fontSize: 11, color: VIOLET, fontWeight: 700, letterSpacing: "0.6px" }}>PROCESSAMENTO SEGURO</span>
-          </motion.div>
-        </motion.div>
-      </div>
-    </div>
-  );
-}
+type Screen    = "bet" | "rejected" | "matchmaking" | "matched" | "timeout" | "pin-confirmation" | "sala-menu" | "sala-aguardar" | "sala-entrar";
 
 /* ── Debito Pay Betting Screen (Carteira Móvel) ── */
 function SMSBettingScreen({
@@ -882,7 +839,9 @@ function MatchmakingScreen({
       matchedRef.current = true;
       if (poll) { clearInterval(poll); poll = null; }
       leaveQueue();
-      const gameId = `${[userId, oppId].sort().join("_")}_${Date.now()}`;
+      // matches.id is a UUID in Supabase. Keep the realtime game id compatible
+      // with the database so settling the winner cannot fail at game end.
+      const gameId = crypto.randomUUID();
       channel.send({
         type: "broadcast",
         event: "match_found",
@@ -1465,8 +1424,8 @@ export default function Apostar() {
       return;
     }
 
-    /* Conta Poker → verify Supabase balance is sufficient */
-    setScreen("processing");
+    /* Conta Poker → verify Supabase balance without replacing the whole
+       screen with a processing/splash background. */
     try {
       let freshBalance = 0;
       if (user?.id) {
@@ -1479,14 +1438,12 @@ export default function Apostar() {
       } else {
         freshBalance = parseFloat(String(profile?.balance ?? "0"));
       }
-      await new Promise(res => setTimeout(res, 1200));
       if (freshBalance < (selectedBet ?? 0)) {
         setScreen("rejected");
         return;
       }
       setScreen("matchmaking");
     } catch {
-      await new Promise(res => setTimeout(res, 1200));
       const fallback = parseFloat(String(profile?.balance ?? "0"));
       if (fallback >= (selectedBet ?? 0)) {
         setScreen("matchmaking");
@@ -1624,9 +1581,6 @@ export default function Apostar() {
       />
     );
   }
-
-  /* ── Processing (Conta Poker) ── */
-  if (screen === "processing") return <ProcessingScreen />;
 
   /* ── Rejected ── */
   if (screen === "rejected") {

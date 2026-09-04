@@ -4,6 +4,8 @@ import healthRouter from "./health";
 import debitoRouter from "./debito";
 import ws from "ws";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 /* ── SMS Forwarder In-Memory Store ── */
 interface StoredSMS {
   id: string;
@@ -1596,6 +1598,10 @@ router.post("/games/bet", async (req, res) => {
     if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
       res.status(400).json({ error: "Tipo de jogo inválido" }); return;
     }
+    const isLocalOrBotGame = gameId === "local" || gameId?.startsWith("bot_");
+    if (gameId && !isLocalOrBotGame && !UUID_RE.test(gameId)) {
+      res.status(400).json({ error: "ID de jogo inválido" }); return;
+    }
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles").select("balance, is_blocked").eq("id", userId).single();
@@ -1628,7 +1634,7 @@ router.post("/games/bet", async (req, res) => {
     if (deductResult === null) { res.status(400).json({ error: "Saldo insuficiente" }); return; }
     const updated = { balance: deductResult };
 
-    if (gameId) {
+    if (gameId && UUID_RE.test(gameId)) {
       await supabaseAdmin
         .from("matches")
         .upsert({
@@ -1660,6 +1666,9 @@ router.post("/games/win", async (req, res) => {
     const { gameId, gameType } = req.body as { gameId?: string; gameType?: string };
 
     if (!gameId || typeof gameId !== "string") {
+      res.status(400).json({ error: "ID de jogo inválido" }); return;
+    }
+    if (!UUID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
     if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
@@ -1754,6 +1763,10 @@ router.post("/games/ludo-dice", async (req, res) => {
     };
 
     if (!gameId || typeof gameId !== "string" || gameId.length > 128) {
+      res.status(400).json({ error: "ID de jogo inválido" }); return;
+    }
+
+    if (gameId !== "local" && !gameId.startsWith("bot_") && !UUID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
 

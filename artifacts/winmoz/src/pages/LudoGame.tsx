@@ -1413,6 +1413,8 @@ export default function LudoGame() {
   const winnerRef    = useRef(winner);
   const channelRef   = useRef<ReturnType<typeof supabase.channel>|null>(null);
   const captureAnimRef = useRef(false);
+  const rollBusyRef   = useRef(false);
+  const moveBusyRef   = useRef(false);
   // Persiste em sessionStorage para não re-debitar se o utilizador fizer back e retomar
   const betDeductedRef = useRef(
     gameId !== "local"
@@ -1550,6 +1552,7 @@ export default function LudoGame() {
   }
 
   function handleMoveComplete(pieceId:PieceId,diceVal:number,currentTurn:Player,prevPos:number){
+    moveBusyRef.current = false;
     setPhase("moving");
     const ps=piecesRef.current;
     const finalPos = prevPos === -1 ? 0 : prevPos + diceVal;
@@ -1618,6 +1621,8 @@ export default function LudoGame() {
   }
 
   const doSelectPiece=useCallback((pid:PieceId,diceVal:number,pl:Player,ps:GamePiece[])=>{
+    if(moveBusyRef.current) return;
+    moveBusyRef.current = true;
     setMovable([]); setPhase("moving");
     const piece=ps.find(p=>p.id===pid)!;
     const isExit=piece.pos===-1;
@@ -1642,9 +1647,11 @@ export default function LudoGame() {
 
   // ── Opponent animation only (no handleMoveComplete — state comes via ludo_state_sync) ──
   function doOpponentMove(pid:PieceId,diceVal:number,_pl:Player,ps:GamePiece[]){
+    if(moveBusyRef.current) return;
+    moveBusyRef.current = true;
     setMovable([]); setPhase("moving");
     const piece=ps.find(p=>p.id===pid);
-    if(!piece) return;
+    if(!piece){ moveBusyRef.current = false; return; }
     const prevPos=piece.pos;
     const plName=opponentName;
     if(piece.pos===-1){
@@ -1664,6 +1671,7 @@ export default function LudoGame() {
         // Run capture animation cosmetically — authoritative state arrives via ludo_state_sync
         const moved=piecesRef.current.find(p=>p.id===pid);
         if(moved) captureAtPos({...moved,pos:finalPos});
+        moveBusyRef.current = false;
       });
     }
   }
@@ -1738,7 +1746,8 @@ export default function LudoGame() {
 
   // ── Roll my color dice — server-side secure roll + broadcasts ───────────────
   const doRoll=useCallback(async()=>{
-    if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current||captureAnimRef.current) return;
+    if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current||captureAnimRef.current||rollBusyRef.current) return;
+    rollBusyRef.current = true;
     playRollSound();
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
@@ -1746,6 +1755,10 @@ export default function LudoGame() {
     const stuckTurns = stuckTurnsRef.current[myColor];
     const consecutiveSixes = consecutiveSixesRef.current;
     const { value: val } = await rollLudoDice(gameId, allInBase, stuckTurns, consecutiveSixes);
+    if(!val){
+      rollBusyRef.current = false;
+      return;
+    }
 
     // Game has definitively started — credit referral reward now (player's own first roll)
     if(BET_AMOUNT > 0 && !rewardFiredRef.current){
@@ -1759,12 +1772,14 @@ export default function LudoGame() {
       payload:{ player:myColor, value:val, seq },
     });
     applyRoll(myColor,val);
+    // Keep the lock through the dice animation and the phase transition.
+    setTimeout(()=>{ rollBusyRef.current = false; }, 950);
   },[myColor,applyRoll,gameId]);
 
   // ── Select piece — broadcasts + applies ────────────────────────────────────
   function handleSelectPiece(pid:PieceId){
     // Guard: only act when it's my turn in select phase, dice must have a value
-    if(phaseRef.current!=="select"||turnRef.current!==myColor) return;
+    if(phaseRef.current!=="select"||turnRef.current!==myColor||moveBusyRef.current) return;
     const dv=myColor==="blue"?diceBlueRef.current:diceGreenRef.current;
     if(dv===null) return;
     // Guard: piece must still be in the movable list
@@ -2163,6 +2178,8 @@ export default function LudoGame() {
     setMovable([]); setWinner(null); setLives({blue:5,green:5}); setTimeLeft(30);
     setOpponentTimeLeft(30);
     setStuckTurns({blue:0,green:0}); consecutiveSixesRef.current=0;
+    rollBusyRef.current = false;
+    moveBusyRef.current = false;
     lastEventSeqRef.current = {};
     setMsg(myColor==="blue"?myTurnMsg:oppTurnMsg);
   }

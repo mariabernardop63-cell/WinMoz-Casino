@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
-import { supabase } from "@/lib/supabase";
+import { forceSessionLogout, isSessionExpiredError, supabase } from "@/lib/supabase";
 import { API_BASE } from "@/lib/apiBase";
 
 export interface UserProfile {
@@ -35,13 +35,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const PROFILE_CACHE_KEY = "wm_profile_cache";
 
-/** Identifies refresh errors without treating them as a user-requested logout.
-    Transient errors (network, 5xx, timeouts) must keep the cache so the
-    user's name/balance survive a dropped connection. */
-function isRefreshTokenDead(msg: string): boolean {
-  return /refresh_token_not_found|Invalid Refresh Token|refresh.?token.*(expired|invalid|revoked|not found)/i.test(msg);
-}
-
 async function fetchProfile(userId: string, attempt = 0): Promise<UserProfile | null> {
   try {
     const { data, error } = await supabase
@@ -49,6 +42,10 @@ async function fetchProfile(userId: string, attempt = 0): Promise<UserProfile | 
       .select("*")
       .eq("id", userId)
       .single();
+    if (error && isSessionExpiredError(error)) {
+      forceSessionLogout("profile_fetch_failed");
+      return null;
+    }
     if (error || !data) {
       // PGRST116 = row not found → profile genuinely missing, don't retry
       if ((error as any)?.code === "PGRST116") return null;
@@ -72,12 +69,19 @@ async function fetchProfile(userId: string, attempt = 0): Promise<UserProfile | 
     the profile. Returns null only when there is no usable session at all. */
 async function refreshSessionAndFetchProfile(): Promise<{ userId: string; email: string; profile: UserProfile | null } | null> {
   try {
-    let { data: { session } } = await supabase.auth.getSession();
+    let { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
-    if (!session?.user) {
-      // Session storage may hold an expired access token — try a refresh
-      const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+    if (sessionError || !session?.user) {
+      // A missing session after the refresh attempt is an invalid account,
+      // not a profile-loading state. Do not keep rendering cached data.
+      const { data: { session: refreshed }, error: refreshError } = await supabase.auth.refreshSession();
       session = refreshed ?? session;
+      if (!session?.user) {
+        forceSessionLogout(isSessionExpiredError(sessionError ?? refreshError)
+          ? "refresh_token_invalid"
+          : "session_missing");
+        return null;
+      }
     }
 
     if (!session?.user) return null;
@@ -87,11 +91,11 @@ async function refreshSessionAndFetchProfile(): Promise<{ userId: string; email:
       const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
       if (refreshed) {
         session = refreshed;
-      } else if (error && isRefreshTokenDead(String((error as any).message ?? ""))) {
-        await supabase.auth.signOut().catch(() => {});
+      } else {
+        forceSessionLogout("refresh_token_invalid");
         return null;
       }
-      // transient refresh failure → continue with the existing session
+      // A session that is still valid can survive a transient refresh error.
     }
 
     const userId = session.user.id;
@@ -186,12 +190,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isBlocked, setIsBlocked] = useState(false);
 
   const activeUidRef = useRef<string | null>(cachedProfile?.id ?? null);
+  const hadAuthenticatedStateRef = useRef(Boolean(cachedProfile));
   const signedInHandledRef = useRef(false);
   const explicitSignOutRef = useRef(false);
+  const invalidatingRef = useRef(false);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const saveAndSet = (p: UserProfile) => {
     if (p.is_blocked) {
+      hadAuthenticatedStateRef.current = false;
       clearCachedProfile();
       setUser(null);
       setProfile(null);
@@ -202,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.auth.signOut().catch(() => {});
       return;
     }
+    hadAuthenticatedStateRef.current = true;
     setIsBlocked(false);
     setProfile(p);
     saveCachedProfile(p);
@@ -237,6 +245,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearInterval(heartbeatRef.current);
       heartbeatRef.current = null;
     }
+  };
+
+  const invalidateSession = () => {
+    if (invalidatingRef.current) return;
+    const shouldRedirect = hadAuthenticatedStateRef.current;
+    invalidatingRef.current = true;
+    hadAuthenticatedStateRef.current = false;
+    activeUidRef.current = null;
+    signedInHandledRef.current = false;
+    stopHeartbeat();
+    if (realtimeChannelRef.current) {
+      supabase.removeChannel(realtimeChannelRef.current);
+      realtimeChannelRef.current = null;
+    }
+    clearCachedProfile();
+    setUser(null);
+    setProfile(null);
+    setIsBlocked(false);
+    setLoading(false);
+    setSessionReady(true);
+    if (shouldRedirect && window.location.pathname !== "/login") {
+      window.history.replaceState({}, "", "/login");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
+    void supabase.auth.signOut().catch(() => {}).finally(() => {
+      invalidatingRef.current = false;
+    });
   };
 
   const refreshProfile = async () => {
@@ -278,15 +313,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* A failed request must not silently destroy the account state. Only the
-     explicit signOut action clears the account and redirects to login. */
+  /* A request that proves the token invalid must clear all user-scoped state.
+     Network/profile retries are handled separately and do not reach here. */
   useEffect(() => {
-    const onSessionInvalid = () => {
-      setLoading(false);
-      setSessionReady(true);
-    };
+    const onSessionInvalid = () => invalidateSession();
     window.addEventListener("wm:session-invalid", onSessionInvalid);
     return () => window.removeEventListener("wm:session-invalid", onSessionInvalid);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Self-heal: if a user is logged in but the profile is missing (e.g. a
@@ -323,9 +356,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           session = refreshed ?? null;
 
           if (!session?.user && !cancelled) {
-            // Never turn a failed silent refresh into an automatic logout.
-            // The cached profile keeps the account identified while the next
-            // focus/interval gives Supabase another chance to recover.
+            invalidateSession();
             setLoading(false);
             setSessionReady(true);
             return;
@@ -335,6 +366,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const result = await refreshSessionAndFetchProfile();
         if (cancelled) return;
         if (!result) {
+          invalidateSession();
           setLoading(false);
           setSessionReady(true);
           return;
@@ -348,6 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         // User is confirmed alive — keep session state
         activeUidRef.current = id;
+        hadAuthenticatedStateRef.current = true;
         setUser({ id, email });
 
         if (data) {
@@ -396,6 +429,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (signedInHandledRef.current && activeUidRef.current === id) return;
 
           activeUidRef.current = id;
+          hadAuthenticatedStateRef.current = true;
           if (!cancelled) setUser({ id, email });
 
           const pendingRaw = sessionStorage.getItem("pendingReg");
@@ -421,13 +455,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
         } else if (event === "SIGNED_OUT") {
-          if (!explicitSignOutRef.current) {
-            // Supabase can emit SIGNED_OUT after a failed background refresh.
-            // Keep the locally persisted account instead of logging out.
-            setLoading(false);
-            setSessionReady(true);
-            return;
-          }
           activeUidRef.current = null;
           signedInHandledRef.current = false;
           stopHeartbeat();

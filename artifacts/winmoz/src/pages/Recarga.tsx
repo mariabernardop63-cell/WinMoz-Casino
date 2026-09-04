@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import {
   ChevronLeft, CheckCircle2, XCircle, RotateCcw, Zap,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { forceSessionLogout, supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { API_BASE } from "@/lib/apiBase";
 
@@ -19,7 +19,7 @@ function formatDisplay(raw: string): string {
   return parts.join("-");
 }
 
-type Screen = "input" | "processing" | "success" | "error";
+type Screen = "input" | "success" | "error";
 
 export default function Recarga() {
   const [, setLocation] = useLocation();
@@ -28,6 +28,7 @@ export default function Recarga() {
   const [screen, setScreen] = useState<Screen>("input");
   const [amount, setAmount] = useState(0);
   const [shake, setShake] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const isComplete = digits.length === 15;
   const display = formatDisplay(digits);
@@ -40,8 +41,8 @@ export default function Recarga() {
   const handleClear = () => setDigits("");
 
   const handleSubmit = async () => {
-    if (!isComplete) return;
-    setScreen("processing");
+    if (!isComplete || submitting) return;
+    setSubmitting(true);
 
     const timeout = (ms: number) =>
       new Promise<never>((_, reject) =>
@@ -55,7 +56,11 @@ export default function Recarga() {
       ]) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
 
       const session = sessionResult.data.session;
-      if (!session) { setScreen("error"); return; }
+       if (!session) {
+         forceSessionLogout("recharge_session_missing");
+         setScreen("error");
+         return;
+       }
 
       const res = await Promise.race([
         fetch(`${API_BASE}/recharge`, {
@@ -69,7 +74,11 @@ export default function Recarga() {
         timeout(15000),
       ]) as Response;
 
-      if (!res.ok) { setScreen("error"); return; }
+       if (!res.ok) {
+         if (res.status === 401) forceSessionLogout("recharge_unauthorized");
+         setScreen("error");
+         return;
+       }
 
       const data = await res.json();
       const creditedAmount: number = data.amount ?? 0;
@@ -84,11 +93,14 @@ export default function Recarga() {
       setScreen("success");
     } catch {
       setScreen("error");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleRetry = () => {
     setDigits("");
+    setSubmitting(false);
     setScreen("input");
   };
 
@@ -179,16 +191,16 @@ export default function Recarga() {
             <motion.button
               whileTap={isComplete ? { scale: 0.98 } : {}}
               onClick={handleSubmit}
-              disabled={!isComplete}
+               disabled={!isComplete || submitting}
               className="w-full h-14 font-syne font-bold text-sm mb-5 transition-all"
               style={{
-                background: isComplete ? "#0a0a0a" : "#f1f5f9",
-                color: isComplete ? "#fff" : "#9ca3af",
+                 background: isComplete && !submitting ? "#0a0a0a" : "#f1f5f9",
+                 color: isComplete && !submitting ? "#fff" : "#9ca3af",
                 borderRadius: 0,
                 border: "none",
                 letterSpacing: "0.3px",
               }}>
-              {isComplete ? "Processar Recarga" : "Introduz o código completo"}
+               {submitting ? "A validar código…" : isComplete ? "Processar Recarga" : "Introduz o código completo"}
             </motion.button>
 
             <div className="grid grid-cols-3 gap-2 pb-8">
@@ -212,26 +224,6 @@ export default function Recarga() {
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  /* ── PROCESSING SCREEN ── */
-  if (screen === "processing") {
-    return (
-      <div className="min-h-screen bg-white w-full flex justify-center items-center">
-        <motion.div className="flex flex-col items-center gap-5"
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="relative w-20 h-20">
-            <div className="w-20 h-20 border border-slate-100 absolute" />
-            <div className="w-20 h-20 border-2 border-transparent border-t-[#0a0a0a] animate-spin absolute" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Zap style={{ width: 22, height: 22, color: "#374151" }} />
-            </div>
-          </div>
-          <p className="font-syne font-bold text-[#0a0a0a] text-base">A validar código…</p>
-          <p style={{ fontSize: 13, color: "#9ca3af" }}>Por favor aguarda</p>
-        </motion.div>
       </div>
     );
   }
