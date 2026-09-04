@@ -172,6 +172,18 @@ export default function Depositar() {
   const handleInitiate = async () => {
     if (!isPhoneValid) { setPhoneError("Número inválido — deve ter 9 dígitos"); return; }
     if (!user) { setPhoneError("Sessão inválida"); return; }
+
+    /* Mínimos reais do gateway Debito Pay por operadora */
+    const minAmount = provider === "mpesa" ? 10 : 50;
+    if (amountVal < minAmount) {
+      setPhoneError(
+        provider === "mpesa"
+          ? "O mínimo para M-Pesa é 10 MZN"
+          : "O mínimo para e-Mola é 50 MZN",
+      );
+      return;
+    }
+
     setPhoneError("");
     setInitError("");
     setInitiating(true);

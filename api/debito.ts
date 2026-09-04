@@ -423,11 +423,12 @@ function parseDebitoError(data: any, status: number, paymentMethod: string): str
   if (status === 400) {
     if (low.includes("authentication") || low.includes("auth")) return paymentMethod === "mpesa" ? "Serviço M-Pesa temporariamente indisponível. Usa e-Mola ou tenta mais tarde." : "Erro de autenticação no gateway. Contacta o suporte.";
     if (low.includes("phone") || low.includes("msisdn") || low.includes("mobile")) return "Número de telefone inválido para este operador.";
-    if (low.includes("amount") || low.includes("minimum") || low.includes("mínimo") || low.includes("minimo")) return "Montante inválido — mínimo é 10 MZN.";
+    if (low.includes("abaixo do mínimo") || low.includes("amount") || low.includes("minimum") || low.includes("mínimo") || low.includes("minimo")) return `Montante abaixo do mínimo permitido (${paymentMethod === "mpesa" ? "10 MZN" : "50 MZN"}). Introduz um valor igual ou superior.`;
     if (low.includes("payment_method") || low.includes("unsupported")) return "Método de pagamento não suportado de momento.";
     if (low.includes("wallet_code") || low.includes("wallet")) return "Código de carteira inválido. Contacta o suporte.";
     if (low.includes("required")) return "Dados em falta no pedido. Contacta o suporte.";
     if (low.includes("timeout") || low.includes("time out")) return "Tempo esgotado — o utilizador não confirmou o PIN a tempo.";
+    if (low.includes("recusado pelo operador") || low.includes("rejected by operator")) return `Pagamento recusado pelo operador. Confirma que tens saldo suficiente na tua carteira ${paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola"} e que o número está correcto. Se o problema persistir, contacta o suporte.`;
     return msg ? `Erro do gateway: ${msg}` : "Pedido rejeitado pelo gateway. Tenta novamente.";
   }
   if (status >= 500) return "Erro temporário do gateway de pagamento. Tenta novamente mais tarde.";
