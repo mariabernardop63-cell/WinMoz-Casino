@@ -1152,17 +1152,9 @@ export default function ChessGame(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[winner]);
 
-  // Platform fee (only white's client inserts to avoid duplicates)
+  // Platform fee — recorded server-side by /api/games/win (platform_earnings)
   useEffect(()=>{
     if(!winner||BET<=0||gameId==="local"||myColor!=="w")return;
-    const platformFee=BET*2-Math.floor(BET*2*0.90);
-    if(platformFee>0){
-      void supabase.from("platform_earnings").insert({
-        amount:platformFee,source:"game_fee",
-        description:`Taxa de jogo (Xadrez) — aposta ${BET} MT`,
-        reference_id:gameId,created_at:new Date().toISOString(),
-      });
-    }
     void supabase.from("matches").update({
       status:"finished",
       winner_name:winner==="w"?playerName:opponentName,

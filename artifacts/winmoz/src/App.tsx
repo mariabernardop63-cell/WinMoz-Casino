@@ -4,46 +4,56 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import NotFound from "@/pages/not-found";
-import AdminApp from "@/admin/AdminApp";
+import { lazy, Suspense, useState, useEffect } from "react";
 import Home from "@/pages/Home";
-import Explorar from "@/pages/Explorar";
-import Login from "@/pages/Login";
-import Registar from "@/pages/Registar";
-import EsqueceuSenha from "@/pages/EsqueceuSenha";
-import RedefinirSenha from "@/pages/RedefinirSenha";
-import OTP from "@/pages/OTP";
-import SplashScreen from "@/pages/SplashScreen";
-import Perfil from "@/pages/Perfil";
-import Recarga from "@/pages/Recarga";
-import Levantar from "@/pages/Levantar";
-import Depositar from "@/pages/Depositar";
-import EditarPerfil from "@/pages/EditarPerfil";
-import ConvidarAmigos from "@/pages/ConvidarAmigos";
-import Extratos from "@/pages/Extratos";
-import Reportar from "@/pages/Reportar";
-import Privacidade from "@/pages/Privacidade";
-import PoliticaPrivacidade from "@/pages/PoliticaPrivacidade";
-import Definicoes from "@/pages/Definicoes";
-import Suporte from "@/pages/Suporte";
-import Notificacoes from "@/pages/Notificacoes";
-import GrupoChat from "@/pages/GrupoChat";
-import ScannerQR from "@/pages/ScannerQR";
-import Apostar from "@/pages/Apostar";
-import ProgramaAfiliados from "@/pages/ProgramaAfiliados";
-import LudoGame from "@/pages/LudoGame";
-import ChessGame from "@/pages/ChessGame";
-import DamasGame from "@/pages/DamasGame";
-import Roleta from "@/pages/Roleta";
-import BilharEmBreve from "@/pages/BilharEmBreve";
 import NotificationBanner from "@/components/NotificationBanner";
 import MaintenancePage from "@/components/MaintenancePage";
 import CookieConsent from "@/components/CookieConsent";
-import { useState, useEffect } from "react";
 import { adminSupabase } from "@/admin/lib/supabase-api";
 import { BrandProvider } from "@/lib/brand-context";
 import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
-import TermosServico from "@/pages/TermosServico";
+
+/* Route-level code splitting — heavy pages (games, admin, forms) load on demand */
+const NotFound = lazy(() => import("@/pages/not-found"));
+const AdminApp = lazy(() => import("@/admin/AdminApp"));
+const Explorar = lazy(() => import("@/pages/Explorar"));
+const Login = lazy(() => import("@/pages/Login"));
+const Registar = lazy(() => import("@/pages/Registar"));
+const EsqueceuSenha = lazy(() => import("@/pages/EsqueceuSenha"));
+const RedefinirSenha = lazy(() => import("@/pages/RedefinirSenha"));
+const OTP = lazy(() => import("@/pages/OTP"));
+const SplashScreen = lazy(() => import("@/pages/SplashScreen"));
+const Perfil = lazy(() => import("@/pages/Perfil"));
+const Recarga = lazy(() => import("@/pages/Recarga"));
+const Levantar = lazy(() => import("@/pages/Levantar"));
+const Depositar = lazy(() => import("@/pages/Depositar"));
+const EditarPerfil = lazy(() => import("@/pages/EditarPerfil"));
+const ConvidarAmigos = lazy(() => import("@/pages/ConvidarAmigos"));
+const Extratos = lazy(() => import("@/pages/Extratos"));
+const Reportar = lazy(() => import("@/pages/Reportar"));
+const Privacidade = lazy(() => import("@/pages/Privacidade"));
+const PoliticaPrivacidade = lazy(() => import("@/pages/PoliticaPrivacidade"));
+const Definicoes = lazy(() => import("@/pages/Definicoes"));
+const Suporte = lazy(() => import("@/pages/Suporte"));
+const Notificacoes = lazy(() => import("@/pages/Notificacoes"));
+const GrupoChat = lazy(() => import("@/pages/GrupoChat"));
+const ScannerQR = lazy(() => import("@/pages/ScannerQR"));
+const Apostar = lazy(() => import("@/pages/Apostar"));
+const ProgramaAfiliados = lazy(() => import("@/pages/ProgramaAfiliados"));
+const LudoGame = lazy(() => import("@/pages/LudoGame"));
+const ChessGame = lazy(() => import("@/pages/ChessGame"));
+const DamasGame = lazy(() => import("@/pages/DamasGame"));
+const Roleta = lazy(() => import("@/pages/Roleta"));
+const BilharEmBreve = lazy(() => import("@/pages/BilharEmBreve"));
+const TermosServico = lazy(() => import("@/pages/TermosServico"));
+
+function PageFallback() {
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-background" aria-busy="true">
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+    </div>
+  );
+}
 
 const queryClient = new QueryClient();
 
@@ -111,6 +121,7 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
 
 function Router() {
   return (
+    <Suspense fallback={<PageFallback />}>
     <Switch>
       {/* Public routes */}
       <Route path="/" component={Home} />
@@ -212,6 +223,7 @@ function Router() {
 
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
   );
 }
 

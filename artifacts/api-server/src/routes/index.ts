@@ -132,6 +132,43 @@ function buildAdminClient(url: string, key: string) {
 
 const router: IRouter = Router();
 
+/* ── Rate limiting (in-memory, per-IP + per-route) ── */
+const rateBuckets = new Map<string, number[]>();
+function rateLimit(scope: string, req: any, max: number, windowMs: number): boolean {
+  const ip = (req.ip || req.socket?.remoteAddress || "unknown") as string;
+  const key = `${scope}:${ip}`;
+  const now = Date.now();
+  let hits = rateBuckets.get(key);
+  if (!hits) { hits = []; rateBuckets.set(key, hits); }
+  while (hits.length > 0 && now - hits[0] > windowMs) hits.shift();
+  if (hits.length >= max) return false;
+  hits.push(now);
+  // opportunistic cleanup
+  if (rateBuckets.size > 10_000) {
+    for (const [k, v] of rateBuckets.entries()) {
+      if (v.length === 0 || now - v[v.length - 1] > 300_000) rateBuckets.delete(k);
+    }
+  }
+  return true;
+}
+
+/* ── Per-user in-process locks: serialise balance mutations to prevent
+      parallel-request double-spend (read-modify-write races) ── */
+const userLocks = new Map<string, Promise<void>>();
+async function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = userLocks.get(userId) ?? Promise.resolve();
+  let release!: () => void;
+  const gate = new Promise<void>(r => { release = r; });
+  userLocks.set(userId, prev.then(() => gate));
+  await prev.catch(() => { /* previous op failed — continue */ });
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (userLocks.get(userId) === gate) userLocks.delete(userId);
+  }
+}
+
 router.use(healthRouter);
 
 /* ── Public ad script — reads platform_settings using admin key, bypasses RLS ── */
@@ -160,17 +197,16 @@ router.get("/ad-script", async (req, res) => {
 
 router.post("/complete-registration", async (req, res) => {
   try {
-    const { user_id, full_name, phone, invite_code_used } = req.body as {
+    const authHeader = req.headers.authorization ?? "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (!token) { res.status(401).json({ error: "Sessão inválida" }); return; }
+
+    const { full_name, phone, invite_code_used } = req.body as {
       user_id?: string;
       full_name?: string;
       phone?: string;
       invite_code_used?: string;
     };
-
-    if (!user_id) {
-      res.status(400).json({ error: "user_id is required" });
-      return;
-    }
 
     const supabaseUrl     = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "";
     const supabaseService = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"] ?? "";
@@ -183,6 +219,12 @@ router.post("/complete-registration", async (req, res) => {
     }
 
     const admin = buildAdminClient(supabaseUrl, supabaseService);
+
+    // SECURITY: user_id is always taken from the verified session token,
+    // never from the request body
+    const { data: userData, error: userError } = await admin.auth.getUser(token);
+    if (userError || !userData?.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
+    const user_id = userData.user.id;
 
     /* ── 1. Generate a unique invite code for this user (if they don't already have one) ── */
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no ambiguous chars (0,O,1,I)
@@ -310,6 +352,21 @@ router.post("/record-bet-reward", async (req, res) => {
     if (refErr || !referralRow) {
       // No referral — user wasn't referred by anyone
       res.json({ success: false, reason: "no_referral" }); return;
+    }
+
+    // SECURITY: only pay a reward when the user actually placed a bet.
+    // Check for at least one "bet" transaction newer than the last paid reward
+    // (or any at all for the first reward).
+    const { data: recentBets } = await admin
+      .from("transactions")
+      .select("id, created_at")
+      .eq("user_id", referredId)
+      .eq("type", "bet")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (!recentBets || recentBets.length === 0) {
+      res.json({ success: false, reason: "no_bets_found" }); return;
     }
 
     const referrerId: string = (referralRow as any).referrer_id;
@@ -500,6 +557,7 @@ router.get("/validate-invite", async (req, res) => {
 /* ── Recharge code validation ── */
 router.post("/recharge", async (req, res) => {
   try {
+    if (!rateLimit("recharge", req, 10, 600_000)) { res.status(429).json({ error: "Demasiadas tentativas. Tenta mais tarde." }); return; }
     const authHeader = req.headers.authorization ?? "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
 
@@ -693,6 +751,7 @@ Sê calorosa, próxima e natural. Tom descontraído mas profissional. Usa "tu". 
 
 router.post("/support/chat", async (req, res) => {
   try {
+    if (!rateLimit("support-chat", req, 20, 60_000)) { res.status(429).json({ error: "Demasiadas mensagens. Aguarda um momento." }); return; }
     const groqKey = process.env["GROQ_API_KEY"];
 
     if (!groqKey) {
@@ -754,6 +813,7 @@ router.post("/support/chat", async (req, res) => {
 /* ── Withdraw ── */
 router.post("/withdraw", async (req, res) => {
   try {
+    if (!rateLimit("withdraw", req, 5, 600_000)) { res.status(429).json({ error: "Demasiadas tentativas. Tenta mais tarde." }); return; }
     const authHeader = req.headers.authorization ?? "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
     if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
@@ -787,10 +847,18 @@ router.post("/withdraw", async (req, res) => {
     }
 
     const totalDeduct = Math.round((amount + WITHDRAWAL_FEE) * 100) / 100;
-    const newBalance = Math.round((currentBalance - totalDeduct) * 100) / 100;
-    const { error: balanceError } = await admin
-      .from("profiles").update({ balance: newBalance }).eq("id", userId);
-    if (balanceError) { res.status(500).json({ error: "Erro ao debitar saldo" }); return; }
+    const newBalance = await withUserLock(userId, async () => {
+      const { data: freshProfile } = await admin
+        .from("profiles").select("balance").eq("id", userId).single();
+      const freshBal = Number((freshProfile as any)?.balance ?? 0);
+      if (freshBal < totalDeduct) return null;
+      const next = Math.round((freshBal - totalDeduct) * 100) / 100;
+      const { error: balanceError } = await admin
+        .from("profiles").update({ balance: next }).eq("id", userId).gte("balance", totalDeduct);
+      if (balanceError) return null;
+      return next;
+    });
+    if (newBalance === null) { res.status(400).json({ error: "Saldo insuficiente" }); return; }
 
     const withdrawalPhone = phone ?? profileData.phone ?? null;
     const withdrawalMeta = JSON.stringify({
@@ -827,9 +895,8 @@ router.post("/withdraw", async (req, res) => {
 /* ── Admin: Approve withdrawal ── */
 router.post("/admin/withdraw/approve", async (req, res) => {
   try {
-    const authHeader = req.headers.authorization ?? "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const gate = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
 
     const { id } = req.body as { id?: string };
     if (!id) { res.status(400).json({ error: "id required" }); return; }
@@ -844,10 +911,6 @@ router.post("/admin/withdraw/approve", async (req, res) => {
     const admin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-
-    // Verify caller is authenticated
-    const { data: userData, error: userError } = await admin.auth.getUser(token);
-    if (userError || !userData.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
 
     // Fetch the withdrawal transaction
     const { data: txData, error: txFetchError } = await admin
@@ -869,9 +932,8 @@ router.post("/admin/withdraw/approve", async (req, res) => {
 /* ── Admin: Reject withdrawal ── */
 router.post("/admin/withdraw/reject", async (req, res) => {
   try {
-    const authHeader = req.headers.authorization ?? "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const gate = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
 
     const { id, reason } = req.body as { id?: string; reason?: string };
     if (!id) { res.status(400).json({ error: "id required" }); return; }
@@ -886,9 +948,6 @@ router.post("/admin/withdraw/reject", async (req, res) => {
     const admin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-
-    const { data: userData, error: userError } = await admin.auth.getUser(token);
-    if (userError || !userData.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
 
     const { data: txData, error: txFetchError } = await admin
       .from("transactions").select("id, amount, user_id, status").eq("id", id).single();
@@ -949,10 +1008,52 @@ async function buildAdminAndVerify(authHeader: string): Promise<
   return { ok: true, supabaseAdmin, userId: userData.user.id };
 }
 
+/* ── Admin: verify JWT AND require profiles.is_admin = true ── */
+async function buildAdminAndVerifyAdmin(authHeader: string): Promise<
+  | { ok: false; status: number; error: string }
+  | { ok: true; supabaseAdmin: any; userId: string }
+> {
+  const result = await buildAdminAndVerify(authHeader);
+  if (!result.ok) return result;
+  const { supabaseAdmin, userId } = result;
+  const { data: profile } = await supabaseAdmin
+    .from("profiles").select("is_admin, is_blocked").eq("id", userId).single();
+  if (!profile || !(profile as any).is_admin) {
+    return { ok: false, status: 403, error: "Acesso restrito a administradores" };
+  }
+  return { ok: true, supabaseAdmin, userId };
+}
+
+/* ── Admin: session check for the AdminSecurityGate ── */
+router.post("/admin/verify", async (req, res) => {
+  try {
+    const gate = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ isAdmin: false }); return; }
+    res.json({ isAdmin: true, userId: gate.userId });
+  } catch (err) {
+    req.log.error({ err }, "admin/verify error");
+    res.status(500).json({ isAdmin: false });
+  }
+});
+
+/* ── Admin: security password for the gate (admin-only) ── */
+router.get("/admin/security-password", async (req, res) => {
+  try {
+    const gate = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+    const { data } = await gate.supabaseAdmin
+      .from("platform_settings").select("value").eq("key", "admin_security_password").maybeSingle();
+    res.json({ password: (data as { value?: string } | null)?.value ?? null });
+  } catch (err) {
+    req.log.error({ err }, "admin/security-password error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── Admin: Approve / Reject Manual Deposit or Bet ── */
 router.post("/admin/deposit/approve", async (req, res) => {
   try {
-    const result = await buildAdminAndVerify(req.headers.authorization ?? "");
+    const result = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
     if (!result.ok) { res.status(result.status).json({ error: result.error }); return; }
     const { supabaseAdmin } = result;
 
@@ -988,7 +1089,7 @@ router.post("/admin/deposit/approve", async (req, res) => {
 
 router.post("/admin/deposit/reject", async (req, res) => {
   try {
-    const result = await buildAdminAndVerify(req.headers.authorization ?? "");
+    const result = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
     if (!result.ok) { res.status(result.status).json({ error: result.error }); return; }
     const { supabaseAdmin } = result;
 
@@ -1036,6 +1137,7 @@ router.get("/roleta/status", async (req, res) => {
 // POST /api/roleta/spin — process a roulette spin (server-side RNG)
 router.post("/roleta/spin", async (req, res) => {
   try {
+    if (!rateLimit("roleta-spin", req, 30, 60_000)) { res.status(429).json({ error: "Demasiados giros. Aguarda um momento." }); return; }
     const result = await buildAdminAndVerify(req.headers.authorization ?? "");
     if (!result.ok) { res.status(result.status).json({ error: result.error }); return; }
     const { supabaseAdmin, userId } = result;
@@ -1165,6 +1267,8 @@ router.post("/roleta/spin", async (req, res) => {
 /* ── Admin: Update / upsert a platform setting ── */
 router.post("/admin/settings/update", async (req, res) => {
   try {
+    const gate = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
     const { key, value } = req.body as { key?: string; value?: string };
     if (!key) { res.status(400).json({ error: "key required" }); return; }
 
@@ -1192,22 +1296,38 @@ router.post("/admin/settings/update", async (req, res) => {
   }
 });
 
-/* ── Admin: Get a single platform setting (public read) ── */
-router.get("/admin/settings/get", async (req, res) => {
+/* Public settings keys readable without admin — anything matching these
+   patterns (tokens, secrets, webhook keys) is never exposed publicly. */
+const SENSITIVE_SETTING_RE = /token|secret|password|webhook|service_role|api_key/i;
+
+/* ── Admin: Get a single platform setting (public read, redacted) ── */
+function publicSettingHandler(req: any, res: any) {
   const key = req.query["key"] as string | undefined;
   if (!key) { res.status(400).json({ error: "key required" }); return; }
+  if (SENSITIVE_SETTING_RE.test(key)) { res.json({ setting: null }); return; }
 
   const supabaseUrl = process.env["SUPABASE_URL"];
   const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
   if (!supabaseUrl || !supabaseServiceKey) { res.json({ setting: null }); return; }
 
   const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
-  const { data } = await admin.from("platform_settings").select("value").eq("key", key).maybeSingle();
-  res.json({ setting: data ? { value: data.value } : null });
-});
+  (async () => {
+    try {
+      const { data } = await admin.from("platform_settings").select("value").eq("key", key).maybeSingle();
+      res.json({ setting: data ? { value: (data as { value?: string }).value } : null });
+    } catch {
+      res.json({ setting: null });
+    }
+  })();
+}
+
+router.get("/admin/settings", publicSettingHandler);
+router.get("/admin/settings/get", publicSettingHandler);
 
 /* ── Admin: Set a platform setting (server-side service role) ── */
 router.post("/admin/settings/set", async (req, res) => {
+  const gate = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
+  if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
   const { key, value } = req.body as { key?: string; value?: string };
   if (!key) { res.status(400).json({ error: "key required" }); return; }
   if (value === undefined || value === null) { res.status(400).json({ error: "value required" }); return; }
@@ -1236,6 +1356,8 @@ router.post("/admin/settings/set", async (req, res) => {
 
 /* ── Admin: Update admin credentials (email or password) via service role ── */
 router.post("/admin/update-admin-credentials", async (req, res) => {
+  const gate = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
+  if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
   const { type, value, adminEmail } = req.body as { type?: string; value?: string; adminEmail?: string };
   if (!type || !value || !adminEmail) {
     res.status(400).json({ error: "Parâmetros em falta (type, value, adminEmail)" });
@@ -1289,6 +1411,8 @@ router.post("/admin/update-admin-credentials", async (req, res) => {
 /* ── Admin: Send support message (service role — bypasses RLS) ── */
 router.post("/admin/support/send", async (req, res) => {
   try {
+    const gate = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
     const { userId, userName, content } = req.body as {
       userId?: string; userName?: string; content?: string;
     };
@@ -1318,6 +1442,8 @@ router.post("/admin/support/send", async (req, res) => {
 /* ── Admin: Send notification to users (service role — bypasses RLS) ── */
 router.post("/admin/notifications/send", async (req, res) => {
   try {
+    const gate = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
     const {
       title, subtitle, type, target,
       targetUserIds, imageUrl, actionButtonLabel, actionButtonUrl, sentBy,
@@ -1357,27 +1483,343 @@ router.post("/admin/notifications/send", async (req, res) => {
   }
 });
 
+/* ── Wallet: atomic server-side bet deduct (replaces client-side balance writes) ── */
+router.post("/bet/deduct", async (req, res) => {
+  try {
+    if (!rateLimit("bet-deduct", req, 60, 60_000)) { res.status(429).json({ error: "Demasiados pedidos." }); return; }
+    const gate = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+    const { supabaseAdmin, userId } = gate;
+
+    const { amount, gameType, description } = req.body as {
+      amount?: number; gameType?: string; description?: string;
+    };
+    if (!amount || typeof amount !== "number" || amount < 1 || amount > 5000) {
+      res.status(400).json({ error: "Montante de aposta inválido" }); return;
+    }
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles").select("balance, is_blocked").eq("id", userId).single();
+    if (!profile) { res.status(500).json({ error: "Erro ao carregar perfil" }); return; }
+    if ((profile as any).is_blocked) { res.status(403).json({ error: "Conta bloqueada" }); return; }
+
+    /* Per-user lock + atomic guard: parallel requests cannot double-spend */
+    const result = await withUserLock(userId, async () => {
+      const { data: updated, error: updErr } = await supabaseAdmin
+        .from("profiles")
+        .update({ balance: Math.round((Number((profile as any).balance ?? 0) - amount) * 100) / 100 })
+        .eq("id", userId)
+        .gte("balance", amount)
+        .select("balance")
+        .maybeSingle();
+
+      if (updErr || !updated) return null;
+
+      await supabaseAdmin.from("transactions").insert({
+        user_id: userId,
+        type: "bet",
+        amount: -Math.abs(amount),
+        description: description || `Aposta (${gameType ?? "jogo"}) - ${amount} MT`,
+        status: "approved",
+        created_at: new Date().toISOString(),
+      });
+
+      return (updated as any).balance as number;
+    });
+
+    if (result === null) { res.status(400).json({ error: "Saldo insuficiente" }); return; }
+    res.json({ ok: true, newBalance: result });
+  } catch (err) {
+    req.log.error({ err }, "bet/deduct error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Wallet: server-side bet refund (cancelled room / match) ── */
+router.post("/bet/refund", async (req, res) => {
+  try {
+    const gate = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+    const { supabaseAdmin, userId } = gate;
+
+    const { amount, description } = req.body as { amount?: number; description?: string };
+    if (!amount || typeof amount !== "number" || amount <= 0 || amount > 5000) {
+      res.status(400).json({ error: "Montante de reembolso inválido" }); return;
+    }
+
+    const { data: profile } = await supabaseAdmin
+      .from("profiles").select("balance").eq("id", userId).single();
+    if (!profile) { res.status(500).json({ error: "Erro ao carregar perfil" }); return; }
+
+    const newBalance = await withUserLock(userId, async () => {
+      const fresh = Math.round((Number((profile as any).balance ?? 0) + amount) * 100) / 100;
+      const { error: updErr } = await supabaseAdmin
+        .from("profiles").update({ balance: fresh }).eq("id", userId);
+      if (updErr) return null;
+
+      await supabaseAdmin.from("transactions").insert({
+        user_id: userId,
+        type: "win",
+        amount,
+        description: description || "Reembolso de aposta",
+        status: "approved",
+        created_at: new Date().toISOString(),
+      });
+      return fresh;
+    });
+    if (newBalance === null) { res.status(500).json({ error: "Erro ao creditar saldo" }); return; }
+
+    res.json({ ok: true, newBalance });
+  } catch (err) {
+    req.log.error({ err }, "bet/refund error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Games: atomic server-side bet (port of Vercel api/games/bet) ── */
+router.post("/games/bet", async (req, res) => {
+  try {
+    if (!rateLimit("games-bet", req, 60, 60_000)) { res.status(429).json({ error: "Demasiados pedidos." }); return; }
+    const gate = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+    const { supabaseAdmin, userId } = gate;
+
+    const { amount, gameType, gameId, description } = req.body as {
+      amount?: number; gameType?: string; gameId?: string; description?: string;
+    };
+
+    if (!amount || typeof amount !== "number" || amount < 1 || amount > 100000) {
+      res.status(400).json({ error: "Montante de aposta inválido" }); return;
+    }
+    if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
+      res.status(400).json({ error: "Tipo de jogo inválido" }); return;
+    }
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles").select("balance, is_blocked").eq("id", userId).single();
+    if (profileError || !profile) { res.status(500).json({ error: "Erro ao carregar perfil" }); return; }
+    if ((profile as any).is_blocked) { res.status(403).json({ error: "Conta bloqueada" }); return; }
+
+    const deductResult = await withUserLock(userId, async () => {
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update({ balance: Math.round((Number((profile as any).balance ?? 0) - amount) * 100) / 100 })
+        .eq("id", userId)
+        .gte("balance", amount)
+        .select("balance")
+        .maybeSingle();
+
+      if (updateError || !updated) return null;
+
+      await supabaseAdmin.from("transactions").insert({
+        user_id: userId,
+        type: "bet",
+        amount: -Math.abs(amount),
+        description: description || `Aposta (${gameType}) - ${amount} MT`,
+        status: "approved",
+        created_at: new Date().toISOString(),
+      });
+
+      return (updated as any).balance as number;
+    });
+
+    if (deductResult === null) { res.status(400).json({ error: "Saldo insuficiente" }); return; }
+    const updated = { balance: deductResult };
+
+    if (gameId) {
+      await supabaseAdmin
+        .from("matches")
+        .upsert({
+          id: gameId,
+          game_type: gameType,
+          player1_id: userId,
+          bet_amount: amount,
+          winner_payout: Math.floor(amount * 2 * 0.9),
+          status: "active",
+          created_at: new Date().toISOString(),
+        }, { onConflict: "id" })
+        .eq("player1_id", userId);
+    }
+
+    res.json({ ok: true, newBalance: (updated as any).balance });
+  } catch (err) {
+    req.log.error({ err }, "games/bet error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Games: settle win (port of Vercel api/games/win) ── */
+router.post("/games/win", async (req, res) => {
+  try {
+    const gate = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+    const { supabaseAdmin, userId } = gate;
+
+    const { gameId, gameType } = req.body as { gameId?: string; gameType?: string };
+
+    if (!gameId || typeof gameId !== "string") {
+      res.status(400).json({ error: "ID de jogo inválido" }); return;
+    }
+    if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
+      res.status(400).json({ error: "Tipo de jogo inválido" }); return;
+    }
+
+    /* Atomic idempotency: only the first caller flips status → finished and
+       only real participants can ever match this filter */
+    const { data: updated, error: updateMatchErr } = await supabaseAdmin
+      .from("matches")
+      .update({
+        winner_id: userId,
+        status: "finished",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", gameId)
+      .neq("status", "finished")
+      .or(`player1_id.eq.${userId},player2_id.eq.${userId}`)
+      .select("id, bet_amount, player1_id, player2_id, game_type")
+      .maybeSingle();
+
+    if (updateMatchErr) {
+      req.log.error({ updateMatchErr }, "games/win match update failed");
+      res.status(500).json({ error: "Erro ao processar vitória" }); return;
+    }
+
+    if (!updated) {
+      const { data: match } = await supabaseAdmin
+        .from("matches").select("status, winner_id").eq("id", gameId).maybeSingle();
+      if (!match) { res.status(404).json({ error: "Partida não encontrada" }); return; }
+      if ((match as any).status === "finished") { res.status(409).json({ error: "Partida já terminada" }); return; }
+      res.status(403).json({ error: "Não és participante desta partida" }); return;
+    }
+
+    const m = updated as { bet_amount: number; game_type: string };
+    const verifiedBet = Math.abs(Number(m.bet_amount) || 0);
+    if (verifiedBet <= 0) { res.status(400).json({ error: "Aposta inválida na partida" }); return; }
+
+    const WIN_RATE = 0.90;
+    const MAX_PAYOUT = 200000;
+    const payout = Math.min(Math.floor(verifiedBet * 2 * WIN_RATE), MAX_PAYOUT);
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles").select("balance").eq("id", userId).single();
+    if (profileError || !profile) { res.status(500).json({ error: "Erro ao carregar perfil" }); return; }
+
+    const newBalance = await withUserLock(userId, async () => {
+      const fresh = Math.round((Number((profile as any).balance ?? 0) + payout) * 100) / 100;
+      const { error: updateError } = await supabaseAdmin
+        .from("profiles").update({ balance: fresh }).eq("id", userId);
+      if (updateError) return null;
+
+      await supabaseAdmin.from("transactions").insert({
+        user_id: userId,
+        type: "win",
+        amount: payout,
+        description: `Vitória (${gameType}) +${payout} MT`,
+        status: "approved",
+        created_at: new Date().toISOString(),
+      });
+      return fresh;
+    });
+    if (newBalance === null) { res.status(500).json({ error: "Erro ao creditar saldo" }); return; }
+
+    try {
+      await supabaseAdmin.from("platform_earnings").insert({
+        match_id: gameId,
+        game_type: gameType,
+        bet_amount: verifiedBet,
+        payout,
+        platform_cut: Math.round(verifiedBet * 2 * (1 - WIN_RATE)),
+        created_at: new Date().toISOString(),
+      });
+    } catch { /* best-effort */ }
+
+    res.json({ ok: true, payout, newBalance });
+  } catch (err) {
+    req.log.error({ err }, "games/win error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Games: secure dice roll (port of Vercel api/games/ludo-dice) ── */
+router.post("/games/ludo-dice", async (req, res) => {
+  try {
+    const gate = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+    const { supabaseAdmin, userId } = gate;
+
+    const { gameId, allInBase, stuckTurns, consecutiveSixes } = req.body as {
+      gameId?: string; allInBase?: boolean; stuckTurns?: number; consecutiveSixes?: number;
+    };
+
+    if (!gameId || typeof gameId !== "string" || gameId.length > 128) {
+      res.status(400).json({ error: "ID de jogo inválido" }); return;
+    }
+
+    if (gameId !== "local" && !gameId.startsWith("bot_")) {
+      const { data: match } = await supabaseAdmin
+        .from("matches").select("player1_id, player2_id, status").eq("id", gameId).single();
+      if (match) {
+        const m = match as { player1_id: string; player2_id: string | null; status: string };
+        if (m.player1_id !== userId && m.player2_id !== userId) {
+          res.status(403).json({ error: "Não és participante desta partida" }); return;
+        }
+        if (m.status === "finished") {
+          res.status(409).json({ error: "Partida já terminada" }); return;
+        }
+      }
+    }
+
+    const buf = new Uint32Array(1);
+    (globalThis.crypto as any).getRandomValues(buf);
+    const secureRandom = buf[0] / 0x100000000;
+
+    let diceValue: number;
+    if (Number(consecutiveSixes) >= 2) {
+      diceValue = Math.floor(secureRandom * 5) + 1;
+    } else if (allInBase && Number(stuckTurns) >= 9) {
+      diceValue = 6;
+    } else {
+      diceValue = Math.floor(secureRandom * 6) + 1;
+    }
+
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ value: diceValue, timestamp: Date.now() });
+  } catch (err) {
+    req.log.error({ err }, "games/ludo-dice error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── SMS Forwarder Webhook ── */
 router.post("/sms/webhook", async (req, res) => {
+  if (!rateLimit("sms-webhook", req, 60, 60_000)) { res.status(429).json({ error: "Rate limited" }); return; }
   const supabaseUrl = process.env["SUPABASE_URL"];
   const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
 
-  // Validate webhook token
+  // SECURITY: webhook credits real money — token is mandatory.
+  // Configure 'sms_webhook_token' em platform_settings ou SMS_WEBHOOK_TOKEN no ambiente.
   if (supabaseUrl && supabaseServiceKey) {
     const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
     const { data: tokenRow } = await admin
       .from("platform_settings").select("value").eq("key", "sms_webhook_token").maybeSingle();
-    const expectedToken = tokenRow?.value ?? null;
+    const expectedToken = tokenRow?.value ?? process.env["SMS_WEBHOOK_TOKEN"] ?? null;
 
-    if (expectedToken) {
-      const authHeader = req.headers.authorization ?? "";
-      const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7)
-        : (req.query["token"] as string | undefined ?? "");
-      if (!provided || provided !== expectedToken) {
-        res.status(401).json({ error: "Unauthorized" });
-        return;
-      }
+    if (!expectedToken) {
+      req.log.error("sms/webhook rejected: no sms_webhook_token configured");
+      res.status(503).json({ error: "Webhook não configurado (falta sms_webhook_token)" });
+      return;
     }
+
+    const authHeader = req.headers.authorization ?? "";
+    const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7)
+      : (req.query["token"] as string | undefined ?? "");
+    if (!provided || provided !== expectedToken) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+  } else {
+    res.status(503).json({ error: "Serviço indisponível" });
+    return;
   }
 
   const { body: smsBody, sender, id: smsId } = req.body as {
@@ -1420,6 +1862,7 @@ router.post("/sms/webhook", async (req, res) => {
 /* ── Deposit: Verify SMS ── */
 router.post("/deposit/verify", async (req, res) => {
   try {
+    if (!rateLimit("deposit-verify", req, 20, 600_000)) { res.status(429).json({ error: "Demasiadas tentativas. Tenta mais tarde." }); return; }
     const authHeader = req.headers.authorization ?? "";
     const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
     if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
@@ -1469,11 +1912,31 @@ router.post("/deposit/verify", async (req, res) => {
 });
 
 /* ── Deposit: Poll Status ── */
-router.get("/deposit/status/:pendingId", (req, res) => {
+router.get("/deposit/status/:pendingId", async (req, res) => {
   const { pendingId } = req.params;
   const pending = pendingStore.get(pendingId);
 
   if (!pending) { res.json({ status: "not_found" }); return; }
+
+  // SECURITY: only the owner polls their own verification
+  const authHeader = req.headers.authorization ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (!token) { res.status(401).json({ status: "unauthorized" }); return; }
+  const supabaseUrl = process.env["SUPABASE_URL"];
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (supabaseUrl && supabaseServiceKey) {
+    try {
+      const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
+      const { data: userData } = await admin.auth.getUser(token);
+      if (!userData?.user || userData.user.id !== pending.userId) {
+        res.status(403).json({ status: "forbidden" });
+        return;
+      }
+    } catch {
+      res.status(401).json({ status: "unauthorized" });
+      return;
+    }
+  }
 
   if (pending.status === "approved") {
     pendingStore.delete(pendingId);
@@ -1613,142 +2076,6 @@ router.post("/deposit/credit", async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     req.log.error({ err }, "Deposit credit error");
-    res.status(500).json({ error: "Erro interno" });
-  }
-});
-
-/* ── Roleta da Sorte: status ── */
-router.get("/roleta/status", async (req, res) => {
-  try {
-    const authHeader = (req.headers.authorization as string) ?? "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
-
-    const supabaseUrl = process.env["SUPABASE_URL"];
-    const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? "";
-    if (!supabaseUrl || !supabaseServiceKey) { res.status(500).json({ error: "Serviço indisponível" }); return; }
-
-    const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
-    const { data: userData, error: userError } = await admin.auth.getUser(token);
-    if (userError || !userData?.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
-    const userId = userData.user.id;
-
-    const mzOffsetMs = 2 * 60 * 60 * 1000;
-    const mzNow = new Date(Date.now() + mzOffsetMs);
-    const startOfDayMz = Date.UTC(mzNow.getUTCFullYear(), mzNow.getUTCMonth(), mzNow.getUTCDate(), 0, 0, 0);
-    const todayStart = new Date(startOfDayMz - mzOffsetMs).toISOString();
-
-    const { data: rows } = await admin
-      .from("transactions").select("id")
-      .eq("user_id", userId).eq("type", "free_spin").gte("created_at", todayStart);
-
-    res.json({ freeSpinAvailable: !rows || rows.length === 0 });
-  } catch (err) {
-    req.log.error({ err }, "Roleta status error");
-    res.status(500).json({ error: "Erro interno" });
-  }
-});
-
-/* ── Roleta da Sorte: spin ── */
-router.post("/roleta/spin", async (req, res) => {
-  try {
-    const authHeader = (req.headers.authorization as string) ?? "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    if (!token) { res.status(401).json({ error: "Unauthorized" }); return; }
-
-    const supabaseUrl = process.env["SUPABASE_URL"];
-    const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? process.env["VITE_SUPABASE_SERVICE_ROLE"] ?? "";
-    if (!supabaseUrl || !supabaseServiceKey) { res.status(500).json({ error: "Serviço indisponível" }); return; }
-
-    const admin = buildAdminClient(supabaseUrl, supabaseServiceKey);
-    const { data: userData, error: userError } = await admin.auth.getUser(token);
-    if (userError || !userData?.user) { res.status(401).json({ error: "Sessão inválida" }); return; }
-    const userId = userData.user.id;
-
-    const PAID_SPIN_COST = 5;
-    const { isFree } = (req.body ?? {}) as { isFree?: boolean };
-
-    if (isFree) {
-      const mzOffsetMs = 2 * 60 * 60 * 1000;
-      const mzNow = new Date(Date.now() + mzOffsetMs);
-      const startOfDayMz = Date.UTC(mzNow.getUTCFullYear(), mzNow.getUTCMonth(), mzNow.getUTCDate(), 0, 0, 0);
-      const todayStart = new Date(startOfDayMz - mzOffsetMs).toISOString();
-
-      const { data: rows } = await admin
-        .from("transactions").select("id")
-        .eq("user_id", userId).eq("type", "free_spin").gte("created_at", todayStart);
-
-      if (rows && rows.length > 0) {
-        res.status(400).json({ error: "Giro grátis já utilizado hoje. Volta amanhã!" }); return;
-      }
-
-      const { data: profileData } = await admin.from("profiles").select("balance").eq("id", userId).single();
-      const currentBalance = Number((profileData as any)?.balance ?? 0);
-
-      await admin.from("transactions").insert({
-        user_id: userId, type: "free_spin", amount: 0,
-        description: "Giro grátis diário (Roleta da Sorte)",
-        status: "approved", created_at: new Date().toISOString(),
-      });
-
-      res.json({ sectorIndex: 8, prize: 0, newBalance: currentBalance });
-      return;
-    }
-
-    const { data: profileData, error: profileError } = await admin.from("profiles").select("balance").eq("id", userId).single();
-    if (profileError || !profileData) { res.status(500).json({ error: "Erro ao obter perfil" }); return; }
-    const currentBalance = Number((profileData as any).balance ?? 0);
-
-    if (currentBalance < PAID_SPIN_COST) {
-      res.status(400).json({ error: "Saldo insuficiente para apostar." }); return;
-    }
-
-    const balanceAfterBet = Math.round((currentBalance - PAID_SPIN_COST) * 100) / 100;
-    const { error: deductError } = await admin.from("profiles").update({ balance: balanceAfterBet }).eq("id", userId);
-    if (deductError) { res.status(500).json({ error: "Erro ao processar aposta" }); return; }
-
-    await admin.from("transactions").insert({
-      user_id: userId, type: "bet", amount: -PAID_SPIN_COST,
-      description: "Aposta — Roleta da Sorte (5 MT)",
-      status: "approved", created_at: new Date().toISOString(),
-    });
-
-    const { data: txRows } = await admin
-      .from("transactions").select("amount")
-      .eq("user_id", userId).in("type", ["bet", "win"]);
-
-    const netPL = txRows
-      ? (txRows as any[]).reduce((sum: number, r: any) => sum + Number(r.amount ?? 0), 0)
-      : 0;
-
-    const rand = Math.random();
-    let sectorIndex: number;
-    let prize = 0;
-
-    if (rand < 0.80) {
-      sectorIndex = 6; prize = 1;
-    } else {
-      if (netPL < -20) {
-        sectorIndex = 5; prize = 5;
-      } else {
-        sectorIndex = 8; prize = 0;
-      }
-    }
-
-    let finalBalance = balanceAfterBet;
-    if (prize > 0) {
-      finalBalance = Math.round((balanceAfterBet + prize) * 100) / 100;
-      await admin.from("profiles").update({ balance: finalBalance }).eq("id", userId);
-      await admin.from("transactions").insert({
-        user_id: userId, type: "win", amount: prize,
-        description: `Prémio Roleta da Sorte (+${prize} MT)`,
-        status: "approved", created_at: new Date().toISOString(),
-      });
-    }
-
-    res.json({ sectorIndex, prize, newBalance: finalBalance });
-  } catch (err) {
-    req.log.error({ err }, "Roleta spin error");
     res.status(500).json({ error: "Erro interno" });
   }
 });

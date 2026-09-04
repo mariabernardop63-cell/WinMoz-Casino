@@ -17,7 +17,7 @@ const GAME_FILTERS = ["Todos", "Damas", "Ludo", "Xadrez"] as const;
 type GameFilter = typeof GAME_FILTERS[number];
 
 const jogosCardsMeta = [
-  { id: "damas",        name: "Damas MZ",         desc: "Jogo de Tabuleiro • 12 Modos", baseIdx: 0, color: "from-blue-500 to-indigo-700",     initials: "DA", hot: true,  category: "Damas",  image: "/damas-mz.png"     },
+  { id: "damas",        name: "Damas MZ",         desc: "Jogo de Tabuleiro • 12 Modos", baseIdx: 0, color: "from-blue-500 to-indigo-700",     initials: "DA", hot: true,  category: "Damas",  image: "/damas-mz.webp"     },
   { id: "xadrez",       name: "Xadrez MZ",        desc: "Estratégia Real • 8 Modos",    baseIdx: 2, color: "from-violet-500 to-purple-800",   initials: "XA", hot: false, category: "Xadrez", image: "/xadrez-mz.jpg"    },
   { id: "ludo-classic", name: "Ludo Cash",        desc: "Jogo de Dados • 3 Modos",      baseIdx: 3, color: "from-pink-500 to-rose-700",       initials: "LC", hot: false, category: "Ludo",   image: "/ludo-cash.jpg"    },
   { id: "bilhar",       name: "Bilhar Apostado",  desc: "Jogo de Mesa • 5 Modos",       baseIdx: 5, color: "from-cyan-500 to-blue-700",        initials: "BI", hot: false, category: "Xadrez", image: "/bilhar-card.webp" },
@@ -196,7 +196,7 @@ interface RoomRecord {
 }
 
 const SALA_GAMES = [
-  { id: "damas",  name: "Damas MZ",   desc: "12 modos de jogo", image: "/damas-mz.png",    imagePos: "center" },
+  { id: "damas",  name: "Damas MZ",   desc: "12 modos de jogo", image: "/damas-mz.webp",    imagePos: "center" },
   { id: "ludo",   name: "Ludo Cash",  desc: "4 modos de jogo",  image: "/ludo-cash.jpg",   imagePos: "center 65%" },
   { id: "xadrez", name: "Xadrez MZ",  desc: "8 modos de jogo",  image: "/xadrez-mz.jpg",   imagePos: "center 30%" },
 ];
@@ -251,23 +251,18 @@ function SalaTab() {
   async function deductBalance(amount: number, desc: string): Promise<boolean> {
     if (!user?.id) return false;
     try {
-      // Read fresh balance from Supabase
-      const { data, error } = await supabase
-        .from("profiles").select("balance").eq("id", user.id).single();
-      if (error || !data) {
-        // Supabase read failed — fall back to cached profile to avoid blocking the user
-        const cachedBal = parseFloat(String(profile?.balance ?? "0"));
-        if (cachedBal < amount) return false;
-        // Attempt update using cached value (best effort)
-        await supabase.from("profiles").update({ balance: cachedBal - amount }).eq("id", user.id);
-        await supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" });
-        refreshProfile();
-        return true;
-      }
-      const bal = parseFloat(String(data.balance ?? "0"));
-      if (bal < amount) return false;
-      await supabase.from("profiles").update({ balance: bal - amount }).eq("id", user.id);
-      await supabase.from("transactions").insert({ user_id: user.id, type: "bet", amount: -amount, description: desc, status: "approved" });
+      /* SECURITY: balance mutations go through the server-side API with atomic
+         guards — the browser must never write to profiles.balance directly */
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return false;
+      const res = await fetch("/api/bet/deduct", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ amount, description: desc }),
+      });
+      const data = await res.json() as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) return false;
       refreshProfile();
       return true;
     } catch { return false; }
@@ -276,11 +271,16 @@ function SalaTab() {
   async function refundBalance(amount: number, code: string) {
     if (!user?.id || amount <= 0) return;
     try {
-      const { data } = await supabase.from("profiles").select("balance").eq("id", user.id).single();
-      const bal = parseFloat(String(data?.balance ?? "0"));
-      await supabase.from("profiles").update({ balance: bal + amount }).eq("id", user.id);
-      await supabase.from("transactions").insert({ user_id: user.id, type: "win", amount, description: `Reembolso sala ${code}`, status: "approved" });
-      refreshProfile();
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/bet/refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ amount, description: `Reembolso sala ${code}` }),
+      });
+      const data = await res.json() as { ok?: boolean };
+      if (res.ok && data.ok) refreshProfile();
     } catch { /* ignore */ }
   }
 
@@ -675,7 +675,7 @@ function SalaTab() {
                   onClick={() => setInputCode(room.code)}
                   className="flex items-center gap-3 p-3.5 bg-white rounded-xl border border-slate-100 hover:border-slate-300 hover:shadow-sm transition-all duration-200 text-left w-full group">
                   <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0">
-                    <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-mz.png"} alt="" className="w-full h-full object-cover" />
+                    <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-mz.webp"} alt="" className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-syne font-bold text-slate-900 text-sm">{room.gameName}</p>
@@ -776,7 +776,7 @@ function SalaTab() {
                   }}
                   className={`flex items-center gap-3 p-3 bg-white rounded-xl border shadow-sm transition-all duration-200 ${isReenterable ? "border-violet-200 cursor-pointer hover:border-violet-400 hover:shadow-md" : "border-slate-100"}`}>
                   <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0">
-                    <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-mz.png"} alt="" className="w-full h-full object-cover" />
+                    <img src={SALA_GAMES.find(g => g.id === room.gameId)?.image ?? "/damas-mz.webp"} alt="" className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-syne font-semibold text-slate-900 text-sm">{room.gameName}</p>

@@ -503,7 +503,7 @@ function BilharBannerImage({ size = 140 }: { size?: number }) {
       style={{ width: size, height: size }}
     >
       <motion.img
-        src="/bilhar-rack.png"
+        src="/bilhar-rack.webp"
         alt="Bilhar"
         animate={{ y: [0, -7, 0], rotate: [0, 1.2, 0] }}
         transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
@@ -661,7 +661,7 @@ function LudoBannerImage({ size = 136 }: { size?: number }) {
       }}
     >
       <img
-        src="/ludo-board-nobg.png"
+        src="/ludo-board-nobg.webp"
         alt="Ludo Board"
         style={{
           width: size,
@@ -809,7 +809,7 @@ const SLIDES = [
     id: "ludo",
     duration: 10000,
     bg: "linear-gradient(135deg, rgba(6,4,16,0.72) 0%, rgba(10,8,28,0.68) 40%, rgba(14,12,40,0.64) 100%)",
-    bgImage: "/ludo-bg.png" as string | null,
+    bgImage: "/ludo-bg.webp" as string | null,
     accent: "#A78BFA",
     badge: "Anúncio Patrocinado",
     badgeBg: "rgba(0,0,0,0.50)",
@@ -841,7 +841,7 @@ const SLIDES = [
     id: "xadrez",
     duration: 9500,
     bg: "linear-gradient(135deg, rgba(4,4,12,0.80) 0%, rgba(10,10,28,0.76) 40%, rgba(16,14,38,0.72) 100%)",
-    bgImage: "/chess-board.png" as string | null,
+    bgImage: "/chess-board.webp" as string | null,
     accent: "#94a3b8",
     badge: "Anúncio Patrocinado",
     badgeBg: "rgba(0,0,0,0.50)",
@@ -941,18 +941,27 @@ function HeroBanner() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
+    /* Preload only the first slide eagerly (LCP); queue the rest idle so they
+       don't compete with the initial JS/CSS/images for bandwidth */
     const srcs = SLIDES.map(s => s.bgImage).filter(Boolean) as string[];
     let loaded = 0;
     const fallback = setTimeout(() => setReady(true), 900);
-    srcs.forEach(src => {
+    const loadImg = (src: string) => {
       const img = new Image();
       img.onload = img.onerror = () => {
         loaded++;
         if (loaded >= 1) { clearTimeout(fallback); setReady(true); }
       };
       img.src = src;
-    });
-    if (srcs.length === 0) { clearTimeout(fallback); setReady(true); }
+    };
+    if (srcs.length > 0) {
+      loadImg(srcs[0]);
+      const rest = srcs.slice(1);
+      const idle = (window as any).requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 1200));
+      idle(() => rest.forEach(loadImg));
+    } else {
+      clearTimeout(fallback); setReady(true);
+    }
     return () => clearTimeout(fallback);
   }, []);
 
@@ -1137,7 +1146,7 @@ const games = [
     bet: "10–5.000 MT",
     rating: "4.8",
     baseIdx: 0,
-    image: "/damas-mz.png",
+    image: "/damas-mz.webp",
     imageFit: "cover" as const,
     imagePos: "center",
   },
@@ -1225,7 +1234,7 @@ const fadeUp = {
    TOP GAMES
 ───────────────────────────────────────────── */
 const topGames = [
-  { id: "dc", gameRoute: "damas",  name: "Damas MZ",       baseIdx: 0, rank: 1, image: "/damas-mz.png",    imagePos: "center",      from: "#1D4ED8", to: "#1E3A8A" },
+  { id: "dc", gameRoute: "damas",  name: "Damas MZ",       baseIdx: 0, rank: 1, image: "/damas-mz.webp",    imagePos: "center",      from: "#1D4ED8", to: "#1E3A8A" },
   { id: "lt", gameRoute: "ludo",   name: "Ludo Cash",      baseIdx: 1, rank: 2, image: "/ludo-cash.jpg",   imagePos: "center 65%",  from: "#059669", to: "#064E3B" },
   { id: "xr", gameRoute: "xadrez", name: "Xadrez MZ",      baseIdx: 2, rank: 3, image: "/xadrez-mz.jpg",   imagePos: "center 30%",  from: "#7C3AED", to: "#3B0764" },
   { id: "bi", gameRoute: "bilhar", name: "Bilhar Apostado", baseIdx: 5, rank: 4, image: "/bilhar-card.webp", imagePos: "center",     from: "#0891b2", to: "#164e63" },
@@ -1246,8 +1255,9 @@ export default function Home() {
   const hasUnread = (notifications as any[]).some((n: any) => !n.isRead);
 
   useEffect(() => {
-    const t = setTimeout(() => setGamesReady(true), 350);
-    return () => clearTimeout(t);
+    /* Render game cards on the next frame instead of an artificial 350 ms delay */
+    const raf = requestAnimationFrame(() => setGamesReady(true));
+    return () => cancelAnimationFrame(raf);
   }, []);
 
   useEffect(() => {
@@ -1345,6 +1355,8 @@ export default function Home() {
                       <img
                         src={game.image}
                         alt={game.name}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full"
                         style={{ objectFit: game.imageFit || "cover", objectPosition: game.imagePos }}
                       />
@@ -1424,6 +1436,8 @@ export default function Home() {
                       <img
                         src={game.image}
                         alt={game.name}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-full object-cover"
                         style={{ objectPosition: game.imagePos }}
                       />

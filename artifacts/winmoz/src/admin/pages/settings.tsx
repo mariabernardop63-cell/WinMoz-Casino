@@ -563,12 +563,21 @@ export default function Settings() {
   const [currentSecPw, setCurrentSecPw] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/admin/settings?key=admin_security_password")
-      .then(r => r.ok ? r.json() : null)
-      .then((data: { setting?: { value: string } | null } | null) => {
-        setCurrentSecPw(data?.setting?.value ?? "12345678y");
-      })
-      .catch(() => setCurrentSecPw("12345678y"));
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch("/api/admin/security-password", {
+          headers: session?.access_token
+            ? { "Authorization": `Bearer ${session.access_token}` }
+            : {},
+        });
+        if (!res.ok) { setCurrentSecPw("12345678y"); return; }
+        const data = await res.json() as { password?: string | null };
+        setCurrentSecPw(data?.password ?? "12345678y");
+      } catch {
+        setCurrentSecPw("12345678y");
+      }
+    })();
   }, []);
 
   const handleSaveSecPw = async () => {

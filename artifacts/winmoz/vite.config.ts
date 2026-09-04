@@ -42,6 +42,19 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    target: "es2020",
+    cssCodeSplit: true,
+    rollupOptions: {
+      output: {
+        /* Split stable vendor libs into cacheable chunks — user code changes
+           no longer invalidate the framework cache on redeploy */
+        manualChunks: {
+          "vendor-react": ["react", "react-dom", "wouter", "@tanstack/react-query"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-motion": ["framer-motion"],
+        },
+      },
+    },
   },
   server: {
     port,

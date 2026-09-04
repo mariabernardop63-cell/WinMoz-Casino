@@ -71,14 +71,17 @@ async function updateLastSeen(userId: string) {
 async function ensureProfileExists(
   userId: string,
   email: string,
-  extraData: { full_name?: string; phone?: string; invite_code_used?: string | null }
+  extraData: { full_name?: string; phone?: string; invite_code_used?: string | null },
+  accessToken?: string | null
 ) {
   try {
     const res = await fetch(`${API_BASE}/complete-registration`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { "Authorization": `Bearer ${accessToken}` } : {}),
+      },
       body: JSON.stringify({
-        user_id: userId,
         email,
         full_name: extraData.full_name ?? null,
         phone: extraData.phone ?? null,
@@ -290,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 full_name: pending.full_name,
                 phone: pending.phone,
                 invite_code_used: pending.invite_code_used,
-              });
+              }, session?.access_token);
             } catch { /* não crítico */ }
           }
 

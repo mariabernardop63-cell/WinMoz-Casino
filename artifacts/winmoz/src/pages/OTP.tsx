@@ -104,10 +104,12 @@ export default function OTP() {
             try {
               await fetch(`${API_BASE}/complete-registration`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${data.session.access_token}`,
+                },
                 signal: ctrl.signal,
                 body: JSON.stringify({
-                  user_id: data.session.user.id,
                   full_name: pending.full_name,
                   phone: pending.phone,
                   invite_code_used: pending.invite_code_used,

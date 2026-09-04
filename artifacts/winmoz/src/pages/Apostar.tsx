@@ -35,7 +35,7 @@ const GAMES_DATA: Record<string, GameInfo> = {
     name: "DAMAS MZ",
     sub: "Jogo de Tabuleiro",
     description: "Elimina todas as peças do adversário com movimentos estratégicos no tabuleiro clássico.",
-    image: "/damas-mz.png",
+    image: "/damas-mz.webp",
     imagePos: "center",
     rating: "4.8",
     online: 3847,
@@ -89,7 +89,7 @@ const FALLBACK_GAME: GameInfo = {
   name: "JOGO",
   sub: "Jogo Apostado",
   description: "Jogue e multiplica o teu saldo com apostas seguras e emocionantes.",
-  image: "/damas-mz.png",
+  image: "/damas-mz.webp",
   imagePos: "center",
   rating: "4.8",
   online: 2500,
@@ -99,7 +99,7 @@ const FALLBACK_GAME: GameInfo = {
 const BET_AMOUNTS = [10, 20, 50, 100, 500, 1000, 5000];
 
 const ALL_GAMES = [
-  { id: "damas",  name: "Damas MZ",   image: "/damas-mz.png",    imagePos: "center",     rating: "4.8", players: "2.4K" },
+  { id: "damas",  name: "Damas MZ",   image: "/damas-mz.webp",    imagePos: "center",     rating: "4.8", players: "2.4K" },
   { id: "ludo",   name: "Ludo Cash",  image: "/ludo-cash.jpg",   imagePos: "center 65%", rating: "4.9", players: "4.1K" },
   { id: "xadrez", name: "Xadrez MZ",  image: "/xadrez-mz.jpg",   imagePos: "center 30%", rating: "4.7", players: "1.2K" },
   { id: "bilhar", name: "Bilhar",     image: "/bilhar-card.webp", imagePos: "center",     rating: "4.6", players: "890"  },

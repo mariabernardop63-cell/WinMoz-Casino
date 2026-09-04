@@ -28,7 +28,33 @@ app.use(
     },
   }),
 );
-app.use(cors());
+/* CORS allowlist — the app is same-origin (vite proxy / static serving),
+   so cross-origin browser calls are blocked; server-to-server (no Origin
+   header) and known hosts keep working. */
+const ALLOWED_ORIGIN_RE = [
+  /\.replit\.dev$/,
+  /\.repl\.co$/,
+  /\.replit\.app$/,
+  /^https?:\/\/localhost(:\d+)?$/,
+  /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+  /(^|\.)mozbet\.online$/,
+  /(^|\.)pokerwinner\.online$/,
+  /\.vercel\.app$/,
+];
+app.use(
+  cors({
+    origin(origin, cb) {
+      if (!origin || ALLOWED_ORIGIN_RE.some(re => re.test(origin))) {
+        cb(null, true);
+      } else {
+        cb(null, false);
+      }
+    },
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    maxAge: 86400,
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

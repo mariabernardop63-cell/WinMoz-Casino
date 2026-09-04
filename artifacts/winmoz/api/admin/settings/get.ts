@@ -22,7 +22,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const settingKey = req.query["key"] as string | undefined;
 
+  // SECURITY: never expose sensitive settings (tokens, secrets, passwords)
+  const SENSITIVE = /token|secret|password|webhook|service_role|api_key/i;
+
   if (settingKey) {
+    if (SENSITIVE.test(settingKey)) {
+      res.status(403).json({ error: "Chave protegida" });
+      return;
+    }
     const { data, error } = await admin
       .from("platform_settings")
       .select("key, value")
@@ -36,7 +43,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .select("key, value");
     if (error) { res.status(500).json({ error: error.message }); return; }
     const map: Record<string, string> = {};
-    (data ?? []).forEach((s: { key: string; value: string }) => { map[s.key] = s.value; });
+    (data ?? []).forEach((s: { key: string; value: string }) => {
+      if (!SENSITIVE.test(s.key)) map[s.key] = s.value;
+    });
     res.status(200).json({ settings: map });
   }
 }

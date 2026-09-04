@@ -41,7 +41,7 @@ function NavIcon({ iconKey, color }: { iconKey: string; color: string }) {
 }
 
 const GAME_META: Record<string, { name: string; image: string; imagePos: string }> = {
-  damas:  { name: "Damas MZ",  image: "/damas-mz.png",    imagePos: "center" },
+  damas:  { name: "Damas MZ",  image: "/damas-mz.webp",    imagePos: "center" },
   chess:  { name: "Xadrez MZ", image: "/xadrez-mz.jpg",   imagePos: "center 30%" },
   ludo:   { name: "Ludo Cash", image: "/ludo-cash.jpg",   imagePos: "center" },
 };
@@ -59,7 +59,7 @@ function ResumeModal({ activeGame, onClose }: { activeGame: ActiveGameRecord | n
   const go = (path: string) => { onClose(); setLocation(path); };
 
   const gameShortcuts = [
-    { id: "damas",  name: "Damas MZ",  image: "/damas-mz.png",    imagePos: "center" },
+    { id: "damas",  name: "Damas MZ",  image: "/damas-mz.webp",    imagePos: "center" },
     { id: "ludo",   name: "Ludo Cash", image: "/ludo-cash.jpg",   imagePos: "center" },
     { id: "xadrez", name: "Xadrez MZ", image: "/xadrez-mz.jpg",   imagePos: "center 30%" },
   ];
