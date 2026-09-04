@@ -51,12 +51,19 @@ async function fetchSecurityPassword(): Promise<string> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return "";
-    const res = await fetch("/api/admin/security-password", {
-      headers: { "Authorization": `Bearer ${session.access_token}` },
-    });
-    if (!res.ok) return "";
-    const data = await res.json() as { password?: string | null };
-    return data?.password ?? "";
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const res = await fetch("/api/admin/security-password", {
+        headers: { "Authorization": `Bearer ${session.access_token}` },
+        signal: ctrl.signal,
+      });
+      if (!res.ok) return "";
+      const data = await res.json() as { password?: string | null };
+      return data?.password ?? "";
+    } finally {
+      clearTimeout(timer);
+    }
   } catch { return ""; }
 }
 
@@ -64,13 +71,22 @@ async function verifyAdminServer(): Promise<boolean> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.access_token) return false;
-    const res = await fetch("/api/admin/verify", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${session.access_token}` },
-    });
-    if (!res.ok) return false;
-    const data = await res.json() as { isAdmin?: boolean };
-    return data?.isAdmin === true;
+    /* Timeout duro: sem isto, uma ligação lenta deixava o ecrã "A verificar..."
+       preso indefinidamente antes de pedir a senha de dois factores. */
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const res = await fetch("/api/admin/verify", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${session.access_token}` },
+        signal: ctrl.signal,
+      });
+      if (!res.ok) return false;
+      const data = await res.json() as { isAdmin?: boolean };
+      return data?.isAdmin === true;
+    } finally {
+      clearTimeout(timer);
+    }
   } catch { return false; }
 }
 

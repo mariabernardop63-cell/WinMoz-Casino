@@ -54,7 +54,6 @@ async function handleInitiate(req: VercelRequest, res: VercelResponse, parsedBod
   if (!supabase) { res.status(503).json({ error: "Serviço de base de dados indisponível" }); return; }
 
   const debitoApiKey = process.env["SLACK_LIVE_API_KEY"];
-  if (!debitoApiKey) { res.status(503).json({ error: "Gateway de pagamento não configurado. Contacta o suporte." }); return; }
 
   const { data: userData, error: authError } = await supabase.auth.getUser(token);
   if (authError || !userData?.user) { res.status(401).json({ error: "Sessão inválida. Faz login novamente." }); return; }
@@ -64,10 +63,12 @@ async function handleInitiate(req: VercelRequest, res: VercelResponse, parsedBod
 
   const { data: settingsRows } = await supabase
     .from("platform_settings").select("key, value")
-    .in("key", ["debito_api_base_url", "debito_public_id", "debito_wallet_code", "debito_mpesa_wallet_code"]);
+    .in("key", ["debito_api_base_url", "debito_public_id", "debito_wallet_code", "debito_mpesa_wallet_code", "mpesa_wallet_enabled", "emola_wallet_enabled"]);
 
   const settings: Record<string, string> = {};
   for (const row of settingsRows ?? []) settings[(row as any).key] = (row as any).value;
+
+  if (!debitoApiKey) { res.status(503).json({ error: "Gateway de pagamento não configurado. Contacta o suporte." }); return; }
 
   const debitoBaseUrl = (settings["debito_api_base_url"] || "https://gyqoaningqhurhvdugne.supabase.co/functions/v1").replace(/\/$/, "");
   const merchantId = (settings["debito_public_id"] || process.env["DEBITO_MERCHANT_ID"] || "1e4d1d55-d740-447f-8cb4-8c8ce1bb0a0c").trim();
@@ -77,6 +78,16 @@ async function handleInitiate(req: VercelRequest, res: VercelResponse, parsedBod
 
   if (walletCode.length > 10 || !/^\d+$/.test(walletCode)) {
     res.status(503).json({ error: "Configuração do gateway inválida (wallet_code). Contacta o suporte." }); return;
+  }
+
+  /* Carteira desactivada pelo admin → recusar antes de tocar no gateway */
+  const walletEnabled = paymentMethod === "mpesa"
+    ? (settings["mpesa_wallet_enabled"] !== "false")
+    : (settings["emola_wallet_enabled"] !== "false");
+  if (!walletEnabled) {
+    const label = paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola";
+    res.status(403).json({ error: `A carteira ${label} está temporariamente indisponível. Tenta outra carteira ou contacta o suporte.` });
+    return;
   }
 
   const cleanPhone = phoneRaw.replace(/\D/g, "").replace(/^258/, "");
@@ -428,7 +439,14 @@ function parseDebitoError(data: any, status: number, paymentMethod: string): str
     if (low.includes("wallet_code") || low.includes("wallet")) return "Código de carteira inválido. Contacta o suporte.";
     if (low.includes("required")) return "Dados em falta no pedido. Contacta o suporte.";
     if (low.includes("timeout") || low.includes("time out")) return "Tempo esgotado — o utilizador não confirmou o PIN a tempo.";
-    if (low.includes("recusado pelo operador") || low.includes("rejected by operator")) return `Pagamento recusado pelo operador. Confirma que tens saldo suficiente na tua carteira ${paymentMethod === "mpesa" ? "M-Pesa" : "e-Mola"} e que o número está correcto. Se o problema persistir, contacta o suporte.`;
+    if (low.includes("recusado pelo operador") || low.includes("rejected by operator")) {
+      if (paymentMethod === "mpesa") {
+        return "Pagamento recusado pelo operador. Confirma que tens saldo suficiente na tua carteira M-Pesa e que o número está correcto. Se o problema persistir, contacta o suporte.";
+      }
+      /* e-Mola: o operador está a recusar a CRIAÇÃO do pagamento (antes do USSD)
+         — tipicamente wallet do merchant inactiva ou indisponível no gateway */
+      return "O pagamento e-Mola não pôde ser iniciado neste momento (recusado pelo operador). Verifica que a tua carteira e-Mola está activa e com saldo. Se o problema persistir, usa M-Pesa ou contacta o suporte — estamos a resolver com o operador.";
+    }
     return msg ? `Erro do gateway: ${msg}` : "Pedido rejeitado pelo gateway. Tenta novamente.";
   }
   if (status >= 500) return "Erro temporário do gateway de pagamento. Tenta novamente mais tarde.";

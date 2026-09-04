@@ -82,17 +82,29 @@ const Roleta = lazy(pageLoaders.Roleta);
 const BilharEmBreve = lazy(pageLoaders.BilharEmBreve);
 const TermosServico = lazy(pageLoaders.TermosServico);
 
-/* Pré-carrega todos os chunks de páginas quando o browser está idle —
-   a primeira navegação fica instantânea, sem ecrã de espera. O painel
-   admin (chunk de ~750 KB) fica de fora: só admins o usam. */
+/* Pré-carrega os chunks: rotas de autenticação imediatamente (a primeira
+   navegação nunca mostra spinner), o resto quando o browser está idle —
+   incluindo o painel admin, para o login de admin não "ficar a processar". */
 function preloadPages() {
+  [
+    pageLoaders.Login, pageLoaders.Registar, pageLoaders.OTP,
+    pageLoaders.EsqueceuSenha, pageLoaders.RedefinirSenha,
+    pageLoaders.SplashScreen, pageLoaders.Explorar,
+  ].forEach(loader => { loader().catch(() => {}); });
+
+  const rest = () => {
+    Object.values(pageLoaders)
+      .filter(l => ![
+        pageLoaders.Login, pageLoaders.Registar, pageLoaders.OTP,
+        pageLoaders.EsqueceuSenha, pageLoaders.RedefinirSenha,
+        pageLoaders.SplashScreen, pageLoaders.Explorar,
+      ].includes(l))
+      .forEach(loader => { loader().catch(() => {}); });
+    import("@/admin/AdminApp").catch(() => {});
+  };
   (window as any).requestIdleCallback
-    ? (window as any).requestIdleCallback(() => {
-        Object.values(pageLoaders).forEach(loader => { loader().catch(() => {}); });
-      }, { timeout: 8000 })
-    : setTimeout(() => {
-        Object.values(pageLoaders).forEach(loader => { loader().catch(() => {}); });
-      }, 3000);
+    ? (window as any).requestIdleCallback(rest, { timeout: 6000 })
+    : setTimeout(rest, 2000);
 }
 
 function PageFallback() {

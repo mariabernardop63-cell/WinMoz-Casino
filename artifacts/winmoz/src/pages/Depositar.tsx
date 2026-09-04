@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import {
   ChevronLeft, X, CheckCircle2, XCircle, AlertTriangle,
-  RotateCcw, Phone, Loader2,
+  RotateCcw, Phone, Loader2, AlertCircle,
 } from "lucide-react";
 import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -48,6 +48,28 @@ export default function Depositar() {
 
   const amountVal = parseFloat(amountStr) || 0;
   const isAmountZero = amountVal <= 0;
+
+  /* Disponibilidade das carteiras — controlada pelo admin (platform_settings) */
+  const [walletsAvailable, setWalletsAvailable] = useState({ mpesa: true, emola: true });
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const [mp, em] = await Promise.all([
+          fetch("/api/admin/settings?key=mpesa_wallet_enabled").then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch("/api/admin/settings?key=emola_wallet_enabled").then(r => r.ok ? r.json() : null).catch(() => null),
+        ]);
+        if (cancelled) return;
+        setWalletsAvailable({
+          mpesa: (mp as { setting?: { value?: string } | null })?.setting?.value !== "false",
+          emola: (em as { setting?: { value?: string } | null })?.setting?.value !== "false",
+        });
+      } catch { /* em caso de falha, assume activas */ }
+    };
+    load();
+    const iv = setInterval(load, 20_000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, []);
 
   const handleDigit = (d: string) => {
     if (d === ".") {
@@ -169,6 +191,9 @@ export default function Depositar() {
     if (!isPhoneValid) { setPhoneError("Número inválido — deve ter 9 dígitos"); return; }
     if (!user) { setPhoneError("Sessão inválida"); return; }
 
+    if (provider === "mpesa" && !walletsAvailable.mpesa) { setPhoneError("A carteira M-Pesa está temporariamente indisponível"); return; }
+    if (provider === "emola" && !walletsAvailable.emola) { setPhoneError("A carteira e-Mola está temporariamente indisponível"); return; }
+
     /* Mínimos reais do gateway Debito Pay por operadora */
     const minAmount = provider === "mpesa" ? 10 : 50;
     if (amountVal < minAmount) {
@@ -237,6 +262,18 @@ export default function Depositar() {
 
       if (!res.ok) {
         const errorMsg = resData?.error || "Erro ao iniciar pagamento. Tenta novamente.";
+        /* e-Mola: quando o OPERADOR recusa a criação do pagamento, o USSD
+           nunca chega ao utilizador. Mostrar o erro na tela do número
+           (antes do modal USSD) em vez do ecrã de espera — assim o user
+           percebe logo que nada foi pedido ao seu telefone. */
+        const refusedBeforeUssd =
+          !isMpesa && /recusado|recusada|não pôde ser iniciado/i.test(errorMsg);
+        if (refusedBeforeUssd) {
+          if (mpesaTimer) clearTimeout(mpesaTimer);
+          setInitError(errorMsg);
+          setInitiating(false);
+          return;
+        }
         if (screenSwitched) {
           setRejectReason(errorMsg);
           setScreen("rejected");
@@ -385,7 +422,8 @@ export default function Depositar() {
               Selecciona a tua carteira móvel
             </p>
 
-            {/* e-Mola — ACTIVE */}
+            {/* e-Mola — disponibilidade controlada pelo admin */}
+            {walletsAvailable.emola ? (
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={() => { setProvider("emola"); setScreen("phone"); }}
@@ -413,8 +451,30 @@ export default function Depositar() {
                 <CheckCircle2 style={{ width: 16, height: 16, color: EMOLA_GREEN }} />
               </div>
             </motion.button>
+            ) : (
+            <div className="w-full p-5 mb-3 flex items-center justify-between"
+              style={{ background: "#f8fafc", border: "1.5px dashed #e5e7eb", borderRadius: 0, opacity: 0.65, cursor: "not-allowed" }}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 flex items-center justify-center overflow-hidden"
+                  style={{ background: "#f1f5f9", border: "1px solid #e5e7eb", filter: "grayscale(1)" }}>
+                  <img src="/emola-logo.png" alt="e-Mola" style={{ width: 40, height: 40, objectFit: "contain" }} />
+                </div>
+                <div className="text-left">
+                  <p style={{ fontWeight: 700, color: "#9ca3af", fontSize: 15, letterSpacing: "0.5px", fontFamily: "'Syne', sans-serif" }}>e-Mola</p>
+                  <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Temporariamente indisponível</p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#fef2f2", color: "#ef4444", letterSpacing: "0.5px" }}>
+                  INDISPONÍVEL
+                </span>
+                <AlertCircle style={{ width: 16, height: 16, color: "#ef4444" }} />
+              </div>
+            </div>
+            )}
 
-            {/* M-Pesa — ACTIVE */}
+            {/* M-Pesa — disponibilidade controlada pelo admin */}
+            {walletsAvailable.mpesa ? (
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={() => { setProvider("mpesa"); setScreen("phone"); }}
@@ -442,6 +502,27 @@ export default function Depositar() {
                 <CheckCircle2 style={{ width: 16, height: 16, color: MPESA_RED }} />
               </div>
             </motion.button>
+            ) : (
+            <div className="w-full p-5 mb-8 flex items-center justify-between"
+              style={{ background: "#f8fafc", border: "1.5px dashed #e5e7eb", borderRadius: 0, opacity: 0.65, cursor: "not-allowed" }}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 flex items-center justify-center overflow-hidden"
+                  style={{ background: "#f1f5f9", border: "1px solid #e5e7eb", filter: "grayscale(1)" }}>
+                  <img src="/mpesa-logo.jpg" alt="M-Pesa" style={{ width: 40, height: 40, objectFit: "contain" }} />
+                </div>
+                <div className="text-left">
+                  <p style={{ fontWeight: 700, color: "#9ca3af", fontSize: 15, letterSpacing: "0.5px", fontFamily: "'Syne', sans-serif" }}>M-Pesa</p>
+                  <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Temporariamente indisponível</p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#fef2f2", color: "#ef4444", letterSpacing: "0.5px" }}>
+                  INDISPONÍVEL
+                </span>
+                <AlertCircle style={{ width: 16, height: 16, color: "#ef4444" }} />
+              </div>
+            </div>
+            )}
 
             <div className="p-4" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
               <div className="flex items-start gap-3">

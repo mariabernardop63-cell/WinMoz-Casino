@@ -3,7 +3,7 @@ import {
   Settings as SettingsIcon, Bell, Shield, Globe, Database,
   Bot, Lock, Mail, Key, Eye, EyeOff, CheckCircle, AlertCircle,
   Save, Wrench, Smartphone, Copy, Link2, Phone, LayoutTemplate, Zap,
-  Tag, FileText, BookOpen,
+  Tag, FileText, BookOpen, Wallet,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useGetPlatformSettings, useUpdatePlatformSetting } from "@/admin/lib/supabase-api";
@@ -344,6 +344,8 @@ export default function Settings() {
       query_cache: platformSettings["query_cache"] !== "false",
       query_logs: platformSettings["query_logs"] === "true",
       poker_winner_mode: platformSettings["poker_winner_mode"] === "true",
+      mpesa_wallet_enabled: platformSettings["mpesa_wallet_enabled"] !== "false",
+      emola_wallet_enabled: platformSettings["emola_wallet_enabled"] !== "false",
     });
   }, [platformSettings]);
 
@@ -687,6 +689,36 @@ export default function Settings() {
                 </span>
               )}
               <FunctionalToggle settingKey="poker_winner_mode" value={settings.poker_winner_mode ?? false} onChange={handleToggle} loading={updateSetting.isPending} />
+            </div>
+          </SettingRow>
+        </SectionCard>
+
+        {/* Carteiras de Pagamento */}
+        <SectionCard title="Carteiras de Pagamento" icon={Wallet} color="#16a34a" bg="rgba(22,163,74,0.1)">
+          <SettingRow
+            label="M-Pesa"
+            description={settings.mpesa_wallet_enabled ? "Carteira activa — os utilizadores podem depositar via M-Pesa" : "⚠️ Carteira INDISPONÍVEL — os utilizadores não conseguem escolher M-Pesa nos depósitos"}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, textTransform: "uppercase",
+                background: settings.mpesa_wallet_enabled ? "rgba(22,163,74,0.12)" : "rgba(239,68,68,0.1)",
+                color: settings.mpesa_wallet_enabled ? "#16a34a" : "#ef4444" }}>
+                {settings.mpesa_wallet_enabled ? "Activa" : "Indisponível"}
+              </span>
+              <FunctionalToggle settingKey="mpesa_wallet_enabled" value={settings.mpesa_wallet_enabled ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+            </div>
+          </SettingRow>
+          <SettingRow
+            label="e-Mola"
+            description={settings.emola_wallet_enabled ? "Carteira activa — os utilizadores podem depositar via e-Mola" : "⚠️ Carteira INDISPONÍVEL — os utilizadores não conseguem escolher e-Mola nos depósitos"}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, textTransform: "uppercase",
+                background: settings.emola_wallet_enabled ? "rgba(22,163,74,0.12)" : "rgba(239,68,68,0.1)",
+                color: settings.emola_wallet_enabled ? "#16a34a" : "#ef4444" }}>
+                {settings.emola_wallet_enabled ? "Activa" : "Indisponível"}
+              </span>
+              <FunctionalToggle settingKey="emola_wallet_enabled" value={settings.emola_wallet_enabled ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
             </div>
           </SettingRow>
         </SectionCard>

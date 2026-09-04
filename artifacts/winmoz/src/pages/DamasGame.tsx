@@ -1144,6 +1144,8 @@ export default function DamasGame() {
     // Compute new board eagerly from ref so boardRef stays in sync for resyncs
     const nb = applyBoardMove(boardRef.current, from, to, captured);
     boardRef.current = nb;
+    // O oponente ouve o som do movimento, tal como eu ouço o meu
+    if (captured.length > 0) playDamasCapture(); else playDamasMove();
     // nextTurn is who moves next; the player who just moved is opp(nextTurn).
     // If the just-moved player captured all of nextTurn's pieces → they win.
     const nextPlayerPieces = countPieces(nb, nextTurn);

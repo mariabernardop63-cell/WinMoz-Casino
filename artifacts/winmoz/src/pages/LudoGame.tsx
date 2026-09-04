@@ -60,9 +60,24 @@ function _playBuffer(buf: AudioBuffer | null, volume = 0.65) {
   } catch {}
 }
 
-function playRollSound()    { _playBuffer(_rollBuffer); }
-function playCaptureSound() { _playBuffer(_captureBuffer); }
+/* ── Anti-duplicação global: cada som toca no máximo 1x por intervalo.
+   Chamas concorrentes (broadcast echo + state sync + capture loop)
+   são absorvidas em vez de empilhar. */
+const _lastPlayAt: Record<string, number> = {};
+function _throttledPlay(kind: string, buf: AudioBuffer | null, minGapMs: number, volume?: number) {
+  const now = Date.now();
+  if (now - (_lastPlayAt[kind] ?? 0) < minGapMs) return;
+  _lastPlayAt[kind] = now;
+  _playBuffer(buf, volume);
+}
+
+function playRollSound()    { _throttledPlay("roll",   _rollBuffer,    400); }
+function playCaptureSound() { _throttledPlay("capture", _captureBuffer, 700); }
 function playVictoryChime() {
+  /* 1x apenas — chames concorrentes (handleMoveComplete + state sync) não repetem */
+  const now = Date.now();
+  if (now - (_lastPlayAt["chime"] ?? 0) < 1500) return;
+  _lastPlayAt["chime"] = now;
   try {
     const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
     // Ascending C-E-G-C arpeggio — classic "goal reached" fanfare
@@ -83,6 +98,9 @@ function playVictoryChime() {
 }
 
 function playWinFanfare() {
+  const now = Date.now();
+  if (now - (_lastPlayAt["fanfare"] ?? 0) < 2000) return;
+  _lastPlayAt["fanfare"] = now;
   try {
     const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
     const melody = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50, 1318.51];
@@ -102,6 +120,9 @@ function playWinFanfare() {
 }
 
 function playMoveSound() {
+  const now = Date.now();
+  if (now - (_lastPlayAt["move"] ?? 0) < 250) return;
+  _lastPlayAt["move"] = now;
   try {
     const ctx = new (window.AudioContext || (window as unknown as {webkitAudioContext: typeof AudioContext}).webkitAudioContext)();
     const osc = ctx.createOscillator();
@@ -1491,11 +1512,14 @@ export default function LudoGame() {
       .forEach(p=>{
         const [pr,pc]=getPieceCoord(p);
         if(pr===mr&&pc===mc && !SAFE_COORDS.has(`${pr},${pc}`)){
-          captured = true;
-          captureAnimRef.current = true;
-          playCaptureSound();
-          const capturerName=mover.player===myColor?playerName.split(" ")[0]:opponentName;
-          setMsg(`${capturerName} capturou uma peça! +1 jogada`);
+          if(!captured){
+            // Som 1x por lance — mesmo capturando várias peças de uma vez
+            captured = true;
+            captureAnimRef.current = true;
+            playCaptureSound();
+            const capturerName=mover.player===myColor?playerName.split(" ")[0]:opponentName;
+            setMsg(`${capturerName} capturou uma peça! +1 jogada`);
+          }
           let pos=p.pos;
           // Safety: always clear captureAnimRef after at most 900ms so it never blocks dice rolls
           const safetyTimer = setTimeout(()=>{ captureAnimRef.current=false; }, 900);
@@ -1618,6 +1642,8 @@ export default function LudoGame() {
       if(willLandOnArrow) effectiveSteps=diceVal+1;
       if(inStretch) effectiveSteps=Math.min(diceVal,56-piece.pos);
       setMsg(`${plName} move ${diceVal} ${diceVal===1?"casa":"casas"}!`);
+      // O oponente ouve o som do movimento assim como eu ouço o meu
+      playMoveSound();
       const finalPos=prevPos+effectiveSteps;
       movePieceSteps(pid,piece.pos,effectiveSteps,false,()=>{
         // Run capture animation cosmetically — authoritative state arrives via ludo_state_sync
@@ -1855,6 +1881,8 @@ export default function LudoGame() {
         rewardFiredRef.current=true;
         supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
       }
+      // O oponente ouve o mesmo som de dado que eu ouço quando jogo
+      playRollSound();
       applyRoll(payload.player as Player, val);
     });
 

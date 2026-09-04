@@ -490,14 +490,14 @@ export default function Levantar() {
           <div className="flex items-start gap-2 p-3.5 mb-3" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
             <Info style={{ width: 13, height: 13, color: "#374151", marginTop: 2, flexShrink: 0 }} />
             <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
-              O teu pedido foi recebido e está a ser verificado. Aguarda a confirmação — esta página actualiza automaticamente em tempo real.
+              O teu pedido foi recebido e está a ser verificado. Esta página actualiza automaticamente em tempo real — não precisas de ficar aqui.
             </p>
           </div>
 
           <div className="flex items-start gap-2 p-3.5 mb-4" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
             <Clock style={{ width: 13, height: 13, color: "#d97706", marginTop: 2, flexShrink: 0 }} />
             <p style={{ fontSize: 12, color: "#92400e", lineHeight: 1.5 }}>
-              O levantamento pode demorar entre <strong>5 a 50 minutos</strong> após a submissão, dependendo do volume de pedidos. Não precisas de ficar nesta página — serás notificado quando aprovado.
+              Devido a <strong>manutenção temporária</strong>, a confirmação pode levar entre <strong>1 a 12 horas</strong>. Em breve os levantamentos voltarão a ser instantâneos. Serás notificado assim que o pagamento for enviado.
             </p>
           </div>
 
