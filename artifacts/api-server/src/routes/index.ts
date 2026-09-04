@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { createClient } from "@supabase/supabase-js";
 import healthRouter from "./health";
+import debitoRouter from "./debito";
 import ws from "ws";
 
 /* ── SMS Forwarder In-Memory Store ── */
@@ -170,6 +171,7 @@ async function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T>
 }
 
 router.use(healthRouter);
+router.use(debitoRouter);
 
 /* ── Public ad script — reads platform_settings using admin key, bypasses RLS ── */
 router.get("/ad-script", async (req, res) => {

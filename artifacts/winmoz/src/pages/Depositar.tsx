@@ -132,9 +132,13 @@ export default function Depositar() {
       count++;
 
       try {
+        const pollSession = await getSessionWithRefresh();
         const csRes = await fetch("/api/debito/check-status", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(pollSession ? { "Authorization": `Bearer ${pollSession.access_token}` } : {}),
+          },
           body: JSON.stringify({ txId: pid }),
         });
         if (csRes.ok) {
@@ -211,7 +215,10 @@ export default function Depositar() {
 
       const res = await fetch("/api/debito/initiate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
         signal: fetchAbort.signal,
         body: JSON.stringify({
           amount: amountVal,

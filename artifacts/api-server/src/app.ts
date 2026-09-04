@@ -55,7 +55,12 @@ app.use(
     maxAge: 86400,
   }),
 );
-app.use(express.json());
+/* Captura o raw body para validar o HMAC do webhook Debito Pay */
+app.use(express.json({
+  verify: (req: any, _res, buf) => {
+    (req as any).rawBody = buf.toString("utf8");
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
