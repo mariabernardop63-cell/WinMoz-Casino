@@ -54,7 +54,13 @@ export default function EsqueceuSenha() {
     }
 
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email.trim().toLowerCase()
+      email.trim().toLowerCase(),
+      {
+        // Quem clicar no link do email cai directamente na página de
+        // redefinição já com a sessão de recuperação (detectSessionInUrl).
+        // Quem preferir digitar o código OTP usa o fluxo /otp?type=recovery.
+        redirectTo: window.location.origin + import.meta.env.BASE_URL + "redefinir-senha",
+      },
     );
 
     setLoading(false);

@@ -127,6 +127,12 @@ export default function OTP() {
       setLocation("/splash");
     } else if (otpType === "recovery") {
       setVerifying(false);
+      if (!data.session?.user) {
+        setError("Código verificado mas a sessão de recuperação não foi criada. Tenta novamente.");
+        return;
+      }
+      // Sessão de recuperação activa — updateUser({ password }) na próxima
+      // página substitui a senha desta conta.
       setLocation("/redefinir-senha");
     } else {
       setVerifying(false);

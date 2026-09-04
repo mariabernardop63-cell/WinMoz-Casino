@@ -35,6 +35,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const PROFILE_CACHE_KEY = "wm_profile_cache";
 
+/** True when the refresh token is definitively dead — the only case where we
+    clear the cached profile. Transient errors (network, 5xx, timeouts) must
+    keep the cache so the user's name/balance survive a dropped connection. */
+function isRefreshTokenDead(msg: string): boolean {
+  return /refresh_token_not_found|Invalid Refresh Token|refresh.?token.*(expired|invalid|revoked|not found)/i.test(msg);
+}
+
 async function fetchProfile(userId: string, attempt = 0): Promise<UserProfile | null> {
   try {
     const { data, error } = await supabase
@@ -43,7 +50,9 @@ async function fetchProfile(userId: string, attempt = 0): Promise<UserProfile | 
       .eq("id", userId)
       .single();
     if (error || !data) {
-      if (attempt < 3) {
+      // PGRST116 = row not found → profile genuinely missing, don't retry
+      if ((error as any)?.code === "PGRST116") return null;
+      if (attempt < 4) {
         await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
         return fetchProfile(userId, attempt + 1);
       }
@@ -51,10 +60,45 @@ async function fetchProfile(userId: string, attempt = 0): Promise<UserProfile | 
     }
     return data as UserProfile;
   } catch {
-    if (attempt < 3) {
+    if (attempt < 4) {
       await new Promise(r => setTimeout(r, 500 * Math.pow(2, attempt)));
       return fetchProfile(userId, attempt + 1);
     }
+    return null;
+  }
+}
+
+/** Refresh the session if the access token is expired/near-expiry, then fetch
+    the profile. Returns null only when there is no usable session at all. */
+async function refreshSessionAndFetchProfile(): Promise<{ userId: string; email: string; profile: UserProfile | null } | null> {
+  try {
+    let { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      // Session storage may hold an expired access token — try a refresh
+      const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+      session = refreshed ?? session;
+    }
+
+    if (!session?.user) return null;
+
+    const expiresAt = session.expires_at ?? 0;
+    if (expiresAt - Math.floor(Date.now() / 1000) < 60) {
+      const { data: { session: refreshed }, error } = await supabase.auth.refreshSession();
+      if (refreshed) {
+        session = refreshed;
+      } else if (error && isRefreshTokenDead(String((error as any).message ?? ""))) {
+        await supabase.auth.signOut().catch(() => {});
+        return null;
+      }
+      // transient refresh failure → continue with the existing session
+    }
+
+    const userId = session.user.id;
+    const email = session.user.email ?? "";
+    const profile = await fetchProfile(userId);
+    return { userId, email, profile };
+  } catch {
     return null;
   }
 }
@@ -188,10 +232,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
-      const data = await fetchProfile(session.user.id);
-      if (data) saveAndSet({ ...data, email: session.user.email ?? "" });
+      const result = await refreshSessionAndFetchProfile();
+      if (!result) return;
+      const { userId, email, profile: data } = result;
+      if (!data) return;
+      if (activeUidRef.current === null || activeUidRef.current === userId) {
+        activeUidRef.current = userId;
+        setUser(prev => (prev?.id === userId ? prev : { id: userId, email }));
+        saveAndSet({ ...data, email });
+      }
     } catch { /* silently fail */ }
   };
 
@@ -218,50 +267,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Self-heal: if a user is logged in but the profile is missing (e.g. a
+  // failed fetch after an expired token), retry automatically with backoff
+  // instead of showing "Utilizador" with no data.
+  const profileRetryRef = useRef(0);
+  useEffect(() => {
+    if (!user || profile || isBlocked) return;
+    if (profileRetryRef.current >= 5) return;
+    const delay = 1500 * Math.pow(2, profileRetryRef.current);
+    const t = setTimeout(() => {
+      profileRetryRef.current += 1;
+      refreshProfile();
+    }, delay);
+    return () => clearTimeout(t);
+  }, [user, profile, isBlocked]);
+  // Reset the retry counter whenever the profile recovers
+  useEffect(() => {
+    if (profile) profileRetryRef.current = 0;
+  }, [profile]);
+
   useEffect(() => {
     let cancelled = false;
 
     const initFromSession = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (cancelled) return;
+        // First fast check: is there a session in storage?
+        let { data: { session } } = await supabase.auth.getSession();
 
         if (!session?.user) {
+          // Maybe the access token expired while the tab was closed —
+          // attempt one silent refresh before deciding the user is logged out
+          const { data: { session: refreshed }, error: refreshErr } = await supabase.auth.refreshSession();
+          session = refreshed ?? null;
+
+          if (!session?.user && !cancelled) {
+            // Only clear the cache when the refresh token is definitively
+            // dead; a network failure must preserve the cached profile
+            const msg = String((refreshErr as any)?.message ?? "");
+            if (!refreshErr || isRefreshTokenDead(msg)) {
+              clearCachedProfile();
+              setUser(null);
+              setProfile(null);
+              setLoading(false);
+              setSessionReady(true);
+              return;
+            }
+            // Network error → keep cached state, the 60 s poll will retry
+            setLoading(false);
+            setSessionReady(true);
+            return;
+          }
+        }
+
+        const result = await refreshSessionAndFetchProfile();
+        if (cancelled) return;
+        if (!result) {
           clearCachedProfile();
           setUser(null);
           setProfile(null);
           setLoading(false);
-          return;
-        }
-
-        const { id, email = "" } = session.user;
-
-        if (cachedProfile?.id === id) {
-          activeUidRef.current = id;
-          signedInHandledRef.current = true;
-          setLoading(false);
           setSessionReady(true);
-          startHeartbeat(id);
-          startRealtimeProfile(id, email);
-          const fresh = await fetchProfile(id);
-          if (!cancelled && activeUidRef.current === id && fresh) {
-            saveAndSet({ ...fresh, email });
-          }
           return;
         }
 
+        const { userId: id, email, profile: data } = result;
+
+        // User is confirmed alive — keep session state
         activeUidRef.current = id;
-        if (!cancelled) setUser({ id, email });
+        setUser({ id, email });
 
-        const data = await fetchProfile(id);
-        if (!cancelled && activeUidRef.current === id) {
-          if (data) saveAndSet({ ...data, email });
-          signedInHandledRef.current = true;
-          setLoading(false);
-          setSessionReady(true);
-          startHeartbeat(id);
-          startRealtimeProfile(id, email);
+        if (data) {
+          saveAndSet({ ...data, email });
         }
+        // If data is null (profile temporarily unfetchable) keep the cached
+        // profile visible — the 60 s interval will retry
+        signedInHandledRef.current = true;
+        setLoading(false);
+        setSessionReady(true);
+        startHeartbeat(id);
+        startRealtimeProfile(id, email);
       } catch {
         if (!cancelled) { setLoading(false); setSessionReady(true); }
       }

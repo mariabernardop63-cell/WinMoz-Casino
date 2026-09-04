@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, Loader2, CheckCircle, KeyRound } from "lucide-react";
@@ -25,6 +25,29 @@ export default function RedefinirSenha() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [noSession, setNoSession] = useState(false);
+
+  /* Esta página exige a sessão de recuperação criada pelo verifyOtp do
+     código OTP ou pelo link do email. Sem sessão, updateUser falharia —
+     redireciona para pedir um novo código. */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const check = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        return !!session?.user;
+      };
+      // 1ª verificação imediata; 2ª após 1.2 s para apanhar o caso em que o
+      // utilizador veio do link do email e o detectSessionInUrl ainda está a
+      // consumir o hash (#access_token...).
+      if (await check()) return;
+      await new Promise(r => setTimeout(r, 1200));
+      if (cancelled) return;
+      if (await check()) return;
+      if (!cancelled) setNoSession(true);
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const inputStyle = (field: string): React.CSSProperties => ({
     width: "100%", padding: "15px 16px", borderRadius: 0,
@@ -44,7 +67,10 @@ export default function RedefinirSenha() {
     setLoading(false);
 
     if (error) {
-      setErrors({ general: error.message || "Não foi possível atualizar a senha." });
+      const msg = /Auth session missing|session.*missing|not authenticated/i.test(error.message)
+        ? "A sessão de recuperação expirou. Pede um novo código."
+        : error.message || "Não foi possível atualizar a senha.";
+      setErrors({ general: msg });
       return;
     }
 
@@ -62,7 +88,27 @@ export default function RedefinirSenha() {
         </motion.div>
 
         <AnimatePresence mode="wait">
-          {done ? (
+          {noSession ? (
+            <motion.div key="nosession" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.38 }} style={{ textAlign: "center", paddingTop: 32 }}>
+              <div style={{ width: 72, height: 72, background: "#fef2f2", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
+                <KeyRound style={{ width: 32, height: 32, color: "#dc2626" }} />
+              </div>
+              <h1 className="font-syne font-bold text-[24px] text-[#0a0a0a] mb-3">Sessão de recuperação expirada</h1>
+              <p className="text-[13.5px] text-slate-500 mb-6">
+                Por segurança, o código de recuperação só vale por pouco tempo.
+                Pede um novo código para definires a tua nova senha.
+              </p>
+              <button onClick={() => setLocation("/esqueceu-senha")}
+                style={{
+                  padding: "14px 28px", background: "#000", color: "#fff",
+                  fontSize: 14.5, fontWeight: 700, border: "none", borderRadius: 0,
+                  cursor: "pointer", fontFamily: "'Syne', sans-serif",
+                }}>
+                Pedir novo código
+              </button>
+            </motion.div>
+          ) : done ? (
             <motion.div key="done" initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.38 }} style={{ textAlign: "center", paddingTop: 32 }}>
               <div style={{ width: 72, height: 72, background: "#f0fdf4", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>

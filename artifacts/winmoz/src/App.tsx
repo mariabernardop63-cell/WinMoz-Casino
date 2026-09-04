@@ -13,44 +13,94 @@ import { adminSupabase } from "@/admin/lib/supabase-api";
 import { BrandProvider } from "@/lib/brand-context";
 import { AppSettingsProvider } from "@/contexts/AppSettingsContext";
 
-/* Route-level code splitting — heavy pages (games, admin, forms) load on demand */
-const NotFound = lazy(() => import("@/pages/not-found"));
+/* Route-level code splitting — heavy pages (games, admin, forms) load on demand.
+   Os importers ficam num mapa para o pré-carregamento em idle (ver abaixo). */
+const pageLoaders = {
+  NotFound: () => import("@/pages/not-found"),
+  Explorar: () => import("@/pages/Explorar"),
+  Login: () => import("@/pages/Login"),
+  Registar: () => import("@/pages/Registar"),
+  EsqueceuSenha: () => import("@/pages/EsqueceuSenha"),
+  RedefinirSenha: () => import("@/pages/RedefinirSenha"),
+  OTP: () => import("@/pages/OTP"),
+  SplashScreen: () => import("@/pages/SplashScreen"),
+  Perfil: () => import("@/pages/Perfil"),
+  Recarga: () => import("@/pages/Recarga"),
+  Levantar: () => import("@/pages/Levantar"),
+  Depositar: () => import("@/pages/Depositar"),
+  EditarPerfil: () => import("@/pages/EditarPerfil"),
+  ConvidarAmigos: () => import("@/pages/ConvidarAmigos"),
+  Extratos: () => import("@/pages/Extratos"),
+  Reportar: () => import("@/pages/Reportar"),
+  Privacidade: () => import("@/pages/Privacidade"),
+  PoliticaPrivacidade: () => import("@/pages/PoliticaPrivacidade"),
+  Definicoes: () => import("@/pages/Definicoes"),
+  Suporte: () => import("@/pages/Suporte"),
+  Notificacoes: () => import("@/pages/Notificacoes"),
+  GrupoChat: () => import("@/pages/GrupoChat"),
+  ScannerQR: () => import("@/pages/ScannerQR"),
+  Apostar: () => import("@/pages/Apostar"),
+  ProgramaAfiliados: () => import("@/pages/ProgramaAfiliados"),
+  LudoGame: () => import("@/pages/LudoGame"),
+  ChessGame: () => import("@/pages/ChessGame"),
+  DamasGame: () => import("@/pages/DamasGame"),
+  Roleta: () => import("@/pages/Roleta"),
+  BilharEmBreve: () => import("@/pages/BilharEmBreve"),
+  TermosServico: () => import("@/pages/TermosServico"),
+};
+
+const NotFound = lazy(pageLoaders.NotFound);
 const AdminApp = lazy(() => import("@/admin/AdminApp"));
-const Explorar = lazy(() => import("@/pages/Explorar"));
-const Login = lazy(() => import("@/pages/Login"));
-const Registar = lazy(() => import("@/pages/Registar"));
-const EsqueceuSenha = lazy(() => import("@/pages/EsqueceuSenha"));
-const RedefinirSenha = lazy(() => import("@/pages/RedefinirSenha"));
-const OTP = lazy(() => import("@/pages/OTP"));
-const SplashScreen = lazy(() => import("@/pages/SplashScreen"));
-const Perfil = lazy(() => import("@/pages/Perfil"));
-const Recarga = lazy(() => import("@/pages/Recarga"));
-const Levantar = lazy(() => import("@/pages/Levantar"));
-const Depositar = lazy(() => import("@/pages/Depositar"));
-const EditarPerfil = lazy(() => import("@/pages/EditarPerfil"));
-const ConvidarAmigos = lazy(() => import("@/pages/ConvidarAmigos"));
-const Extratos = lazy(() => import("@/pages/Extratos"));
-const Reportar = lazy(() => import("@/pages/Reportar"));
-const Privacidade = lazy(() => import("@/pages/Privacidade"));
-const PoliticaPrivacidade = lazy(() => import("@/pages/PoliticaPrivacidade"));
-const Definicoes = lazy(() => import("@/pages/Definicoes"));
-const Suporte = lazy(() => import("@/pages/Suporte"));
-const Notificacoes = lazy(() => import("@/pages/Notificacoes"));
-const GrupoChat = lazy(() => import("@/pages/GrupoChat"));
-const ScannerQR = lazy(() => import("@/pages/ScannerQR"));
-const Apostar = lazy(() => import("@/pages/Apostar"));
-const ProgramaAfiliados = lazy(() => import("@/pages/ProgramaAfiliados"));
-const LudoGame = lazy(() => import("@/pages/LudoGame"));
-const ChessGame = lazy(() => import("@/pages/ChessGame"));
-const DamasGame = lazy(() => import("@/pages/DamasGame"));
-const Roleta = lazy(() => import("@/pages/Roleta"));
-const BilharEmBreve = lazy(() => import("@/pages/BilharEmBreve"));
-const TermosServico = lazy(() => import("@/pages/TermosServico"));
+const Explorar = lazy(pageLoaders.Explorar);
+const Login = lazy(pageLoaders.Login);
+const Registar = lazy(pageLoaders.Registar);
+const EsqueceuSenha = lazy(pageLoaders.EsqueceuSenha);
+const RedefinirSenha = lazy(pageLoaders.RedefinirSenha);
+const OTP = lazy(pageLoaders.OTP);
+const SplashScreen = lazy(pageLoaders.SplashScreen);
+const Perfil = lazy(pageLoaders.Perfil);
+const Recarga = lazy(pageLoaders.Recarga);
+const Levantar = lazy(pageLoaders.Levantar);
+const Depositar = lazy(pageLoaders.Depositar);
+const EditarPerfil = lazy(pageLoaders.EditarPerfil);
+const ConvidarAmigos = lazy(pageLoaders.ConvidarAmigos);
+const Extratos = lazy(pageLoaders.Extratos);
+const Reportar = lazy(pageLoaders.Reportar);
+const Privacidade = lazy(pageLoaders.Privacidade);
+const PoliticaPrivacidade = lazy(pageLoaders.PoliticaPrivacidade);
+const Definicoes = lazy(pageLoaders.Definicoes);
+const Suporte = lazy(pageLoaders.Suporte);
+const Notificacoes = lazy(pageLoaders.Notificacoes);
+const GrupoChat = lazy(pageLoaders.GrupoChat);
+const ScannerQR = lazy(pageLoaders.ScannerQR);
+const Apostar = lazy(pageLoaders.Apostar);
+const ProgramaAfiliados = lazy(pageLoaders.ProgramaAfiliados);
+const LudoGame = lazy(pageLoaders.LudoGame);
+const ChessGame = lazy(pageLoaders.ChessGame);
+const DamasGame = lazy(pageLoaders.DamasGame);
+const Roleta = lazy(pageLoaders.Roleta);
+const BilharEmBreve = lazy(pageLoaders.BilharEmBreve);
+const TermosServico = lazy(pageLoaders.TermosServico);
+
+/* Pré-carrega todos os chunks de páginas quando o browser está idle —
+   a primeira navegação fica instantânea, sem ecrã de espera. O painel
+   admin (chunk de ~750 KB) fica de fora: só admins o usam. */
+function preloadPages() {
+  (window as any).requestIdleCallback
+    ? (window as any).requestIdleCallback(() => {
+        Object.values(pageLoaders).forEach(loader => { loader().catch(() => {}); });
+      }, { timeout: 8000 })
+    : setTimeout(() => {
+        Object.values(pageLoaders).forEach(loader => { loader().catch(() => {}); });
+      }, 3000);
+}
 
 function PageFallback() {
+  /* Fundo neutro claro combinado com o branding (páginas auth são brancas).
+     Nunca ecrã preto — e raramente aparece, graças ao preload em idle. */
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-background" aria-busy="true">
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+    <div className="min-h-screen w-full flex items-center justify-center bg-white" aria-busy="true">
+      <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-slate-700" />
     </div>
   );
 }
@@ -237,7 +287,9 @@ function AppContent() {
   );
 }
 
+/* Pré-carrega as páginas uma única vez, logo após o primeiro render */
 function App() {
+  useEffect(() => { preloadPages(); }, []);
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

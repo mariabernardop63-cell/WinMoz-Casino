@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type Session } from "@supabase/supabase-js";
 
 const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || "https://placeholder.supabase.co";
 const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || "placeholder-key";
@@ -11,13 +11,22 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+/** Returns true when the refresh token itself is dead (revoked/expired/unknown).
+    In that case the only option is a clean sign-out. Network errors must NOT
+    log the user out — the token may still be refreshed once connectivity
+    returns. */
+function isRefreshTokenDead(msg: string): boolean {
+  return /refresh_token_not_found|Invalid Refresh Token|refresh.?token.*(expired|invalid|revoked|not found)/i.test(msg);
+}
+
 /**
- * Returns a valid session, proactively refreshing if the access token
- * expires in <60 s. Signs out and returns null if the refresh token
- * is expired or any auth error occurs — the caller should then redirect
- * the user to /login with a friendly message.
+ * Returns a valid session, proactively refreshing when the access token is
+ * expired or expires in <60 s. Behaviour on failure:
+ *  - refresh token dead  → clean sign-out, returns null
+ *  - transient/network   → keeps the (possibly stale) session so the UI can
+ *    keep showing cached data while retrying in the background
  */
-export async function getSessionWithRefresh() {
+export async function getSessionWithRefresh(): Promise<Session | null> {
   try {
     const { data: { session }, error } = await supabase.auth.getSession();
     if (error || !session) return null;
@@ -30,14 +39,23 @@ export async function getSessionWithRefresh() {
     const { data: { session: refreshed }, error: refreshErr } =
       await supabase.auth.refreshSession();
 
-    if (refreshErr || !refreshed) {
+    if (refreshed) return refreshed;
+
+    const msg = String((refreshErr as any)?.message ?? refreshErr ?? "");
+    if (isRefreshTokenDead(msg)) {
       await supabase.auth.signOut();
       return null;
     }
-    return refreshed;
+
+    // Transient failure — return the old session; callers keep cached data
+    return session;
   } catch {
-    await supabase.auth.signOut().catch(() => {});
-    return null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      return session ?? null;
+    } catch {
+      return null;
+    }
   }
 }
 

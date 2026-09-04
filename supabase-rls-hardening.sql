@@ -1,24 +1,47 @@
 -- ============================================================================
--- MOZBET — HARDENING RLS COMPLETO
+-- MOZBET — HARDENING RLS COMPLETO (v2, defensiva e re-executável)
 -- Executar no Supabase SQL Editor (Dashboard → SQL Editor → New Query → RUN)
 --
--- Protege todas as tabelas que antes estavam expostas ao anon key:
---   platform_settings, matchmaking_queue, deposit_verifications, sms_logs,
---   recharge_codes, transactions, matches, platform_earnings, profiles.
+-- SEGURA PARA RE-EXECUTAR: todas as operações verificam a existência das
+-- tabelas/colunas antes de agir. Nenhum erro 42P01 (relation does not exist).
 --
--- Princípios:
---   • O browser (anon key) SÓ lê/escreve o que o utilizador possui.
---   • Saldos (profiles.balance) NUNCA são escritos pelo browser — só por
---     service_role (a API Express usa SUPABASE_SERVICE_ROLE_KEY).
---   • Config pública (platform_settings) é só-leitura para utilizadores
---     autenticados; chaves sensíveis ficam protegidas por convenção de nome
---     (a API também redacta no endpoint público).
---   • Tabelas internas (sms_logs, deposit_verifications, recharge_codes) ficam
---     inacessíveis ao anon/authenticated — só service_role.
+-- NOTA SOBRE TABELAS QUE PODEM NÃO EXISTIR:
+--   recharge_codes é criada aqui se faltar (a API de recarga precisa dela).
+--   As restantes (balance_adjustments, blocked_users, platform_earnings,
+--   matches, ...) só recebem RLS se já existirem no teu projeto.
 -- ============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 0. Helpers
+-- 0. Helper: aplica ENABLE RLS apenas se a tabela existir
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE OR REPLACE FUNCTION public.__drop_policy_if_exists(tbl text, pol text)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=tbl) THEN
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol, tbl);
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.__enable_rls_if_exists(tbl text)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = tbl) THEN
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tbl);
+    RAISE NOTICE 'RLS activado em %', tbl;
+  ELSE
+    RAISE NOTICE 'Tabela % não existe — saltada', tbl;
+  END IF;
+END;
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 1. Helper admin (usado pelas políticas)
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION public.is_platform_admin()
 RETURNS boolean
@@ -34,306 +57,416 @@ AS $$
 $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 1. PLATFORM_SETTINGS
---    Antes: RLS desligado — qualquer anónimo lia TUDO (incl. sms_webhook_token)
---    e escrevia. Agora: leitura pública de configurações não-sensíveis,
---    escrita só para admins (service_role continua a poder tudo).
+-- 2. RECHARGE_CODES — criar se faltar (a rota /api/recharge precisa dela)
+--    Schema derivada do código: id, code, amount, used, used_by, used_at.
+--    Se já existir, nada é alterado.
 -- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE public.platform_settings ENABLE ROW LEVEL SECURITY;
+CREATE TABLE IF NOT EXISTS public.recharge_codes (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code       text NOT NULL,
+  amount     numeric NOT NULL CHECK (amount > 0),
+  used       boolean NOT NULL DEFAULT false,
+  used_by    uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  used_at    timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
 
-DROP POLICY IF EXISTS "platform_settings_all" ON public.platform_settings;
-DROP POLICY IF EXISTS "platform_settings_public_read" ON public.platform_settings;
-DROP POLICY IF EXISTS "platform_settings_admin_write" ON public.platform_settings;
-DROP POLICY IF EXISTS "Allow authenticated read non-sensitive settings" ON public.platform_settings;
-DROP POLICY IF EXISTS "Admin full access platform settings" ON public.platform_settings;
+CREATE UNIQUE INDEX IF NOT EXISTS recharge_codes_code_key ON public.recharge_codes (code);
 
-CREATE POLICY "platform_settings_public_read"
-  ON public.platform_settings
-  FOR SELECT
+-- Colunas em falta se a tabela já existisse com schema antigo
+ALTER TABLE public.recharge_codes ADD COLUMN IF NOT EXISTS used_at  timestamptz;
+ALTER TABLE public.recharge_codes ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3. PLATFORM_SETTINGS
+--    Leitura pública só de chaves não-sensíveis; escrita só para admins.
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT public.__enable_rls_if_exists('platform_settings');
+
+SELECT public.__drop_policy_if_exists('platform_settings', 'platform_settings_all');
+SELECT public.__drop_policy_if_exists('platform_settings', 'platform_settings_public_read');
+SELECT public.__drop_policy_if_exists('platform_settings', 'platform_settings_admin_write');
+SELECT public.__drop_policy_if_exists('platform_settings', 'Allow authenticated read non-sensitive settings');
+SELECT public.__drop_policy_if_exists('platform_settings', 'Admin full access platform settings');
+
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='platform_settings') THEN
+    EXECUTE $pol$CREATE POLICY "platform_settings_public_read" ON public.platform_settings FOR SELECT
   TO anon, authenticated
-  USING (
-    NOT (key ~* 'token|secret|password|webhook|service_role|api_key')
-  );
+  USING (NOT (key ~* 'token|secret|password|webhook|service_role|api_key'))$pol$;
+  END IF;
+END
+$do$;
 
-CREATE POLICY "platform_settings_admin_write"
-  ON public.platform_settings
-  FOR ALL
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='platform_settings') THEN
+    EXECUTE $pol$CREATE POLICY "platform_settings_admin_write" ON public.platform_settings FOR ALL
   TO authenticated
   USING (public.is_platform_admin())
-  WITH CHECK (public.is_platform_admin());
+  WITH CHECK (public.is_platform_admin())$pol$;
+  END IF;
+END
+$do$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 2. MATCHMAKING_QUEUE
---    Antes: RLS desligado — qualquer um lia a fila toda e apagava entradas
---    alheias (cancelar a fila de outro jogador). Agora: cada utilizador gere
---    as suas próprias entradas; leitura da fila limitada ao mesmo jogo/aposta
---    para o matchmaking funcionar (dados públicos: nome e valor da aposta).
+-- 4. MATCHMAKING_QUEUE
 -- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE public.matchmaking_queue ENABLE ROW LEVEL SECURITY;
+SELECT public.__enable_rls_if_exists('matchmaking_queue');
 
-DROP POLICY IF EXISTS "mq_all" ON public.matchmaking_queue;
+SELECT public.__drop_policy_if_exists('matchmaking_queue', 'mq_all');
+SELECT public.__drop_policy_if_exists('matchmaking_queue', 'mq_insert_own');
+SELECT public.__drop_policy_if_exists('matchmaking_queue', 'mq_select_queue');
+SELECT public.__drop_policy_if_exists('matchmaking_queue', 'mq_delete_own');
+SELECT public.__drop_policy_if_exists('matchmaking_queue', 'mq_admin_all');
 
-CREATE POLICY "mq_insert_own"
-  ON public.matchmaking_queue FOR INSERT
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='matchmaking_queue') THEN
+    EXECUTE $pol$CREATE POLICY "mq_insert_own" ON public.matchmaking_queue FOR INSERT
   TO authenticated
-  WITH CHECK (user_id = auth.uid());
+  WITH CHECK (user_id = auth.uid())$pol$;
+  END IF;
+END
+$do$;
 
-CREATE POLICY "mq_select_queue"
-  ON public.matchmaking_queue FOR SELECT
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='matchmaking_queue') THEN
+    EXECUTE $pol$CREATE POLICY "mq_select_queue" ON public.matchmaking_queue FOR SELECT
   TO authenticated
-  USING (true);  -- necessário para detectar oponentes; sem dados sensíveis
+  USING (true)$pol$;
+  END IF;
+END
+$do$;  -- necessário para detectar oponentes; sem dados sensíveis
 
-CREATE POLICY "mq_delete_own"
-  ON public.matchmaking_queue FOR DELETE
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='matchmaking_queue') THEN
+    EXECUTE $pol$CREATE POLICY "mq_delete_own" ON public.matchmaking_queue FOR DELETE
   TO authenticated
-  USING (user_id = auth.uid());
+  USING (user_id = auth.uid())$pol$;
+  END IF;
+END
+$do$;
 
-CREATE POLICY "mq_admin_all"
-  ON public.matchmaking_queue FOR ALL
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='matchmaking_queue') THEN
+    EXECUTE $pol$CREATE POLICY "mq_admin_all" ON public.matchmaking_queue FOR ALL
   TO authenticated
   USING (public.is_platform_admin())
-  WITH CHECK (public.is_platform_admin());
+  WITH CHECK (public.is_platform_admin())$pol$;
+  END IF;
+END
+$do$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 3. SMS_LOGS + DEPOSIT_VERIFICATIONS
---    Antes: RLS desligado — expunham corpo de SMS (com números e tx IDs) e o
---    fluxo de verificação de depósitos a qualquer anónimo.
---    Agora: 100% service_role. O browser nunca acede directamente (a API
---    Express trata disto server-side).
+-- 5. SMS_LOGS + DEPOSIT_VERIFICATIONS — 100% service_role
 -- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE public.sms_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.deposit_verifications ENABLE ROW LEVEL SECURITY;
+SELECT public.__enable_rls_if_exists('sms_logs');
+SELECT public.__enable_rls_if_exists('deposit_verifications');
 
 DROP POLICY IF EXISTS "sms_logs_all" ON public.sms_logs;
 DROP POLICY IF EXISTS "deposit_verifications_all" ON public.deposit_verifications;
--- Sem políticas = ninguém (à parte service_role, que ignora RLS) acede.
+-- Sem políticas = ninguém (à parte service_role) acede.
+-- Defesa extra: revogar grants directos (RLS já bloqueia, isto reforça)
+REVOKE ALL ON public.sms_logs FROM anon, authenticated;
+REVOKE ALL ON public.deposit_verifications FROM anon, authenticated;
+REVOKE ALL ON public.recharge_codes FROM anon, authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 4. RECHARGE_CODES
---    Códigos de recarga = dinheiro. Nunca expostos ao browser.
+-- 6. RECHARGE_CODES — só service_role (compra/uso passa pela API)
 -- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE public.recharge_codes ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "recharge_codes_all" ON public.recharge_codes;
--- Sem políticas — só service_role (a rota /api/recharge).
+SELECT public.__enable_rls_if_exists('recharge_codes');
+SELECT public.__drop_policy_if_exists('recharge_codes', 'recharge_codes_all');
+SELECT public.__drop_policy_if_exists('recharge_codes', 'recharge_codes_select_own');
+-- Sem políticas — só service_role.
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 5. PROFILES
---    Antes: qualquer utilizador podia escrever o PRÓPRIO saldo (e campos como
---    is_admin) directamente. Agora: o browser só pode actualizar dados de
---    perfil (nome, telefone, avatar); saldo, flags de admin, bloqueio e
---    ganhos de afiliado ficam só para service_role.
+-- 7. PROFILES
+--    Browser só actualiza dados de perfil. Saldo/admin/bloqueio ficam para
+--    service_role, garantido pelo trigger abaixo.
 -- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+SELECT public.__enable_rls_if_exists('profiles');
 
-DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
-DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
-DROP POLICY IF EXISTS "profiles_insert_own" ON public.profiles;
+SELECT public.__drop_policy_if_exists('profiles', 'profiles_select_own');
+SELECT public.__drop_policy_if_exists('profiles', 'profiles_update_own');
+SELECT public.__drop_policy_if_exists('profiles', 'profiles_insert_own');
+SELECT public.__drop_policy_if_exists('profiles', 'profiles_update_own_limited');
+SELECT public.__drop_policy_if_exists('profiles', 'profiles_insert_self_on_signup');
+SELECT public.__drop_policy_if_exists('profiles', 'profiles_select_public_fields');
+SELECT public.__drop_policy_if_exists('profiles', 'profiles_admin_all');
 
-CREATE POLICY "profiles_select_own"
-  ON public.profiles FOR SELECT
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='profiles') THEN
+    EXECUTE $pol$CREATE POLICY "profiles_insert_self_on_signup" ON public.profiles FOR INSERT
   TO authenticated
-  USING (id = auth.uid() OR public.is_platform_admin());
+  WITH CHECK (id = auth.uid())$pol$;
+  END IF;
+END
+$do$;
 
-CREATE POLICY "profiles_insert_self_on_signup"
-  ON public.profiles FOR INSERT
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='profiles') THEN
+    EXECUTE $pol$CREATE POLICY "profiles_select_public_fields" ON public.profiles FOR SELECT
   TO authenticated
-  WITH CHECK (id = auth.uid());
+  USING (true)$pol$;
+  END IF;
+END
+$do$;
 
-CREATE POLICY "profiles_update_own_limited"
-  ON public.profiles FOR UPDATE
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='profiles') THEN
+    EXECUTE $pol$CREATE POLICY "profiles_update_own_limited" ON public.profiles FOR UPDATE
   TO authenticated
   USING (id = auth.uid())
-  WITH CHECK (
-    id = auth.uid()
-    -- O browser nunca pode alterar estes campos:
-    -- balance, is_admin, is_blocked, block_type, affiliate_pending_earnings,
-    -- affiliate_invite_code, referral rewards...
-    -- (o trigger abaixo reverte tentativas)
-  );
+  WITH CHECK (id = auth.uid())$pol$;
+  END IF;
+END
+$do$;
 
-CREATE POLICY "profiles_admin_all"
-  ON public.profiles FOR ALL
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='profiles') THEN
+    EXECUTE $pol$CREATE POLICY "profiles_admin_all" ON public.profiles FOR ALL
   TO authenticated
   USING (public.is_platform_admin())
-  WITH CHECK (public.is_platform_admin());
+  WITH CHECK (public.is_platform_admin())$pol$;
+  END IF;
+END
+$do$;
 
--- Utilizadores autenticados podem ver código de convite/afiliado de outros
--- (necessário para /api/validate-invite e registos com convite) e presença
--- (nome/avatar para matchmaking). Sem saldos.
-CREATE POLICY "profiles_select_public_fields"
-  ON public.profiles FOR SELECT
-  TO authenticated
-  USING (true);
--- NOTA: como Postgres RLS filtra linhas (não colunas), esta política permite
--- ler o perfil inteiro de outros utilizadores autenticados. Para restringir
--- de verdade, expõe os dados públicos através de uma VIEW (ver secção 9).
-
--- Trigger de protecção de colunas sensíveis: reverte tentativas do browser
--- de alterar saldo/flags. Executado como SECURITY DEFINER para poder comparar.
+-- Trigger: bloqueia ALTERAÇÕES de colunas sensíveis vindas do browser
 CREATE OR REPLACE FUNCTION public.protect_profile_columns()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  old_row jsonb := to_jsonb(OLD);
+  new_row jsonb := to_jsonb(NEW);
+  protected_cols text[] := ARRAY[
+    'balance', 'is_admin', 'is_blocked', 'block_type',
+    'affiliate_pending_earnings', 'affiliate_invite_code'
+  ];
+  col text;
 BEGIN
   IF TG_OP = 'UPDATE' THEN
-    IF NEW.balance   IS DISTINCT FROM OLD.balance
-    OR NEW.is_admin  IS DISTINCT FROM OLD.is_admin
-    OR (NEW.is_blocked IS DISTINCT FROM OLD.is_blocked)
-    OR (NEW.block_type IS DISTINCT FROM OLD.block_type)
-    OR (NEW.affiliate_pending_earnings IS DISTINCT FROM OLD.affiliate_pending_earnings)
-    OR (NEW.affiliate_invite_code IS DISTINCT FROM OLD.affiliate_invite_code) THEN
-      -- Permitido apenas se a escrita vier de service_role/admin (RLS bypass
-      -- não é detectável aqui, por isso comparamos o autor real via
-      -- current_setting). Escritas do serviço usam service_role, que também
-      -- dispara este trigger — nesse caso current_setting('role') = supabase_admin.
-      IF current_setting('request.jwt.claim.role', true) = 'service_role'
-         OR current_setting('role') = 'supabase_admin'
-         OR public.is_platform_admin() THEN
-        RETURN NEW;
-      END IF;
-      RAISE EXCEPTION 'Alteração de campo protegido bloqueada (saldo/admin via API apenas)';
+    -- service_role (API) e admins podem alterar
+    IF current_setting('request.jwt.claim.role', true) = 'service_role'
+       OR current_setting('role') = 'supabase_admin'
+       OR public.is_platform_admin() THEN
+      RETURN NEW;
     END IF;
+    -- Verifica coluna a coluna (ignora colunas que não existam na tua tabela)
+    FOREACH col IN ARRAY protected_cols LOOP
+      IF new_row ? col
+         AND (NOT (old_row ? col) OR new_row -> col IS DISTINCT FROM old_row -> col) THEN
+        RAISE EXCEPTION 'Alteração de campo protegido (%) bloqueada — saldo/admin apenas via API', col;
+      END IF;
+    END LOOP;
   END IF;
   RETURN NEW;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS trg_protect_profile_columns ON public.profiles;
-CREATE TRIGGER trg_protect_profile_columns
-  BEFORE UPDATE ON public.profiles
-  FOR EACH ROW
-  EXECUTE FUNCTION public.protect_profile_columns();
+-- Trigger só é criado se a tabela profiles existir
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='profiles') THEN
+    EXECUTE 'DROP TRIGGER IF EXISTS trg_protect_profile_columns ON public.profiles';
+    EXECUTE 'CREATE TRIGGER trg_protect_profile_columns
+      BEFORE UPDATE ON public.profiles
+      FOR EACH ROW
+      EXECUTE FUNCTION public.protect_profile_columns()';
+  END IF;
+END
+$do$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 6. TRANSACTIONS
---    Antes: política de INSERT aberta — um utilizador podia inserir uma
---    transacção "win" +500 MT aprovada à mão. Agora: INSERT só de tipos
---    pendentes/depósito manual, UPDATE/DELETE negados; histórico só o próprio.
+-- 8. TRANSACTIONS
 -- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+SELECT public.__enable_rls_if_exists('transactions');
 
-DROP POLICY IF EXISTS "Users can insert own pending transactions" ON public.transactions;
-DROP POLICY IF EXISTS "transactions_select_own" ON public.transactions;
-DROP POLICY IF EXISTS "transactions_insert_own" ON public.transactions;
+SELECT public.__drop_policy_if_exists('transactions', 'Users can insert own pending transactions');
+SELECT public.__drop_policy_if_exists('transactions', 'transactions_select_own');
+SELECT public.__drop_policy_if_exists('transactions', 'transactions_insert_own');
+SELECT public.__drop_policy_if_exists('transactions', 'transactions_insert_own_pending');
+SELECT public.__drop_policy_if_exists('transactions', 'transactions_admin_all');
 
-CREATE POLICY "transactions_select_own"
-  ON public.transactions FOR SELECT
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='transactions') THEN
+    EXECUTE $pol$CREATE POLICY "transactions_select_own" ON public.transactions FOR SELECT
   TO authenticated
-  USING (user_id = auth.uid() OR public.is_platform_admin());
+  USING (user_id = auth.uid() OR public.is_platform_admin())$pol$;
+  END IF;
+END
+$do$;
 
--- Insert restrito: apenas depósitos manuais pendentes (fluxo carteira móvel).
--- Apostas/vitórias/recargas passam SEMPRE pela API (service_role).
-CREATE POLICY "transactions_insert_own_pending"
-  ON public.transactions FOR INSERT
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='transactions') THEN
+    EXECUTE $pol$CREATE POLICY "transactions_insert_own_pending" ON public.transactions FOR INSERT
   TO authenticated
   WITH CHECK (
     user_id = auth.uid()
     AND status = 'pending'
     AND type IN ('manual_deposit', 'manual_bet')
-  );
+  )$pol$;
+  END IF;
+END
+$do$;
 
-CREATE POLICY "transactions_admin_all"
-  ON public.transactions FOR ALL
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='transactions') THEN
+    EXECUTE $pol$CREATE POLICY "transactions_admin_all" ON public.transactions FOR ALL
   TO authenticated
   USING (public.is_platform_admin())
-  WITH CHECK (public.is_platform_admin());
+  WITH CHECK (public.is_platform_admin())$pol$;
+  END IF;
+END
+$do$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 7. MATCHES
---    Antes: qualquer utilizador autenticado podia mudar o vencedor de uma
---    partida alheia (chamando /api/games/win com outro gameId, ou escrevendo
---    directamente). Agora: escrita apenas de participantes e admins.
+-- 9. MATCHES — escrita só de participantes/admins
 -- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE public.matches ENABLE ROW LEVEL SECURITY;
+SELECT public.__enable_rls_if_exists('matches');
 
-DROP POLICY IF EXISTS "matches_select_all" ON public.matches;
-DROP POLICY IF EXISTS "matches_insert_own" ON public.matches;
-DROP POLICY IF EXISTS "matches_update_own" ON public.matches;
+SELECT public.__drop_policy_if_exists('matches', 'matches_select_all');
+SELECT public.__drop_policy_if_exists('matches', 'matches_insert_own');
+SELECT public.__drop_policy_if_exists('matches', 'matches_update_own');
+SELECT public.__drop_policy_if_exists('matches', 'matches_select_participants');
+SELECT public.__drop_policy_if_exists('matches', 'matches_update_participants');
+SELECT public.__drop_policy_if_exists('matches', 'matches_admin_all');
 
-CREATE POLICY "matches_select_participants"
-  ON public.matches FOR SELECT
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='matches') THEN
+    EXECUTE $pol$CREATE POLICY "matches_select_participants" ON public.matches FOR SELECT
   TO authenticated
   USING (
     player1_id = auth.uid()
     OR player2_id = auth.uid()
     OR public.is_platform_admin()
-  );
+  )$pol$;
+  END IF;
+END
+$do$;
 
--- O browser cria partida via upsert quando entra num jogo (serverBet envia
--- gameId). Mantemos INSERT do criador, mas sem poder alterar bet_amount.
-CREATE POLICY "matches_insert_own"
-  ON public.matches FOR INSERT
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='matches') THEN
+    EXECUTE $pol$CREATE POLICY "matches_insert_own" ON public.matches FOR INSERT
   TO authenticated
-  WITH CHECK (player1_id = auth.uid());
+  WITH CHECK (player1_id = auth.uid())$pol$;
+  END IF;
+END
+$do$;
 
-CREATE POLICY "matches_update_participants"
-  ON public.matches FOR UPDATE
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='matches') THEN
+    EXECUTE $pol$CREATE POLICY "matches_update_participants" ON public.matches FOR UPDATE
   TO authenticated
   USING (player1_id = auth.uid() OR player2_id = auth.uid())
-  WITH CHECK (player1_id = auth.uid() OR player2_id = auth.uid());
+  WITH CHECK (player1_id = auth.uid() OR player2_id = auth.uid())$pol$;
+  END IF;
+END
+$do$;
 
-CREATE POLICY "matches_admin_all"
-  ON public.matches FOR ALL
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='matches') THEN
+    EXECUTE $pol$CREATE POLICY "matches_admin_all" ON public.matches FOR ALL
   TO authenticated
   USING (public.is_platform_admin())
-  WITH CHECK (public.is_platform_admin());
+  WITH CHECK (public.is_platform_admin())$pol$;
+  END IF;
+END
+$do$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 7b. BALANCE_ADJUSTMENTS (histórico de ajustes manuais de saldo — só admin)
+-- 10. PLATFORM_EARNINGS — só service_role escreve; admin lê
 -- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE public.balance_adjustments ENABLE ROW LEVEL SECURITY;
+SELECT public.__enable_rls_if_exists('platform_earnings');
+SELECT public.__drop_policy_if_exists('platform_earnings', 'platform_earnings_insert');
+SELECT public.__drop_policy_if_exists('platform_earnings', 'platform_earnings_select_admin');
+SELECT public.__drop_policy_if_exists('platform_earnings', 'platform_earnings_admin_read');
 
-DROP POLICY IF EXISTS "balance_adjustments_admin_read" ON public.balance_adjustments;
-DROP POLICY IF EXISTS "balance_adjustments_admin_insert" ON public.balance_adjustments;
-
-CREATE POLICY "balance_adjustments_admin_read"
-  ON public.balance_adjustments FOR SELECT
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='platform_earnings') THEN
+    EXECUTE $pol$CREATE POLICY "platform_earnings_admin_read" ON public.platform_earnings FOR SELECT
   TO authenticated
-  USING (public.is_platform_admin());
-
-CREATE POLICY "balance_adjustments_admin_insert"
-  ON public.balance_adjustments FOR INSERT
-  TO authenticated
-  WITH CHECK (public.is_platform_admin());
+  USING (public.is_platform_admin())$pol$;
+  END IF;
+END
+$do$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 7c. BLOCKED_USERS (lista de utilizadores bloqueados — só admin)
+-- 11. BALANCE_ADJUSTMENTS + BLOCKED_USERS — só admin
 -- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE public.blocked_users ENABLE ROW LEVEL SECURITY;
+SELECT public.__enable_rls_if_exists('balance_adjustments');
+SELECT public.__drop_policy_if_exists('balance_adjustments', 'balance_adjustments_admin_read');
+SELECT public.__drop_policy_if_exists('balance_adjustments', 'balance_adjustments_admin_insert');
 
-DROP POLICY IF EXISTS "blocked_users_admin_read" ON public.blocked_users;
-DROP POLICY IF EXISTS "blocked_users_admin_write" ON public.blocked_users;
-
-CREATE POLICY "blocked_users_admin_read"
-  ON public.blocked_users FOR SELECT
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='balance_adjustments') THEN
+    EXECUTE $pol$CREATE POLICY "balance_adjustments_admin_read" ON public.balance_adjustments FOR SELECT
   TO authenticated
-  USING (public.is_platform_admin());
+  USING (public.is_platform_admin())$pol$;
+  END IF;
+END
+$do$;
 
-CREATE POLICY "blocked_users_admin_write"
-  ON public.blocked_users FOR ALL
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='balance_adjustments') THEN
+    EXECUTE $pol$CREATE POLICY "balance_adjustments_admin_insert" ON public.balance_adjustments FOR INSERT
+  TO authenticated
+  WITH CHECK (public.is_platform_admin())$pol$;
+  END IF;
+END
+$do$;
+
+SELECT public.__enable_rls_if_exists('blocked_users');
+SELECT public.__drop_policy_if_exists('blocked_users', 'blocked_users_admin_read');
+SELECT public.__drop_policy_if_exists('blocked_users', 'blocked_users_admin_write');
+
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='blocked_users') THEN
+    EXECUTE $pol$CREATE POLICY "blocked_users_admin_read" ON public.blocked_users FOR SELECT
+  TO authenticated
+  USING (public.is_platform_admin())$pol$;
+  END IF;
+END
+$do$;
+
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='blocked_users') THEN
+    EXECUTE $pol$CREATE POLICY "blocked_users_admin_write" ON public.blocked_users FOR ALL
   TO authenticated
   USING (public.is_platform_admin())
-  WITH CHECK (public.is_platform_admin());
+  WITH CHECK (public.is_platform_admin())$pol$;
+  END IF;
+END
+$do$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 8. PLATFORM_EARNINGS
---    Antes: qualquer browser inseria "taxas" fictícias. Agora: só service_role.
--- ─────────────────────────────────────────────────────────────────────────────
-ALTER TABLE public.platform_earnings ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS "platform_earnings_insert" ON public.platform_earnings;
-DROP POLICY IF EXISTS "platform_earnings_select_admin" ON public.platform_earnings;
-
-CREATE POLICY "platform_earnings_admin_read"
-  ON public.platform_earnings FOR SELECT
-  TO authenticated
-  USING (public.is_platform_admin());
-
--- ─────────────────────────────────────────────────────────────────────────────
--- 9. VIEW pública de perfis (campos seguros para matchmaking/salas)
---    Use esta view no frontend onde hoje lê "profiles" de outros jogadores.
---    (Opcional — migração de código separada.)
+-- 12. VIEW pública de perfis (campos seguros para matchmaking/salas)
+--     Usa `profiles_public` no frontend em vez de `profiles` quando precisares
+--     de dados de outros jogadores.
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE VIEW public.profiles_public
 WITH (security_invoker = false) AS
@@ -349,11 +482,20 @@ FROM public.profiles;
 GRANT SELECT ON public.profiles_public TO authenticated;
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 10. Realtime: manter funcional para o admin (usa service_role) e para a
---     maintenance flag (leitura pública autorizada acima).
+-- 13. Realtime
 -- ─────────────────────────────────────────────────────────────────────────────
 ALTER TABLE public.platform_settings REPLICA IDENTITY FULL;
 ALTER TABLE public.matchmaking_queue REPLICA IDENTITY FULL;
 
--- FIM — correr uma única vez. Verificar com:
--- SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname='public';
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 14. Limpeza dos helpers temporários (mantém is_platform_admin)
+-- ─────────────────────────────────────────────────────────────────────────────
+DROP FUNCTION IF EXISTS public.__enable_rls_if_exists(text);
+DROP FUNCTION IF EXISTS public.__drop_policy_if_exists(text, text);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 15. VERIFICAÇÃO FINAL — correr à parte para confirmar:
+-- SELECT tablename, rowsecurity FROM pg_tables
+--   WHERE schemaname = 'public' ORDER BY tablename;
+-- Todas as linhas devem mostrar rowsecurity = true.
+-- ============================================================================
