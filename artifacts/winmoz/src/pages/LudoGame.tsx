@@ -1990,9 +1990,7 @@ export default function LudoGame() {
       const key = `dice_${payload.player}`;
       if(seq && lastEventSeqRef.current[key] >= seq) return;
       if(seq) lastEventSeqRef.current[key] = seq;
-      // Only apply if it is actually the opponent's turn and we are waiting
-      // for a roll. Delayed broadcasts from the previous turn are ignored.
-      if(phaseRef.current!=="roll"||turnRef.current!==payload.player||winnerRef.current) return;
+      if(phaseRef.current==="done"||winnerRef.current) return;
       // Security: validate dice value is in expected range
       const val = payload.value as number;
       if(typeof val !== "number" || val < 1 || val > 6 || !Number.isInteger(val)) return;
@@ -2020,9 +2018,6 @@ export default function LudoGame() {
       const diceVal = payload.diceVal as number;
       if(!/^[BG][0-3]$/.test(pieceId)) return;
       if(typeof diceVal !== "number" || diceVal < 1 || diceVal > 6 || !Number.isInteger(diceVal)) return;
-      // A delayed selection from the previous turn must not animate or lock
-      // the board after the turn has already changed.
-      if(turnRef.current!==payload.player) return;
       const expectedPrefix = payload.player === "blue" ? "B" : "G";
       if(pieceId[0] !== expectedPrefix) return;
       // Use doOpponentMove (animation only) — final state comes via ludo_state_sync
@@ -2068,61 +2063,23 @@ export default function LudoGame() {
       channel.send({ type:"broadcast", event:"ludo_resync_state", payload:{
         pieces:piecesRef.current, turn:turnRef.current, phase:phaseRef.current,
         diceBlue:diceBlueRef.current, diceGreen:diceGreenRef.current,
-        stateSeq:stateSyncSeqRef.current,
-        sourcePlayer:myColor,
       }});
     });
 
     channel.on("broadcast",{ event:"ludo_resync_state" },({ payload })=>{
-       const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;stateSeq?:number;sourcePlayer?:Player};
-      const sourcePlayer = p.sourcePlayer === "blue" || p.sourcePlayer === "green"
-        ? p.sourcePlayer
-        : other(myColor);
-      if(sourcePlayer===myColor) return;
-      if(typeof p.stateSeq==="number" && p.stateSeq <= remoteStateSeqRef.current[sourcePlayer]) return;
-      if(typeof p.stateSeq==="number") remoteStateSeqRef.current[sourcePlayer]=p.stateSeq;
-       const previousTurn = turnRef.current;
+      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null};
       setPieces(p.pieces); setTurn(p.turn); setPhase(p.phase);
       setDiceBlue(p.diceBlue); setDiceGreen(p.diceGreen);
       piecesRef.current=p.pieces; turnRef.current=p.turn; phaseRef.current=p.phase;
       diceBlueRef.current=p.diceBlue; diceGreenRef.current=p.diceGreen;
-       if(p.phase==="roll" && p.turn!==previousTurn){
-         turnEpochRef.current++;
-         rolledEpochRef.current=null;
-         if(p.turn===myColor) rollConsumedRef.current=false;
-       }
-      rollBusyRef.current = false;
     });
 
     // ── Authoritative state sync — sent by the moving player after every move ──
     channel.on("broadcast",{ event:"ludo_state_sync" },({ payload })=>{
       if(phaseRef.current==="done") return;
-       const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;stateSeq?:number;sourcePlayer?:Player;winner?:Player};
-       const sourcePlayer = p.sourcePlayer === "blue" || p.sourcePlayer === "green"
-         ? p.sourcePlayer
-         : other(myColor);
-       if(sourcePlayer===myColor) return;
-      const stateSeq = typeof p.stateSeq==="number" ? p.stateSeq : null;
-       if(stateSeq !== null && stateSeq <= remoteStateSeqRef.current[sourcePlayer]) return;
-       if(stateSeq !== null) remoteStateSeqRef.current[sourcePlayer]=stateSeq;
+      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;winner?:Player};
       // Delay slightly so ongoing capture animation can finish before state is overwritten
       setTimeout(()=>{
-        // A newer sync may have arrived while this one was waiting for the
-        // remote movement animation to finish.
-         if(stateSeq !== null && stateSeq !== remoteStateSeqRef.current[sourcePlayer]) return;
-        // A same-player "roll" snapshot can be an old hand-off arriving after
-        // the local player already rolled. It must never re-arm the die.
-        // Only ownership changing to the other player starts a new turn here;
-        // the local player already advances its epoch when it grants a legal
-        // extra turn (six/capture/finish).
-        const isNewRollTurn =
-          p.phase === "roll" &&
-          p.turn !== turnRef.current;
-        if(isNewRollTurn){
-          turnEpochRef.current++;
-          rolledEpochRef.current = null;
-          if(p.turn===myColor) rollConsumedRef.current = false;
-        }
         setPieces(p.pieces);
         setTurn(p.turn);
         setPhase(p.phase);
@@ -2133,10 +2090,6 @@ export default function LudoGame() {
         phaseRef.current=p.phase;
         diceBlueRef.current=p.diceBlue??null;
         diceGreenRef.current=p.diceGreen??null;
-        // The sync is authoritative. An interrupted remote animation must
-        // never leave the board locked for the next local turn.
-        moveBusyRef.current = false;
-         rollBusyRef.current = false;
         if(p.winner){
           setWinner(p.winner);
           winnerRef.current=p.winner;
