@@ -638,8 +638,9 @@ function BoardSVG({ pieces }:{ pieces:GamePiece[] }) {
 }
 
 // ─── Board overlay (interactive pawn layer) ────────────────────────────────────
-function Board({ pieces, movable, onSelectPiece }:{
+function Board({ pieces, movable, onSelectPiece, rotateForPlayer }:{
   pieces:GamePiece[]; movable:PieceId[]; onSelectPiece:(id:PieceId)=>void;
+  rotateForPlayer?: boolean;
 }) {
   // Show selection effect only when player has a real choice (2+ movable pieces)
   const mustChoose = movable.length >= 2;
@@ -687,6 +688,7 @@ function Board({ pieces, movable, onSelectPiece }:{
       background:"#DCE5EF",
       border:"1px solid #CBD5E1",
       boxShadow:"0 18px 38px rgba(15,23,42,0.18), 0 4px 10px rgba(15,23,42,0.10)",
+      transform: rotateForPlayer ? "rotate(180deg)" : undefined,
     }}>
       <BoardSVG pieces={pieces}/>
 
@@ -921,9 +923,10 @@ function TrophySVG({ size=72 }:{size?:number}) {
 
 // ─── Professional Player Panel — white card ─────────────────────────────────────
 function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRoll,
-  finished, lives, timeLeft, isMe }:{
+  finished, lives, timeLeft, isMe, canRoll }:{
   player:Player; name:string; balance:string; isActive:boolean; diceValue:number|null;
   rolling:boolean; onRoll:()=>void; finished:number; lives:number; timeLeft:number; isMe:boolean;
+  canRoll?: boolean;
 }) {
   const color:PawnColor = player==="blue" ? "blue" : "green";
   const accentColor     = player==="blue" ? "#3B82F6" : "#22C55E";
@@ -1029,7 +1032,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
           <Dice3D
             value={diceValue} rolling={rolling}
             onClick={onRoll}
-            active={isActive && isMe}
+            active={isActive && isMe && canRoll !== false}
             sz={34}
           />
         </div>
@@ -1424,6 +1427,10 @@ export default function LudoGame() {
   const captureAnimRef = useRef(false);
   const rollBusyRef   = useRef(false);
   const moveBusyRef   = useRef(false);
+  // A timeout must finish the whole turn, not only roll the die. This flag
+  // carries the intent through the asynchronous dice animation so a roll
+  // with several legal pieces is selected automatically.
+  const autoMoveAfterRollRef = useRef(false);
   // Persiste em sessionStorage para não re-debitar se o utilizador fizer back e retomar
   const betDeductedRef = useRef(
     gameId !== "local"
@@ -1735,11 +1742,19 @@ export default function LudoGame() {
           ?`${plName} — 6 mas sem movimento!`
           :`${plName} — ${val} sem jogadas.`);
         consecutiveSixesRef.current=0;
-        // Also increment stuckTurns if all still in base (6 with no exit = unusual but possible)
+        // No piece moved, so the player who owns this turn must publish the
+        // hand-off. Without this event the other device could keep an old
+        // turn/phase and reject the next player's roll forever.
         setTimeout(()=>{
           const next=other(pl); setTurn(next); setPhase("roll");
           setDiceBlue(null); setDiceGreen(null);
           setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
+          if (pl===myColor && !isBot) {
+            channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
+              pieces:piecesRef.current, turn:next, phase:"roll",
+              diceBlue:null, diceGreen:null,
+            }});
+          }
         },1300);
       } else if(mv.length===1){
         setMsg(`${plName} tirou ${val}!`);
@@ -1759,6 +1774,18 @@ export default function LudoGame() {
           // My turn or bot: show selectable pieces + enter select phase
           setMovable(mv); setPhase("select");
           setMsg(`${plName} — ${val}! ${pl===myColor?"Escolhe uma peça.":""}`);
+          if (pl===myColor && autoMoveAfterRollRef.current) {
+            autoMoveAfterRollRef.current = false;
+            // Let React commit the select phase before choosing a piece.
+            setTimeout(() => {
+              if (turnRef.current !== pl || phaseRef.current !== "select" || winnerRef.current) return;
+              const available = movableRef.current.length > 0
+                ? movableRef.current
+                : calcMovable(piecesRef.current, pl, val);
+              const pid = available[Math.floor(Math.random() * available.length)];
+              if (pid) doSelectPiece(pid, val, pl, piecesRef.current);
+            }, 220);
+          }
         } else {
           // Multiplayer opponent: only show the message.
           // Do NOT touch phase/movable — ludo_state_sync from the opponent
@@ -1805,7 +1832,16 @@ export default function LudoGame() {
     if(!val){
       (myColor==="blue"?setRollingB:setRollingG)(false);
       rollBusyRef.current = false;
+      autoMoveAfterRollRef.current = false;
       setMsg(rollError || "Não foi possível rolar o dado. Tenta novamente.");
+      return;
+    }
+    // The server call can outlive the turn (for example after a tab switch or
+    // a remote state sync). Never publish a stale roll into the next turn.
+    if (phaseRef.current !== "roll" || turnRef.current !== myColor || winnerRef.current) {
+      (myColor==="blue"?setRollingB:setRollingG)(false);
+      rollBusyRef.current = false;
+      autoMoveAfterRollRef.current = false;
       return;
     }
 
@@ -2006,6 +2042,7 @@ export default function LudoGame() {
     channel.on("broadcast",{ event:"ludo_lives_sync" },({ payload })=>{
       const newLives = payload.lives as {blue:number;green:number};
       if(!newLives||typeof newLives.blue!=="number"||typeof newLives.green!=="number") return;
+      if (payload.player && payload.player !== opponentColor) return;
       setLives(newLives);
       livesRef.current = newLives;
       if(payload.gameOver){
@@ -2160,16 +2197,19 @@ export default function LudoGame() {
       setWinner(opponentColor); setPhase("done");
       setMsg(`${opponentName} venceu! ${playerName.split(" ")[0]} perdeu todas as vidas.`);
       if (!isBot) channelRef.current?.send({ type:"broadcast", event:"ludo_lives_sync",
-        payload:{ lives: newLives, gameOver: true } });
+        payload:{ lives: newLives, gameOver: true, player: myColor, timedOut: true } });
       return;
     }
     setMsg(`Tempo esgotado! ${playerName.split(" ")[0]} perde 1 vida (${nb} restante${nb===1?"":"s"}).`);
     if (!isBot) channelRef.current?.send({ type:"broadcast", event:"ludo_lives_sync",
-      payload:{ lives: newLives, gameOver: false } });
+      payload:{ lives: newLives, gameOver: false, player: myColor, timedOut: true } });
     const cur = phaseRef.current;
     const mv  = movableRef.current;
     const dv  = myColor === "blue" ? diceBlueRef.current : diceGreenRef.current;
-    if (cur === "roll") setTimeout(() => doRoll(), 200);
+    if (cur === "roll") {
+      autoMoveAfterRollRef.current = true;
+      setTimeout(() => void doRoll(), 200);
+    }
     else if (cur === "select" && mv.length > 0 && dv !== null)
       setTimeout(() => doSelectPiece(mv[Math.floor(Math.random() * mv.length)], dv, myColor, piecesRef.current), 200);
   };
@@ -2236,6 +2276,7 @@ export default function LudoGame() {
     setMovable([]); setWinner(null); setLives({blue:5,green:5}); setTimeLeft(30);
     setOpponentTimeLeft(30);
     setStuckTurns({blue:0,green:0}); consecutiveSixesRef.current=0;
+    autoMoveAfterRollRef.current = false;
     rollBusyRef.current = false;
     moveBusyRef.current = false;
     lastEventSeqRef.current = {};
@@ -2375,7 +2416,8 @@ export default function LudoGame() {
             diceValue={diceGreen} rolling={rollingGreen}
             onRoll={doRoll}
             finished={greenFinished} lives={lives.green}
-            timeLeft={myColor==="green" ? timeLeft : opponentTimeLeft} isMe={myColor==="green"}
+             timeLeft={myColor==="green" ? timeLeft : opponentTimeLeft}
+             isMe={myColor==="green"} canRoll={phase==="roll" && !winner}
           />
         </div>
 
@@ -2401,7 +2443,12 @@ export default function LudoGame() {
           display:"flex", alignItems:"center", justifyContent:"center",
         }}>
           <div style={{ width:"100%", maxHeight:"100%", aspectRatio:"1" }}>
-            <Board pieces={pieces} movable={movable} onSelectPiece={handleSelectPiece}/>
+             <Board
+               pieces={pieces}
+               movable={movable}
+               onSelectPiece={handleSelectPiece}
+               rotateForPlayer={myColor==="green"}
+             />
           </div>
         </div>
 
@@ -2443,7 +2490,8 @@ export default function LudoGame() {
             diceValue={diceBlue} rolling={rollingBlue}
             onRoll={doRoll}
             finished={blueFinished} lives={lives.blue}
-            timeLeft={myColor==="blue" ? timeLeft : opponentTimeLeft} isMe={myColor==="blue"}
+             timeLeft={myColor==="blue" ? timeLeft : opponentTimeLeft}
+             isMe={myColor==="blue"} canRoll={phase==="roll" && !winner}
           />
         </div>
 

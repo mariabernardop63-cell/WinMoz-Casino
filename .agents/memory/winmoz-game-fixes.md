@@ -41,3 +41,6 @@ description: Key decisions and patterns from major bug-fix session — payout, r
 - Realtime dice and piece-selection events must be accepted only when their player matches the current turn; remote base-exit animations must always release the movement lock.
 - **Why:** Delayed broadcasts otherwise reuse an old die/result on the next turn, and a remote piece leaving home can leave the local board permanently non-selectable.
 - **How to apply:** Keep turn/phase checks both before and after animation delays, clear both dice faces on hand-off, and release animation locks in every remote-move completion path.
+- A timed-out Ludo turn must publish the turn hand-off even when no pawn can move, and must auto-select a pawn after an automatic roll with multiple legal choices.
+- **Why:** A client-only timeout can otherwise reduce a life while leaving the other device on the old phase, or leave the timed-out player stuck in piece selection.
+- **How to apply:** Treat timeout as a complete turn transaction: decrement life, roll if needed, choose/move, then broadcast the authoritative next turn/state.
