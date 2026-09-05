@@ -104,7 +104,7 @@ function tryMatchForwarderSms(userBody: string, expectedAmount: number): StoredS
 }
 
 async function creditBalance(
-  admin: ReturnType<typeof createClient>,
+  admin: any,
   userId: string,
   amount: number,
   txId: string | null | undefined,

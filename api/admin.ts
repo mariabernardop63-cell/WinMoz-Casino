@@ -5,6 +5,8 @@ import { authenticateAdmin, getSupabaseAdmin, setCorsHeaders } from "./_lib/auth
 const PUBLIC_KEYS = new Set([
   "maintenance_mode", "platform_name", "min_bet", "max_bet",
   "ludo_enabled", "damas_enabled", "xadrez_enabled", "roleta_enabled",
+  "poker_winner_mode", "whatsapp_group_url",
+  "mpesa_wallet_enabled", "emola_wallet_enabled",
 ]);
 const ADMIN_ONLY_KEYS = new Set([
   "admin_security_password", "revenue_reset_at", "saidas_reset_at",
@@ -15,6 +17,14 @@ const WRITE_ALLOWED_KEYS = new Set([
   "min_withdrawal", "max_withdrawal", "withdrawal_fee", "referral_bonus",
   "platform_name", "revenue_reset_at", "saidas_reset_at",
   "ludo_enabled", "damas_enabled", "xadrez_enabled", "roleta_enabled",
+  "poker_winner_mode", "support_ai_mode", "allow_new_users", "bets_active",
+  "backup_auto", "query_cache", "query_logs",
+  "mpesa_wallet_enabled", "emola_wallet_enabled",
+  "app_version", "terms_of_service_content", "privacy_policy_content",
+  "ad_banner_script", "footer_tagline", "footer_phone", "footer_email",
+  "footer_app_download_url", "whatsapp_group_url",
+  "sms_mpesa_number", "sms_mpesa_name", "sms_emola_number", "sms_emola_name",
+  "sms_webhook_token",
 ]);
 
 // ─── /api/admin/deposit ──────────────────────────────────────────────────────
@@ -119,6 +129,60 @@ async function handleVerify(req: VercelRequest, res: VercelResponse) {
   const auth = await authenticateAdmin(req);
   if (!auth) { res.status(403).json({ isAdmin: false, error: "Acesso negado" }); return; }
   res.json({ isAdmin: true });
+}
+
+// ─── /api/admin/security-password ────────────────────────────────────────────
+async function handleSecurityPassword(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+  const auth = await authenticateAdmin(req);
+  if (!auth) { res.status(403).json({ error: "Acesso negado" }); return; }
+  try {
+    const admin = getSupabaseAdmin();
+    const { data, error } = await admin
+      .from("platform_settings")
+      .select("value")
+      .eq("key", "admin_security_password")
+      .maybeSingle();
+    if (error) { res.status(500).json({ error: error.message }); return; }
+    res.status(200).json({ password: (data as { value?: string } | null)?.value ?? null });
+  } catch {
+    res.status(500).json({ error: "Erro interno" });
+  }
+}
+
+// ─── /api/admin/update-admin-credentials ──────────────────────────────────────
+async function handleUpdateAdminCredentials(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+  const auth = await authenticateAdmin(req);
+  if (!auth) { res.status(403).json({ error: "Acesso negado" }); return; }
+  const { type, value, adminEmail } = req.body as {
+    type?: "email" | "password";
+    value?: string;
+    adminEmail?: string;
+  };
+  if (!type || !value || !adminEmail) {
+    res.status(400).json({ error: "Parâmetros em falta (type, value, adminEmail)" });
+    return;
+  }
+  if (type !== "email" && type !== "password") {
+    res.status(400).json({ error: "Tipo inválido" });
+    return;
+  }
+  try {
+    const admin = getSupabaseAdmin();
+    const { data, error: listError } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    if (listError) { res.status(500).json({ error: "Erro ao procurar utilizador: " + listError.message }); return; }
+    const user = data.users.find((candidate) =>
+      candidate.email?.toLowerCase() === adminEmail.trim().toLowerCase()
+    );
+    if (!user) { res.status(404).json({ error: "Nenhuma conta encontrada com esse e-mail" }); return; }
+    const update = type === "email" ? { email: value.trim() } : { password: value };
+    const { error: updateError } = await admin.auth.admin.updateUserById(user.id, update);
+    if (updateError) { res.status(500).json({ error: "Erro ao actualizar: " + updateError.message }); return; }
+    res.status(200).json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Erro interno" });
+  }
 }
 
 // ─── /api/admin/notifications/send ───────────────────────────────────────────
@@ -306,8 +370,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   switch (action) {
     case "deposit":                    return handleDeposit(req, res);
-    case "settings":                   return handleSettings(req, res);
+    case "settings":
+    case "settings/get":
+    case "settings/set":
+    case "settings/update":             return handleSettings(req, res);
     case "verify":                     return handleVerify(req, res);
+    case "security-password":           return handleSecurityPassword(req, res);
+    case "update-admin-credentials":    return handleUpdateAdminCredentials(req, res);
     case "notifications/send":         return handleNotificationsSend(req, res);
     case "notifications/history":      return handleNotificationsHistory(req, res);
     case "support/send":               return handleSupportSend(req, res);

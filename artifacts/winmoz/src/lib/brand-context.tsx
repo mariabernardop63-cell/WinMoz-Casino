@@ -9,9 +9,9 @@ export interface BrandConfig {
 }
 
 const defaults: BrandConfig = {
-  isPokerWinner: false,
-  brandName: "MOZBET",
-  brandSubtitle: "MOZAMBIQUE",
+  isPokerWinner: true,
+  brandName: "POKER",
+  brandSubtitle: "Winner Online",
   whatsappUrl: "",
 };
 
@@ -36,24 +36,18 @@ export function BrandProvider({ children }: { children: React.ReactNode }) {
   /* Estado inicial lido do localStorage — o modo activo aparece logo no
      primeiro render, sem flash "Mozbet" (o script inline do index.html já
      definiu o título; aqui alinhamos o resto do branding). */
-  const [config, setConfig] = useState<BrandConfig>(() => ({
-    ...defaults,
-    isPokerWinner:
-      (typeof window !== "undefined" && localStorage.getItem("wm_brand_poker_winner") === "1"),
-    brandName:
-      (typeof window !== "undefined" && localStorage.getItem("wm_brand_poker_winner") === "1")
-        ? "POKER" : "MOZBET",
-    brandSubtitle:
-      (typeof window !== "undefined" && localStorage.getItem("wm_brand_poker_winner") === "1")
-        ? "Winner Online" : "MOZAMBIQUE",
-  }));
+  const [config, setConfig] = useState<BrandConfig>(() => {
+    const cachedMode = typeof window !== "undefined"
+      ? localStorage.getItem("wm_brand_poker_winner")
+      : null;
+    return cachedMode === "0" ? buildConfig({ poker_winner_mode: "false" }) : defaults;
+  });
 
   /* Título do separador acompanha o branding activo */
   useEffect(() => {
     /* Persiste o modo para o script inline do index.html e próximos loads */
     try {
-      if (config.isPokerWinner) localStorage.setItem("wm_brand_poker_winner", "1");
-      else localStorage.removeItem("wm_brand_poker_winner");
+      localStorage.setItem("wm_brand_poker_winner", config.isPokerWinner ? "1" : "0");
     } catch { /* storage indisponível */ }
     document.title = config.isPokerWinner
       ? "Poker Winner - Jogos e Apostas Online"

@@ -1,7 +1,6 @@
 import { Router, type IRouter } from "express";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
-// @ts-expect-error — ws não tem declarações neste projeto (padrão já usado em routes/index.ts)
 import ws from "ws";
 import { withUserLock } from "../lib/userLock";
 

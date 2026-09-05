@@ -4,9 +4,11 @@ App de jogos e apostas online com painel de administração integrado.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/winmoz run dev` — run the frontend (port 3000)
+- `pnpm install --frozen-lockfile` — install the pinned workspace dependencies
+- `PORT=5000 pnpm --filter @workspace/winmoz run dev` — run the frontend preview
+- `PORT=8080 pnpm --filter @workspace/api-server run dev` — run the API server
 - `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
+- `BASE_PATH=/ pnpm run build` — typecheck + build all packages
 
 ## Stack
 

@@ -21,6 +21,8 @@ The admin panel (from SHAZANANA repo) is integrated at `artifacts/winmoz/src/adm
 
 **Sidebar routes (current):** `/` dashboard · `/matches` · `/players` · `/transactions` (Transação) · `/messages` (Mensagem) · `/reports` (Denúncias) · `/withdrawals` (Saques) · `/notifications` · `/online-users` · `/balance` · `/block-users` (Bloquear Usuários) · `/security` (Segurança) · `/relatorios` (alias for reports) · `/settings` (bottom icon).
 
+**Serverless settings routes:** Vercel rewrites `/api/admin/:action*` into `api/admin.ts` with `_action`. Any frontend call such as `/api/admin/settings/update` needs an explicit matching switch case and an allowlisted key in `api/admin.ts`; otherwise it returns `Endpoint não encontrado`.
+
 **Dark mode:** `.dark .admin-panel-root` CSS block in `src/index.css` handles full dark mode adaptation for cards, topbar, glass, rows, etc.
 
 **Background:** Layout outer div has NO background set — `.admin-panel-root` CSS owns it (`hsl(248 50% 97%)` light / `hsl(248 30% 8%)` dark).

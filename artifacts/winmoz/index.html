@@ -4,15 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
 
-    <title>Mozbet — Jogos e Apostas Online em Moçambique</title>
+    <title>Poker Winner - Jogos e Apostas Online</title>
     <script>
       /* Branding imediato: aplica o modo Poker Winner guardado no localStorage
          antes de o React carregar, evitando o flash "Mozbet" no primeiro paint */
       (function () {
         try {
-          if (localStorage.getItem("wm_brand_poker_winner") === "1") {
-            document.title = "Poker Winner - Jogos e Apostas Online";
-          }
+           document.title = localStorage.getItem("wm_brand_poker_winner") === "0"
+             ? "Mozbet - Jogos e Apostas Online em Moçambique"
+             : "Poker Winner - Jogos e Apostas Online";
         } catch (e) { /* storage indisponível */ }
       })();
     </script>
