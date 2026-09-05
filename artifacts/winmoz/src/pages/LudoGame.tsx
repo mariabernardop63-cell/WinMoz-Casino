@@ -1415,6 +1415,10 @@ export default function LudoGame() {
   // Both clients carry it forward so delayed state syncs can never restore an
   // older turn and re-enable the wrong player's die.
   const stateSyncSeqRef = useRef(0);
+  // Each player owns its own state sequence. Comparing both players against
+  // one shared counter makes simultaneous updates with seq=1 discard each
+  // other, leaving one client on an old turn.
+  const remoteStateSeqRef = useRef<Record<Player,number>>({blue:0,green:0});
   // Each roll phase is a transaction of its own. React state can be one render
   // behind a click or a delayed realtime message, so phase/turn checks alone
   // are not enough to prevent a second roll in the same turn.
@@ -1615,9 +1619,10 @@ export default function LudoGame() {
       const stateSeq = ++stateSyncSeqRef.current;
       setTimeout(()=>{
         channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
-          pieces:authPieces, turn:syncTurn, phase:syncPhase,
+           pieces:authPieces, turn:syncTurn, phase:syncPhase,
           diceBlue:null, diceGreen:null,
           stateSeq,
+           sourcePlayer: currentTurn,
           ...(syncWinner?{winner:syncWinner}:{}),
         }});
       },delay);
@@ -1813,6 +1818,7 @@ export default function LudoGame() {
               pieces:piecesRef.current, turn:next, phase:"roll",
               diceBlue:null, diceGreen:null,
               stateSeq:++stateSyncSeqRef.current,
+              sourcePlayer: pl,
             }});
           }
         },1300);
@@ -2150,9 +2156,13 @@ export default function LudoGame() {
     });
 
     channel.on("broadcast",{ event:"ludo_resync_state" },({ payload })=>{
-      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;stateSeq?:number};
-      if(typeof p.stateSeq==="number" && p.stateSeq < stateSyncSeqRef.current) return;
-      if(typeof p.stateSeq==="number") stateSyncSeqRef.current=p.stateSeq;
+      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;stateSeq?:number;sourcePlayer?:Player};
+      const sourcePlayer = p.sourcePlayer === "blue" || p.sourcePlayer === "green"
+        ? p.sourcePlayer
+        : other(myColor);
+      if(sourcePlayer===myColor) return;
+      if(typeof p.stateSeq==="number" && p.stateSeq <= remoteStateSeqRef.current[sourcePlayer]) return;
+      if(typeof p.stateSeq==="number") remoteStateSeqRef.current[sourcePlayer]=p.stateSeq;
       setPieces(p.pieces); setTurn(p.turn); setPhase(p.phase);
       setDiceBlue(p.diceBlue); setDiceGreen(p.diceGreen);
       piecesRef.current=p.pieces; turnRef.current=p.turn; phaseRef.current=p.phase;
@@ -2163,15 +2173,19 @@ export default function LudoGame() {
     // ── Authoritative state sync — sent by the moving player after every move ──
     channel.on("broadcast",{ event:"ludo_state_sync" },({ payload })=>{
       if(phaseRef.current==="done") return;
-      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;stateSeq?:number;winner?:Player};
+       const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;stateSeq?:number;sourcePlayer?:Player;winner?:Player};
+       const sourcePlayer = p.sourcePlayer === "blue" || p.sourcePlayer === "green"
+         ? p.sourcePlayer
+         : other(myColor);
+       if(sourcePlayer===myColor) return;
       const stateSeq = typeof p.stateSeq==="number" ? p.stateSeq : null;
-      if(stateSeq !== null && stateSeq <= stateSyncSeqRef.current) return;
-      if(stateSeq !== null) stateSyncSeqRef.current=stateSeq;
+       if(stateSeq !== null && stateSeq <= remoteStateSeqRef.current[sourcePlayer]) return;
+       if(stateSeq !== null) remoteStateSeqRef.current[sourcePlayer]=stateSeq;
       // Delay slightly so ongoing capture animation can finish before state is overwritten
       setTimeout(()=>{
         // A newer sync may have arrived while this one was waiting for the
         // remote movement animation to finish.
-        if(stateSeq !== null && stateSeq !== stateSyncSeqRef.current) return;
+         if(stateSeq !== null && stateSeq !== remoteStateSeqRef.current[sourcePlayer]) return;
         // A same-player "roll" snapshot can be an old hand-off arriving after
         // the local player already rolled. It must never re-arm the die.
         // Only ownership changing to the other player starts a new turn here;
