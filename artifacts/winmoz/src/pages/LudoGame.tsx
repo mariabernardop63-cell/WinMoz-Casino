@@ -1710,6 +1710,9 @@ export default function LudoGame() {
     setR(true);
     setTimeout(()=>{
       setD(val); setR(false);
+      // The request/animation lock only covers this roll. Turn ownership is
+      // handled by the normal hand-off below.
+      rollBusyRef.current = false;
 
       // Track consecutive sixes (Rule 4) — update ref synchronously to avoid timing bugs
       if(val===6){
