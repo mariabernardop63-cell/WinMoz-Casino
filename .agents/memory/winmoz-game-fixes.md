@@ -50,6 +50,6 @@ description: Key decisions and patterns from major bug-fix session — payout, r
 - Each Ludo roll phase also needs a monotonic client transaction/epoch, because a delayed render or realtime hand-off can otherwise make the same phase appear rollable twice.
 - **Why:** A boolean busy ref can be cleared by a stale transition while an older async roll is still returning.
 - **How to apply:** Mark the epoch synchronously before the server request, validate it after the response/animation, and clear it only when a new authoritative roll phase begins.
-- Authoritative Ludo hand-offs need a shared monotonic state version carried through both clients.
-- **Why:** Realtime delivery can reorder delayed movement snapshots; an old snapshot can otherwise restore the previous turn and reactivate the wrong die.
-- **How to apply:** Increment the version on every outgoing hand-off, propagate the received version before the next hand-off, and ignore older snapshots both on receipt and after animation delays.
+- Authoritative Ludo hand-offs need monotonic versions scoped per sender (or a truly global unique version), not two independent counters compared as one stream.
+- **Why:** Two clients can both emit sequence 1; treating equal numbers as duplicates drops a valid hand-off and leaves one board on the old turn.
+- **How to apply:** Include the source player with every state snapshot, track the latest sequence per source, ignore only older snapshots from that source, and re-check after animation delays.
