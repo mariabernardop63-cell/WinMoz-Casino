@@ -1411,6 +1411,10 @@ export default function LudoGame() {
   const consecutiveSixesRef = useRef(0);
   // eventSeqRef: tracks last processed event sequence to discard duplicates
   const lastEventSeqRef = useRef<Record<string,number>>({});
+  // Every authoritative hand-off gets one monotonically increasing version.
+  // Both clients carry it forward so delayed state syncs can never restore an
+  // older turn and re-enable the wrong player's die.
+  const stateSyncSeqRef = useRef(0);
 
   const myTurnMsg  = `${playerName.split(" ")[0]} — clica nos dados!`;
   const oppTurnMsg = `A aguardar ${opponentName}…`;
@@ -1597,10 +1601,12 @@ export default function LudoGame() {
     // Helper: broadcast authoritative state to opponent (only moving player sends this)
     const broadcastSync=(syncTurn:Player,syncPhase:Phase,delay:number,syncWinner?:Player)=>{
       if(isBot||currentTurn!==myColor||!channelRef.current) return;
+      const stateSeq = ++stateSyncSeqRef.current;
       setTimeout(()=>{
         channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
           pieces:authPieces, turn:syncTurn, phase:syncPhase,
           diceBlue:null, diceGreen:null,
+          stateSeq,
           ...(syncWinner?{winner:syncWinner}:{}),
         }});
       },delay);
@@ -1764,6 +1770,7 @@ export default function LudoGame() {
             channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
               pieces:piecesRef.current, turn:next, phase:"roll",
               diceBlue:null, diceGreen:null,
+              stateSeq:++stateSyncSeqRef.current,
             }});
           }
         },1300);
@@ -2076,11 +2083,14 @@ export default function LudoGame() {
       channel.send({ type:"broadcast", event:"ludo_resync_state", payload:{
         pieces:piecesRef.current, turn:turnRef.current, phase:phaseRef.current,
         diceBlue:diceBlueRef.current, diceGreen:diceGreenRef.current,
+        stateSeq:stateSyncSeqRef.current,
       }});
     });
 
     channel.on("broadcast",{ event:"ludo_resync_state" },({ payload })=>{
-      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null};
+      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;stateSeq?:number};
+      if(typeof p.stateSeq==="number" && p.stateSeq < stateSyncSeqRef.current) return;
+      if(typeof p.stateSeq==="number") stateSyncSeqRef.current=p.stateSeq;
       setPieces(p.pieces); setTurn(p.turn); setPhase(p.phase);
       setDiceBlue(p.diceBlue); setDiceGreen(p.diceGreen);
       piecesRef.current=p.pieces; turnRef.current=p.turn; phaseRef.current=p.phase;
@@ -2091,9 +2101,15 @@ export default function LudoGame() {
     // ── Authoritative state sync — sent by the moving player after every move ──
     channel.on("broadcast",{ event:"ludo_state_sync" },({ payload })=>{
       if(phaseRef.current==="done") return;
-      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;winner?:Player};
+      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;stateSeq?:number;winner?:Player};
+      const stateSeq = typeof p.stateSeq==="number" ? p.stateSeq : null;
+      if(stateSeq !== null && stateSeq <= stateSyncSeqRef.current) return;
+      if(stateSeq !== null) stateSyncSeqRef.current=stateSeq;
       // Delay slightly so ongoing capture animation can finish before state is overwritten
       setTimeout(()=>{
+        // A newer sync may have arrived while this one was waiting for the
+        // remote movement animation to finish.
+        if(stateSeq !== null && stateSeq !== stateSyncSeqRef.current) return;
         setPieces(p.pieces);
         setTurn(p.turn);
         setPhase(p.phase);
