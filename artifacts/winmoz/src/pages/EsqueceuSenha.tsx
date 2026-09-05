@@ -75,7 +75,7 @@ export default function EsqueceuSenha() {
 
   return (
     <div className="min-h-screen bg-white w-full flex justify-center">
-      <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col px-6 pt-16 pb-10 relative">
+      <div className="auth-shell w-full max-w-[430px] min-h-screen bg-white flex flex-col px-6 pt-16 pb-10 relative">
 
         <button onClick={() => setLocation("/login")}
           className="absolute top-5 left-5 flex items-center justify-center transition-colors hover:bg-slate-100"

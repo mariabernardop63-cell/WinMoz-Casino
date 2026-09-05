@@ -315,7 +315,7 @@ export default function BottomNav() {
 
   return (
     <>
-      <nav className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50"
+      <nav className="public-bottom-nav fixed bottom-5 left-1/2 -translate-x-1/2 z-50"
         style={{ width: "calc(100% - 40px)", maxWidth: 390 }}>
         <AnimatePresence mode="wait">
           {searching ? (

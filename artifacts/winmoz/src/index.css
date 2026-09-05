@@ -732,3 +732,117 @@
   min-height: 100vh;
   min-height: -webkit-fill-available;
 }
+
+/* ── Responsive public app layout ──────────────────────────────────────────
+   Most public screens were originally designed around a 430px phone canvas.
+   Keep that comfortable width on phones, but let the same screens breathe on
+   tablets and desktops instead of leaving a narrow column in the middle. */
+[class~="max-w-[430px]"] {
+  width: 100%;
+}
+
+.public-bottom-nav {
+  width: calc(100% - 24px) !important;
+  max-width: 430px !important;
+  bottom: max(12px, env(safe-area-inset-bottom)) !important;
+}
+
+.responsive-game-viewport {
+  min-height: 100svh;
+  min-height: 100dvh;
+  height: auto !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.responsive-game-shell {
+  min-height: 100svh;
+  min-height: 100dvh;
+  height: auto !important;
+  overflow-y: auto !important;
+}
+
+.admin-responsive-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+.admin-settings-grid {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+@media (min-width: 640px) {
+  .admin-responsive-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 768px) {
+  [class~="max-w-[430px]"] {
+    max-width: min(1180px, calc(100vw - 48px)) !important;
+    margin-inline: auto;
+  }
+
+  .auth-shell {
+    max-width: 520px !important;
+  }
+
+  .public-bottom-nav {
+    max-width: 560px !important;
+  }
+
+  .responsive-game-shell {
+    max-width: 860px !important;
+  }
+
+  .public-content-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px !important;
+  }
+
+  .public-content-grid > * {
+    min-width: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .public-bottom-nav {
+    max-width: 640px !important;
+  }
+
+  .admin-settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .admin-responsive-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .responsive-game-shell {
+    max-width: 980px !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  .public-bottom-nav {
+    max-width: 720px !important;
+  }
+
+  .public-content-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 374px) {
+  .public-bottom-nav {
+    width: calc(100% - 16px) !important;
+  }
+}
+
+@media (min-width: 768px) and (max-height: 720px) {
+  .responsive-game-shell {
+    overflow-y: auto !important;
+  }
+}

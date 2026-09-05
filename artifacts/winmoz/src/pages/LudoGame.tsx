@@ -2277,13 +2277,13 @@ export default function LudoGame() {
   const greenFinished = finishedCount(pieces,"green");
 
   return (
-    <div style={{
+    <div className="responsive-game-viewport" style={{
       height:"100vh", width:"100%", overflow:"hidden",
       background:"#fff",
       display:"flex", justifyContent:"center",
     }}>
 
-      <div style={{
+      <div className="responsive-game-shell" style={{
         width:"100%", maxWidth:430,
         height:"100vh", overflow:"hidden",
         display:"flex", flexDirection:"column",

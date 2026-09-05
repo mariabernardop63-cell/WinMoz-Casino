@@ -303,7 +303,7 @@ export default function Security() {
         </div>
 
         {/* Quick stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 16 }}>
+        <div className="admin-responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginTop: 16 }}>
           {[
             { icon: UserX, label: "Contas bloqueadas", value: d.totalBlocked },
             { icon: AlertTriangle, label: "Tx rejeitadas", value: d.totalSuspicious },
@@ -364,7 +364,7 @@ export default function Security() {
       {/* ── Services ── */}
       <div className="gz-card p-5">
         <div style={{ fontSize: 14, fontWeight: 700, color: "var(--gz-text-primary)", marginBottom: 14 }}>Estado dos Serviços</div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        <div className="admin-responsive-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {d.services.map(s => (
             <div key={s.name} style={{
               display: "flex", alignItems: "center", gap: 10,

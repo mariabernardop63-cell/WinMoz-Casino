@@ -84,7 +84,7 @@ export default function Transactions() {
         <p className="text-sm ml-12" style={{ color: "var(--gz-text-muted)" }}>Monitore todas as transações da plataforma</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="admin-responsive-grid grid gap-4 mb-6">
         {[
           { label: "Total de Transações", value: totalEntries,                         color: "text-indigo-600" },
           { label: "Volume Total",        value: `MT ${totalVolume.toFixed(2)}`,       color: "text-purple-600" },

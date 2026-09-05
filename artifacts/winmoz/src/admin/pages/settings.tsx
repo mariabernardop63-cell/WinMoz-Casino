@@ -623,7 +623,7 @@ export default function Settings() {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="admin-settings-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
         {/* Notifications — all locked */}
         <SectionCard title="Notificações" icon={Bell} color="#6C5CE7" bg="rgba(108,92,231,0.1)">

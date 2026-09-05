@@ -114,7 +114,7 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
 
   return (
     <aside
-      className="gz-sidebar flex flex-col items-center"
+      className="gz-sidebar admin-sidebar flex flex-col items-center"
       style={{
         width: 66,
         height: "100%",

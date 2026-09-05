@@ -1325,7 +1325,7 @@ export default function Home() {
             variants={stagger}
             initial="hidden"
             animate={gamesReady ? "show" : "hidden"}
-            className="flex gap-3 overflow-x-auto pt-1 pb-1 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            className="public-content-grid flex gap-3 overflow-x-auto pt-1 pb-1 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             style={{ display: gamesReady ? undefined : "none" }}
           >
             {games.map((game) => (

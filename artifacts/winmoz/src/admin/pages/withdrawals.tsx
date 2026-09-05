@@ -137,7 +137,7 @@ export default function Withdrawals() {
       </div>
 
       {/* Stats — responsive grid */}
-      <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+      <div className="admin-responsive-grid grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         <div className="gz-card p-3 sm:p-5">
           <div className="flex items-center gap-2 mb-1">
             <Clock style={{ width: 14, height: 14, color: "#d97706", flexShrink: 0 }} />

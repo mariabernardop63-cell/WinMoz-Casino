@@ -1456,11 +1456,11 @@ export default function ChessGame(){
   const myCheck=status==="check"&&turn===myColor;
 
   return(
-    <div style={{height:"100vh",width:"100%",overflow:"hidden",
+    <div className="responsive-game-viewport" style={{height:"100vh",width:"100%",overflow:"hidden",
       background:"#fff",
       display:"flex",justifyContent:"center"}}>
 
-      <div style={{width:"100%",maxWidth:430,height:"100vh",
+      <div className="responsive-game-shell" style={{width:"100%",maxWidth:430,height:"100vh",
         display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
 
         {/* Header */}

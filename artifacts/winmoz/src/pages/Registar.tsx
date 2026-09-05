@@ -202,7 +202,7 @@ export default function Registar() {
 
   return (
     <div className="min-h-screen bg-white w-full flex justify-center">
-      <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col pb-10 relative" style={{ overflowX: "hidden" }}>
+      <div className="auth-shell w-full max-w-[430px] min-h-screen bg-white flex flex-col pb-10 relative" style={{ overflowX: "hidden" }}>
 
         <button onClick={goBack}
           className="absolute top-5 left-5 flex items-center justify-center transition-colors hover:bg-slate-100"

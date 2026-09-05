@@ -370,7 +370,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
         >
           <TopBar onMenuClick={() => setSidebarOpen(o => !o)} navPos={navPos} onNavPosChange={handleNavPosChange} />
-          <div style={{ flex: 1, overflowX: "hidden", paddingBottom: 70 }} className="lg:pb-0">
+          <div style={{ flex: 1, overflowX: "hidden", paddingBottom: "calc(70px + env(safe-area-inset-bottom, 0px))" }} className="lg:pb-0">
             {children}
           </div>
         </div>
@@ -387,7 +387,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <div className="hidden lg:block w-full" style={{ zIndex: 30, borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
           <HorizontalSidebar />
         </div>
-        <div style={{ flex: 1, overflowX: "hidden", paddingBottom: 70 }} className="lg:pb-0">
+        <div style={{ flex: 1, overflowX: "hidden", paddingBottom: "calc(70px + env(safe-area-inset-bottom, 0px))" }} className="lg:pb-0">
           {children}
         </div>
         <MobileBottomNav />
@@ -399,7 +399,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <TopBar onMenuClick={() => setSidebarOpen(o => !o)} navPos={navPos} onNavPosChange={handleNavPosChange} />
-      <div style={{ flex: 1, overflowX: "hidden", paddingBottom: 70 }} className="lg:pb-16">
+      <div style={{ flex: 1, overflowX: "hidden", paddingBottom: "calc(70px + env(safe-area-inset-bottom, 0px))" }} className="lg:pb-16">
         {children}
       </div>
       {/* Desktop bottom bar */}

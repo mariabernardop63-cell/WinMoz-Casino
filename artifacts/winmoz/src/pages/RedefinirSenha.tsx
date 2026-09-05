@@ -83,7 +83,7 @@ export default function RedefinirSenha() {
 
   return (
     <div className="min-h-screen bg-white w-full flex justify-center">
-      <div className="w-full max-w-[430px] min-h-screen bg-white flex flex-col px-6 pt-16 pb-10 relative">
+      <div className="auth-shell w-full max-w-[430px] min-h-screen bg-white flex flex-col px-6 pt-16 pb-10 relative">
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}
           className="flex justify-center mb-9">
           <WinMozLogo />

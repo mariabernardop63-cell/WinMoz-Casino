@@ -201,7 +201,7 @@ export default function DepositRequests() {
       </div>
 
       {/* Stats */}
-      <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+      <div className="admin-responsive-grid grid gap-3 mb-6" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         {[
           { label: "Pendentes", val: requests.length, icon: Clock, color: "#f59e0b" },
           { label: "Depósitos", val: requests.filter(r => r.type === "manual_deposit").length, icon: Wallet, color: CYAN },
