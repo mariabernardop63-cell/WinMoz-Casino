@@ -47,9 +47,6 @@ description: Key decisions and patterns from major bug-fix session — payout, r
 - Ludo roll locks must last until the server response and phase transition, not a fixed short delay.
 - **Why:** A slow roll request can outlive a fixed unlock timer and let rapid clicks create concurrent rolls or duplicate turn events.
 - **How to apply:** Lock before the request, release on error/stale response or authoritative state transition, and reject duplicate remote roll broadcasts while the current roll is being resolved.
-- Each Ludo roll phase also needs a monotonic client transaction/epoch, because a delayed render or realtime hand-off can otherwise make the same phase appear rollable twice.
-- **Why:** A boolean busy ref can be cleared by a stale transition while an older async roll is still returning.
-- **How to apply:** Mark the epoch synchronously before the server request, validate it after the response/animation, and clear it only when a new authoritative roll phase begins.
-- Authoritative Ludo hand-offs need monotonic versions scoped per sender (or a truly global unique version), not two independent counters compared as one stream.
-- **Why:** Two clients can both emit sequence 1; treating equal numbers as duplicates drops a valid hand-off and leaves one board on the old turn.
-- **How to apply:** Include the source player with every state snapshot, track the latest sequence per source, ignore only older snapshots from that source, and re-check after animation delays.
+- Avoid adding client-side epochs or snapshot sequence gates to the working Ludo dice flow without a full two-client test.
+- **Why:** A local client can still be on the previous phase when a valid opponent roll arrives; strict epoch/turn filters then reject the event and make one player's die appear permanently disabled.
+- **How to apply:** Keep the reference event flow for dice, selection, and state sync; use only a short local request lock to prevent duplicate clicks, and validate any stronger authority at the server boundary.
