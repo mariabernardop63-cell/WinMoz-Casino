@@ -2152,21 +2152,28 @@ export default function LudoGame() {
         pieces:piecesRef.current, turn:turnRef.current, phase:phaseRef.current,
         diceBlue:diceBlueRef.current, diceGreen:diceGreenRef.current,
         stateSeq:stateSyncSeqRef.current,
+        sourcePlayer:myColor,
       }});
     });
 
     channel.on("broadcast",{ event:"ludo_resync_state" },({ payload })=>{
-      const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;stateSeq?:number;sourcePlayer?:Player};
+       const p=payload as{pieces:GamePiece[];turn:Player;phase:Phase;diceBlue:number|null;diceGreen:number|null;stateSeq?:number;sourcePlayer?:Player};
       const sourcePlayer = p.sourcePlayer === "blue" || p.sourcePlayer === "green"
         ? p.sourcePlayer
         : other(myColor);
       if(sourcePlayer===myColor) return;
       if(typeof p.stateSeq==="number" && p.stateSeq <= remoteStateSeqRef.current[sourcePlayer]) return;
       if(typeof p.stateSeq==="number") remoteStateSeqRef.current[sourcePlayer]=p.stateSeq;
+       const previousTurn = turnRef.current;
       setPieces(p.pieces); setTurn(p.turn); setPhase(p.phase);
       setDiceBlue(p.diceBlue); setDiceGreen(p.diceGreen);
       piecesRef.current=p.pieces; turnRef.current=p.turn; phaseRef.current=p.phase;
       diceBlueRef.current=p.diceBlue; diceGreenRef.current=p.diceGreen;
+       if(p.phase==="roll" && p.turn!==previousTurn){
+         turnEpochRef.current++;
+         rolledEpochRef.current=null;
+         if(p.turn===myColor) rollConsumedRef.current=false;
+       }
       rollBusyRef.current = false;
     });
 
@@ -2400,6 +2407,7 @@ export default function LudoGame() {
     turnEpochRef.current = 0;
     rolledEpochRef.current = null;
     rollConsumedRef.current = false;
+    remoteStateSeqRef.current = {blue:0,green:0};
     moveBusyRef.current = false;
     lastEventSeqRef.current = {};
     setMsg(myColor==="blue"?myTurnMsg:oppTurnMsg);
