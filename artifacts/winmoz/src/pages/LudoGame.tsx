@@ -1702,10 +1702,19 @@ export default function LudoGame() {
   }
 
   // ── Apply a dice roll locally (no broadcast) ────────────────────────────────
-  const applyRoll=useCallback((pl:Player,val:number)=>{
+  const applyRoll=useCallback((pl:Player,val:number,alreadyLocked=false)=>{
     // Realtime events may arrive late. A roll is valid only for the player
     // whose turn is currently active and while the UI is waiting for a roll.
-    if(turnRef.current!==pl||phaseRef.current!=="roll"||winnerRef.current) return;
+    if(turnRef.current!==pl||phaseRef.current!=="roll"||winnerRef.current) {
+      if(alreadyLocked) rollBusyRef.current = false;
+      return;
+    }
+    // A local request locks before the server call; remote/bot rolls lock here.
+    // This prevents duplicate broadcasts from starting parallel animations.
+    if(!alreadyLocked){
+      if(rollBusyRef.current) return;
+      rollBusyRef.current = true;
+    }
     const setR=pl==="blue"?setRollingB:setRollingG;
     const setD=pl==="blue"?setDiceBlue:setDiceGreen;
     setR(true);
@@ -1714,6 +1723,7 @@ export default function LudoGame() {
       // the turn to the other player during those 800ms.
       if(turnRef.current!==pl||phaseRef.current!=="roll"||winnerRef.current){
         setR(false);
+        rollBusyRef.current = false;
         return;
       }
       setD(val); setR(false);
@@ -1749,6 +1759,7 @@ export default function LudoGame() {
           const next=other(pl); setTurn(next); setPhase("roll");
           setDiceBlue(null); setDiceGreen(null);
           setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
+          rollBusyRef.current = false;
           if (pl===myColor && !isBot) {
             channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
               pieces:piecesRef.current, turn:next, phase:"roll",
@@ -1763,9 +1774,11 @@ export default function LudoGame() {
           channelRef.current?.send({type:"broadcast",event:"piece_selected",
             payload:{pieceId:mv[0],diceVal:val,player:pl,seq:Date.now()}});
           doSelectPiece(mv[0],val,pl,piecesRef.current);
+          setTimeout(()=>{ rollBusyRef.current = false; },120);
         } else if(isBot){
           // Bot opponent: move directly (no channel)
           doSelectPiece(mv[0],val,pl,piecesRef.current);
+          setTimeout(()=>{ rollBusyRef.current = false; },120);
         }
         // else: multiplayer opponent — piece_selected broadcast will arrive shortly,
         //       doOpponentMove handles animation + ludo_state_sync sets final state
@@ -1774,6 +1787,7 @@ export default function LudoGame() {
           // My turn or bot: show selectable pieces + enter select phase
           setMovable(mv); setPhase("select");
           setMsg(`${plName} — ${val}! ${pl===myColor?"Escolhe uma peça.":""}`);
+           if(pl===myColor||isBot) setTimeout(()=>{ rollBusyRef.current = false; },120);
           if (pl===myColor && autoMoveAfterRollRef.current) {
             autoMoveAfterRollRef.current = false;
             // Let React commit the select phase before choosing a piece.
@@ -1856,9 +1870,7 @@ export default function LudoGame() {
       event:"dice_rolled",
       payload:{ player:myColor, value:val, seq },
     });
-    applyRoll(myColor,val);
-    // Keep the lock through the dice animation and the phase transition.
-    setTimeout(()=>{ rollBusyRef.current = false; }, 950);
+    applyRoll(myColor,val,true);
   },[myColor,applyRoll,gameId]);
 
   // ── Select piece — broadcasts + applies ────────────────────────────────────
@@ -2073,6 +2085,7 @@ export default function LudoGame() {
       setDiceBlue(p.diceBlue); setDiceGreen(p.diceGreen);
       piecesRef.current=p.pieces; turnRef.current=p.turn; phaseRef.current=p.phase;
       diceBlueRef.current=p.diceBlue; diceGreenRef.current=p.diceGreen;
+      rollBusyRef.current = false;
     });
 
     // ── Authoritative state sync — sent by the moving player after every move ──
@@ -2094,6 +2107,7 @@ export default function LudoGame() {
         // The sync is authoritative. An interrupted remote animation must
         // never leave the board locked for the next local turn.
         moveBusyRef.current = false;
+         rollBusyRef.current = false;
         if(p.winner){
           setWinner(p.winner);
           winnerRef.current=p.winner;
@@ -2347,6 +2361,30 @@ export default function LudoGame() {
   const blueFinished  = finishedCount(pieces,"blue");
   const greenFinished = finishedCount(pieces,"green");
 
+  // Keep the local player at the bottom of the screen. The board is rotated
+  // separately for green, so the panel order must follow the same perspective.
+  function renderPlayerPanel(player:Player){
+    const isGreen = player === "green";
+    return (
+      <div key={player} style={{ padding:player===opponentColor ? "5px 10px 3px" : "2px 10px 3px", flexShrink:0 }}>
+        <PlayerPanel
+          player={player}
+          name={myColor===player ? playerName : opponentName}
+          balance={myColor===player ? playerBal : opponentBal}
+          isActive={turn===player&&!winner}
+          diceValue={isGreen ? diceGreen : diceBlue}
+          rolling={isGreen ? rollingGreen : rollingBlue}
+          onRoll={doRoll}
+          finished={isGreen ? greenFinished : blueFinished}
+          lives={isGreen ? lives.green : lives.blue}
+          timeLeft={myColor===player ? timeLeft : opponentTimeLeft}
+          isMe={myColor===player}
+          canRoll={phase==="roll" && !winner && !rollBusyRef.current}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="responsive-game-viewport" style={{
       height:"100vh", width:"100%", overflow:"hidden",
@@ -2406,20 +2444,8 @@ export default function LudoGame() {
           </div>
         </div>
 
-        {/* ── Green panel */}
-        <div style={{ padding:"5px 10px 3px", flexShrink:0 }}>
-          <PlayerPanel
-            player="green"
-            name={myColor==="green" ? playerName : opponentName}
-            balance={myColor==="green" ? playerBal : opponentBal}
-            isActive={turn==="green"&&!winner}
-            diceValue={diceGreen} rolling={rollingGreen}
-            onRoll={doRoll}
-            finished={greenFinished} lives={lives.green}
-             timeLeft={myColor==="green" ? timeLeft : opponentTimeLeft}
-             isMe={myColor==="green"} canRoll={phase==="roll" && !winner}
-          />
-        </div>
+        {/* ── Opponent panel: always above the board */}
+        {renderPlayerPanel(opponentColor)}
 
         {/* ── Status message */}
         <div style={{ padding:"2px 10px", flexShrink:0 }}>
@@ -2480,20 +2506,8 @@ export default function LudoGame() {
           </motion.div>
         </div>
 
-        {/* ── Blue panel */}
-        <div style={{ padding:"2px 10px 3px", flexShrink:0 }}>
-          <PlayerPanel
-            player="blue"
-            name={myColor==="blue" ? playerName : opponentName}
-            balance={myColor==="blue" ? playerBal : opponentBal}
-            isActive={turn==="blue"&&!winner}
-            diceValue={diceBlue} rolling={rollingBlue}
-            onRoll={doRoll}
-            finished={blueFinished} lives={lives.blue}
-             timeLeft={myColor==="blue" ? timeLeft : opponentTimeLeft}
-             isMe={myColor==="blue"} canRoll={phase==="roll" && !winner}
-          />
-        </div>
+        {/* ── Local player panel: always below the board */}
+        {renderPlayerPanel(myColor)}
 
         {/* ── Ad banner */}
         <div style={{ padding:"0 10px 5px", flexShrink:0 }}>

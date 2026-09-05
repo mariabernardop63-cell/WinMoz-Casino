@@ -44,3 +44,6 @@ description: Key decisions and patterns from major bug-fix session — payout, r
 - A timed-out Ludo turn must publish the turn hand-off even when no pawn can move, and must auto-select a pawn after an automatic roll with multiple legal choices.
 - **Why:** A client-only timeout can otherwise reduce a life while leaving the other device on the old phase, or leave the timed-out player stuck in piece selection.
 - **How to apply:** Treat timeout as a complete turn transaction: decrement life, roll if needed, choose/move, then broadcast the authoritative next turn/state.
+- Ludo roll locks must last until the server response and phase transition, not a fixed short delay.
+- **Why:** A slow roll request can outlive a fixed unlock timer and let rapid clicks create concurrent rolls or duplicate turn events.
+- **How to apply:** Lock before the request, release on error/stale response or authoritative state transition, and reject duplicate remote roll broadcasts while the current roll is being resolved.
