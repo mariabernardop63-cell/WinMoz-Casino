@@ -2157,9 +2157,14 @@ export default function LudoGame() {
         // A newer sync may have arrived while this one was waiting for the
         // remote movement animation to finish.
         if(stateSeq !== null && stateSeq !== stateSyncSeqRef.current) return;
+        // A same-player "roll" snapshot can be an old hand-off arriving after
+        // the local player already rolled. It must never re-arm the die.
+        // Only ownership changing to the other player starts a new turn here;
+        // the local player already advances its epoch when it grants a legal
+        // extra turn (six/capture/finish).
         const isNewRollTurn =
           p.phase === "roll" &&
-          (p.turn !== turnRef.current || phaseRef.current !== "roll");
+          p.turn !== turnRef.current;
         if(isNewRollTurn){
           turnEpochRef.current++;
           rolledEpochRef.current = null;
