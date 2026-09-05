@@ -1412,22 +1412,6 @@ export default function LudoGame() {
   // eventSeqRef: tracks last processed event sequence to discard duplicates
   const lastEventSeqRef = useRef<Record<string,number>>({});
   // Every authoritative hand-off gets one monotonically increasing version.
-  // Both clients carry it forward so delayed state syncs can never restore an
-  // older turn and re-enable the wrong player's die.
-  const stateSyncSeqRef = useRef(0);
-  // Each player owns its own state sequence. Comparing both players against
-  // one shared counter makes simultaneous updates with seq=1 discard each
-  // other, leaving one client on an old turn.
-  const remoteStateSeqRef = useRef<Record<Player,number>>({blue:0,green:0});
-  // Each roll phase is a transaction of its own. React state can be one render
-  // behind a click or a delayed realtime message, so phase/turn checks alone
-  // are not enough to prevent a second roll in the same turn.
-  const turnEpochRef = useRef(0);
-  const rolledEpochRef = useRef<number|null>(null);
-  // Hard one-roll-per-turn gate. Only an explicit hand-off or legal extra
-  // turn may release it; remote snapshots cannot re-arm the die.
-  const rollConsumedRef = useRef(false);
-
   const myTurnMsg  = `${playerName.split(" ")[0]} — clica nos dados!`;
   const oppTurnMsg = `A aguardar ${opponentName}…`;
   const [msg,setMsg] = useState(myColor==="blue" ? myTurnMsg : oppTurnMsg);
@@ -2274,10 +2258,6 @@ export default function LudoGame() {
     setStuckTurns({blue:0,green:0}); consecutiveSixesRef.current=0;
     autoMoveAfterRollRef.current = false;
     rollBusyRef.current = false;
-    turnEpochRef.current = 0;
-    rolledEpochRef.current = null;
-    rollConsumedRef.current = false;
-    remoteStateSeqRef.current = {blue:0,green:0};
     moveBusyRef.current = false;
     lastEventSeqRef.current = {};
     setMsg(myColor==="blue"?myTurnMsg:oppTurnMsg);
