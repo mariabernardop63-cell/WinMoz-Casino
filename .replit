@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web"]
+modules = ["nodejs-20", "web", "python-base-3.13"]
 
 [deployment]
 router = "application"
@@ -78,9 +78,6 @@ externalPort = 8081
 localPort = 8090
 externalPort = 3003
 
-[[ports]]
-localPort = 19790
-externalPort = 80
 
 [nix]
 channel = "stable-25_05"
