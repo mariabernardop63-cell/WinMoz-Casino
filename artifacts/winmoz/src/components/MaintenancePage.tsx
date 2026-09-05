@@ -105,7 +105,7 @@ export default function MaintenancePage() {
               color: "#111827",
             }}
           >
-            Winmoz
+            PokerWinner
           </span>
         </div>
 
@@ -171,7 +171,7 @@ export default function MaintenancePage() {
             }}
           >
             <Sparkles size={15} strokeWidth={2.2} />
-            Uma nova experiência está a caminho
+            Lançamento em breve
           </div>
 
           <h1
@@ -185,9 +185,7 @@ export default function MaintenancePage() {
               letterSpacing: "-0.075em",
             }}
           >
-            Em
-            <br />
-            <span style={{ color: "#6c5ce7" }}>desenvolvimento.</span>
+            <span style={{ color: "#6c5ce7" }}>Em desenvolvimento.</span>
           </h1>
 
           <p
@@ -199,8 +197,9 @@ export default function MaintenancePage() {
               lineHeight: 1.7,
             }}
           >
-            A plataforma Winmoz ainda está em desenvolvimento. Estamos a
-            preparar uma experiência mais segura, simples e completa para si.
+            A plataforma PokerWinner ainda não foi lançada. Estamos a concluir
+            os últimos detalhes legais e de desenvolvimento antes de abrir o
+            acesso ao público.
           </p>
 
           <p
@@ -213,8 +212,8 @@ export default function MaintenancePage() {
               lineHeight: 1.65,
             }}
           >
-            Neste momento, o acesso está disponível apenas para pessoas
-            autorizadas.
+            O lançamento será anunciado brevemente. Até lá, o acesso está
+            disponível apenas para pessoas autorizadas.
           </p>
 
           <a
@@ -287,7 +286,7 @@ export default function MaintenancePage() {
               letterSpacing: "-0.04em",
             }}
           >
-            Estamos a construir algo melhor.
+            Lançamento em breve.
           </h2>
           <p
             style={{
@@ -297,8 +296,8 @@ export default function MaintenancePage() {
               lineHeight: 1.65,
             }}
           >
-            A nossa equipa está a trabalhar para tornar o Winmoz mais
-            confiável e preparado para todos.
+            A PokerWinner será disponibilizada brevemente, assim que os
+            processos legais e os preparativos técnicos estiverem concluídos.
           </p>
 
           <div
@@ -384,7 +383,7 @@ export default function MaintenancePage() {
           zIndex: 1,
         }}
       >
-        © 2026 Winmoz · Todos os direitos reservados
+        © 2026 PokerWinner · Todos os direitos reservados
       </footer>
 
       <style>{`
