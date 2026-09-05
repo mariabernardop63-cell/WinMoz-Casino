@@ -1582,6 +1582,9 @@ export default function LudoGame() {
 
   function handleMoveComplete(pieceId:PieceId,diceVal:number,currentTurn:Player,prevPos:number){
     moveBusyRef.current = false;
+    // Keep the ref in lockstep with the state immediately. A click arriving
+    // before React commits setPhase("moving") must not select another piece.
+    phaseRef.current = "moving";
     setPhase("moving");
     const ps=piecesRef.current;
     const finalPos = prevPos === -1 ? 0 : prevPos + diceVal;
@@ -1668,6 +1671,8 @@ export default function LudoGame() {
     const piece=ps.find(p=>p.id===pid);
     if(!piece || piece.player!==pl || !calcMovable(ps,pl,diceVal).includes(pid)) return;
     moveBusyRef.current = true;
+    movableRef.current = [];
+    phaseRef.current = "moving";
     setMovable([]); setPhase("moving");
     const isExit=piece.pos===-1;
     const prevPos=piece.pos;
@@ -1693,6 +1698,8 @@ export default function LudoGame() {
   function doOpponentMove(pid:PieceId,diceVal:number,_pl:Player,ps:GamePiece[]){
     if(moveBusyRef.current) return;
     moveBusyRef.current = true;
+    movableRef.current = [];
+    phaseRef.current = "moving";
     setMovable([]); setPhase("moving");
     const piece=ps.find(p=>p.id===pid);
     if(!piece){ moveBusyRef.current = false; return; }
