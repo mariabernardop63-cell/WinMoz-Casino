@@ -366,10 +366,17 @@ function aiEval(b: Board, forColor: PColor): number {
   // A forced capture is strategically more valuable than raw mobility.
   // This prevents the bot from choosing a pretty-looking move that allows
   // the opponent to create a forcing sequence on the next turn.
-  const forForced = aiGetAllMoves(b, forColor).filter(m => m.captured.length > 0).length;
-  const oppForced = aiGetAllMoves(b, oppColor).filter(m => m.captured.length > 0).length;
+  const forMoves = aiGetAllMoves(b, forColor);
+  const oppMoves = aiGetAllMoves(b, oppColor);
+  const forForced = forMoves.filter(m => m.captured.length > 0).length;
+  const oppForced = oppMoves.filter(m => m.captured.length > 0).length;
+  const forMaxCapture = Math.max(0, ...forMoves.map(m => m.captured.length));
+  const oppMaxCapture = Math.max(0, ...oppMoves.map(m => m.captured.length));
   score += (forMob - oppMob) * 4;
   score += (forForced - oppForced) * 16;
+  // Prefer positions that create a real multi-capture threat, not just
+  // positions where one isolated pawn can be taken.
+  score += (forMaxCapture - oppMaxCapture) * 34;
 
   // ── King endgame: we have kings + opponent has only 1 king left ──────────
   if (oppPieces.length === 1 && oppKings.length === 1 && forPieces.length >= 2 && forKings.length >= 1) {
@@ -512,16 +519,23 @@ function _minimax(
 
 const AI_DEPTH = 9;
 
-function getBestBotMove(b: Board, botColor: PColor, depth: number = AI_DEPTH): AIMove | null {
-  const moves = aiGetAllMoves(b, botColor);
+function getBestBotMove(
+  b: Board,
+  botColor: PColor,
+  depth: number = AI_DEPTH,
+  precomputedMoves?: AIMove[],
+): AIMove | null {
+  const moves = precomputedMoves ?? aiGetAllMoves(b, botColor);
   if (moves.length === 0) return null;
+  // Do not spend several seconds re-searching a forced move. The strategic
+  // search is valuable only when there is an actual choice to make.
+  if (moves.length === 1) return moves[0];
   const ordered = orderDamasMoves(b, moves);
-  const oppColor = opp(botColor);
   const totalPieces = b.flat().filter(Boolean).length;
   const targetDepth = totalPieces <= 6 ? Math.max(depth + 5, 14) : totalPieces <= 10 ? Math.max(depth + 2, 11) : depth;
   const ctx: DamasSearchContext = {
     cache: new Map(),
-    deadline: Date.now() + (totalPieces <= 10 ? 6500 : 4500),
+    deadline: Date.now() + (totalPieces <= 6 ? 5200 : totalPieces <= 10 ? 4500 : 3400),
     nodes: 0,
     aborted: false,
   };
@@ -983,19 +997,21 @@ export default function DamasGame() {
   useEffect(() => {
     if (!isBot || turn !== oppColor || !!winner) return;
     setBotThinking(true);
-    // Realistic thinking delay: varies by position complexity so the timer visibly counts down.
-    // Simple positions: 2–5 s. Complex (all-kings or multiple captures): 5–10 s. Never hits 30 s.
+    // Thinking delay follows the position, not an arbitrary long timer:
+    // forced moves stay around 2–3 seconds while strategic positions get
+    // enough time to calculate without making every turn feel slow.
     const currentMoves = aiGetAllMoves(boardRef.current, oppColor);
     const hasCaptures = currentMoves.some(m => m.captured.length > 0);
     const allKingsCurrent = boardRef.current.flat().every(p => p === null || p.isDame);
-    const minDelay = allKingsCurrent ? 5000 : hasCaptures ? 3500 : 2000;
-    const maxDelay = allKingsCurrent ? 10000 : hasCaptures ? 8000 : 5000;
+    const onlyMove = currentMoves.length === 1;
+    const minDelay = onlyMove ? 1900 : allKingsCurrent ? 2800 : hasCaptures ? 2300 : 2000;
+    const maxDelay = onlyMove ? 2700 : allKingsCurrent ? 4200 : hasCaptures ? 3600 : 3000;
     const delay = minDelay + Math.random() * (maxDelay - minDelay);
     const pendingTimers: ReturnType<typeof setTimeout>[] = [];
 
     const mainTimer = setTimeout(() => {
       setBotThinking(false);
-       const move = getBestBotMove(boardRef.current, oppColor, AI_DEPTH);
+        const move = getBestBotMove(boardRef.current, oppColor, AI_DEPTH, currentMoves);
       if (!move) {
         setWinner(myColor); winnerRef.current = myColor;
         setWinReason(`${opponentName} ficou sem movimentos`);

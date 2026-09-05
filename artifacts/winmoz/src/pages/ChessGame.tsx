@@ -475,9 +475,14 @@ const CHESS_BOT_DEPTH=5;
 function getBestChessBotMove(b:Board,botColor:PColor,ep:Sq|null):{from:Sq;to:Sq}|null{
   const raw=getAllLegalMoves(b,botColor,ep);
   if(!raw.length)return null;
+  // A forced move does not need a deep search. This keeps obvious captures,
+  // check evasions and endgame moves responsive.
+  if(raw.length===1)return{from:raw[0][0],to:raw[0][1]};
   const pieceCount=b.flat().filter(Boolean).length;
   const targetDepth=pieceCount<=10?7:CHESS_BOT_DEPTH;
-  const ctx:ChessSearchContext={cache:new Map(),deadline:Date.now()+(pieceCount<=10?6500:5000),nodes:0,aborted:false};
+  const tacticalCount=raw.filter(([from,to])=>isTacticalChessMove(b,from,to,ep)).length;
+  const budget=raw.length<=3&&tacticalCount===0?2400:pieceCount<=10?5200:3600;
+  const ctx:ChessSearchContext={cache:new Map(),deadline:Date.now()+budget,nodes:0,aborted:false};
   let moves=_aiOrder(b,raw);
   let bestMove=moves[0];
   for(let currentDepth=1;currentDepth<=targetDepth&&!ctx.aborted;currentDepth++){
@@ -1212,7 +1217,10 @@ export default function ChessGame(){
   useEffect(()=>{
     if(!isBot||turn!==opponentColor||!!winner||status==="checkmate"||status==="stalemate"||status==="draw")return;
     setBotThinking(true);
-    const delay=1200+Math.random()*900;
+    const legal=getAllLegalMoves(boardRef.current,opponentColor,epRef.current);
+    const onlyMove=legal.length===1;
+    const pieceCount=boardRef.current.flat().filter(Boolean).length;
+    const delay=onlyMove?1900+Math.random()*700:legal.length<=3?2100+Math.random()*900:pieceCount<=10?2500+Math.random()*900:2300+Math.random()*900;
     const t=setTimeout(()=>{
       setBotThinking(false);
       const move=getBestChessBotMove(boardRef.current,opponentColor,epRef.current);
