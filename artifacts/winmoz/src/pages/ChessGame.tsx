@@ -315,60 +315,183 @@ function _aiPST(p: Piece, r: number, c: number): number {
 
 function _aiEval(b: Board, forColor: PColor): number {
   let score=0;
+  const counts: Record<PColor, Record<PType, number>> = {
+    w: { P:0, N:0, B:0, R:0, Q:0, K:0 },
+    b: { P:0, N:0, B:0, R:0, Q:0, K:0 },
+  };
   for(let r=0;r<8;r++) for(let c=0;c<8;c++){
     const p=b[r][c]; if(!p) continue;
+    counts[p.c][p.t]++;
     score += (p.c===forColor?1:-1)*(_AI_PVAL[p.t]+_aiPST(p,r,c));
+  }
+  const enemy: PColor=forColor==="w"?"b":"w";
+  const ownMobility=getAllLegalMoves(b,forColor,null).length;
+  const enemyMobility=getAllLegalMoves(b,enemy,null).length;
+  score+=(ownMobility-enemyMobility)*4;
+  if(counts[forColor].B>=2)score+=28;
+  if(counts[enemy].B>=2)score-=28;
+  for(const color of ["w","b"] as PColor[]){
+    const sign=color===forColor?1:-1;
+    for(let c=0;c<8;c++){
+      let pawns=0;
+      for(let r=0;r<8;r++)if(b[r][c]?.c===color&&b[r][c]?.t==="P")pawns++;
+      if(pawns>1)score-=sign*(pawns-1)*14;
+      if(pawns===0)score+=sign*8;
+    }
   }
   return score;
 }
 
 function _aiOrder(b: Board, moves: [Sq,Sq][]): [Sq,Sq][] {
   return [...moves].sort((a,z)=>{
-    const av=b[a[1][0]][a[1][1]]?_AI_PVAL[b[a[1][0]][a[1][1]]!.t]:0;
-    const zv=b[z[1][0]][z[1][1]]?_AI_PVAL[b[z[1][0]][z[1][1]]!.t]:0;
+    const ap=b[a[0][0]][a[0][1]]!;
+    const zp=b[z[0][0]][z[0][1]]!;
+    const ac=b[a[1][0]][a[1][1]];
+    const zc=b[z[1][0]][z[1][1]];
+    const av=(ac?_AI_PVAL[ac.t]*100-_AI_PVAL[ap.t]:0)+(ap.t==="P"&&(a[1][0]===0||a[1][0]===7)?900:0);
+    const zv=(zc?_AI_PVAL[zc.t]*100-_AI_PVAL[zp.t]:0)+(zp.t==="P"&&(z[1][0]===0||z[1][0]===7)?900:0);
     return zv-av;
   });
 }
 
-const CHESS_BOT_DEPTH=4;
+interface ChessSearchContext {
+  cache: Map<string, { depth: number; value: number }>;
+  deadline: number;
+  nodes: number;
+  aborted: boolean;
+}
 
-function _chessAB(b:Board,depth:number,alpha:number,beta:number,maximizing:boolean,botColor:PColor,ep:Sq|null):number{
-  const cur:PColor=maximizing?botColor:(botColor==="w"?"b":"w");
-  const st=getStatus(b,cur,ep);
-  if(st==="checkmate") return maximizing?-99000+depth:99000-depth;
-  if(st==="stalemate"||st==="draw") return 0;
-  if(depth===0) return _aiEval(b,botColor);
-  const moves=_aiOrder(b,getAllLegalMoves(b,cur,ep));
-  if(maximizing){
-    let best=-Infinity;
-    for(const[from,to]of moves){
+function chessBoardKey(b: Board): string {
+  return b.map(row => row.map(p => p ? `${p.c}${p.t}${p.moved ? "1" : "0"}` : ".").join("")).join("/");
+}
+
+function isTacticalChessMove(b: Board, from: Sq, to: Sq, ep: Sq|null): boolean {
+  const p=b[from[0]][from[1]];
+  if(!p)return false;
+  const capture=!!b[to[0]][to[1]]||(p.t==="P"&&from[1]!==to[1]&&!b[to[0]][to[1]]&&!!ep&&ep[0]===to[0]&&ep[1]===to[1]);
+  const promotion=p.t==="P"&&(to[0]===0||to[0]===7);
+  if(capture||promotion)return true;
+  const res=applyMove(b,from,to);
+  return inCheck(res.board,p.c==="w"?"b":"w");
+}
+
+function _chessQuiescence(
+  b: Board,
+  alpha: number,
+  beta: number,
+  botColor: PColor,
+  turn: PColor,
+  ep: Sq|null,
+  remaining: number,
+  ctx: ChessSearchContext,
+): number {
+  ctx.nodes++;
+  if((ctx.nodes&1023)===0&&Date.now()>=ctx.deadline){ctx.aborted=true;return 0;}
+  const legal=getAllLegalMoves(b,turn,ep);
+  const checked=inCheck(b,turn);
+  if(!legal.length)return checked?(turn===botColor?-990000:990000):0;
+  const stand=_aiEval(b,botColor);
+  if(remaining<=0)return stand;
+  const forcing=checked?legal:legal.filter(([from,to])=>isTacticalChessMove(b,from,to,ep));
+  if(!forcing.length)return stand;
+  const ordered=_aiOrder(b,forcing);
+  if(turn===botColor){
+    let best=stand;
+    if(best>=beta)return best;
+    alpha=Math.max(alpha,best);
+    for(const[from,to]of ordered){
       const res=applyMove(b,from,to);
-      best=Math.max(best,_chessAB(res.board,depth-1,alpha,beta,false,botColor,res.ep));
+      best=Math.max(best,_chessQuiescence(res.board,alpha,beta,botColor,turn==="w"?"b":"w",res.ep,remaining-1,ctx));
+      if(ctx.aborted)return 0;
       alpha=Math.max(alpha,best);
       if(alpha>=beta)break;
     }
     return best;
-  } else {
-    let best=Infinity;
-    for(const[from,to]of moves){
-      const res=applyMove(b,from,to);
-      best=Math.min(best,_chessAB(res.board,depth-1,alpha,beta,true,botColor,res.ep));
-      beta=Math.min(beta,best);
-      if(alpha>=beta)break;
-    }
-    return best;
   }
+  let best=stand;
+  if(best<=alpha)return best;
+  beta=Math.min(beta,best);
+  for(const[from,to]of ordered){
+    const res=applyMove(b,from,to);
+    best=Math.min(best,_chessQuiescence(res.board,alpha,beta,botColor,turn==="w"?"b":"w",res.ep,remaining-1,ctx));
+    if(ctx.aborted)return 0;
+    beta=Math.min(beta,best);
+    if(alpha>=beta)break;
+  }
+  return best;
 }
+
+function _chessAB(
+  b:Board,
+  depth:number,
+  alpha:number,
+  beta:number,
+  maximizing:boolean,
+  botColor:PColor,
+  ep:Sq|null,
+  ctx: ChessSearchContext,
+  ply: number,
+):number{
+  ctx.nodes++;
+  if((ctx.nodes&1023)===0&&Date.now()>=ctx.deadline){ctx.aborted=true;return 0;}
+  const cur:PColor=maximizing?botColor:(botColor==="w"?"b":"w");
+  const key=`${chessBoardKey(b)}|${cur}|${ep?.join(",")??"-"}|${depth}`;
+  const cached=ctx.cache.get(key);
+  if(cached&&cached.depth>=depth)return cached.value;
+  const moves=getAllLegalMoves(b,cur,ep);
+  const checked=inCheck(b,cur);
+  if(!moves.length)return checked?(maximizing?-990000+ply:990000-ply):0;
+  if(depth<=0)return _chessQuiescence(b,alpha,beta,botColor,cur,ep,5,ctx);
+  const ordered=_aiOrder(b,moves);
+  let cutoff=false;
+  let result:number;
+  if(maximizing){
+    let best=-Infinity;
+    for(const[from,to]of ordered){
+      const res=applyMove(b,from,to);
+      best=Math.max(best,_chessAB(res.board,depth-1,alpha,beta,false,botColor,res.ep,ctx,ply+1));
+      if(ctx.aborted)return 0;
+      alpha=Math.max(alpha,best);
+      if(alpha>=beta){cutoff=true;break;}
+    }
+    result=best;
+  }else{
+    let best=Infinity;
+    for(const[from,to]of ordered){
+      const res=applyMove(b,from,to);
+      best=Math.min(best,_chessAB(res.board,depth-1,alpha,beta,true,botColor,res.ep,ctx,ply+1));
+      if(ctx.aborted)return 0;
+      beta=Math.min(beta,best);
+      if(alpha>=beta){cutoff=true;break;}
+    }
+    result=best;
+  }
+  if(!cutoff)ctx.cache.set(key,{depth,value:result});
+  return result;
+}
+
+const CHESS_BOT_DEPTH=5;
 
 function getBestChessBotMove(b:Board,botColor:PColor,ep:Sq|null):{from:Sq;to:Sq}|null{
   const raw=getAllLegalMoves(b,botColor,ep);
-  if(!raw.length) return null;
-  const moves=_aiOrder(b,raw);
-  let bestMove=moves[0]; let bestVal=-Infinity;
-  for(const[from,to]of moves){
-    const res=applyMove(b,from,to);
-    const val=_chessAB(res.board,CHESS_BOT_DEPTH-1,-Infinity,Infinity,false,botColor,res.ep);
-    if(val>bestVal){bestVal=val;bestMove=[from,to];}
+  if(!raw.length)return null;
+  const pieceCount=b.flat().filter(Boolean).length;
+  const targetDepth=pieceCount<=10?7:CHESS_BOT_DEPTH;
+  const ctx:ChessSearchContext={cache:new Map(),deadline:Date.now()+(pieceCount<=10?6500:5000),nodes:0,aborted:false};
+  let moves=_aiOrder(b,raw);
+  let bestMove=moves[0];
+  for(let currentDepth=1;currentDepth<=targetDepth&&!ctx.aborted;currentDepth++){
+    let roundBest=moves[0],roundBestVal=-Infinity;
+    for(const[from,to]of moves){
+      const res=applyMove(b,from,to);
+      const val=_chessAB(res.board,currentDepth-1,-Infinity,Infinity,false,botColor,res.ep,ctx,1);
+      if(ctx.aborted)break;
+      if(val>roundBestVal){roundBestVal=val;roundBest=[from,to];}
+    }
+    if(!ctx.aborted){
+      bestMove=roundBest;
+      moves=[roundBest,...moves.filter(m=>m!==roundBest)];
+    }
   }
   return{from:bestMove[0],to:bestMove[1]};
 }

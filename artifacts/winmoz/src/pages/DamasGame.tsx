@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
+import { evaluateBotDifficulty } from "@/lib/botBrain";
 import { serverBet, serverWin } from "@/lib/gameApi";
 import AdBanner from "@/components/AdBanner";
 // ─── Sound helpers ────────────────────────────────────────────────────────────
@@ -346,11 +346,12 @@ function aiEval(b: Board, forColor: PColor): number {
     for (let c = 0; c < 8; c++) {
       const p = b[r][c]; if (!p) continue;
       const sign = p.color === forColor ? 1 : -1;
-      const pieceVal = p.isDame ? 300 : 100;
-      const adv = p.isDame ? 0 : (p.color === "w" ? (7 - r) * 6 : r * 6);
-      const back = !p.isDame && ((p.color === "w" && r === 7) || (p.color === "b" && r === 0)) ? 15 : 0;
-      const center = (r >= 2 && r <= 5 && c >= 1 && c <= 6) ? 8 : 0;
-      score += sign * (pieceVal + adv + back + center);
+       const pieceVal = p.isDame ? 380 : 100;
+       const adv = p.isDame ? 0 : (p.color === "w" ? (7 - r) * 7 : r * 7);
+       const back = !p.isDame && ((p.color === "w" && r === 7) || (p.color === "b" && r === 0)) ? 12 : 0;
+       const center = (r >= 2 && r <= 5 && c >= 1 && c <= 6) ? 10 : 0;
+       const edgePenalty = p.isDame ? 0 : (c === 0 || c === 7 ? 5 : 0);
+       score += sign * (pieceVal + adv + back + center - edgePenalty);
       if (p.color === forColor) forPieces.push({ r, c, isDame: p.isDame });
       else oppPieces.push({ r, c, isDame: p.isDame });
     }
@@ -359,6 +360,16 @@ function aiEval(b: Board, forColor: PColor): number {
   const forKings = forPieces.filter(p => p.isDame);
   const oppKings = oppPieces.filter(p => p.isDame);
   const onlyKingsLeft = forPieces.length === forKings.length && oppPieces.length === oppKings.length;
+  const forMob = getMobility(b, forColor);
+  const oppMob = getMobility(b, oppColor);
+
+  // A forced capture is strategically more valuable than raw mobility.
+  // This prevents the bot from choosing a pretty-looking move that allows
+  // the opponent to create a forcing sequence on the next turn.
+  const forForced = aiGetAllMoves(b, forColor).filter(m => m.captured.length > 0).length;
+  const oppForced = aiGetAllMoves(b, oppColor).filter(m => m.captured.length > 0).length;
+  score += (forMob - oppMob) * 4;
+  score += (forForced - oppForced) * 16;
 
   // ── King endgame: we have kings + opponent has only 1 king left ──────────
   if (oppPieces.length === 1 && oppKings.length === 1 && forPieces.length >= 2 && forKings.length >= 1) {
@@ -374,8 +385,7 @@ function aiEval(b: Board, forColor: PColor): number {
     }
 
     // Restrict opponent mobility heavily
-    const oppMob = getMobility(b, oppColor);
-    score -= oppMob * 40;
+     score -= oppMob * 40;
 
     // Triangulation bonus: multiple kings surrounding opponent
     if (forKings.length >= 2) {
@@ -385,9 +395,6 @@ function aiEval(b: Board, forColor: PColor): number {
     }
   } else if (onlyKingsLeft && forKings.length > 0 && oppKings.length > 0) {
     // ── All-kings endgame (both sides only kings) ──────────────────────────
-    const forMob = getMobility(b, forColor);
-    const oppMob = getMobility(b, oppColor);
-
     // Mobility advantage is critical in king endgames
     score += (forMob - oppMob) * 18;
 
@@ -415,62 +422,124 @@ function aiEval(b: Board, forColor: PColor): number {
     score -= oppMob * 12;
   } else if (forKings.length >= 1 || oppKings.length >= 1) {
     // General king/endgame mobility advantage
-    const forMob = getMobility(b, forColor);
-    const oppMob = getMobility(b, oppColor);
     score += (forMob - oppMob) * 5;
   }
 
   return score;
 }
 
-function _minimax(b: Board, depth: number, alpha: number, beta: number, maximizing: boolean, botColor: PColor): number {
-  const curColor: PColor = maximizing ? botColor : opp(botColor);
-  const moves = aiGetAllMoves(b, curColor);
-  if (depth === 0 || moves.length === 0) return aiEval(b, botColor);
-  if (maximizing) {
-    let best = -Infinity;
-    for (const mv of moves) {
-      const nb = applyBoardMove(b, mv.from, mv.to, mv.captured);
-      best = Math.max(best, _minimax(nb, depth - 1, alpha, beta, false, botColor));
-      alpha = Math.max(alpha, best);
-      if (alpha >= beta) break;
-    }
-    return best;
-  } else {
-    let best = Infinity;
-    for (const mv of moves) {
-      const nb = applyBoardMove(b, mv.from, mv.to, mv.captured);
-      best = Math.min(best, _minimax(nb, depth - 1, alpha, beta, true, botColor));
-      beta = Math.min(beta, best);
-      if (alpha >= beta) break;
-    }
-    return best;
-  }
+interface DamasSearchContext {
+  cache: Map<string, { depth: number; value: number }>;
+  deadline: number;
+  nodes: number;
+  aborted: boolean;
 }
 
-const AI_DEPTH = 7;
+function damasBoardKey(b: Board): string {
+  return b.map(row => row.map(p => p ? (p.color === "w" ? (p.isDame ? "W" : "w") : (p.isDame ? "B" : "b")) : ".").join("")).join("/");
+}
+
+function orderDamasMoves(b: Board, moves: AIMove[]): AIMove[] {
+  return [...moves].sort((a, z) => {
+    const aPiece = b[a.from[0]][a.from[1]];
+    const zPiece = b[z.from[0]][z.from[1]];
+    const aPromotes = !!aPiece && !aPiece.isDame && ((aPiece.color === "w" && a.to[0] === 0) || (aPiece.color === "b" && a.to[0] === 7));
+    const zPromotes = !!zPiece && !zPiece.isDame && ((zPiece.color === "w" && z.to[0] === 0) || (zPiece.color === "b" && z.to[0] === 7));
+    const aCenter = 4 - Math.abs(a.to[0] - 3.5) - Math.abs(a.to[1] - 3.5);
+    const zCenter = 4 - Math.abs(z.to[0] - 3.5) - Math.abs(z.to[1] - 3.5);
+    return (z.captured.length - a.captured.length) * 1000
+      + (Number(zPromotes) - Number(aPromotes)) * 220
+      + zCenter - aCenter;
+  });
+}
+
+function _minimax(
+  b: Board,
+  depth: number,
+  alpha: number,
+  beta: number,
+  maximizing: boolean,
+  botColor: PColor,
+  ctx: DamasSearchContext,
+  ply: number,
+): number {
+  ctx.nodes++;
+  if ((ctx.nodes & 1023) === 0 && Date.now() >= ctx.deadline) {
+    ctx.aborted = true;
+    return 0;
+  }
+
+  const curColor: PColor = maximizing ? botColor : opp(botColor);
+  const key = `${damasBoardKey(b)}|${curColor}|${depth}`;
+  const cached = ctx.cache.get(key);
+  if (cached && cached.depth >= depth) return cached.value;
+
+  const moves = aiGetAllMoves(b, curColor);
+  if (moves.length === 0 || countPieces(b, curColor) === 0) {
+    // A side with no legal move or no pieces has lost. Prefer the
+    // quickest forced win and delay a forced loss as long as possible.
+    return curColor === botColor ? -900000 + ply : 900000 - ply;
+  }
+  if (depth === 0) return aiEval(b, botColor);
+
+  const ordered = orderDamasMoves(b, moves);
+  let cutoff = false;
+  let result: number;
+  if (maximizing) {
+    let best = -Infinity;
+    for (const mv of ordered) {
+      const nb = applyBoardMove(b, mv.from, mv.to, mv.captured);
+      best = Math.max(best, _minimax(nb, depth - 1, alpha, beta, false, botColor, ctx, ply + 1));
+      if (ctx.aborted) return 0;
+      alpha = Math.max(alpha, best);
+      if (alpha >= beta) { cutoff = true; break; }
+    }
+    result = best;
+  } else {
+    let best = Infinity;
+    for (const mv of ordered) {
+      const nb = applyBoardMove(b, mv.from, mv.to, mv.captured);
+      best = Math.min(best, _minimax(nb, depth - 1, alpha, beta, true, botColor, ctx, ply + 1));
+      if (ctx.aborted) return 0;
+      beta = Math.min(beta, best);
+      if (alpha >= beta) { cutoff = true; break; }
+    }
+    result = best;
+  }
+  if (!cutoff) ctx.cache.set(key, { depth, value: result });
+  return result;
+}
+
+const AI_DEPTH = 9;
 
 function getBestBotMove(b: Board, botColor: PColor, depth: number = AI_DEPTH): AIMove | null {
   const moves = aiGetAllMoves(b, botColor);
   if (moves.length === 0) return null;
-  // Move ordering: captures first → better alpha-beta pruning
-  moves.sort((a, z) => z.captured.length - a.captured.length);
-  // Easy mode: occasionally return a random legal move (opaque — not every time)
-  if (depth < 4 && Math.random() < 0.45) {
-    return moves[Math.floor(Math.random() * Math.min(moves.length, 4))];
-  }
-  // Increase depth for king endgame (any all-kings situation or opponent nearly gone)
+  const ordered = orderDamasMoves(b, moves);
   const oppColor = opp(botColor);
-  const oppPieces = b.flat().filter(p => p?.color === oppColor);
-  const allKingsOnly = b.flat().every(p => p === null || p.isDame);
-  const endgameDepth = allKingsOnly ? Math.max(depth, 10) : (oppPieces.length <= 2 ? Math.max(depth, 9) : depth);
+  const totalPieces = b.flat().filter(Boolean).length;
+  const targetDepth = totalPieces <= 6 ? Math.max(depth + 5, 14) : totalPieces <= 10 ? Math.max(depth + 2, 11) : depth;
+  const ctx: DamasSearchContext = {
+    cache: new Map(),
+    deadline: Date.now() + (totalPieces <= 10 ? 6500 : 4500),
+    nodes: 0,
+    aborted: false,
+  };
 
-  let bestMove: AIMove = moves[0];
-  let bestVal = -Infinity;
-  for (const mv of moves) {
-    const nb = applyBoardMove(b, mv.from, mv.to, mv.captured);
-    const val = _minimax(nb, endgameDepth - 1, -Infinity, Infinity, false, botColor);
-    if (val > bestVal) { bestVal = val; bestMove = mv; }
+  // Iterative deepening means a difficult position always has a legal,
+  // fully evaluated answer, while endgames get as much calculation as the
+  // available thinking window allows.
+  let bestMove: AIMove = ordered[0];
+  for (let currentDepth = 1; currentDepth <= targetDepth && !ctx.aborted; currentDepth++) {
+    let roundBest = ordered[0];
+    let roundBestVal = -Infinity;
+    for (const mv of ordered) {
+      const nb = applyBoardMove(b, mv.from, mv.to, mv.captured);
+      const val = _minimax(nb, currentDepth - 1, -Infinity, Infinity, false, botColor, ctx, 1);
+      if (ctx.aborted) break;
+      if (val > roundBestVal) { roundBestVal = val; roundBest = mv; }
+    }
+    if (!ctx.aborted) bestMove = roundBest;
   }
   return bestMove;
 }
@@ -926,9 +995,7 @@ export default function DamasGame() {
 
     const mainTimer = setTimeout(() => {
       setBotThinking(false);
-      const _diff = getBotDifficultySync(profile?.id ?? "");
-      const _depth = _diff === "easy" ? (Math.random() < 0.5 ? 2 : 3) : AI_DEPTH;
-      const move = getBestBotMove(boardRef.current, oppColor, _depth);
+       const move = getBestBotMove(boardRef.current, oppColor, AI_DEPTH);
       if (!move) {
         setWinner(myColor); winnerRef.current = myColor;
         setWinReason(`${opponentName} ficou sem movimentos`);
