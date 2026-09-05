@@ -984,9 +984,9 @@ function HeroBanner() {
   const slide = SLIDES[slideIdx];
 
   return (
-    <section className="px-4 pt-5 pb-3">
+    <section className="home-hero-section px-4 pt-5 pb-3">
       <div
-        className="relative w-full rounded-3xl overflow-hidden shadow-2xl"
+        className="home-hero relative w-full rounded-3xl overflow-hidden shadow-2xl"
         style={{
           backgroundImage: slide.bgImage
             ? `${slide.bg}, url(${slide.bgImage})`
@@ -1013,11 +1013,11 @@ function HeroBanner() {
             initial="initial"
             animate="animate"
             exit="exit"
-            className="relative z-10 flex items-center justify-between px-5 py-6 gap-3"
+            className="home-hero-content relative z-10 flex items-center justify-between px-5 py-6 gap-3"
             style={{ minHeight: 190, maxHeight: 220 }}
           >
             {/* LEFT: text */}
-            <div style={{ flex: "1 1 0", minWidth: 0, maxWidth: "58%" }}>
+            <div className="home-hero-copy" style={{ flex: "1 1 0", minWidth: 0, maxWidth: "58%" }}>
               {/* Badge */}
               <div
                 className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold uppercase border backdrop-blur-sm"
@@ -1086,7 +1086,7 @@ function HeroBanner() {
             </div>
 
             {/* RIGHT: board — fixed size, never grows */}
-            <div style={{ flexShrink: 0, width: 130, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div className="home-hero-art" style={{ flexShrink: 0, width: 130, display: "flex", alignItems: "center", justifyContent: "center" }}>
               {slide.id === "damas" ? (
                 <motion.div
                   initial={{ opacity: 0, rotate: -4, scale: 0.88 }}
@@ -1267,36 +1267,43 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-slate-900 w-full flex justify-center selection:bg-blue-100">
-      <div className="w-full max-w-[430px] flex flex-col relative pb-24 bg-[#F8F9FA]">
+      <div className="home-shell w-full max-w-[430px] flex flex-col relative pb-24 bg-[#F8F9FA]">
 
         {/* TOP NAV */}
-        <header className="sticky top-0 z-50 flex items-center justify-between px-5 py-3.5 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
+        <header className="home-header sticky top-0 z-50 flex items-center justify-between px-5 py-3.5 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
           <WinMozLogo />
-          {isLoggedIn ? (
-            <div className="flex items-center gap-2">
-              {/* Notification Bell */}
-              <button onClick={() => setLocation("/notificacoes")} className="relative flex items-center justify-center w-9 h-9 rounded-full bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all duration-200 shadow-sm">
-                <Bell className="w-4 h-4 text-slate-600" />
-                {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />}
-              </button>
-              {/* Profile Icon */}
-              <button
-                onClick={() => setLocation("/perfil")}
-                className="flex items-center justify-center w-9 h-9 rounded-full border-2 border-violet-400/50 hover:border-violet-500 transition-all duration-200 shadow-sm overflow-hidden"
-                style={{ background: "#1e1e2e" }}
-              >
-                {profile?.avatar_url
-                  ? <img src={profile.avatar_url} alt="Perfil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  : <User className="w-4.5 h-4.5 text-slate-300" style={{ width: 18, height: 18 }} />}
-              </button>
-            </div>
-          ) : (
-            <Link href="/registar">
-              <span className="bg-blue-700 text-white font-semibold text-sm px-5 py-2 rounded-xl shadow-md font-syne tracking-wide cursor-pointer" style={{ display: "inline-block" }}>
-                Registar-se
-              </span>
-            </Link>
-          )}
+          <div className="flex items-center gap-5">
+            <nav className="home-desktop-links hidden items-center gap-6">
+              <Link href="/explorar" className="text-sm font-semibold text-slate-600 hover:text-blue-700 transition-colors">Jogos</Link>
+              <Link href="/depositar" className="text-sm font-semibold text-slate-600 hover:text-blue-700 transition-colors">Carteira</Link>
+              <Link href="/suporte" className="text-sm font-semibold text-slate-600 hover:text-blue-700 transition-colors">Suporte</Link>
+            </nav>
+            {isLoggedIn ? (
+              <div className="flex items-center gap-2">
+                {/* Notification Bell */}
+                <button onClick={() => setLocation("/notificacoes")} className="relative flex items-center justify-center w-9 h-9 rounded-full bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all duration-200 shadow-sm">
+                  <Bell className="w-4 h-4 text-slate-600" />
+                  {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />}
+                </button>
+                {/* Profile Icon */}
+                <button
+                  onClick={() => setLocation("/perfil")}
+                  className="flex items-center justify-center w-9 h-9 rounded-full border-2 border-violet-400/50 hover:border-violet-500 transition-all duration-200 shadow-sm overflow-hidden"
+                  style={{ background: "#1e1e2e" }}
+                >
+                  {profile?.avatar_url
+                    ? <img src={profile.avatar_url} alt="Perfil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    : <User className="w-4.5 h-4.5 text-slate-300" style={{ width: 18, height: 18 }} />}
+                </button>
+              </div>
+            ) : (
+              <Link href="/registar">
+                <span className="bg-blue-700 text-white font-semibold text-sm px-5 py-2 rounded-xl shadow-md font-syne tracking-wide cursor-pointer" style={{ display: "inline-block" }}>
+                  Registar-se
+                </span>
+              </Link>
+            )}
+          </div>
         </header>
 
         {/* HERO BANNER */}
@@ -1325,7 +1332,7 @@ export default function Home() {
             variants={stagger}
             initial="hidden"
             animate={gamesReady ? "show" : "hidden"}
-            className="public-content-grid flex gap-3 overflow-x-auto pt-1 pb-1 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+            className="home-featured-grid public-content-grid flex gap-3 overflow-x-auto pt-1 pb-1 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
             style={{ display: gamesReady ? undefined : "none" }}
           >
             {games.map((game) => (
@@ -1338,7 +1345,7 @@ export default function Home() {
                   if (game.id === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.id}`);
                 }}
-                className="min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col cursor-pointer"
+                className="home-featured-card min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col cursor-pointer"
               >
                 <div
                   className="h-28 w-full relative overflow-hidden"
@@ -1401,11 +1408,10 @@ export default function Home() {
           </motion.div>
         </section>
 
-        {/* DIVIDER */}
-        <div className="mx-4 border-t border-slate-200 my-1"/>
-
+        {/* DESKTOP CONTENT AREA: popular games + activity feed */}
+        <div className="home-secondary-grid">
         {/* POPULARES AGORA */}
-        <section className="px-4 py-4 mb-4">
+        <section className="home-popular-section px-4 py-4 mb-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-syne font-bold text-base text-slate-900">Populares Agora</h2>
             <Link href="/explorar" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center">
@@ -1413,7 +1419,7 @@ export default function Home() {
             </Link>
           </div>
 
-          <motion.div variants={stagger} initial="hidden" animate="show" className="flex flex-col gap-2.5">
+          <motion.div variants={stagger} initial="hidden" animate="show" className="home-popular-list flex flex-col gap-2.5">
             {topGames.map((game) => (
               <motion.div
                 key={game.id}
@@ -1470,17 +1476,20 @@ export default function Home() {
           </motion.div>
         </section>
 
-        {/* SAQUES 24 HORAS */}
-        <div className="px-4 pb-2">
-          <AdBanner />
+        <div className="home-side-column">
+          {/* SAQUES 24 HORAS */}
+          <div className="home-side-ad px-4 pb-2">
+            <AdBanner />
+          </div>
+          <SaquesSection />
+          {/* ATUALIZAÇÕES */}
+          <AtualizacoesSection />
         </div>
-        <SaquesSection />
-
-        {/* ATUALIZAÇÕES */}
-        <AtualizacoesSection />
+        </div>
 
         {/* FLOATING SUPPORT BUTTON */}
         <motion.button
+            className="home-support-button"
             onClick={() => setLocation("/suporte")}
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
