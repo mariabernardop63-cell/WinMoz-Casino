@@ -1589,9 +1589,6 @@ export default function LudoGame() {
 
   function handleMoveComplete(pieceId:PieceId,diceVal:number,currentTurn:Player,prevPos:number){
     moveBusyRef.current = false;
-    // Keep the ref in lockstep with the state immediately. A click arriving
-    // before React commits setPhase("moving") must not select another piece.
-    phaseRef.current = "moving";
     setPhase("moving");
     const ps=piecesRef.current;
     const finalPos = prevPos === -1 ? 0 : prevPos + diceVal;
@@ -1616,13 +1613,10 @@ export default function LudoGame() {
     // Helper: broadcast authoritative state to opponent (only moving player sends this)
     const broadcastSync=(syncTurn:Player,syncPhase:Phase,delay:number,syncWinner?:Player)=>{
       if(isBot||currentTurn!==myColor||!channelRef.current) return;
-      const stateSeq = ++stateSyncSeqRef.current;
       setTimeout(()=>{
         channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
            pieces:authPieces, turn:syncTurn, phase:syncPhase,
           diceBlue:null, diceGreen:null,
-          stateSeq,
-           sourcePlayer: currentTurn,
           ...(syncWinner?{winner:syncWinner}:{}),
         }});
       },delay);
@@ -1643,14 +1637,7 @@ export default function LudoGame() {
       setMsg(`${plName} ${reason} — joga de novo!`);
       setMovable([]);
       // Keep consecutiveSixes for this extra turn (don't reset, it accumulates)
-      setTimeout(()=>{
-        turnEpochRef.current++;
-        rolledEpochRef.current = null;
-        if(currentTurn===myColor) rollConsumedRef.current = false;
-        turnRef.current = currentTurn;
-        phaseRef.current = "roll";
-        setPhase("roll");setDiceBlue(null);setDiceGreen(null);
-      },400);
+      setTimeout(()=>{setPhase("roll");if(currentTurn==="blue")setDiceBlue(null);else setDiceGreen(null);},400);
       broadcastSync(currentTurn,"roll",500);
     } else {
       const next=other(currentTurn);
@@ -1661,14 +1648,8 @@ export default function LudoGame() {
       setMovable([]);
       consecutiveSixesRef.current=0;
       setTimeout(()=>{
-        turnEpochRef.current++;
-        rolledEpochRef.current = null;
-        turnRef.current = next;
-        phaseRef.current = "roll";
         setTurn(next); setPhase("roll");
-        // Clear both faces at hand-off so the next player never sees the
-        // previous player's result as if it were their own roll.
-        setDiceBlue(null); setDiceGreen(null);
+        if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
         setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
       },500);
       broadcastSync(next,"roll",600);
