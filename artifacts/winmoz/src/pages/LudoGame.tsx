@@ -1720,40 +1720,11 @@ export default function LudoGame() {
   }
 
   // ── Apply a dice roll locally (no broadcast) ────────────────────────────────
-  const applyRoll=useCallback((pl:Player,val:number,alreadyLocked=false,rollEpoch?:number)=>{
-    // Realtime events may arrive late. A roll is valid only for the player
-    // whose turn is currently active and while the UI is waiting for a roll.
-    if(
-      turnRef.current!==pl ||
-      phaseRef.current!=="roll" ||
-      winnerRef.current ||
-      (rollEpoch !== undefined && rollEpoch !== turnEpochRef.current)
-    ) {
-      if(alreadyLocked) rollBusyRef.current = false;
-      return;
-    }
-    // A local request locks before the server call; remote/bot rolls lock here.
-    // This prevents duplicate broadcasts from starting parallel animations.
-    if(!alreadyLocked){
-      if(rollBusyRef.current) return;
-      rollBusyRef.current = true;
-    }
+  const applyRoll=useCallback((pl:Player,val:number)=>{
     const setR=pl==="blue"?setRollingB:setRollingG;
     const setD=pl==="blue"?setDiceBlue:setDiceGreen;
     setR(true);
     setTimeout(()=>{
-      // Re-check after the dice animation delay because a state sync can hand
-      // the turn to the other player during those 800ms.
-      if(
-        turnRef.current!==pl ||
-        phaseRef.current!=="roll" ||
-        winnerRef.current ||
-        (rollEpoch !== undefined && rollEpoch !== turnEpochRef.current)
-      ){
-        setR(false);
-        rollBusyRef.current = false;
-        return;
-      }
       setD(val); setR(false);
 
       // Track consecutive sixes (Rule 4) — update ref synchronously to avoid timing bugs
@@ -1785,21 +1756,13 @@ export default function LudoGame() {
         // turn/phase and reject the next player's roll forever.
         setTimeout(()=>{
           const next=other(pl);
-          turnEpochRef.current++;
-          rolledEpochRef.current = null;
-          if(next===myColor) rollConsumedRef.current = false;
-          turnRef.current = next;
-          phaseRef.current = "roll";
           setTurn(next); setPhase("roll");
-          setDiceBlue(null); setDiceGreen(null);
+          if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
           setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
-          rollBusyRef.current = false;
           if (pl===myColor && !isBot) {
             channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
               pieces:piecesRef.current, turn:next, phase:"roll",
               diceBlue:null, diceGreen:null,
-              stateSeq:++stateSyncSeqRef.current,
-              sourcePlayer: pl,
             }});
           }
         },1300);
@@ -1810,11 +1773,9 @@ export default function LudoGame() {
           channelRef.current?.send({type:"broadcast",event:"piece_selected",
             payload:{pieceId:mv[0],diceVal:val,player:pl,seq:Date.now()}});
           doSelectPiece(mv[0],val,pl,piecesRef.current);
-          setTimeout(()=>{ rollBusyRef.current = false; },120);
         } else if(isBot){
           // Bot opponent: move directly (no channel)
           doSelectPiece(mv[0],val,pl,piecesRef.current);
-          setTimeout(()=>{ rollBusyRef.current = false; },120);
         }
         // else: multiplayer opponent — piece_selected broadcast will arrive shortly,
         //       doOpponentMove handles animation + ludo_state_sync sets final state
@@ -1823,7 +1784,6 @@ export default function LudoGame() {
           // My turn or bot: show selectable pieces + enter select phase
           setMovable(mv); setPhase("select");
           setMsg(`${plName} — ${val}! ${pl===myColor?"Escolhe uma peça.":""}`);
-           if(pl===myColor||isBot) setTimeout(()=>{ rollBusyRef.current = false; },120);
           if (pl===myColor && autoMoveAfterRollRef.current) {
             autoMoveAfterRollRef.current = false;
             // Let React commit the select phase before choosing a piece.
