@@ -1518,6 +1518,10 @@ export default function LudoGame() {
       setPieces(prev=>prev.map(p=>p.id===id?{...p,pos:0}:p));
       setTimeout(onDone,280); return;
     }
+    if(steps<=0){
+      onDone();
+      return;
+    }
     for(let i=1;i<=steps;i++){
       const s=i;
       setTimeout(()=>{
@@ -1633,9 +1637,10 @@ export default function LudoGame() {
 
   const doSelectPiece=useCallback((pid:PieceId,diceVal:number,pl:Player,ps:GamePiece[])=>{
     if(moveBusyRef.current) return;
+    const piece=ps.find(p=>p.id===pid);
+    if(!piece || piece.player!==pl || !calcMovable(ps,pl,diceVal).includes(pid)) return;
     moveBusyRef.current = true;
     setMovable([]); setPhase("moving");
-    const piece=ps.find(p=>p.id===pid)!;
     const isExit=piece.pos===-1;
     const prevPos=piece.pos;
     const plName=pl===myColor?playerName.split(" ")[0]:opponentName;
@@ -1770,15 +1775,37 @@ export default function LudoGame() {
   const doRoll=useCallback(async()=>{
     if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current||captureAnimRef.current||rollBusyRef.current) return;
     rollBusyRef.current = true;
+    // Start the visual roll before waiting for the server. Previously a slow
+    // API made the die look dead even though the click and sound were handled.
+    (myColor==="blue"?setRollingB:setRollingG)(true);
     playRollSound();
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
     const allInBase = myPieces.every(p=>p.pos===-1);
     const stuckTurns = stuckTurnsRef.current[myColor];
     const consecutiveSixes = consecutiveSixesRef.current;
-    const { value: val } = await rollLudoDice(gameId, allInBase, stuckTurns, consecutiveSixes);
+    let val = 0;
+    let rollError = "";
+    if(gameId==="local"){
+      // The demo board must remain playable without authentication or an API
+      // server. Real-money games always use the server-side roll below.
+      val = generateWeightedDice(
+        myPieces,
+        piecesRef.current.filter(p=>p.player===opponentColor),
+        myColor,
+        stuckTurns,
+        consecutiveSixes,
+        gameId,
+      );
+    } else {
+      const result = await rollLudoDice(gameId, allInBase, stuckTurns, consecutiveSixes);
+      val = result.value;
+      rollError = result.error ?? "";
+    }
     if(!val){
+      (myColor==="blue"?setRollingB:setRollingG)(false);
       rollBusyRef.current = false;
+      setMsg(rollError || "Não foi possível rolar o dado. Tenta novamente.");
       return;
     }
 
@@ -2027,6 +2054,9 @@ export default function LudoGame() {
         phaseRef.current=p.phase;
         diceBlueRef.current=p.diceBlue??null;
         diceGreenRef.current=p.diceGreen??null;
+        // The sync is authoritative. An interrupted remote animation must
+        // never leave the board locked for the next local turn.
+        moveBusyRef.current = false;
         if(p.winner){
           setWinner(p.winner);
           winnerRef.current=p.winner;

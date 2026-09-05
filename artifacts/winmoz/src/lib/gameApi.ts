@@ -95,21 +95,33 @@ export async function rollLudoDice(
   }
 
   try {
-    const res = await fetch("/api/games/ludo-dice", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ gameId, allInBase, stuckTurns, consecutiveSixes }),
-    });
-    const data = await res.json() as { value?: number; error?: string };
-    if (!res.ok || !data.value) {
-      if (res.status === 401) handleAuthError(data);
-      return { value: 0, error: data.error ?? "Erro ao rolar o dado" };
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8_000);
+    try {
+      const res = await fetch("/api/games/ludo-dice", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ gameId, allInBase, stuckTurns, consecutiveSixes }),
+        signal: controller.signal,
+      });
+      const data = await res.json() as { value?: number; error?: string };
+      if (!res.ok || typeof data.value !== "number" || !Number.isInteger(data.value) || data.value < 1 || data.value > 6) {
+        if (res.status === 401) handleAuthError(data);
+        return { value: 0, error: data.error ?? "Erro ao rolar o dado" };
+      }
+      return { value: data.value };
+    } finally {
+      window.clearTimeout(timeout);
     }
-    return { value: data.value };
-  } catch {
-    return { value: 0, error: "Erro de ligação ao servidor" };
+  } catch (error) {
+    return {
+      value: 0,
+      error: error instanceof DOMException && error.name === "AbortError"
+        ? "O servidor demorou demasiado a responder"
+        : "Erro de ligação ao servidor",
+    };
   }
 }
