@@ -1810,24 +1810,16 @@ export default function LudoGame() {
 
   // ── Roll my color dice — server-side secure roll + broadcasts ───────────────
   const doRoll=useCallback(async()=>{
-    const rollEpoch = turnEpochRef.current;
     if(
       phaseRef.current!=="roll" ||
       turnRef.current!==myColor ||
       winnerRef.current ||
       captureAnimRef.current ||
-      rollBusyRef.current ||
-      rollConsumedRef.current ||
-      rolledEpochRef.current === rollEpoch
+      rollBusyRef.current
     ) return;
-    // Mark the current turn before awaiting the server. This is deliberately
-    // synchronous so two fast clicks cannot create two dice requests.
-    rolledEpochRef.current = rollEpoch;
-    rollConsumedRef.current = true;
+    // One request at a time, matching the working turn/dice flow from
+    // 400fe82. The lock is released when the visual roll resolves.
     rollBusyRef.current = true;
-    // Start the visual roll before waiting for the server. Previously a slow
-    // API made the die look dead even though the click and sound were handled.
-    (myColor==="blue"?setRollingB:setRollingG)(true);
     playRollSound();
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
@@ -1855,23 +1847,7 @@ export default function LudoGame() {
     if(!val){
       (myColor==="blue"?setRollingB:setRollingG)(false);
       rollBusyRef.current = false;
-      rolledEpochRef.current = null;
-      rollConsumedRef.current = false;
-      autoMoveAfterRollRef.current = false;
       setMsg(rollError || "Não foi possível rolar o dado. Tenta novamente.");
-      return;
-    }
-    // The server call can outlive the turn (for example after a tab switch or
-    // a remote state sync). Never publish a stale roll into the next turn.
-    if (
-      phaseRef.current !== "roll" ||
-      turnRef.current !== myColor ||
-      winnerRef.current ||
-      rollEpoch !== turnEpochRef.current
-    ) {
-      (myColor==="blue"?setRollingB:setRollingG)(false);
-      rollBusyRef.current = false;
-      autoMoveAfterRollRef.current = false;
       return;
     }
 
@@ -1886,7 +1862,7 @@ export default function LudoGame() {
       event:"dice_rolled",
       payload:{ player:myColor, value:val, seq },
     });
-    applyRoll(myColor,val,true,rollEpoch);
+    applyRoll(myColor,val);
   },[myColor,applyRoll,gameId]);
 
   // ── Select piece — broadcasts + applies ────────────────────────────────────
