@@ -47,6 +47,9 @@ description: Key decisions and patterns from major bug-fix session — payout, r
 - Ludo roll locks must last until the server response and phase transition, not a fixed short delay.
 - **Why:** A slow roll request can outlive a fixed unlock timer and let rapid clicks create concurrent rolls or duplicate turn events.
 - **How to apply:** Lock before the request, release on error/stale response or authoritative state transition, and reject duplicate remote roll broadcasts while the current roll is being resolved.
+- Each Ludo roll phase also needs a monotonic client transaction/epoch, because a delayed render or realtime hand-off can otherwise make the same phase appear rollable twice.
+- **Why:** A boolean busy ref can be cleared by a stale transition while an older async roll is still returning.
+- **How to apply:** Mark the epoch synchronously before the server request, validate it after the response/animation, and clear it only when a new authoritative roll phase begins.
 - Authoritative Ludo hand-offs need a shared monotonic state version carried through both clients.
 - **Why:** Realtime delivery can reorder delayed movement snapshots; an old snapshot can otherwise restore the previous turn and reactivate the wrong die.
 - **How to apply:** Increment the version on every outgoing hand-off, propagate the received version before the next hand-off, and ignore older snapshots both on receipt and after animation delays.

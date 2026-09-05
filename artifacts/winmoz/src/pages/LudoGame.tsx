@@ -1415,6 +1415,11 @@ export default function LudoGame() {
   // Both clients carry it forward so delayed state syncs can never restore an
   // older turn and re-enable the wrong player's die.
   const stateSyncSeqRef = useRef(0);
+  // Each roll phase is a transaction of its own. React state can be one render
+  // behind a click or a delayed realtime message, so phase/turn checks alone
+  // are not enough to prevent a second roll in the same turn.
+  const turnEpochRef = useRef(0);
+  const rolledEpochRef = useRef<number|null>(null);
 
   const myTurnMsg  = `${playerName.split(" ")[0]} — clica nos dados!`;
   const oppTurnMsg = `A aguardar ${opponentName}…`;
@@ -1627,7 +1632,13 @@ export default function LudoGame() {
       setMsg(`${plName} ${reason} — joga de novo!`);
       setMovable([]);
       // Keep consecutiveSixes for this extra turn (don't reset, it accumulates)
-      setTimeout(()=>{setPhase("roll");setDiceBlue(null);setDiceGreen(null);},400);
+      setTimeout(()=>{
+        turnEpochRef.current++;
+        rolledEpochRef.current = null;
+        turnRef.current = currentTurn;
+        phaseRef.current = "roll";
+        setPhase("roll");setDiceBlue(null);setDiceGreen(null);
+      },400);
       broadcastSync(currentTurn,"roll",500);
     } else {
       const next=other(currentTurn);
@@ -1638,6 +1649,10 @@ export default function LudoGame() {
       setMovable([]);
       consecutiveSixesRef.current=0;
       setTimeout(()=>{
+        turnEpochRef.current++;
+        rolledEpochRef.current = null;
+        turnRef.current = next;
+        phaseRef.current = "roll";
         setTurn(next); setPhase("roll");
         // Clear both faces at hand-off so the next player never sees the
         // previous player's result as if it were their own roll.
@@ -1708,10 +1723,15 @@ export default function LudoGame() {
   }
 
   // ── Apply a dice roll locally (no broadcast) ────────────────────────────────
-  const applyRoll=useCallback((pl:Player,val:number,alreadyLocked=false)=>{
+  const applyRoll=useCallback((pl:Player,val:number,alreadyLocked=false,rollEpoch?:number)=>{
     // Realtime events may arrive late. A roll is valid only for the player
     // whose turn is currently active and while the UI is waiting for a roll.
-    if(turnRef.current!==pl||phaseRef.current!=="roll"||winnerRef.current) {
+    if(
+      turnRef.current!==pl ||
+      phaseRef.current!=="roll" ||
+      winnerRef.current ||
+      (rollEpoch !== undefined && rollEpoch !== turnEpochRef.current)
+    ) {
       if(alreadyLocked) rollBusyRef.current = false;
       return;
     }
@@ -1727,7 +1747,12 @@ export default function LudoGame() {
     setTimeout(()=>{
       // Re-check after the dice animation delay because a state sync can hand
       // the turn to the other player during those 800ms.
-      if(turnRef.current!==pl||phaseRef.current!=="roll"||winnerRef.current){
+      if(
+        turnRef.current!==pl ||
+        phaseRef.current!=="roll" ||
+        winnerRef.current ||
+        (rollEpoch !== undefined && rollEpoch !== turnEpochRef.current)
+      ){
         setR(false);
         rollBusyRef.current = false;
         return;
@@ -1762,7 +1787,12 @@ export default function LudoGame() {
         // hand-off. Without this event the other device could keep an old
         // turn/phase and reject the next player's roll forever.
         setTimeout(()=>{
-          const next=other(pl); setTurn(next); setPhase("roll");
+          const next=other(pl);
+          turnEpochRef.current++;
+          rolledEpochRef.current = null;
+          turnRef.current = next;
+          phaseRef.current = "roll";
+          setTurn(next); setPhase("roll");
           setDiceBlue(null); setDiceGreen(null);
           setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
           rollBusyRef.current = false;
@@ -1821,7 +1851,18 @@ export default function LudoGame() {
 
   // ── Roll my color dice — server-side secure roll + broadcasts ───────────────
   const doRoll=useCallback(async()=>{
-    if(phaseRef.current!=="roll"||turnRef.current!==myColor||winnerRef.current||captureAnimRef.current||rollBusyRef.current) return;
+    const rollEpoch = turnEpochRef.current;
+    if(
+      phaseRef.current!=="roll" ||
+      turnRef.current!==myColor ||
+      winnerRef.current ||
+      captureAnimRef.current ||
+      rollBusyRef.current ||
+      rolledEpochRef.current === rollEpoch
+    ) return;
+    // Mark the current turn before awaiting the server. This is deliberately
+    // synchronous so two fast clicks cannot create two dice requests.
+    rolledEpochRef.current = rollEpoch;
     rollBusyRef.current = true;
     // Start the visual roll before waiting for the server. Previously a slow
     // API made the die look dead even though the click and sound were handled.
@@ -1853,13 +1894,19 @@ export default function LudoGame() {
     if(!val){
       (myColor==="blue"?setRollingB:setRollingG)(false);
       rollBusyRef.current = false;
+      rolledEpochRef.current = null;
       autoMoveAfterRollRef.current = false;
       setMsg(rollError || "Não foi possível rolar o dado. Tenta novamente.");
       return;
     }
     // The server call can outlive the turn (for example after a tab switch or
     // a remote state sync). Never publish a stale roll into the next turn.
-    if (phaseRef.current !== "roll" || turnRef.current !== myColor || winnerRef.current) {
+    if (
+      phaseRef.current !== "roll" ||
+      turnRef.current !== myColor ||
+      winnerRef.current ||
+      rollEpoch !== turnEpochRef.current
+    ) {
       (myColor==="blue"?setRollingB:setRollingG)(false);
       rollBusyRef.current = false;
       autoMoveAfterRollRef.current = false;
@@ -1877,7 +1924,7 @@ export default function LudoGame() {
       event:"dice_rolled",
       payload:{ player:myColor, value:val, seq },
     });
-    applyRoll(myColor,val,true);
+    applyRoll(myColor,val,true,rollEpoch);
   },[myColor,applyRoll,gameId]);
 
   // ── Select piece — broadcasts + applies ────────────────────────────────────
@@ -2110,6 +2157,13 @@ export default function LudoGame() {
         // A newer sync may have arrived while this one was waiting for the
         // remote movement animation to finish.
         if(stateSeq !== null && stateSeq !== stateSyncSeqRef.current) return;
+        const isNewRollTurn =
+          p.phase === "roll" &&
+          (p.turn !== turnRef.current || phaseRef.current !== "roll");
+        if(isNewRollTurn){
+          turnEpochRef.current++;
+          rolledEpochRef.current = null;
+        }
         setPieces(p.pieces);
         setTurn(p.turn);
         setPhase(p.phase);
@@ -2308,6 +2362,8 @@ export default function LudoGame() {
     setStuckTurns({blue:0,green:0}); consecutiveSixesRef.current=0;
     autoMoveAfterRollRef.current = false;
     rollBusyRef.current = false;
+    turnEpochRef.current = 0;
+    rolledEpochRef.current = null;
     moveBusyRef.current = false;
     lastEventSeqRef.current = {};
     setMsg(myColor==="blue"?myTurnMsg:oppTurnMsg);
