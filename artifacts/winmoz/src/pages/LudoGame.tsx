@@ -1870,11 +1870,13 @@ export default function LudoGame() {
       winnerRef.current ||
       captureAnimRef.current ||
       rollBusyRef.current ||
+      rollConsumedRef.current ||
       rolledEpochRef.current === rollEpoch
     ) return;
     // Mark the current turn before awaiting the server. This is deliberately
     // synchronous so two fast clicks cannot create two dice requests.
     rolledEpochRef.current = rollEpoch;
+    rollConsumedRef.current = true;
     rollBusyRef.current = true;
     // Start the visual roll before waiting for the server. Previously a slow
     // API made the die look dead even though the click and sound were handled.
@@ -1907,6 +1909,7 @@ export default function LudoGame() {
       (myColor==="blue"?setRollingB:setRollingG)(false);
       rollBusyRef.current = false;
       rolledEpochRef.current = null;
+      rollConsumedRef.current = false;
       autoMoveAfterRollRef.current = false;
       setMsg(rollError || "Não foi possível rolar o dado. Tenta novamente.");
       return;
@@ -2180,6 +2183,7 @@ export default function LudoGame() {
         if(isNewRollTurn){
           turnEpochRef.current++;
           rolledEpochRef.current = null;
+          if(p.turn===myColor) rollConsumedRef.current = false;
         }
         setPieces(p.pieces);
         setTurn(p.turn);
@@ -2381,6 +2385,7 @@ export default function LudoGame() {
     rollBusyRef.current = false;
     turnEpochRef.current = 0;
     rolledEpochRef.current = null;
+    rollConsumedRef.current = false;
     moveBusyRef.current = false;
     lastEventSeqRef.current = {};
     setMsg(myColor==="blue"?myTurnMsg:oppTurnMsg);
