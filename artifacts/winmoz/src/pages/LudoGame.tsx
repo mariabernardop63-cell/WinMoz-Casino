@@ -1420,6 +1420,9 @@ export default function LudoGame() {
   // are not enough to prevent a second roll in the same turn.
   const turnEpochRef = useRef(0);
   const rolledEpochRef = useRef<number|null>(null);
+  // Hard one-roll-per-turn gate. Only an explicit hand-off or legal extra
+  // turn may release it; remote snapshots cannot re-arm the die.
+  const rollConsumedRef = useRef(false);
 
   const myTurnMsg  = `${playerName.split(" ")[0]} — clica nos dados!`;
   const oppTurnMsg = `A aguardar ${opponentName}…`;
@@ -1638,6 +1641,7 @@ export default function LudoGame() {
       setTimeout(()=>{
         turnEpochRef.current++;
         rolledEpochRef.current = null;
+        if(currentTurn===myColor) rollConsumedRef.current = false;
         turnRef.current = currentTurn;
         phaseRef.current = "roll";
         setPhase("roll");setDiceBlue(null);setDiceGreen(null);
@@ -1797,6 +1801,7 @@ export default function LudoGame() {
           const next=other(pl);
           turnEpochRef.current++;
           rolledEpochRef.current = null;
+          if(next===myColor) rollConsumedRef.current = false;
           turnRef.current = next;
           phaseRef.current = "roll";
           setTurn(next); setPhase("roll");
