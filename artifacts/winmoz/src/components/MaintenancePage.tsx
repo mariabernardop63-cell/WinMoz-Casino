@@ -1,300 +1,421 @@
 import { motion } from "framer-motion";
-import { Wrench, Clock, Mail, Shield } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, LockKeyhole, Sparkles } from "lucide-react";
+
+const details = [
+  {
+    icon: LockKeyhole,
+    label: "Acesso",
+    value: "Apenas autorizado",
+    tone: "purple",
+  },
+  {
+    icon: CheckCircle2,
+    label: "Estado",
+    value: "Desenvolvimento ativo",
+    tone: "green",
+  },
+];
+
+function BrandMark() {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: 38,
+        height: 38,
+        display: "grid",
+        placeItems: "center",
+        background: "#111827",
+        color: "#fff",
+        flexShrink: 0,
+      }}
+    >
+      <svg width="18" height="24" viewBox="0 0 18 26" fill="none">
+        <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="currentColor" />
+        <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="currentColor" opacity="0.48" />
+      </svg>
+    </div>
+  );
+}
 
 export default function MaintenancePage() {
   return (
-    <div
+    <main
       style={{
         minHeight: "100dvh",
         width: "100%",
-        background: "linear-gradient(135deg, #0d0618 0%, #1a0533 40%, #2d0f6b 100%)",
+        background: "#f8f9fc",
+        color: "#111827",
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px 16px",
         position: "relative",
         overflow: "hidden",
+        fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
       }}
     >
-      {/* Animated background orbs */}
-      <motion.div
-        animate={{ scale: [1, 1.15, 1], opacity: [0.12, 0.2, 0.12] }}
-        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+      <div
+        aria-hidden="true"
         style={{
           position: "absolute",
-          top: "-10%",
-          right: "-10%",
-          width: 400,
-          height: 400,
+          width: 620,
+          height: 620,
+          right: "-18%",
+          top: "-32%",
           borderRadius: "50%",
-          background: "radial-gradient(circle, #7C3AED 0%, transparent 70%)",
+          background:
+            "radial-gradient(circle, rgba(108,92,231,0.14) 0%, rgba(108,92,231,0.04) 38%, transparent 70%)",
           pointerEvents: "none",
         }}
       />
-      <motion.div
-        animate={{ scale: [1, 1.2, 1], opacity: [0.08, 0.15, 0.08] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+      <div
+        aria-hidden="true"
         style={{
           position: "absolute",
-          bottom: "-15%",
-          left: "-10%",
-          width: 500,
-          height: 500,
+          width: 520,
+          height: 520,
+          left: "-24%",
+          bottom: "-34%",
           borderRadius: "50%",
-          background: "radial-gradient(circle, #4f46e5 0%, transparent 70%)",
+          background:
+            "radial-gradient(circle, rgba(16,185,129,0.07) 0%, rgba(16,185,129,0.02) 42%, transparent 70%)",
           pointerEvents: "none",
         }}
       />
 
-      {/* Floating particles */}
-      {[...Array(8)].map((_, i) => (
-        <motion.div
-          key={i}
-          animate={{
-            y: [0, -20, 0],
-            opacity: [0.3, 0.7, 0.3],
-          }}
-          transition={{
-            duration: 3 + i * 0.5,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: i * 0.4,
-          }}
-          style={{
-            position: "absolute",
-            width: 4 + (i % 3) * 2,
-            height: 4 + (i % 3) * 2,
-            borderRadius: "50%",
-            background: i % 2 === 0 ? "#7C3AED" : "#4f46e5",
-            left: `${10 + i * 11}%`,
-            top: `${15 + (i % 4) * 18}%`,
-            opacity: 0.4,
-            pointerEvents: "none",
-          }}
-        />
-      ))}
-
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
+      <header
         style={{
           width: "100%",
-          maxWidth: 420,
+          maxWidth: 1120,
+          margin: "0 auto",
+          padding: "28px clamp(20px, 5vw, 56px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           position: "relative",
-          zIndex: 10,
+          zIndex: 1,
         }}
       >
-        {/* Logo/Brand */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+          <BrandMark />
+          <span
+            style={{
+              fontSize: 17,
+              fontWeight: 800,
+              letterSpacing: "-0.04em",
+              color: "#111827",
+            }}
+          >
+            Winmoz
+          </span>
+        </div>
+
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "8px 12px",
+            border: "1px solid #e5e7eb",
+            background: "rgba(255,255,255,0.72)",
+            color: "#4b5563",
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}
+        >
+          <span
+            aria-hidden="true"
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              background: "#6c5ce7",
+              boxShadow: "0 0 0 4px rgba(108,92,231,0.12)",
+            }}
+          />
+          Acesso restrito
+        </div>
+      </header>
+
+      <section
+        style={{
+          width: "100%",
+          maxWidth: 1120,
+          margin: "auto",
+          padding: "56px clamp(20px, 5vw, 56px) 72px",
+          display: "grid",
+          gridTemplateColumns: "minmax(0, 1.05fr) minmax(300px, 0.95fr)",
+          alignItems: "center",
+          gap: "clamp(44px, 9vw, 120px)",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, ease: "easeOut" }}
+        >
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: 10,
-              padding: "8px 20px",
-              borderRadius: 100,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              marginBottom: 24,
+              gap: 8,
+              color: "#6c5ce7",
+              fontSize: 12,
+              fontWeight: 800,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              marginBottom: 22,
             }}
           >
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                background: "linear-gradient(135deg, #7C3AED, #4f46e5)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <svg width="14" height="17" viewBox="0 0 18 26" fill="none">
-                <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="#fff" />
-                <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="#fff" opacity="0.5" />
-              </svg>
-            </div>
-            <span
-              style={{
-                color: "#fff",
-                fontWeight: 700,
-                fontSize: 14,
-                letterSpacing: "0.5px",
-              }}
-            >
-              Winmoz
-            </span>
+            <Sparkles size={15} strokeWidth={2.2} />
+            Uma nova experiência está a caminho
           </div>
-        </div>
-
-        {/* Main card */}
-        <div
-          style={{
-            background: "rgba(255,255,255,0.04)",
-            backdropFilter: "blur(20px)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 28,
-            padding: "40px 32px",
-            textAlign: "center",
-            boxShadow: "0 32px 80px rgba(0,0,0,0.5)",
-          }}
-        >
-          {/* Icon */}
-          <motion.div
-            animate={{ rotate: [0, -8, 8, 0] }}
-            transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-            style={{
-              width: 80,
-              height: 80,
-              borderRadius: 24,
-              background: "linear-gradient(135deg, rgba(124,58,237,0.3), rgba(79,70,229,0.3))",
-              border: "1.5px solid rgba(124,58,237,0.4)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              margin: "0 auto 28px",
-              boxShadow: "0 8px 32px rgba(124,58,237,0.25)",
-            }}
-          >
-            <Wrench style={{ width: 36, height: 36, color: "#a78bfa" }} />
-          </motion.div>
 
           <h1
             style={{
-              color: "#fff",
-              fontSize: 26,
-              fontWeight: 800,
-              margin: "0 0 10px",
-              letterSpacing: "-0.5px",
+              margin: 0,
+              maxWidth: 650,
+              color: "#111827",
+              fontSize: "clamp(42px, 6vw, 76px)",
+              lineHeight: 0.98,
+              fontWeight: 850,
+              letterSpacing: "-0.075em",
             }}
           >
-            Em Manutenção
+            Em
+            <br />
+            <span style={{ color: "#6c5ce7" }}>desenvolvimento.</span>
           </h1>
 
           <p
             style={{
-              color: "rgba(255,255,255,0.55)",
-              fontSize: 14,
-              lineHeight: 1.65,
-              margin: "0 0 32px",
+              maxWidth: 520,
+              margin: "28px 0 0",
+              color: "#5f6878",
+              fontSize: "clamp(16px, 2vw, 18px)",
+              lineHeight: 1.7,
             }}
           >
-            A plataforma está temporariamente indisponível enquanto realizamos melhorias. Voltamos em breve com novidades!
+            A plataforma Winmoz ainda está em desenvolvimento. Estamos a
+            preparar uma experiência mais segura, simples e completa para si.
           </p>
 
-          {/* Animated progress */}
-          <div
+          <p
             style={{
-              background: "rgba(255,255,255,0.06)",
-              borderRadius: 100,
-              height: 6,
-              overflow: "hidden",
-              marginBottom: 32,
+              maxWidth: 520,
+              margin: "14px 0 0",
+              color: "#374151",
+              fontSize: 14,
+              fontWeight: 600,
+              lineHeight: 1.65,
             }}
           >
-            <motion.div
-              animate={{ x: ["-100%", "100%"] }}
-              transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-              style={{
-                height: "100%",
-                width: "40%",
-                background: "linear-gradient(90deg, transparent, #7C3AED, #a78bfa, transparent)",
-                borderRadius: 100,
-              }}
-            />
-          </div>
+            Neste momento, o acesso está disponível apenas para pessoas
+            autorizadas.
+          </p>
 
-          {/* Info cards */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 12,
-              marginBottom: 32,
-            }}
-          >
-            {[
-              {
-                icon: Clock,
-                title: "Tempo Previsto",
-                value: "Em breve",
-                color: "#a78bfa",
-              },
-              {
-                icon: Shield,
-                title: "Segurança",
-                value: "Activa",
-                color: "#34d399",
-              },
-            ].map((item) => (
-              <div
-                key={item.title}
-                style={{
-                  background: "rgba(255,255,255,0.04)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  borderRadius: 16,
-                  padding: "14px 12px",
-                }}
-              >
-                <item.icon
-                  style={{ width: 18, height: 18, color: item.color, margin: "0 auto 6px" }}
-                />
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: "rgba(255,255,255,0.4)",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.8px",
-                    marginBottom: 3,
-                  }}
-                >
-                  {item.title}
-                </div>
-                <div
-                  style={{ fontSize: 13, fontWeight: 700, color: "#fff" }}
-                >
-                  {item.value}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Contact */}
           <a
             href="mailto:support@pokerw.co.mz"
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: 8,
-              padding: "10px 20px",
-              borderRadius: 100,
-              background: "rgba(124,58,237,0.15)",
-              border: "1px solid rgba(124,58,237,0.3)",
-              color: "#a78bfa",
-              fontSize: 13,
-              fontWeight: 500,
+              gap: 9,
+              marginTop: 30,
+              color: "#111827",
+              fontSize: 14,
+              fontWeight: 800,
               textDecoration: "none",
-              cursor: "pointer",
+              borderBottom: "1px solid #111827",
+              paddingBottom: 5,
             }}
           >
-            <Mail style={{ width: 14, height: 14 }} />
-            support@pokerw.co.mz
+            Falar com a equipa
+            <ArrowUpRight size={16} strokeWidth={2.4} />
           </a>
-        </div>
+        </motion.div>
 
-        <p
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.65, delay: 0.12, ease: "easeOut" }}
           style={{
-            textAlign: "center",
-            color: "rgba(255,255,255,0.2)",
-            fontSize: 11,
-            marginTop: 20,
+            width: "100%",
+            maxWidth: 410,
+            justifySelf: "end",
+            background: "#fff",
+            border: "1px solid #e5e7eb",
+            boxShadow: "0 24px 70px rgba(17,24,39,0.09)",
+            padding: "clamp(24px, 5vw, 38px)",
           }}
         >
-          © 2025 Winmoz · Todos os direitos reservados
-        </p>
-      </motion.div>
-    </div>
+          <div
+            style={{
+              width: 78,
+              height: 78,
+              display: "grid",
+              placeItems: "center",
+              background: "#f0efff",
+              color: "#6c5ce7",
+              marginBottom: 27,
+            }}
+          >
+            <LockKeyhole size={34} strokeWidth={1.6} />
+          </div>
+
+          <div
+            style={{
+              color: "#9ca3af",
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              marginBottom: 9,
+            }}
+          >
+            Estado da plataforma
+          </div>
+          <h2
+            style={{
+              margin: 0,
+              color: "#111827",
+              fontSize: 25,
+              lineHeight: 1.2,
+              fontWeight: 800,
+              letterSpacing: "-0.04em",
+            }}
+          >
+            Estamos a construir algo melhor.
+          </h2>
+          <p
+            style={{
+              margin: "13px 0 28px",
+              color: "#6b7280",
+              fontSize: 14,
+              lineHeight: 1.65,
+            }}
+          >
+            A nossa equipa está a trabalhar para tornar o Winmoz mais
+            confiável e preparado para todos.
+          </p>
+
+          <div
+            style={{
+              height: 4,
+              background: "#edeef2",
+              overflow: "hidden",
+              marginBottom: 28,
+            }}
+          >
+            <motion.div
+              aria-hidden="true"
+              animate={{ x: ["-100%", "230%"] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+              style={{
+                width: "38%",
+                height: "100%",
+                background: "#6c5ce7",
+              }}
+            />
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 10,
+            }}
+          >
+            {details.map(({ icon: Icon, label, value, tone }) => {
+              const accent = tone === "green" ? "#059669" : "#6c5ce7";
+              const background = tone === "green" ? "#ecfdf5" : "#f5f3ff";
+
+              return (
+                <div
+                  key={label}
+                  style={{
+                    minWidth: 0,
+                    background,
+                    padding: "14px 12px",
+                  }}
+                >
+                  <Icon size={17} color={accent} strokeWidth={2} />
+                  <div
+                    style={{
+                      color: "#9ca3af",
+                      fontSize: 10,
+                      fontWeight: 800,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      marginTop: 11,
+                    }}
+                  >
+                    {label}
+                  </div>
+                  <div
+                    style={{
+                      color: "#374151",
+                      fontSize: 12,
+                      fontWeight: 750,
+                      lineHeight: 1.35,
+                      marginTop: 4,
+                    }}
+                  >
+                    {value}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      </section>
+
+      <footer
+        style={{
+          width: "100%",
+          maxWidth: 1120,
+          margin: "0 auto",
+          padding: "20px clamp(20px, 5vw, 56px) 28px",
+          color: "#9ca3af",
+          fontSize: 11,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        © 2026 Winmoz · Todos os direitos reservados
+      </footer>
+
+      <style>{`
+        @media (max-width: 760px) {
+          header {
+            padding-top: 20px !important;
+            padding-bottom: 20px !important;
+          }
+          header > div:last-child {
+            font-size: 9px !important;
+            padding: 7px 9px !important;
+          }
+          section {
+            grid-template-columns: 1fr !important;
+            padding-top: 52px !important;
+            padding-bottom: 40px !important;
+            margin: 0 !important;
+          }
+          section > div:last-child {
+            max-width: none !important;
+            justify-self: stretch !important;
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          * {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
+      `}</style>
+    </main>
   );
 }
