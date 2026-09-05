@@ -214,13 +214,13 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
-    /* Fallback for older Android/Chrome that doesn't support space-separated hsl() */
-    background-color: #070813;
-    color: #f0eff8;
+    /* Keep route/auth loading states light while their content is mounting. */
+    background-color: #fff;
+    color: #111;
   }
 
   html {
-    background-color: #070813;
+    background-color: #fff;
   }
 }
 

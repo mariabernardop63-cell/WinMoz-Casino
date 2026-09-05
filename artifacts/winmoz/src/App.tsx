@@ -106,9 +106,35 @@ function preloadPages() {
 }
 
 function PageFallback() {
-  // Keep the current surface instead of showing an extra processing screen
-  // during a lazy route transition.
-  return null;
+  // Never leave the browser's dark body exposed while a route chunk loads.
+  // The previous route may already have been removed by Suspense at this point.
+  return (
+    <div
+      role="status"
+      aria-label="A carregar"
+      style={{
+        minHeight: "100vh",
+        width: "100%",
+        background: "#fff",
+        color: "#111",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <div
+        style={{
+          width: 24,
+          height: 24,
+          border: "2px solid #e5e7eb",
+          borderTopColor: "#111",
+          borderRadius: "50%",
+          animation: "wm-route-spin 0.7s linear infinite",
+        }}
+      />
+      <style>{`@keyframes wm-route-spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
 }
 
 const queryClient = new QueryClient();
@@ -165,8 +191,9 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
   // Admin routes always pass through
   if (isAdminRoute) return <>{children}</>;
 
-  // Still checking
-  if (!checked) return null;
+  // Still checking: keep a real surface visible instead of exposing the
+  // browser/body background during the first request.
+  if (!checked) return <PageFallback />;
 
   if (maintenance) {
     return <MaintenancePage />;

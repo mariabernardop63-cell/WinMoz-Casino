@@ -36,3 +36,8 @@ description: Key decisions and patterns from major bug-fix session — payout, r
 
 ## Admin matches panel
 - Default `statusFilter` is `"active"` (not `"all"`) to hide finished matches on load
+
+## Ludo realtime invariants
+- Realtime dice and piece-selection events must be accepted only when their player matches the current turn; remote base-exit animations must always release the movement lock.
+- **Why:** Delayed broadcasts otherwise reuse an old die/result on the next turn, and a remote piece leaving home can leave the local board permanently non-selectable.
+- **How to apply:** Keep turn/phase checks both before and after animation delays, clear both dice faces on hand-off, and release animation locks in every remote-move completion path.

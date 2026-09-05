@@ -705,7 +705,7 @@ function Board({ pieces, movable, onSelectPiece }:{
           const [svgX,svgY] = HOME_SVG_PX[p.player][slotIdx];
           return (
             <motion.div key={p.id}
-              onClick={selectable?()=>onSelectPiece(p.id):undefined}
+              onPointerDown={selectable?()=>onSelectPiece(p.id):undefined}
               animate={showEffect ? { y:[0,-5,0] } : { y:0 }}
               transition={showEffect ? { duration:0.65, repeat:Infinity, ease:"easeInOut" } : {}}
               style={{
@@ -717,6 +717,8 @@ function Board({ pieces, movable, onSelectPiece }:{
                 translateY:"-50%",
                 zIndex:selectable?20:5,
                 cursor:selectable?"pointer":"default",
+                 touchAction:"manipulation",
+                 userSelect:"none",
               }}>
               {showEffect && <SelectionRing color={color}/>}
               <div style={{
@@ -756,7 +758,7 @@ function Board({ pieces, movable, onSelectPiece }:{
 
         return (
           <motion.div key={p.id}
-            onClick={selectable?()=>onSelectPiece(p.id):undefined}
+            onPointerDown={selectable?()=>onSelectPiece(p.id):undefined}
             animate={showEffect ? { y:[0,-4,0] } : { y:0 }}
             transition={showEffect ? { duration:0.65, repeat:Infinity, ease:"easeInOut" } : {}}
             style={{
@@ -768,6 +770,8 @@ function Board({ pieces, movable, onSelectPiece }:{
               translateY:`calc(-50% + ${offY}px)`,
               zIndex:selectable?20:10,
               cursor:selectable?"pointer":"default",
+               touchAction:"manipulation",
+               userSelect:"none",
             }}>
             {showEffect && <SelectionRing color={color}/>}
             <div style={{
@@ -817,7 +821,12 @@ function Dice3D({ value, rolling, onClick, active, sz=48 }:{
     1:{rx:0,ry:0},2:{rx:-90,ry:0},3:{rx:0,ry:-90},4:{rx:0,ry:90},5:{rx:90,ry:0},6:{rx:0,ry:180},
   };
   useEffect(()=>{
-    if(!rolling){ if(value!==null) setDisp(value); return; }
+    if(!rolling){
+      // A cleared die must not keep showing the previous player's result.
+      if(value===null){ setDisp(1); return; }
+      setDisp(value);
+      return;
+    }
     setRollKey(k=>k+1);
     let n=0;
     const iv=setInterval(()=>{ setDisp(Math.floor(Math.random()*6)+1); if(++n>14) clearInterval(iv); },45);
@@ -1601,7 +1610,7 @@ export default function LudoGame() {
       setMsg(`${plName} ${reason} — joga de novo!`);
       setMovable([]);
       // Keep consecutiveSixes for this extra turn (don't reset, it accumulates)
-      setTimeout(()=>{setPhase("roll");if(currentTurn==="blue")setDiceBlue(null);else setDiceGreen(null);},400);
+      setTimeout(()=>{setPhase("roll");setDiceBlue(null);setDiceGreen(null);},400);
       broadcastSync(currentTurn,"roll",500);
     } else {
       const next=other(currentTurn);
@@ -1613,7 +1622,9 @@ export default function LudoGame() {
       consecutiveSixesRef.current=0;
       setTimeout(()=>{
         setTurn(next); setPhase("roll");
-        if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
+        // Clear both faces at hand-off so the next player never sees the
+        // previous player's result as if it were their own roll.
+        setDiceBlue(null); setDiceGreen(null);
         setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
       },500);
       broadcastSync(next,"roll",600);
@@ -1656,7 +1667,9 @@ export default function LudoGame() {
     const plName=opponentName;
     if(piece.pos===-1){
       setMsg(`${plName} coloca peça no tabuleiro!`);
-      movePieceSteps(pid,-1,1,true,()=>{});
+      // Release the lock after an opponent exits the base too. Without this,
+      // the next local selection could remain blocked forever.
+      movePieceSteps(pid,-1,1,true,()=>{ moveBusyRef.current = false; });
     } else {
       const willLandOnArrow=piece.pos+diceVal===50;
       const inStretch=piece.pos>=51;
@@ -1678,10 +1691,19 @@ export default function LudoGame() {
 
   // ── Apply a dice roll locally (no broadcast) ────────────────────────────────
   const applyRoll=useCallback((pl:Player,val:number)=>{
+    // Realtime events may arrive late. A roll is valid only for the player
+    // whose turn is currently active and while the UI is waiting for a roll.
+    if(turnRef.current!==pl||phaseRef.current!=="roll"||winnerRef.current) return;
     const setR=pl==="blue"?setRollingB:setRollingG;
     const setD=pl==="blue"?setDiceBlue:setDiceGreen;
     setR(true);
     setTimeout(()=>{
+      // Re-check after the dice animation delay because a state sync can hand
+      // the turn to the other player during those 800ms.
+      if(turnRef.current!==pl||phaseRef.current!=="roll"||winnerRef.current){
+        setR(false);
+        return;
+      }
       setD(val); setR(false);
 
       // Track consecutive sixes (Rule 4) — update ref synchronously to avoid timing bugs
@@ -1711,7 +1733,7 @@ export default function LudoGame() {
         // Also increment stuckTurns if all still in base (6 with no exit = unusual but possible)
         setTimeout(()=>{
           const next=other(pl); setTurn(next); setPhase("roll");
-          if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
+          setDiceBlue(null); setDiceGreen(null);
           setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
         },1300);
       } else if(mv.length===1){
@@ -1901,8 +1923,9 @@ export default function LudoGame() {
       const key = `dice_${payload.player}`;
       if(seq && lastEventSeqRef.current[key] >= seq) return;
       if(seq) lastEventSeqRef.current[key] = seq;
-      // Only apply if it's actually the opponent's turn and we're in roll phase
-      if(phaseRef.current==="done"||winnerRef.current) return;
+      // Only apply if it is actually the opponent's turn and we are waiting
+      // for a roll. Delayed broadcasts from the previous turn are ignored.
+      if(phaseRef.current!=="roll"||turnRef.current!==payload.player||winnerRef.current) return;
       // Security: validate dice value is in expected range
       const val = payload.value as number;
       if(typeof val !== "number" || val < 1 || val > 6 || !Number.isInteger(val)) return;
@@ -1930,6 +1953,11 @@ export default function LudoGame() {
       const diceVal = payload.diceVal as number;
       if(!/^[BG][0-3]$/.test(pieceId)) return;
       if(typeof diceVal !== "number" || diceVal < 1 || diceVal > 6 || !Number.isInteger(diceVal)) return;
+      // A delayed selection from the previous turn must not animate or lock
+      // the board after the turn has already changed.
+      if(turnRef.current!==payload.player) return;
+      const expectedPrefix = payload.player === "blue" ? "B" : "G";
+      if(pieceId[0] !== expectedPrefix) return;
       // Use doOpponentMove (animation only) — final state comes via ludo_state_sync
       doOpponentMove(
         pieceId as PieceId,
