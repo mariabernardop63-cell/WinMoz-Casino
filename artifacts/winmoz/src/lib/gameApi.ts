@@ -32,6 +32,13 @@ export interface WinResult {
 export interface DiceResult {
   value: number;
   error?: string;
+  turnBlocked?: boolean;
+}
+
+export interface PassTurnResult {
+  ok: boolean;
+  turn?: "blue" | "green";
+  error?: string;
 }
 
 export async function serverBet(
@@ -110,6 +117,9 @@ export async function rollLudoDice(
       const data = await res.json() as { value?: number; error?: string };
       if (!res.ok || typeof data.value !== "number" || !Number.isInteger(data.value) || data.value < 1 || data.value > 6) {
         if (res.status === 401) handleAuthError(data);
+        // 423 = server says it's not this player's turn — a hard signal the
+        // local turn state diverged and a resync is required.
+        if (res.status === 423) return { value: 0, error: data.error ?? "Não é a tua vez", turnBlocked: true };
         return { value: 0, error: data.error ?? "Erro ao rolar o dado" };
       }
       return { value: data.value };
@@ -119,6 +129,45 @@ export async function rollLudoDice(
   } catch (error) {
     return {
       value: 0,
+      error: error instanceof DOMException && error.name === "AbortError"
+        ? "O servidor demorou demasiado a responder"
+        : "Erro de ligação ao servidor",
+    };
+  }
+}
+
+export async function passLudoTurn(
+  gameId: string,
+  keepTurn: boolean,
+  reopen = false
+): Promise<PassTurnResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: "Não autenticado" };
+  try {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 8_000);
+    try {
+      const res = await fetch("/api/games/ludo-turn", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ gameId, keepTurn, reopen }),
+        signal: controller.signal,
+      });
+      const data = await res.json() as { ok?: boolean; turn?: "blue" | "green"; error?: string };
+      if (!res.ok || !data.ok) {
+        if (res.status === 401) handleAuthError(data);
+        return { ok: false, error: data.error ?? "Erro ao passar a vez" };
+      }
+      return { ok: true, turn: data.turn };
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  } catch (error) {
+    return {
+      ok: false,
       error: error instanceof DOMException && error.name === "AbortError"
         ? "O servidor demorou demasiado a responder"
         : "Erro de ligação ao servidor",
