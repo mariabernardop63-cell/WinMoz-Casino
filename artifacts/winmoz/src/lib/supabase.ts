@@ -67,9 +67,34 @@ export function isHardAuthError(err: unknown): boolean {
  * com uma mensagem amigável — o utilizador nunca fica preso numa conta morta.
  */
 export function forceSessionLogout(reason = "invalid_session") {
+  // Durante a janela de login, um refresh antigo (da sessão anterior) pode
+  // falhar ao mesmo tempo que o utilizador entra. Ignorar: quase de certeza
+  // é a sessão velha a morrer — nunca a nova.
+  if (inLoginGrace()) return;
   window.dispatchEvent(new CustomEvent("wm:session-invalid", {
     detail: { reason },
   }));
+}
+
+/* ── Janela de graça de login ──────────────────────────────────────────────
+   Entre o submit do login e a estabilização da nova sessão, um refresh em
+   curso da SESSÃO VELHA pode falhar e o auth-js faz `_removeSession()` —
+   que apaga do storage a sessão NOVA e dispara SIGNED_OUT. Durante a
+   graça: ignoramos esses fins de sessão e um watchdog repara o storage. */
+let loginGraceUntil = 0;
+const LOGIN_GRACE_MS = 25_000;
+
+export function beginLoginGrace() {
+  loginGraceUntil = Date.now() + LOGIN_GRACE_MS;
+}
+
+export function cancelLoginGrace() {
+  loginGraceUntil = 0;
+  stopLoginWatchdog();
+}
+
+export function inLoginGrace(): boolean {
+  return Date.now() < loginGraceUntil;
 }
 
 interface EnsureSessionOptions {
@@ -104,8 +129,15 @@ async function runEnsureFreshSession({ forceRefresh, marginSeconds = 90 }: Ensur
     if (session && !forceRefresh && expiresAt - nowSecs >= marginSeconds) return session;
     if (!session?.refresh_token) return session ?? null;
 
+    const attemptedToken = session.refresh_token;
     const { data: { session: refreshed }, error: refreshErr } = await supabase.auth.refreshSession();
     if (refreshed) return refreshed;
+
+    // Enquanto o refresh antigo estava em curso, o storage pode ter sido
+    // substituído (novo login, outra aba). Se a sessão actual já não é a que
+    // tentámos refrescar, é mais nova — usá-la e ignorar a falha antiga.
+    const { data: { session: current } } = await supabase.auth.getSession();
+    if (current?.user && current.refresh_token !== attemptedToken) return current;
 
     if (isHardAuthError(refreshErr)) {
       forceSessionLogout("refresh_token_invalid");
@@ -148,6 +180,65 @@ export async function recoverAfter401(): Promise<boolean> {
   return Boolean(session?.access_token);
 }
 
+/* ── Watchdog pós-login ────────────────────────────────────────────────────
+   Enquanto a graça durar, verifica periodicamente se a sessão do login
+   continua intacta no storage. Um refresh antigo pendente do auth-js pode
+   falhar TARDE e apagar a sessão nova (_removeSession). Quando isso
+   acontece, este watchdog repõe a sessão em ≤600 ms e o auth-js volta a
+   disparar SIGNED_IN — o perfil é recarregado sem intervenção. */
+
+let watchdogTimer: ReturnType<typeof setInterval> | null = null;
+let watchdogSession: Session | null = null;
+
+function stopLoginWatchdog() {
+  if (watchdogTimer) { clearInterval(watchdogTimer); watchdogTimer = null; }
+  watchdogSession = null;
+}
+
+async function repairLoginSession(): Promise<boolean> {
+  if (!watchdogSession) return false;
+  try {
+    const { data: { session: current } } = await supabase.auth.getSession();
+    if (current?.refresh_token === watchdogSession.refresh_token) return true;
+    // Storage perdido/substituído → repor a sessão do login.
+    await supabase.auth.setSession({
+      access_token: watchdogSession.access_token,
+      refresh_token: watchdogSession.refresh_token,
+    });
+    return true;
+  } catch { return false; }
+}
+
+/**
+ * Chamado pelo Login após `signInWithPassword` devolver uma sessão:
+ *  1. verificação imediata — se um refresh antigo já apagou o storage,
+ *     repõe a sessão de imediato (antes da navegação para /admin, p.ex.);
+ *  2. watchdog até ao fim da graça — repara eliminações tardias.
+ */
+export async function finalizeLogin(session: Session): Promise<void> {
+  if (!session?.refresh_token) return;
+  beginLoginGrace();
+  watchdogSession = session;
+
+  // Reparo imediato (rápido quando está tudo intacto).
+  try {
+    const { data: { session: current } } = await supabase.auth.getSession();
+    if (!current || current.refresh_token !== session.refresh_token) {
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+    }
+  } catch { /* ignore */ }
+
+  if (!watchdogTimer) {
+    watchdogTimer = setInterval(async () => {
+      if (!inLoginGrace()) { stopLoginWatchdog(); return; }
+      await repairLoginSession();
+    }, 600);
+  }
+}
+
 /** Chaves de sessão do supabase-js: sb-<ref>-auth-token[-user|-code-verifier]. */
 const AUTH_STORAGE_KEY_RE = /^sb-.*-auth-token/;
 
@@ -168,6 +259,8 @@ export function clearLocalAuthStorage() {
  * em 5 s, as credenciais locais são limpas na mesma.
  */
 export async function terminateSession(scope: "global" | "local" = "global"): Promise<void> {
+  // Um logout cancela a graça e o watchdog — a sessão nova deixou de existir.
+  cancelLoginGrace();
   try {
     await Promise.race([
       supabase.auth.signOut({ scope }),

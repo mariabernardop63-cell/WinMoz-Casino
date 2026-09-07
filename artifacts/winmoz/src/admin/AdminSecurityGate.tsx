@@ -90,6 +90,18 @@ async function verifyAdminServer(): Promise<boolean> {
   } catch { return false; }
 }
 
+/* Igual a verifyAdminServer, mas com retries: logo após o login, um refresh
+   antigo pode devolver 401 na primeira chamada. O gate de segurança só deve
+   rejeitar quando o servidor respondeu definitivamente "não é admin". */
+async function verifyAdminServerWithRetry(attempts = 3): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    const ok = await verifyAdminServer();
+    if (ok) return true;
+    if (i < attempts - 1) await new Promise(r => setTimeout(r, 1200 * (i + 1)));
+  }
+  return false;
+}
+
 function formatCountdown(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
@@ -115,7 +127,7 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
   useEffect(() => {
     (async () => {
       if (isSessionAuthenticated()) {
-        const isAdmin = await verifyAdminServer();
+        const isAdmin = await verifyAdminServerWithRetry();
         if (isAdmin) {
           verifiedRef.current = true;
           setPassed(true);
@@ -162,7 +174,7 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
 
     const [correctPw, isAdmin] = await Promise.all([
       fetchSecurityPassword(),
-      verifyAdminServer(),
+      verifyAdminServerWithRetry(),
     ]);
 
     if (!isAdmin) {

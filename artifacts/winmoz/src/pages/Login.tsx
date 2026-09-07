@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, ArrowLeft, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, finalizeLogin, beginLoginGrace, cancelLoginGrace } from "@/lib/supabase";
 import { useBrand } from "@/lib/brand-context";
 
 function PokerLogo() {
@@ -43,13 +43,16 @@ export default function Login() {
 
     setLoading(true);
     setErrors({});
+    // Janela de graça: cobre o pedido de login E o refresh antigo (da sessão
+    // anterior) que ainda possa estar em curso no auth-js.
+    beginLoginGrace();
 
     try {
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("timeout")), 15000)
       );
 
-      const { error } = await Promise.race([
+      const loginResult = await Promise.race([
         supabase.auth.signInWithPassword({
           email: email.trim().toLowerCase(),
           password,
@@ -59,7 +62,9 @@ export default function Login() {
 
       setLoading(false);
 
-      if (error) {
+      if (loginResult.error) {
+        const error = loginResult.error;
+        cancelLoginGrace();
         if (
           error.message.includes("Invalid login credentials") ||
           error.message.includes("invalid_credentials")
@@ -73,6 +78,13 @@ export default function Login() {
         return;
       }
 
+      // Protege a sessão nova: um refresh antigo (da sessão anterior) pode
+      // falhar nos próximos segundos e apagá-la do storage. finalizeLogin
+      // repõe a sessão durante essa janela (watchdog) e evita o "conta nula".
+      if (loginResult.data.session) {
+        await finalizeLogin(loginResult.data.session);
+      }
+
       const adminEmail = "123456789@gmail.com";
       if (email.trim().toLowerCase() === adminEmail) {
         setLocation("/admin");
@@ -80,7 +92,16 @@ export default function Login() {
         setLocation("/");
       }
     } catch {
+      /* Timeout do pedido: o login pode ainda ter concluído em segundo
+         plano — confirma antes de mostrar erro. */
+      await new Promise(r => setTimeout(r, 1500));
+      const { data: { session } } = await supabase.auth.getSession();
       setLoading(false);
+      if (session) {
+        await finalizeLogin(session);
+        setLocation(email.trim().toLowerCase() === "123456789@gmail.com" ? "/admin" : "/");
+        return;
+      }
       setErrors({ general: "Ligação lenta ou sem resposta. Tenta novamente." });
     }
   };

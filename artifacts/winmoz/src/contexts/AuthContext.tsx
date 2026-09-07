@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import {
   forceSessionLogout, isSessionExpiredError, isHardAuthError,
-  ensureFreshSession, terminateSession, clearLocalAuthStorage, supabase,
+  ensureFreshSession, terminateSession, clearLocalAuthStorage,
+  inLoginGrace, cancelLoginGrace, supabase,
 } from "@/lib/supabase";
 import { API_BASE } from "@/lib/apiBase";
 
@@ -49,8 +50,17 @@ function loadCachedProfile(): (UserProfile & { email?: string }) | null {
       ?? sessionStorage.getItem(PROFILE_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as (UserProfile & { email?: string }) | null;
-    // Validação mínima: um perfil em cache tem de ter, pelo menos, um id.
     if (!parsed || typeof parsed.id !== "string" || !parsed.id) return null;
+    /* Stubs legacy (bug antigo): perfil sem NENHUM dado identificativo
+       (nome, telefone, código de convite, avatar). Era o "conta expirada
+       com tudo null" que ficava cravado no dispositivo — não é fiável. */
+    if (!parsed.full_name && !parsed.phone && !parsed.my_invite_code && !parsed.avatar_url) {
+      try {
+        localStorage.removeItem(PROFILE_CACHE_KEY);
+        sessionStorage.removeItem(PROFILE_CACHE_KEY);
+      } catch { /* ignore */ }
+      return null;
+    }
     try { localStorage.setItem(PROFILE_CACHE_KEY, raw); } catch { /* ignore */ }
     return parsed;
   } catch { return null; }
@@ -271,6 +281,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsBlocked(false);
     setLoading(false);
     setSessionReady(true);
+    // Cancela a graça/watchdog: nada deve repor uma sessão que estamos a
+    // encerrar por decisão própria (refresh token provadamente morto).
+    cancelLoginGrace();
     clearLocalAuthStorage();
     invalidatingRef.current = false;
     if (wasAuthenticated && window.location.pathname !== "/login") {
@@ -301,6 +314,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      Não depende de rede: limpa o estado local primeiro, tenta avisar o
      servidor com um limite temporal, e devolve o controlo ao utilizador. */
   const signOut = async () => {
+    // Cancela a graça/watchdog do login antes de mais nada.
+    cancelLoginGrace();
     signedInHandledRef.current = false;
     hadAuthenticatedStateRef.current = false;
     activeUidRef.current = null;
@@ -464,7 +479,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (event === "SIGNED_IN" && session?.user) {
           const { id, email = "" } = session.user;
-          if (signedInHandledRef.current && activeUidRef.current === id) return;
+          if (signedInHandledRef.current && activeUidRef.current === id) {
+            /* Já tratámos este login — mas se o perfil ainda não chegou
+               (watchdog repôs a sessão após um refresh antigo ter a apagado),
+               deixar correr para re-tentar fetchProfile. */
+            if (profile) return;
+          }
 
           activeUidRef.current = id;
           hadAuthenticatedStateRef.current = true;
@@ -485,7 +505,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           const data = await fetchProfile(id);
           if (!cancelled && activeUidRef.current === id) {
-            if (data) saveAndSet({ ...data, email });
+            if (data) {
+              saveAndSet({ ...data, email });
+            } else {
+              /* Falha transitória a buscar a linha do perfil: mostra já a
+                 identidade a partir dos metadados (sem persistir) e deixa o
+                 self-heal preencher nome/telefone/saldo assim que a DB
+                 responder — a conta nunca fica "tudo null". */
+              const meta = (session.user.user_metadata ?? {}) as Record<string, unknown>;
+              saveAndSet({
+                id,
+                full_name: typeof meta.full_name === "string" ? meta.full_name as string : null,
+                email,
+                phone: typeof meta.phone === "string" ? meta.phone as string : null,
+                avatar_url: typeof meta.avatar_url === "string" ? meta.avatar_url as string : null,
+                invite_code_used: null,
+                my_invite_code: null,
+                balance: 0,
+              }, { persist: false });
+            }
             signedInHandledRef.current = true;
             setLoading(false);
             startHeartbeat(id);
@@ -493,6 +531,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
         } else if (event === "SIGNED_OUT") {
+          /* Ignorar SIGNED_OUT durante a graça de login: é tipicamente um
+             refresh antigo (da sessão anterior) a falhar e a apagar a
+             sessão NOVA do storage. Limpar o estado aqui deixava o
+             utilizador "entrado" com uma conta nula. O watchdog do
+             finalizeLogin repõe a sessão e o SIGNED_IN volta a chegar. */
+          if (inLoginGrace()) return;
           activeUidRef.current = null;
           signedInHandledRef.current = false;
           hadAuthenticatedStateRef.current = false;
