@@ -6,7 +6,7 @@ import {
   XCircle, RotateCcw, AlertTriangle, Swords, Users,
   CreditCard, Smartphone, CheckCircle2, Clock, X, Pencil, Phone, Copy, Hash, Loader2,
 } from "lucide-react";
-import { supabase, getSessionWithRefresh, isSessionExpiredError, forceSessionLogout } from "@/lib/supabase";
+import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getLivePlayerCount, getSalaOnlineCount } from "@/lib/simulation";
 import { API_BASE } from "@/lib/apiBase";
@@ -1335,7 +1335,7 @@ export default function Apostar() {
     setSalaLoading(true);
     try {
       if (salaRoomId) {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getSessionWithRefresh();
         const token = session?.access_token;
         if (token) {
           await fetch(`${API_BASE}/rooms/cancel`, {

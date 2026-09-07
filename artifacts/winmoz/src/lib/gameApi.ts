@@ -1,19 +1,46 @@
-import { supabase, getSessionWithRefresh, forceSessionLogout } from "@/lib/supabase";
+import { ensureFreshSession, recoverAfter401, forceSessionLogout } from "@/lib/supabase";
 
 async function getToken(): Promise<string | null> {
   try {
-    const session = await getSessionWithRefresh();
+    const session = await ensureFreshSession({ marginSeconds: 60 });
     return session?.access_token ?? null;
   } catch { return null; }
 }
 
-/* 401 numa chamada de jogo prova que o token já não é aceite. Limpar a
-   sessão evita continuar a jogar com nome/saldo de um perfil inválido. */
-function handleAuthError(data: { error?: string } | null) {
-  const msg = String(data?.error ?? "");
-  if (/não autenticado|sessão inválida|unauthorized|invalid jwt|token/i.test(msg)) {
-    forceSessionLogout("api_unauthorized");
+/* Pedido autenticado com retry: num 401, refresca o token e repete UMA vez
+   antes de declarar a sessão terminada. Só encerra a sessão quando nem o
+   refresh consegue produzir um token novo — uma falha de rede nunca
+   desloga o utilizador. */
+async function postWithAuthRetry(
+  url: string,
+  body: unknown,
+  signal?: AbortSignal
+): Promise<{ res: Response; data: Record<string, unknown> } | null> {
+  let token = await getToken();
+  if (!token) return null;
+
+  const doFetch = (t: string) => fetch(url, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${t}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+
+  let res = await doFetch(token);
+  if (res.status === 401) {
+    const recovered = await recoverAfter401();
+    if (recovered) {
+      const fresh = await getToken();
+      if (fresh) res = await doFetch(fresh);
+    }
+    if (res.status === 401) forceSessionLogout("api_unauthorized");
   }
+  let data: Record<string, unknown> = {};
+  try { data = await res.json() as Record<string, unknown>; } catch { /* body vazio */ }
+  return { res, data };
 }
 
 export interface BetResult {
@@ -47,23 +74,13 @@ export async function serverBet(
   description?: string,
   gameId?: string
 ): Promise<BetResult> {
-  const token = await getToken();
-  if (!token) return { ok: false, newBalance: 0, error: "Não autenticado" };
-
-  const res = await fetch("/api/games/bet", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ amount, gameType, description, gameId }),
-  });
-  const data = await res.json() as { ok?: boolean; newBalance?: number; error?: string };
+  const result = await postWithAuthRetry("/api/games/bet", { amount, gameType, description, gameId });
+  if (!result) return { ok: false, newBalance: 0, error: "Não autenticado" };
+  const { res, data } = result;
   if (!res.ok || !data.ok) {
-    if (res.status === 401) handleAuthError(data);
-    return { ok: false, newBalance: 0, error: data.error ?? "Erro ao processar aposta" };
+    return { ok: false, newBalance: 0, error: (data.error as string) ?? "Erro ao processar aposta" };
   }
-  return { ok: true, newBalance: data.newBalance ?? 0 };
+  return { ok: true, newBalance: Number(data.newBalance ?? 0) };
 }
 
 export async function serverWin(
@@ -71,23 +88,13 @@ export async function serverWin(
   gameType: "damas" | "ludo" | "xadrez",
   betAmount: number
 ): Promise<WinResult> {
-  const token = await getToken();
-  if (!token) return { ok: false, payout: 0, newBalance: 0, error: "Não autenticado" };
-
-  const res = await fetch("/api/games/win", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ gameId, gameType, betAmount }),
-  });
-  const data = await res.json() as { ok?: boolean; payout?: number; newBalance?: number; error?: string };
+  const result = await postWithAuthRetry("/api/games/win", { gameId, gameType, betAmount });
+  if (!result) return { ok: false, payout: 0, newBalance: 0, error: "Não autenticado" };
+  const { res, data } = result;
   if (!res.ok || !data.ok) {
-    if (res.status === 401) handleAuthError(data);
-    return { ok: false, payout: 0, newBalance: 0, error: data.error ?? "Erro ao registar vitória" };
+    return { ok: false, payout: 0, newBalance: 0, error: (data.error as string) ?? "Erro ao registar vitória" };
   }
-  return { ok: true, payout: data.payout ?? 0, newBalance: data.newBalance ?? 0 };
+  return { ok: true, payout: Number(data.payout ?? 0), newBalance: Number(data.newBalance ?? 0) };
 }
 
 export async function rollLudoDice(
@@ -105,24 +112,16 @@ export async function rollLudoDice(
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8_000);
     try {
-      const res = await fetch("/api/games/ludo-dice", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ gameId, allInBase, stuckTurns, consecutiveSixes }),
-        signal: controller.signal,
-      });
-      const data = await res.json() as { value?: number; error?: string };
+      const result = await postWithAuthRetry("/api/games/ludo-dice", { gameId, allInBase, stuckTurns, consecutiveSixes }, controller.signal);
+      if (!result) return { value: 0, error: "Não autenticado" };
+      const { res, data } = result;
       if (!res.ok || typeof data.value !== "number" || !Number.isInteger(data.value) || data.value < 1 || data.value > 6) {
-        if (res.status === 401) handleAuthError(data);
         // 423 = server says it's not this player's turn — a hard signal the
         // local turn state diverged and a resync is required.
-        if (res.status === 423) return { value: 0, error: data.error ?? "Não é a tua vez", turnBlocked: true };
-        return { value: 0, error: data.error ?? "Erro ao rolar o dado" };
+        if (res.status === 423) return { value: 0, error: (data.error as string) ?? "Não é a tua vez", turnBlocked: true };
+        return { value: 0, error: (data.error as string) ?? "Erro ao rolar o dado" };
       }
-      return { value: data.value };
+      return { value: data.value as number };
     } finally {
       window.clearTimeout(timeout);
     }
@@ -147,21 +146,13 @@ export async function passLudoTurn(
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8_000);
     try {
-      const res = await fetch("/api/games/ludo-turn", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ gameId, keepTurn, reopen }),
-        signal: controller.signal,
-      });
-      const data = await res.json() as { ok?: boolean; turn?: "blue" | "green"; error?: string };
+      const result = await postWithAuthRetry("/api/games/ludo-turn", { gameId, keepTurn, reopen }, controller.signal);
+      if (!result) return { ok: false, error: "Não autenticado" };
+      const { res, data } = result;
       if (!res.ok || !data.ok) {
-        if (res.status === 401) handleAuthError(data);
-        return { ok: false, error: data.error ?? "Erro ao passar a vez" };
+        return { ok: false, error: (data.error as string) ?? "Erro ao passar a vez" };
       }
-      return { ok: true, turn: data.turn };
+      return { ok: true, turn: data.turn as "blue" | "green" | undefined };
     } finally {
       window.clearTimeout(timeout);
     }

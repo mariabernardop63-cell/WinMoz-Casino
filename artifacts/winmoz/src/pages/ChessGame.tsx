@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { serverBet, serverWin } from "@/lib/gameApi";
 import AdBanner from "@/components/AdBanner";
 // ─── Sound helpers ─────────────────────────────────────────────────────────────
@@ -1205,7 +1205,7 @@ export default function ChessGame(){
       try{
         const result = await serverBet(BET, "xadrez", `Aposta (Xadrez) vs ${opponentName}`, gameId);
         if(!result.ok){ betDeductedRef.current=false; return; }
-        supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
+        getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
         try{sessionStorage.setItem(`wm_bet_deducted_chess_${gameId}`,"1");}catch{}
         await refreshProfile();
       }catch{betDeductedRef.current=false;}
@@ -1403,7 +1403,7 @@ export default function ChessGame(){
     // Game has definitively started — credit referral reward now (player's own first move)
     if(BET>0&&!rewardFiredRef.current){
       rewardFiredRef.current=true;
-      supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
+      getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
     }
     const seq=Date.now();
     channelRef.current?.send({type:"broadcast",event:"chess_move",
@@ -1431,7 +1431,7 @@ export default function ChessGame(){
       // Game has definitively started — credit referral reward now (opponent's first move)
       if(BET>0&&!rewardFiredRef.current){
         rewardFiredRef.current=true;
-        supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
+        getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
       }
       applyMoveToState(boardRef.current,payload.from as Sq,payload.to as Sq,
         payload.prom as PType,epRef.current,turnRef.current);

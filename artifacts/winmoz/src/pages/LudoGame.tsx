@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
 import { serverBet, serverWin, rollLudoDice, passLudoTurn } from "@/lib/gameApi";
 import AdBanner from "@/components/AdBanner";
@@ -1911,7 +1911,7 @@ export default function LudoGame() {
     // Game has definitively started — credit referral reward now (player's own first roll)
     if(BET_AMOUNT > 0 && !rewardFiredRef.current){
       rewardFiredRef.current=true;
-      supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
+      getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
     }
     const seq = Date.now();
     channelRef.current?.send({
@@ -1949,7 +1949,7 @@ export default function LudoGame() {
       try{
         const result = await serverBet(BET_AMOUNT, "ludo", `Aposta (Ludo) vs ${opponentName}`, gameId);
         if(!result.ok){ betDeductedRef.current=false; return; }
-        supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
+        getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
         try{sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`,"1");}catch{}
         await refreshProfile();
         if(profile?.id) evaluateBotDifficulty(profile.id).catch(()=>{});
@@ -2054,7 +2054,7 @@ export default function LudoGame() {
       // Game has definitively started — credit referral reward now (opponent's first move)
       if(BET_AMOUNT > 0 && !rewardFiredRef.current){
         rewardFiredRef.current=true;
-        supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
+        getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
       }
       lastActivityAtRef.current = Date.now();
       // O oponente ouve o mesmo som de dado que eu ouço quando jogo

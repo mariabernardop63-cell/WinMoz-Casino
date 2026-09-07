@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { evaluateBotDifficulty } from "@/lib/botBrain";
 import { serverBet, serverWin } from "@/lib/gameApi";
 import AdBanner from "@/components/AdBanner";
@@ -984,7 +984,7 @@ export default function DamasGame() {
       try {
         const result = await serverBet(BET, "damas", `Aposta (Damas) vs ${opponentName}`, gameId);
         if (!result.ok) { betDeductedRef.current = false; return; }
-        supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
+        getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
         try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch {}
         await refreshProfile();
         if (profile?.id) evaluateBotDifficulty(profile.id).catch(() => {});
@@ -1279,7 +1279,7 @@ export default function DamasGame() {
       // Game has definitively started — credit referral reward now (opponent's first move)
       if (BET > 0 && !rewardFiredRef.current) {
         rewardFiredRef.current = true;
-        supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
+        getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
       }
       applyRemoteMove(from, to, payload.captured as Sq[], nextTurn);
     });
@@ -1428,7 +1428,7 @@ export default function DamasGame() {
     // Game has definitively started — credit referral reward now (player's own first move)
     if (BET > 0 && !rewardFiredRef.current) {
       rewardFiredRef.current = true;
-      supabase.auth.getSession().then(({data:{session}})=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
+      getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
     }
     seqRef.current++;
     channelRef.current?.send({

@@ -7,7 +7,7 @@ import { Link, useLocation } from "wouter";
 import BottomNav from "@/components/BottomNav";
 import { AtualizacoesCards } from "./Home";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { getLivePlayerCount, formatPlayerCount, generateMatchPool, getSalaOnlineCount, formatOnlineCount, type SimMatch } from "@/lib/simulation";
 
 const TABS = ["Jogos", "Assistir", "Sala", "Novidades", "Chat"] as const;
@@ -253,7 +253,7 @@ function SalaTab() {
     try {
       /* SECURITY: balance mutations go through the server-side API with atomic
          guards — the browser must never write to profiles.balance directly */
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getSessionWithRefresh();
       const token = session?.access_token;
       if (!token) return false;
       const res = await fetch("/api/bet/deduct", {
@@ -271,7 +271,7 @@ function SalaTab() {
   async function refundBalance(amount: number, code: string) {
     if (!user?.id || amount <= 0) return;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getSessionWithRefresh();
       const token = session?.access_token;
       if (!token) return;
       const res = await fetch("/api/bet/refund", {

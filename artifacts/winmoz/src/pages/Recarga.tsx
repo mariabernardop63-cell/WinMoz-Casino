@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import {
   ChevronLeft, CheckCircle2, XCircle, RotateCcw, Zap,
 } from "lucide-react";
-import { forceSessionLogout, supabase } from "@/lib/supabase";
+import { forceSessionLogout, getSessionWithRefresh, recoverAfter401 } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { API_BASE } from "@/lib/apiBase";
 
@@ -50,26 +50,33 @@ export default function Recarga() {
       );
 
     try {
-      const sessionResult = await Promise.race([
-        supabase.auth.getSession(),
+      const session = await Promise.race([
+        getSessionWithRefresh(),
         timeout(8000),
-      ]) as Awaited<ReturnType<typeof supabase.auth.getSession>>;
+      ]);
 
-      const session = sessionResult.data.session;
        if (!session) {
-         forceSessionLogout("recharge_session_missing");
          setScreen("error");
          return;
        }
 
+      const doRecharge = (token: string) => fetch(`${API_BASE}/recharge`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code: digits }),
+      });
+
       const res = await Promise.race([
-        fetch(`${API_BASE}/recharge`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ code: digits }),
+        doRecharge(session.access_token).then(async r => {
+          // Token expirado a meio: refresca e repete uma vez antes de falhar.
+          if (r.status === 401 && await recoverAfter401()) {
+            const fresh = await getSessionWithRefresh();
+            if (fresh) return doRecharge(fresh.access_token);
+          }
+          return r;
         }),
         timeout(15000),
       ]) as Response;

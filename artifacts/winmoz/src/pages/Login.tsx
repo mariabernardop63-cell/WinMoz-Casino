@@ -27,6 +27,10 @@ export default function Login() {
   const [focused, setFocused] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
   const [loading, setLoading] = useState(false);
+  const [sessionExpired] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get("expired") === "1"; }
+    catch { return false; }
+  });
 
   const clearErr = (f: keyof typeof errors) =>
     setErrors(e => { const n = { ...e }; delete n[f]; return n; });
@@ -131,6 +135,14 @@ export default function Login() {
           <p className="text-[13.5px] text-slate-500 mb-7">
             Bem-vindo de volta. Introduza os seus dados.
           </p>
+
+          {sessionExpired && !errors.general && (
+            <div className="mb-5 p-3.5" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
+              <p style={{ fontSize: 13, color: "#b45309" }}>
+                A tua sessão terminou por segurança. Entra novamente para continuar.
+              </p>
+            </div>
+          )}
 
           {errors.general && (
             <div className="mb-5 p-3.5" style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>

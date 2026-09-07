@@ -5,7 +5,7 @@ import {
   ChevronLeft, Bell, Clock,
   CheckCircle2, XCircle, AlertTriangle, Smartphone, Pencil, Info, Loader2,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { API_BASE } from "@/lib/apiBase";
 
@@ -182,10 +182,10 @@ export default function Levantar() {
       let apiSuccess = false;
 
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = await getSessionWithRefresh();
         const token = session?.access_token;
         if (token) {
-          const res = await fetch(`${API_BASE}/withdraw`, {
+          const res = await fetch(`/withdraw`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
