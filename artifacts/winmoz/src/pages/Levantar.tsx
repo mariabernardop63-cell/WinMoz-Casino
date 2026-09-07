@@ -280,7 +280,9 @@ export default function Levantar() {
                   }}
                   className="px-3 py-1 text-xs font-bold transition-all"
                   style={{ background: editPhoneVal.length >= 9 ? "#0a0a0a" : "#e5e7eb", color: editPhoneVal.length >= 9 ? "#fff" : "#9ca3af", cursor: editPhoneVal.length >= 9 ? "pointer" : "default", borderRadius: 0 }}>
-                  {savingPhone ? "…" : "Guardar"}
+                  {savingPhone
+                    ? <Loader2 style={{ width: 12, height: 12 }} className="animate-spin" />
+                    : "Guardar"}
                 </button>
               </div>
             )}

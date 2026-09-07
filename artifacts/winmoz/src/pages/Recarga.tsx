@@ -207,7 +207,7 @@ export default function Recarga() {
                 border: "none",
                 letterSpacing: "0.3px",
               }}>
-               {submitting ? "A validar código…" : isComplete ? "Processar Recarga" : "Introduz o código completo"}
+               {submitting ? <><div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" /><span>A validar código…</span></> : isComplete ? "Processar Recarga" : "Introduz o código completo"}
             </motion.button>
 
             <div className="grid grid-cols-3 gap-2 pb-8">

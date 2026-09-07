@@ -105,9 +105,15 @@ function preloadPages() {
     : setTimeout(rest, 2000);
 }
 
+/* Fallback de rota: sem ecrã de processamento. As páginas são
+   pré-carregadas em idle (preloadPages), por isso um clique num botão
+   deve mostrar a nova tela de imediato — o botão já deu o seu feedback.
+   O fallback existe apenas para o primeiro arranque em rede muito lenta,
+   onde um ecrã branco puro seria pior. */
+let pageFallbackUsed = false;
 function PageFallback() {
-  // Never leave the browser's dark body exposed while a route chunk loads.
-  // The previous route may already have been removed by Suspense at this point.
+  if (pageFallbackUsed) return null;
+  pageFallbackUsed = true;
   return (
     <div
       role="status"
@@ -191,9 +197,8 @@ function MaintenanceGate({ children }: { children: React.ReactNode }) {
   // Admin routes always pass through
   if (isAdminRoute) return <>{children}</>;
 
-  // Still checking: keep a real surface visible instead of exposing the
-  // browser/body background during the first request.
-  if (!checked) return <PageFallback />;
+  // Still checking: sem ecrã de processamento — mantém a superfície actual.
+  if (!checked) return null;
 
   if (maintenance) {
     return <MaintenancePage />;

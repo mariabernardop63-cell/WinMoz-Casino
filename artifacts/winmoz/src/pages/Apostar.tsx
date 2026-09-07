@@ -1414,9 +1414,16 @@ export default function Apostar() {
     getLivePlayerCount(0, tick) + getLivePlayerCount(1, tick) + getLivePlayerCount(2, tick);
 
   const canStart = selectedBet !== null;
+  const [starting, setStarting] = useState(false);
+
+  // Se o utilizador cancelar o matchmaking e voltar ao ecrã de aposta,
+  // o botão tem de voltar ao estado normal (nunca fica preso a girar).
+  useEffect(() => {
+    if (screen === "bet") setStarting(false);
+  }, [screen]);
 
   const handleStart = async () => {
-    if (!canStart) return;
+    if (!canStart || starting) return;
 
     if (payMethod === "carteira") {
       /* Carteira Móvel → PIN confirmation screen, no balance debit here (deducted in game) */
@@ -1424,8 +1431,9 @@ export default function Apostar() {
       return;
     }
 
-    /* Conta Poker → verify Supabase balance without replacing the whole
-       screen with a processing/splash background. */
+    /* Conta Poker → verify Supabase balance with feedback inline no botão
+       (spinner), sem substituir o ecrã por um background de processamento. */
+    setStarting(true);
     try {
       let freshBalance = 0;
       if (user?.id) {
@@ -1439,6 +1447,7 @@ export default function Apostar() {
         freshBalance = parseFloat(String(profile?.balance ?? "0"));
       }
       if (freshBalance < (selectedBet ?? 0)) {
+        setStarting(false);
         setScreen("rejected");
         return;
       }
@@ -1448,7 +1457,9 @@ export default function Apostar() {
       if (fallback >= (selectedBet ?? 0)) {
         setScreen("matchmaking");
       } else {
+        setStarting(false);
         setScreen("rejected");
+        return;
       }
     }
   };
@@ -1492,7 +1503,9 @@ export default function Apostar() {
                 <Users style={{ width: 20, height: 20, color: "#fff" }} />
               </div>
               <div>
-                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff", marginBottom: 2 }}>{salaLoading ? "A criar sala…" : "Criar Sala"}</p>
+                <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 15, color: "#fff", marginBottom: 2, display: "flex", alignItems: "center", gap: 8 }}>
+                  {salaLoading ? <><div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.25)", borderTopColor: "#fff" }} className="animate-spin" /> A criar sala…</> : "Criar Sala"}
+                </p>
                 <p style={{ fontSize: 12, color: "rgba(255,255,255,0.65)" }}>Gera um código e convida um amigo.</p>
               </div>
             </button>
@@ -1527,8 +1540,8 @@ export default function Apostar() {
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00D4B4" }} />
             <p style={{ fontSize: 13, color: "#00D4B4" }}>À espera que o teu amigo entre…</p>
           </motion.div>
-          <button onClick={handleCancelarSala} disabled={salaLoading} style={{ width: "100%", height: 52, borderRadius: 99, background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, cursor: salaLoading ? "wait" : "pointer" }}>
-            {salaLoading ? "A cancelar…" : "Cancelar e Devolver Aposta"}
+          <button onClick={handleCancelarSala} disabled={salaLoading} style={{ width: "100%", height: 52, borderRadius: 99, background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 14, cursor: salaLoading ? "wait" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            {salaLoading ? <><div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(248,113,113,0.25)", borderTopColor: "#f87171" }} className="animate-spin" /> A cancelar…</> : "Cancelar e Devolver Aposta"}
           </button>
         </div>
       </div>
@@ -1562,8 +1575,8 @@ export default function Apostar() {
           <button
             onClick={handleEntrarSala}
             disabled={salaInput.length !== 6 || salaLoading || !selectedBet}
-            style={{ width: "100%", height: 60, borderRadius: 99, background: salaInput.length === 6 && selectedBet ? `linear-gradient(135deg, ${VIOLET}, #5b21b6)` : "#1c1c1e", border: "none", color: salaInput.length === 6 && selectedBet ? "#fff" : "#52525b", fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 15, cursor: salaInput.length === 6 && !salaLoading && selectedBet ? "pointer" : "not-allowed", marginTop: 24 }}>
-            {salaLoading ? "A entrar…" : "Entrar na Sala"}
+            style={{ width: "100%", height: 60, borderRadius: 99, background: salaInput.length === 6 && selectedBet ? `linear-gradient(135deg, ${VIOLET}, #5b21b6)` : "#1c1c1e", border: "none", color: salaInput.length === 6 && selectedBet ? "#fff" : "#52525b", fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 15, cursor: salaInput.length === 6 && !salaLoading && selectedBet ? "pointer" : "not-allowed", marginTop: 24, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+            {salaLoading ? <><div style={{ width: 15, height: 15, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} className="animate-spin" /> A entrar…</> : "Entrar na Sala"}
           </button>
         </div>
       </div>
@@ -1880,20 +1893,30 @@ export default function Apostar() {
           {/* Start Button */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.32, duration: 0.4 }} style={{ marginBottom: 32 }}>
-            <motion.button onClick={handleStart} disabled={!canStart}
-              whileTap={canStart ? { scale: 0.97 } : {}}
+            <motion.button onClick={handleStart} disabled={!canStart || starting}
+              whileTap={canStart && !starting ? { scale: 0.97 } : {}}
               style={{
                 width: "100%", height: 58,
                 border: canStart ? "none" : "1.5px solid #e5e7eb",
-                cursor: canStart ? "pointer" : "not-allowed",
+                cursor: canStart && !starting ? "pointer" : "not-allowed",
                 background: canStart ? "#000" : "#f8fafc",
                 color: canStart ? "#fff" : "#9ca3af",
                 fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 14,
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "0 18px", transition: "all 0.25s",
                 letterSpacing: "0.4px", borderRadius: 0,
+                opacity: starting ? 0.85 : 1,
               }}>
-              {canStart ? (
+              {starting ? (
+                <>
+                  <div style={{ width: 36 }} />
+                  <span style={{ flex: 1, textAlign: "center", fontSize: 14, fontWeight: 800, letterSpacing: "0.5px", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+                    <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff" }} className="animate-spin" />
+                    A VERIFICAR SALDO…
+                  </span>
+                  <div style={{ width: 36 }} />
+                </>
+              ) : canStart ? (
                 <>
                   <div style={{ width: 36, height: 36, display: "flex",
                     alignItems: "center", justifyContent: "center", flexShrink: 0,

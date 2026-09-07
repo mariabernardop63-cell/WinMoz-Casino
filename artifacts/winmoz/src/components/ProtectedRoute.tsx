@@ -83,34 +83,11 @@ export default function ProtectedRoute({ children }: Props) {
   }, [user, loading, isBlocked, setLocation]);
 
   if (loading) {
-    // Auth can rehydrate after the current route has already mounted. Render
-    // a light, bounded loading surface instead of exposing the dark body.
-    return (
-      <div
-        role="status"
-        aria-label="A carregar"
-        style={{
-          minHeight: "100vh",
-          width: "100%",
-          background: "#fff",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div
-          style={{
-            width: 24,
-            height: 24,
-            border: "2px solid #e5e7eb",
-            borderTopColor: "#111",
-            borderRadius: "50%",
-            animation: "wm-auth-spin 0.7s linear infinite",
-          }}
-        />
-        <style>{`@keyframes wm-auth-spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    );
+    /* Sem ecrã de processamento: a conta reidrata quase de imediato a partir
+       do perfil em cache (AuthProvider), e o AuthProvider já garante uma
+       superfície renderizada. Manter a página actual evita o "flash" branco
+       de loading entre o clique do botão e a tela. */
+    return null;
   }
 
   if (isBlocked) return <BlockedScreen />;
