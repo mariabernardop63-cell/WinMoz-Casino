@@ -27,6 +27,7 @@ import DepositRequests from "@/admin/pages/deposit-requests";
 import BotManagement from "@/admin/pages/bots";
 import AffiliatesPage from "@/admin/pages/affiliates";
 import GameManagement from "@/admin/pages/game-management";
+import RechargeManagement from "@/admin/pages/recharge-management";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 const ADMIN_BASE = `${BASE}/admin`;
@@ -56,6 +57,7 @@ function AdminRouter() {
         <Route path="/bots"            component={BotManagement}   />
         <Route path="/affiliates"      component={AffiliatesPage}  />
         <Route path="/game-management" component={GameManagement}  />
+        <Route path="/recharge-management" component={RechargeManagement} />
         <Route component={Dashboard} />
       </Switch>
     </AdminLayout>

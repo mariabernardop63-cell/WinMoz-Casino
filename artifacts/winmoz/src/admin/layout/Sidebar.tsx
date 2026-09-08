@@ -20,6 +20,7 @@ import {
   Bot,
   Star,
   Gamepad2 as GamepadIcon,
+  Ticket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRef, useState, useEffect } from "react";
@@ -42,6 +43,7 @@ const navItems = [
   { href: "/bots",             icon: Bot,          label: "Gestão de Bots"     },
   { href: "/affiliates",       icon: Star,         label: "Afiliados"           },
   { href: "/game-management",  icon: GamepadIcon,  label: "Gestão de Jogos"    },
+  { href: "/recharge-management", icon: Ticket,    label: "Gestão de Recargas" },
 ];
 
 function Tooltip({ label }: { label: string }) {

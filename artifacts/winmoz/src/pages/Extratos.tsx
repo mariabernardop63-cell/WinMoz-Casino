@@ -115,6 +115,9 @@ export default function Extratos() {
               } else if (t.type === "withdrawal" && meta.method) {
                 const phone = meta.phone ? String(meta.phone) : null;
                 cleanDesc = phone ? `Levantamento via ${meta.method} · ${phone}` : `Levantamento via ${meta.method}`;
+              } else if (t.type === "recharge" && meta.code) {
+                const c = String(meta.code).replace(/(\d{4})(?=\d)/g, "$1 ").trim();
+                cleanDesc = `Recarga · código ${c}`;
               }
             } catch { /* keep cleanDesc */ }
           }

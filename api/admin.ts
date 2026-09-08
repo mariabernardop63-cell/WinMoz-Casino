@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { authenticateAdmin, getSupabaseAdmin, setCorsHeaders } from "./_lib/auth";
+import { randomInt } from "crypto";
 
 // ─── Settings key allowlists ────────────────────────────────────────────────
 const PUBLIC_KEYS = new Set([
@@ -361,6 +362,270 @@ async function handleSupportConversations(req: VercelRequest, res: VercelRespons
   }
 }
 
+// ─── Recharge codes: shared helpers ─────────────────────────────────────────
+const RECHARGE_CODE_LENGTH = 12;
+const RECHARGE_MAX_BATCH = 200;
+const RECHARGE_MAX_USES = 1000;
+const RECHARGE_MAX_AMOUNT = 100000;
+
+/** Gera um código de 12 dígitos (só números) com aleatoriedade criptográfica */
+function generateRechargeCode(): string {
+  let code = "";
+  for (let i = 0; i < RECHARGE_CODE_LENGTH; i++) code += String(randomInt(0, 10));
+  return code;
+}
+
+/** Estado efectivo de um código (considera validade temporal) */
+function effectiveStatus(c: { status: string; expires_at: string | null }): string {
+  if (c.status === "active" && c.expires_at && new Date(c.expires_at).getTime() < Date.now()) {
+    return "expired";
+  }
+  return c.status;
+}
+
+// ─── /api/admin/recharge/list ────────────────────────────────────────────────
+async function handleRechargeList(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  const auth = await authenticateAdmin(req);
+  if (!auth) { res.status(403).json({ error: "Acesso negado" }); return; }
+
+  const page = Math.max(1, parseInt(String(req.query["page"] ?? "1"), 10) || 1);
+  const limit = Math.min(100, Math.max(5, parseInt(String(req.query["limit"] ?? "20"), 10) || 20));
+  const status = String(req.query["status"] ?? "all");      // all | active | expired | revoked
+  const search = String(req.query["search"] ?? "").replace(/\D/g, "").slice(0, RECHARGE_CODE_LENGTH);
+
+  try {
+    const admin = getSupabaseAdmin();
+
+    let query = admin
+      .from("recharge_codes")
+      .select("id, code, amount, max_uses, used_count, status, created_by, expires_at, used_at, last_used_by, created_at", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range((page - 1) * limit, page * limit - 1);
+
+    if (search.length === RECHARGE_CODE_LENGTH) query = query.eq("code", search);
+    else if (search.length > 0) query = query.like("code", `${search}%`);
+
+    const { data, error, count } = await query;
+    if (error) { res.status(500).json({ error: error.message }); return; }
+
+    let rows = (data ?? []) as Array<{
+      id: string; code: string; amount: number; max_uses: number; used_count: number;
+      status: string; expires_at: string | null; used_at: string | null; created_at: string;
+      last_used_by: string | null;
+    }>;
+
+    // Filtro de estado (inclui expiração temporal calculada)
+    if (status !== "all") {
+      rows = rows.filter((r) => effectiveStatus(r) === status);
+    }
+
+    // Usos (quem resgatou) para os códigos da página
+    const ids = rows.map((r) => r.id);
+    const redemptionsByCode: Record<string, Array<{ userId: string; userName: string; amount: number; createdAt: string }>> = {};
+    if (ids.length > 0) {
+      const { data: redData } = await admin
+        .from("recharge_redemptions")
+        .select("code_id, user_id, amount, created_at, profiles:user_id(full_name)")
+        .in("code_id", ids)
+        .order("created_at", { ascending: true });
+      for (const rd of (redData ?? []) as Array<Record<string, unknown>>) {
+        const cid = rd.code_id as string;
+        const prof = (rd.profiles ?? {}) as { full_name?: string };
+        (redemptionsByCode[cid] ??= []).push({
+          userId: rd.user_id as string,
+          userName: prof.full_name ?? "utilizador",
+          amount: Number(rd.amount ?? 0),
+          createdAt: rd.created_at as string,
+        });
+      }
+    }
+
+    // Estatísticas globais (em paralelo, limitadas)
+    const [allCodes, redeemAgg] = await Promise.all([
+      admin.from("recharge_codes").select("status, amount, max_uses, used_count, expires_at").limit(10000),
+      admin.from("transactions").select("amount").eq("type", "recharge").eq("status", "approved").limit(10000),
+    ]);
+    const all = (allCodes.data ?? []) as Array<{ status: string; amount: number; max_uses: number; used_count: number; expires_at: string | null }>;
+    const stats = {
+      total: all.length,
+      active: 0, expired: 0, revoked: 0,
+      totalValueActive: 0,
+      remainingUsesActive: 0,
+      redeemedTotal: 0,
+      redeemedCount: 0,
+    };
+    for (const c of all) {
+      const st = effectiveStatus(c);
+      if (st === "active") { stats.active++; stats.totalValueActive += Number(c.amount); stats.remainingUsesActive += (c.max_uses - c.used_count) * Number(c.amount); }
+      else if (st === "expired") stats.expired++;
+      else if (st === "revoked") stats.revoked++;
+    }
+    const reTx = (redeemAgg.data ?? []) as Array<{ amount: number }>;
+    stats.redeemedTotal = reTx.reduce((s, t) => s + Number(t.amount ?? 0), 0);
+    stats.redeemedCount = reTx.length;
+
+    res.setHeader("Cache-Control", "no-store");
+    res.status(200).json({
+      items: rows.map((r) => ({ ...r, effectiveStatus: effectiveStatus(r), redemptions: redemptionsByCode[r.id] ?? [] })),
+      total: count ?? rows.length,
+      page,
+      limit,
+      stats,
+    });
+  } catch {
+    res.status(500).json({ error: "Erro interno" });
+  }
+}
+
+// ─── /api/admin/recharge/create ──────────────────────────────────────────────
+async function handleRechargeCreate(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  const auth = await authenticateAdmin(req);
+  if (!auth) { res.status(403).json({ error: "Acesso negado" }); return; }
+
+  const body = (req.body ?? {}) as {
+    amount?: number; maxUses?: number; quantity?: number; expiresInDays?: number | null; note?: string | null;
+  };
+
+  const amount = Number(body.amount);
+  const maxUses = Math.floor(Number(body.maxUses ?? 1));
+  const quantity = Math.floor(Number(body.quantity ?? 1));
+  const expiresInDays = body.expiresInDays == null ? null : Math.floor(Number(body.expiresInDays));
+  const note = typeof body.note === "string" ? body.note.trim().slice(0, 200) : null;
+
+  if (!Number.isFinite(amount) || amount <= 0 || amount > RECHARGE_MAX_AMOUNT) {
+    res.status(400).json({ error: `Valor deve estar entre 1 e ${RECHARGE_MAX_AMOUNT} MZN` }); return;
+  }
+  if (!Number.isFinite(maxUses) || maxUses < 1 || maxUses > RECHARGE_MAX_USES) {
+    res.status(400).json({ error: `Usos máximos deve estar entre 1 e ${RECHARGE_MAX_USES}` }); return;
+  }
+  if (!Number.isFinite(quantity) || quantity < 1 || quantity > RECHARGE_MAX_BATCH) {
+    res.status(400).json({ error: `Quantidade deve estar entre 1 e ${RECHARGE_MAX_BATCH}` }); return;
+  }
+  if (expiresInDays != null && (!Number.isFinite(expiresInDays) || expiresInDays < 1 || expiresInDays > 3650)) {
+    res.status(400).json({ error: "Validade deve estar entre 1 e 3650 dias" }); return;
+  }
+
+  try {
+    const admin = getSupabaseAdmin();
+    const createdAt = new Date().toISOString();
+    const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString() : null;
+
+    const created: Array<{ code: string; id: string }> = [];
+    let attempts = 0;
+
+    while (created.length < quantity && attempts < quantity * 10 + 20) {
+      attempts++;
+      const need = quantity - created.length;
+      const batch = new Set<string>();
+      while (batch.size < need) batch.add(generateRechargeCode());
+      const candidates = Array.from(batch);
+
+      // Colisões com a base de dados
+      const { data: existing } = await admin
+        .from("recharge_codes")
+        .select("code")
+        .in("code", candidates);
+      const taken = new Set((existing ?? []).map((e: { code: string }) => e.code));
+      const fresh = candidates.filter((c) => !taken.has(c));
+      if (fresh.length === 0) continue;
+
+      const rows = fresh.map((code) => ({
+        code, amount, max_uses: maxUses, used_count: 0, status: "active",
+        created_by: auth.userId, expires_at: expiresAt, created_at: createdAt,
+      }));
+
+      const { data: inserted, error: insertError } = await admin
+        .from("recharge_codes")
+        .insert(rows)
+        .select("id, code");
+
+      if (insertError) {
+        // Colisão rara de UNIQUE — tenta novo lote
+        if (insertError.code === "23505") continue;
+        res.status(500).json({ error: insertError.message }); return;
+      }
+      for (const r of (inserted ?? []) as Array<{ id: string; code: string }>) created.push(r);
+    }
+
+    if (created.length < quantity) {
+      res.status(500).json({ error: "Não foi possível gerar todos os códigos. Tenta novamente." }); return;
+    }
+
+    res.setHeader("Cache-Control", "no-store");
+    res.status(200).json({ ok: true, created });
+  } catch {
+    res.status(500).json({ error: "Erro interno" });
+  }
+}
+
+// ─── /api/admin/recharge/delete ──────────────────────────────────────────────
+async function handleRechargeDelete(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  const auth = await authenticateAdmin(req);
+  if (!auth) { res.status(403).json({ error: "Acesso negado" }); return; }
+
+  const { id } = (req.body ?? {}) as { id?: string };
+  if (!id) { res.status(400).json({ error: "id obrigatório" }); return; }
+
+  try {
+    const admin = getSupabaseAdmin();
+    // Elimina o código — os usos (recharge_redemptions) são removidos em cascata;
+    // o histórico financeiro fica intacto na tabela transactions.
+    const { error } = await admin.from("recharge_codes").delete().eq("id", id);
+    if (error) { res.status(500).json({ error: error.message }); return; }
+    res.status(200).json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Erro interno" });
+  }
+}
+
+// ─── /api/admin/recharge/toggle ──────────────────────────────────────────────
+async function handleRechargeToggle(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  const auth = await authenticateAdmin(req);
+  if (!auth) { res.status(403).json({ error: "Acesso negado" }); return; }
+
+  const { id, action } = (req.body ?? {}) as { id?: string; action?: "disable" | "enable" };
+  if (!id || (action !== "disable" && action !== "enable")) {
+    res.status(400).json({ error: "id e action ('disable'|'enable') obrigatórios" }); return;
+  }
+
+  try {
+    const admin = getSupabaseAdmin();
+    const { data: row } = await admin
+      .from("recharge_codes")
+      .select("id, status, used_count, max_uses, expires_at")
+      .eq("id", id)
+      .single();
+
+    const c = row as { id: string; status: string; used_count: number; max_uses: number; expires_at: string | null } | null;
+    if (!c) { res.status(404).json({ error: "Código não encontrado" }); return; }
+
+    if (action === "disable") {
+      const { error } = await admin.from("recharge_codes").update({ status: "revoked" }).eq("id", id);
+      if (error) { res.status(500).json({ error: error.message }); return; }
+    } else {
+      // Re-activar apenas se não estiver esgotado nem fora da validade
+      if (c.used_count >= c.max_uses) { res.status(400).json({ error: "Código já esgotado — não pode ser reactivado" }); return; }
+      if (c.expires_at && new Date(c.expires_at).getTime() < Date.now()) {
+        res.status(400).json({ error: "Código fora da validade — não pode ser reactivado" }); return;
+      }
+      const { error } = await admin.from("recharge_codes").update({ status: "active" }).eq("id", id);
+      if (error) { res.status(500).json({ error: error.message }); return; }
+    }
+
+    res.status(200).json({ ok: true });
+  } catch {
+    res.status(500).json({ error: "Erro interno" });
+  }
+}
+
 // ─── Main router ─────────────────────────────────────────────────────────────
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
@@ -381,6 +646,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case "notifications/history":      return handleNotificationsHistory(req, res);
     case "support/send":               return handleSupportSend(req, res);
     case "support/conversations":      return handleSupportConversations(req, res);
+    case "recharge/list":              return handleRechargeList(req, res);
+    case "recharge/create":            return handleRechargeCreate(req, res);
+    case "recharge/delete":            return handleRechargeDelete(req, res);
+    case "recharge/toggle":            return handleRechargeToggle(req, res);
     default:
       res.status(404).json({ error: "Endpoint não encontrado" });
   }

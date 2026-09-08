@@ -13,9 +13,9 @@ function fmtMZN(val: number) {
 }
 
 function formatDisplay(raw: string): string {
-  const digits = raw.slice(0, 15);
+  const digits = raw.slice(0, 12);
   const parts: string[] = [];
-  for (let i = 0; i < digits.length; i += 5) parts.push(digits.slice(i, i + 5));
+  for (let i = 0; i < digits.length; i += 4) parts.push(digits.slice(i, i + 4));
   return parts.join("-");
 }
 
@@ -30,11 +30,11 @@ export default function Recarga() {
   const [shake, setShake] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const isComplete = digits.length === 15;
+  const isComplete = digits.length === 12;
   const display = formatDisplay(digits);
 
   const handleDigit = (d: string) => {
-    if (digits.length >= 15) return;
+    if (digits.length >= 12) return;
     setDigits(prev => prev + d);
   };
   const handleBackspace = () => setDigits(prev => prev.slice(0, -1));
@@ -136,7 +136,7 @@ export default function Recarga() {
                 <span style={{ color: "#374151" }}>código</span>
               </h1>
               <p style={{ fontSize: 13, color: "#6b7280" }}>
-                O teu código de 15 dígitos encontra-se no comprovativo de compra.
+                O teu código de 12 dígitos encontra-se no comprovativo de compra.
               </p>
             </motion.div>
 
@@ -145,8 +145,7 @@ export default function Recarga() {
               transition={{ duration: 0.5 }}
               className="mb-4 p-5"
               style={{ border: isComplete ? "1.5px solid #0a0a0a" : "1px solid #e5e7eb", background: "#f8fafc" }}>
-              <p
-                className="text-center font-mono tracking-[0.22em] mb-3"
+              <p className="text-center font-mono tracking-[0.22em] mb-3"
                 style={{
                   fontSize: digits.length === 0 ? 18 : 22,
                   color: digits.length === 0 ? "#d1d5db" : isComplete ? "#0a0a0a" : "#374151",
@@ -155,19 +154,19 @@ export default function Recarga() {
                   minHeight: 34,
                   transition: "color 0.2s",
                 }}>
-                {digits.length === 0 ? "00000-00000-00000" : display || "—"}
+                {digits.length === 0 ? "0000-0000-0000" : display || "—"}
               </p>
 
               <div className="w-full h-1 overflow-hidden" style={{ background: "#e5e7eb" }}>
                 <motion.div
                   className="h-full"
                   style={{ background: isComplete ? "#0a0a0a" : "#9ca3af" }}
-                  animate={{ width: `${(digits.length / 15) * 100}%` }}
+                  animate={{ width: `${(digits.length / 12) * 100}%` }}
                   transition={{ duration: 0.15 }}
                 />
               </div>
               <p style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 8, textAlign: "center" }}>
-                {digits.length}/15 dígitos
+                {digits.length}/12 dígitos
               </p>
 
               <AnimatePresence>
@@ -191,7 +190,7 @@ export default function Recarga() {
               <Zap style={{ width: 12, height: 12, color: "#9ca3af", flexShrink: 0 }} />
               <p style={{ fontSize: 12, color: "#9ca3af" }}>
                 Exemplo:{" "}
-                <span className="font-mono" style={{ color: "#374151" }}>10000-00000-00000</span>
+                <span className="font-mono" style={{ color: "#374151" }}>0000-0000-0000</span>
               </p>
             </div>
 
