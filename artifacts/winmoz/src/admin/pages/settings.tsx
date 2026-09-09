@@ -442,6 +442,7 @@ export default function Settings() {
   const [footerEmail, setFooterEmail]     = useState("");
   const [footerAppUrl, setFooterAppUrl]   = useState("");
   const [whatsappGroupUrl, setWhatsappGroupUrl] = useState("");
+  const [rechargeWhatsapp, setRechargeWhatsapp] = useState("");
   const [savingFooter, setSavingFooter]   = useState(false);
 
   useEffect(() => {
@@ -458,6 +459,7 @@ export default function Settings() {
     if (platformSettings["footer_email"])            setFooterEmail(platformSettings["footer_email"]);
     if (platformSettings["footer_app_download_url"]) setFooterAppUrl(platformSettings["footer_app_download_url"]);
     if (platformSettings["whatsapp_group_url"])      setWhatsappGroupUrl(platformSettings["whatsapp_group_url"]);
+    if (platformSettings["recharge_whatsapp_contact"]) setRechargeWhatsapp(platformSettings["recharge_whatsapp_contact"]);
   }, [platformSettings]);
 
   const handleSaveVersion = async () => {
@@ -505,6 +507,7 @@ export default function Settings() {
       await updateSetting.mutateAsync({ key: "footer_email",            value: footerEmail.trim() });
       await updateSetting.mutateAsync({ key: "footer_app_download_url", value: footerAppUrl.trim() });
       await updateSetting.mutateAsync({ key: "whatsapp_group_url",      value: whatsappGroupUrl.trim() });
+      await updateSetting.mutateAsync({ key: "recharge_whatsapp_contact", value: rechargeWhatsapp.trim() });
       toast.success("Rodapé guardado com sucesso");
     } catch { toast.error("Erro ao guardar rodapé"); }
     setSavingFooter(false);
@@ -787,6 +790,21 @@ export default function Settings() {
                   style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
               </div>
               <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 5 }}>URL exibido no botão "Grupo do WhatsApp" no menu de jogos.</p>
+            </div>
+
+            {/* WhatsApp Comprar Recargas */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
+                WhatsApp — Comprar Recargas
+              </label>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(37,211,102,0.25)" }}>
+                <Phone style={{ width: 14, height: 14, color: "#25d366", flexShrink: 0 }} />
+                <input value={rechargeWhatsapp} onChange={e => setRechargeWhatsapp(e.target.value)} placeholder="25884xxxxxxx (número com indicativo)"
+                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
+              </div>
+              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 5 }}>
+                Número (258XXXXXXXXX) ou link wa.me — os utilizadores são levados aqui ao clicar em "Comprar Recarga" na tela de recarga.
+              </p>
             </div>
 
             {/* Save button */}

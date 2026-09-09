@@ -1209,7 +1209,7 @@ export default function Apostar() {
   /* Bet State */
   const [selectedBet, setSelectedBet] = useState<number | null>(null);
   const [gameMode,    setGameMode]    = useState<GameMode>("solo");
-  const [payMethod,   setPayMethod]   = useState<PayMethod>("carteira");   // default: carteira
+  const [payMethod,   setPayMethod]   = useState<PayMethod>("poker");   // default: conta poker
   const [screen,      setScreen]      = useState<Screen>("bet");
 
   /* Phone for Carteira Móvel — initialized from profile */
@@ -1424,12 +1424,6 @@ export default function Apostar() {
 
   const handleStart = async () => {
     if (!canStart || starting) return;
-
-    if (payMethod === "carteira") {
-      /* Carteira Móvel → PIN confirmation screen, no balance debit here (deducted in game) */
-      setScreen("pin-confirmation");
-      return;
-    }
 
     /* Conta Poker → verify Supabase balance with feedback inline no botão
        (spinner), sem substituir o ecrã por um background de processamento. */
@@ -1879,10 +1873,24 @@ export default function Apostar() {
               value={payMethod}
               onChange={(v) => setPayMethod(v as PayMethod)}
               options={[
-                { value: "carteira", label: "Carteira Móvel", icon: <Smartphone style={{ width: 14, height: 14 }} /> },
                 { value: "poker",    label: "Conta Poker",    icon: <CreditCard  style={{ width: 14, height: 14 }} /> },
               ]}
             />
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setLocation("/recarga")}
+              className="w-full h-12 font-semibold text-sm flex items-center justify-center gap-2.5 transition-all"
+              style={{
+                background: "linear-gradient(135deg, #16a34a, #15803d)",
+                color: "#fff",
+                border: "none",
+                borderRadius: 0,
+                marginTop: 12,
+                boxShadow: "0 4px 14px rgba(22,163,74,.3)",
+              }}>
+              <Zap style={{ width: 16, height: 16 }} />
+              Recarregar Saldo
+            </motion.button>
 
             {/* Ad banner below payment toggle */}
             <div style={{ marginTop: 12 }}>

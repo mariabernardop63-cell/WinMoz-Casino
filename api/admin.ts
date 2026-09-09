@@ -6,7 +6,7 @@ import { randomInt } from "crypto";
 const PUBLIC_KEYS = new Set([
   "maintenance_mode", "platform_name", "min_bet", "max_bet",
   "ludo_enabled", "damas_enabled", "xadrez_enabled", "roleta_enabled",
-  "poker_winner_mode", "whatsapp_group_url",
+  "poker_winner_mode", "whatsapp_group_url", "recharge_whatsapp_contact",
   "mpesa_wallet_enabled", "emola_wallet_enabled",
 ]);
 const ADMIN_ONLY_KEYS = new Set([
@@ -23,7 +23,7 @@ const WRITE_ALLOWED_KEYS = new Set([
   "mpesa_wallet_enabled", "emola_wallet_enabled",
   "app_version", "terms_of_service_content", "privacy_policy_content",
   "ad_banner_script", "footer_tagline", "footer_phone", "footer_email",
-  "footer_app_download_url", "whatsapp_group_url",
+  "footer_app_download_url", "whatsapp_group_url", "recharge_whatsapp_contact",
   "sms_mpesa_number", "sms_mpesa_name", "sms_emola_number", "sms_emola_name",
   "sms_webhook_token",
 ]);
