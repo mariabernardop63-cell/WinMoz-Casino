@@ -674,6 +674,19 @@ function parseWithdrawalPhone(description: unknown): string | null {
   return null;
 }
 
+function parseRechargeCodeLabel(description: unknown): string {
+  if (typeof description === "string" && description.trim().startsWith("{")) {
+    try {
+      const desc = JSON.parse(description);
+      if (desc?.code) {
+        const c = String(desc.code).replace(/\D/g, "").replace(/(\d{4})(?=\d)/g, "$1 ").trim();
+        return `Código ${c}`;
+      }
+    } catch { /* not JSON */ }
+  }
+  return "—";
+}
+
 function parseTxGame(description: unknown): string {
   try {
     const desc = typeof description === "string" ? JSON.parse(description) : null;
@@ -751,7 +764,7 @@ export function useListTransactions(params?: { status?: string; type?: string })
           amount,
           payout:     txType === "win" ? amount : null,
           status:     mapTxStatus(tx.status as string, txType),
-          game:       parseTxGame(tx.description),
+          game:       txType === "recharge" ? parseRechargeCodeLabel(tx.description) : parseTxGame(tx.description),
           createdAt:  tx.created_at as string,
           phone:      txType === "withdrawal" ? parseWithdrawalPhone(tx.description) : null,
         } satisfies AdminTransaction;

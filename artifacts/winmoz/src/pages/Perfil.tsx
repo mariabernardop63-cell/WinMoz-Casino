@@ -92,6 +92,10 @@ function parseTxDescription(raw: string | null, type: string): string {
       const phone = p.phone ? String(p.phone) : null;
       return phone ? `Levamento via ${p.method} · ${phone}` : `Levamento via ${p.method}`;
     }
+    if (type === "recharge" && p.code) {
+      const c = String(p.code).replace(/\D/g, "").replace(/(\d{4})(?=\d)/g, "$1 ").trim();
+      return `Recarga via código · ${c}`;
+    }
   } catch { /* not JSON — use raw text */ }
   return stripBotMarkers(raw);
 }

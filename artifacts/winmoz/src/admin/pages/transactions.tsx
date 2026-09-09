@@ -30,6 +30,7 @@ function TypeIcon({ type }: { type: string }) {
 function TypeLabel({ type }: { type: string }) {
   const labels: Record<string, string> = {
     bet: "Aposta", win: "Ganhos", deposit: "Depósito", withdrawal: "Levantamento",
+    recharge: "Recarga",
   };
   return <>{labels[type] ?? type}</>;
 }
@@ -41,6 +42,9 @@ function GameBadge({ game }: { game: string }) {
     xadrez: "bg-emerald-100 text-emerald-700",
     roleta: "bg-amber-100 text-amber-700",
   };
+  if (game.startsWith("Código")) {
+    return <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-cyan-50 text-cyan-700 font-mono">{game}</span>;
+  }
   return game === "—"
     ? <span className="text-xs text-gray-400">—</span>
     : <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${colors[game] ?? "bg-gray-100 text-gray-600"}`}>{game}</span>;
