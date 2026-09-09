@@ -57,9 +57,9 @@ function CountdownButton({ onDismiss }: { onDismiss: () => void }) {
 }
 
 export default function NotificationBanner() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [, setLocation] = useLocation();
-  const { data: notifications = [] } = useGetUserNotifications(user?.id ?? null);
+  const { data: notifications = [] } = useGetUserNotifications(user?.id ?? null, profile?.created_at ?? null);
   const markRead = useMarkNotificationRead();
   const [queue, setQueue] = useState<UserNotification[]>([]);
   const [current, setCurrent] = useState<UserNotification | null>(null);

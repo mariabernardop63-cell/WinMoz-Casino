@@ -1308,12 +1308,18 @@ export function useGetUserNotifications(userId: string | null, userCreatedAt?: s
     queryKey: ["user-notifications", userId, userCreatedAt],
     queryFn: async () => {
       if (!userId) return [];
+      // Só mostrar notificações criadas DEPOIS do registo do utilizador.
+      // Sem data conhecida → mostra apenas as últimas 24h (evita notificações
+      // antigas aparecerem para utilizadores novos ou sem created_at no perfil).
+      const cutoff = userCreatedAt
+        ? new Date(userCreatedAt).toISOString()
+        : new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       let q = adminSupabase
         .from("notifications")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(100);
-      if (userCreatedAt) q = q.gte("created_at", userCreatedAt);
+      q = q.gte("created_at", cutoff);
       const { data, error } = await q;
       if (error) throw error;
 
