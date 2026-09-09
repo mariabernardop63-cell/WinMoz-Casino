@@ -651,24 +651,116 @@ router.post("/recharge", async (req, res) => {
 
     const result = (rpcData ?? null) as { ok?: boolean; error?: string; amount?: number; newBalance?: number } | null;
 
+    // ── Fallback: RPC não existe (SQL não corrido) ──
+    let finalResult = result;
+    const rpcCode = (rpcError as { code?: string } | null)?.code ?? "";
+    if (rpcError && (rpcCode === "42883" || rpcCode === "PGRST202")) {
+      finalResult = await redeemWithoutRpc(supabaseAdmin, cleanCode, userId);
+    }
+
     await supabaseAdmin.from("recharge_attempts").insert({
       ip: ipRaw,
       code: cleanCode,
-      success: Boolean(result?.ok),
+      success: Boolean(finalResult?.ok),
       created_at: new Date().toISOString(),
     });
 
-    if (rpcError || !result?.ok) {
-      res.status(400).json({ error: result?.error ?? "Código inválido, expirado ou já utilizado" });
+    if (rpcError && !finalResult) {
+      res.status(500).json({ error: "Sistema de recargas não inicializado. Contacta o suporte." });
       return;
     }
 
-    res.json({ success: true, amount: result.amount, newBalance: result.newBalance });
+    if (!finalResult?.ok) {
+      res.status(400).json({ error: finalResult?.error ?? "Código inválido, expirado ou já utilizado" });
+      return;
+    }
+
+    res.json({ success: true, amount: finalResult.amount, newBalance: finalResult.newBalance });
   } catch (err) {
     req.log.error({ err }, "Recharge error");
     res.status(500).json({ error: "Erro interno" });
   }
 });
+
+/* Redeemer sem RPC — só usado quando o RPC ainda não existe na BD.
+   Mesmas regras: 1 uso por utilizador, expira quando esgota/fora de validade.
+   Atomicidade garantida por updates condicionais (used_count guard). */
+async function redeemWithoutRpc(
+  supabaseAdmin: any,
+  cleanCode: string,
+  userId: string,
+): Promise<{ ok: boolean; error?: string; amount?: number; newBalance?: number }> {
+  const { data: codeRow } = await supabaseAdmin
+    .from("recharge_codes")
+    .select("id, code, amount, max_uses, used_count, status, expires_at")
+    .eq("code", cleanCode)
+    .maybeSingle();
+
+  const c = codeRow as any;
+  if (!c) return { ok: false, error: "Código não encontrado" };
+  if (c.status !== "active") return { ok: false, error: "Este código expirou" };
+  if (c.expires_at && new Date(c.expires_at).getTime() < Date.now()) {
+    await supabaseAdmin.from("recharge_codes").update({ status: "expired" }).eq("id", c.id);
+    return { ok: false, error: "Este código expirou" };
+  }
+  if (c.used_count >= c.max_uses) {
+    await supabaseAdmin.from("recharge_codes").update({ status: "expired" }).eq("id", c.id);
+    return { ok: false, error: "Este código já foi utilizado" };
+  }
+
+  // Um uso por utilizador
+  const { error: dupError } = await supabaseAdmin
+    .from("recharge_redemptions")
+    .insert({ code_id: c.id, user_id: userId, amount: c.amount });
+  if (dupError) {
+    if ((dupError as { code?: string }).code === "23505") return { ok: false, error: "Já usaste este código de recarga" };
+    return { ok: false, error: "Erro ao processar a recarga" };
+  }
+
+  // Reserva atómica do uso
+  const { data: reserved, error: resErr } = await supabaseAdmin
+    .from("recharge_codes")
+    .update({ used_count: c.used_count + 1, used_at: new Date().toISOString(), last_used_by: userId })
+    .eq("id", c.id)
+    .lt("used_count", c.max_uses)
+    .eq("status", "active")
+    .select("used_count, max_uses")
+    .maybeSingle();
+
+  if (resErr || !reserved) {
+    await supabaseAdmin.from("recharge_redemptions").delete().eq("code_id", c.id).eq("user_id", userId);
+    await supabaseAdmin.from("recharge_codes").update({ status: "expired" }).eq("id", c.id);
+    return { ok: false, error: "Este código já foi utilizado" };
+  }
+
+  const usedCount = Number((reserved as any).used_count);
+  const maxUses = Number((reserved as any).max_uses);
+  if (usedCount >= maxUses) {
+    await supabaseAdmin.from("recharge_codes").update({ status: "expired" }).eq("id", c.id);
+  }
+
+  // Crédito de saldo
+  const { data: profile } = await supabaseAdmin.from("profiles").select("balance").eq("id", userId).single();
+  const current = Number((profile as any)?.balance ?? 0);
+  const newBalance = Math.round((current + Number(c.amount)) * 100) / 100;
+  const { error: balErr } = await supabaseAdmin.from("profiles").update({ balance: newBalance }).eq("id", userId);
+  if (balErr) {
+    await supabaseAdmin.from("recharge_redemptions").delete().eq("code_id", c.id).eq("user_id", userId);
+    await supabaseAdmin.from("recharge_codes").update({ used_count: c.used_count, status: "active" }).eq("id", c.id);
+    return { ok: false, error: "Erro ao creditar saldo" };
+  }
+
+  await supabaseAdmin.from("transactions").insert({
+    user_id: userId,
+    type: "recharge",
+    amount: c.amount,
+    description: JSON.stringify({ code: c.code ?? cleanCode, rechargeId: c.id }),
+    status: "approved",
+    created_at: new Date().toISOString(),
+  });
+
+  return { ok: true, amount: Number(c.amount), newBalance };
+}
 
 /* ── AI Support Chat (Groq) ── */
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
@@ -1162,11 +1254,12 @@ router.get("/admin/recharge/list", async (req, res) => {
     const ids = rows.map((r) => r.id);
     const redemptionsByCode: Record<string, any[]> = {};
     if (ids.length > 0) {
-      const { data: redData } = await supabaseAdmin
+      const { data: redData, error: redErr } = await supabaseAdmin
         .from("recharge_redemptions")
         .select("code_id, user_id, amount, created_at, profiles:user_id(full_name)")
         .in("code_id", ids)
         .order("created_at", { ascending: true });
+      if (redErr) req.log.error({ redErr }, "admin/recharge/list redemptions query failed");
       for (const rd of (redData ?? []) as any[]) {
         const cid = rd.code_id as string;
         const prof = (rd.profiles ?? {}) as { full_name?: string };
@@ -1218,7 +1311,17 @@ router.post("/admin/recharge/create", async (req, res) => {
   try {
     const result = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
     if (!result.ok) { res.status(result.status).json({ error: result.error }); return; }
-    const { supabaseAdmin, userId } = result;
+    const supabaseAdmin = result.supabaseAdmin;
+    const userId = result.userId;
+
+    // Pré-checagem: tabela existe e é a nova versão (tem coluna max_uses)
+    const { error: probeError } = await supabaseAdmin.from("recharge_codes").select("max_uses").limit(1);
+    if (probeError) {
+      res.status(500).json({
+        error: "Tabela recharge_codes não está actualizada. Executa supabase-recharge-system.sql no Supabase SQL Editor. (" + probeError.message + ")",
+      });
+      return;
+    }
 
     const body = (req.body ?? {}) as {
       amount?: number; maxUses?: number; quantity?: number; expiresInDays?: number | null; note?: string | null;

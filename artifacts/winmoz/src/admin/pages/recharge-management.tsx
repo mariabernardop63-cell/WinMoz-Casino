@@ -31,7 +31,8 @@ async function getAdminToken(): Promise<string | null> {
 
 async function adminFetch<T>(action: string, init?: { method?: string; body?: unknown; query?: string }): Promise<T> {
   const token = await getAdminToken();
-  const res = await fetch(`/api/admin/${action}${init?.query ?? ""}`, {
+  const url = `/api/admin/${action}${init?.query ?? ""}`;
+  const res = await fetch(url, {
     method: init?.method ?? (init?.body ? "POST" : "GET"),
     headers: {
       "Content-Type": "application/json",
@@ -40,7 +41,7 @@ async function adminFetch<T>(action: string, init?: { method?: string; body?: un
     body: init?.body ? JSON.stringify(init.body) : undefined,
   });
   const data = await res.json().catch(() => ({})) as T & { error?: string };
-  if (!res.ok) throw new Error((data as { error?: string })?.error ?? "Erro na operação");
+  if (!res.ok) throw new Error((data as { error?: string })?.error ?? `Erro ${res.status} em ${action}`);
   return data;
 }
 
@@ -119,9 +120,9 @@ export default function RechargeManagement() {
 
   const limit = 20;
 
-  const { data, isLoading, refetch, isRefetching } = useQuery<ListResponse>({
+  const { data, isLoading, refetch, isRefetching, error: listError } = useQuery<ListResponse>({
     queryKey: ["recharge-codes", page, status, search],
-    queryFn: () => adminFetch<ListResponse>("recharge/list", { query: `&page=${page}&limit=${limit}&status=${status}&search=${encodeURIComponent(search)}` }),
+    queryFn: () => adminFetch<ListResponse>("recharge/list", { query: `?page=${page}&limit=${limit}&status=${status}&search=${encodeURIComponent(search)}` }),
     staleTime: 5000,
   });
 
@@ -417,6 +418,15 @@ export default function RechargeManagement() {
       )}
 
       {/* ── Filters ── */}
+      {listError && (
+        <div className="gz-card p-4 flex items-start gap-3" style={{ background: "rgba(239,68,68,.06)", border: "1px solid rgba(239,68,68,.3)" }}>
+          <AlertTriangle style={{ width: 16, height: 16, color: "#ef4444", flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <p className="text-[12.5px] font-bold" style={{ color: "#ef4444" }}>Erro ao carregar recargas</p>
+            <p className="text-[11.5px] font-medium mt-0.5" style={{ color: "var(--gz-text-accent)" }}>{(listError as Error).message}</p>
+          </div>
+        </div>
+      )}
       <div className="gz-card p-4 flex items-center gap-3 flex-wrap">
         <form
           onSubmit={(e) => { e.preventDefault(); setPage(1); setSearch(searchInput.replace(/\D/g, "").slice(0, 12)); }}
@@ -462,7 +472,9 @@ export default function RechargeManagement() {
               {isLoading ? (
                 <tr><td colSpan={7} className="px-4 py-10 text-center text-[13px] font-semibold" style={{ color: "var(--gz-text-accent)" }}>A carregar recargas…</td></tr>
               ) : items.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-[13px] font-semibold" style={{ color: "var(--gz-text-accent)" }}>Nenhuma recarga encontrada</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-[13px] font-semibold" style={{ color: "var(--gz-text-accent)" }}>
+                  {listError ? "Não foi possível carregar — vê o erro acima" : "Nenhuma recarga encontrada"}
+                </td></tr>
               ) : items.map((c) => {
                 const meta = STATUS_META[c.effectiveStatus] ?? STATUS_META.expired;
                 const pct = c.max_uses > 0 ? Math.min(100, (c.used_count / c.max_uses) * 100) : 0;

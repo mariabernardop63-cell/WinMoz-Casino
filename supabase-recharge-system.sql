@@ -8,10 +8,10 @@
 -- MODELO DE SEGURANÇA:
 --   - RLS activado em TODAS as tabelas de recarga, SEM políticas para
 --     anon/authenticated → nenhum cliente consegue ler/criar/alterar códigos
---     directamente. Todo o acesso passa pelo service_role (API server-side).
+--     directamente. Todo o acesso passa pelo serviTEce_role (API server-side).
 --   - Códigos: 12 dígitos numéricos únicos (índice UNIQUE), gerados com
 --     criptografia segura pelo backend. Nunca expostos parcialmente.
---   - Uso atómico via RPC SECURITY DEFINER com row lock (FOR UPDATE):
+--   - Uso atómico via RPC SECURITY DEFINER com row lock (FOR UPDA):
 --     impossível usar o mesmo código duas vezes em paralelo (race-safe).
 --   - Um mesmo utilizador NUNCA pode usar a mesma recarga duas vezes
 --     (mesmo que a recarga permita múltiplos usos por utilizadores
@@ -22,18 +22,9 @@
 -- ============================================================================
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 0. Helpers
+-- 0. Helpers: todas as operações defensivas são inline (DO blocks) — o script
+--    não depende de funções externas nem cria grids de resultado no editor.
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE OR REPLACE FUNCTION public.__drop_policy_if_exists(tbl text, pol text)
-RETURNS void
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename=tbl) THEN
-    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol, tbl);
-  END IF;
-END;
-$$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. TABELA recharge_codes
@@ -54,10 +45,8 @@ CREATE TABLE IF NOT EXISTS public.recharge_codes (
   CONSTRAINT recharge_codes_used_count_max CHECK (used_count <= max_uses)
 );
 
-CREATE INDEX IF NOT EXISTS recharge_codes_status_idx ON public.recharge_codes (status);
-CREATE INDEX IF NOT EXISTS recharge_codes_created_at_idx ON public.recharge_codes (created_at DESC);
-
 -- Colunas extra se a tabela já existisse com schema antigo
+-- (executar ANTES dos índices, que referem colunas como "status")
 ALTER TABLE public.recharge_codes ADD COLUMN IF NOT EXISTS max_uses     integer NOT NULL DEFAULT 1 CHECK (max_uses >= 1) ;
 ALTER TABLE public.recharge_codes ADD COLUMN IF NOT EXISTS used_count   integer NOT NULL DEFAULT 0;
 ALTER TABLE public.recharge_codes ADD COLUMN IF NOT EXISTS status       text NOT NULL DEFAULT 'active';
@@ -80,6 +69,9 @@ BEGIN
   END IF;
 END
 $do$;
+
+CREATE INDEX IF NOT EXISTS recharge_codes_status_idx ON public.recharge_codes (status);
+CREATE INDEX IF NOT EXISTS recharge_codes_created_at_idx ON public.recharge_codes (created_at DESC);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. TABELA recharge_redemptions (histórico de usos)
@@ -112,19 +104,28 @@ CREATE INDEX IF NOT EXISTS recharge_attempts_ip_time_idx ON public.recharge_atte
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 4. RLS: nenhuma política → apenas service_role acede
 -- ─────────────────────────────────────────────────────────────────────────────
-SELECT public.__enable_rls_if_exists('recharge_codes');
-SELECT public.__drop_policy_if_exists('recharge_codes', 'recharge_codes_all');
-SELECT public.__drop_policy_if_exists('recharge_codes', 'recharge_codes_select_own');
-SELECT public.__drop_policy_if_exists('recharge_codes', 'recharge_codes_admin_all');
--- Sem políticas — só service_role.
-
-SELECT public.__enable_rls_if_exists('recharge_redemptions');
-SELECT public.__drop_policy_if_exists('recharge_redemptions', 'recharge_redemptions_all');
--- Sem políticas — só service_role.
-
-SELECT public.__enable_rls_if_exists('recharge_attempts');
-SELECT public.__drop_policy_if_exists('recharge_attempts', 'recharge_attempts_all');
--- Sem políticas — só service_role.
+DO $$
+DECLARE
+  tbl text;
+  pol record;
+BEGIN
+  FOREACH tbl IN ARRAY ARRAY['recharge_codes', 'recharge_redemptions', 'recharge_attempts'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname = 'public' AND tablename = tbl) THEN
+      EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', tbl);
+      -- Remove quaisquer políticas antigas (defensivo)
+      FOR pol IN
+        SELECT policyname FROM pg_policies
+        WHERE schemaname = 'public' AND tablename = tbl
+      LOOP
+        EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', pol.policyname, tbl);
+      END LOOP;
+      RAISE NOTICE 'RLS activado em % (sem políticas — só service_role acede)', tbl;
+    ELSE
+      RAISE NOTICE 'Tabela % não existe — saltada', tbl;
+    END IF;
+  END LOOP;
+END
+$$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 5. RPC: usar recarga de forma ATÓMICA e SEGURA
@@ -255,3 +256,27 @@ GRANT EXECUTE ON FUNCTION public.use_recharge_code(text, uuid) TO service_role;
 --      ou quando expires_at passa (status actualizado na leitura/uso).
 --    - Admin apaga códigos via API (service_role) — nunca pelo browser.
 -- ============================================================================
+
+DO $$
+DECLARE
+  v_tables int;
+  v_rpc    boolean;
+BEGIN
+  SELECT count(*) INTO v_tables
+  FROM pg_tables
+  WHERE schemaname = 'public'
+    AND tablename IN ('recharge_codes', 'recharge_redemptions', 'recharge_attempts');
+
+  SELECT EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'use_recharge_code'
+  ) INTO v_rpc;
+
+  IF v_tables = 3 AND v_rpc THEN
+    RAISE NOTICE '✅ SISTEMA DE RECARGAS INSTALADO COM SUCESSO — 3 tabelas + RPC prontos';
+  ELSE
+    RAISE NOTICE '⚠️ INSTALAÇÃO INCOMPLETA: tabelas=%, rpc=%', v_tables, v_rpc;
+  END IF;
+END
+$$;

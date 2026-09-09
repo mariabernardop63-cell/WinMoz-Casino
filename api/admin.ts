@@ -425,11 +425,14 @@ async function handleRechargeList(req: VercelRequest, res: VercelResponse) {
     const ids = rows.map((r) => r.id);
     const redemptionsByCode: Record<string, Array<{ userId: string; userName: string; amount: number; createdAt: string }>> = {};
     if (ids.length > 0) {
-      const { data: redData } = await admin
+      const { data: redData, error: redErr } = await admin
         .from("recharge_redemptions")
         .select("code_id, user_id, amount, created_at, profiles:user_id(full_name)")
         .in("code_id", ids)
         .order("created_at", { ascending: true });
+      if (redErr) {
+        console.error("[recharge/list] redemptions query failed:", redErr.message);
+      }
       for (const rd of (redData ?? []) as Array<Record<string, unknown>>) {
         const cid = rd.code_id as string;
         const prof = (rd.profiles ?? {}) as { full_name?: string };
@@ -447,6 +450,9 @@ async function handleRechargeList(req: VercelRequest, res: VercelResponse) {
       admin.from("recharge_codes").select("status, amount, max_uses, used_count, expires_at").limit(10000),
       admin.from("transactions").select("amount").eq("type", "recharge").eq("status", "approved").limit(10000),
     ]);
+    if (allCodes.error) {
+      res.status(500).json({ error: "recharge_codes: " + allCodes.error.message }); return;
+    }
     const all = (allCodes.data ?? []) as Array<{ status: string; amount: number; max_uses: number; used_count: number; expires_at: string | null }>;
     const stats = {
       total: all.length,
@@ -511,6 +517,16 @@ async function handleRechargeCreate(req: VercelRequest, res: VercelResponse) {
 
   try {
     const admin = getSupabaseAdmin();
+
+    // Pré-checagem: tabela existe e é a nova versão (tem coluna max_uses)
+    const { error: probeError } = await admin.from("recharge_codes").select("max_uses").limit(1);
+    if (probeError) {
+      res.status(500).json({
+        error: "Tabela recharge_codes não está actualizada. Executa supabase-recharge-system.sql no Supabase SQL Editor. (" + probeError.message + ")",
+      });
+      return;
+    }
+
     const createdAt = new Date().toISOString();
     const expiresAt = expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString() : null;
 

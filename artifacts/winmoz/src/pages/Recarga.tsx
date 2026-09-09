@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import {
-  ChevronLeft, CheckCircle2, XCircle, RotateCcw, Zap,
+  ChevronLeft, CheckCircle2, XCircle, RotateCcw, Zap, ClipboardPaste,
 } from "lucide-react";
 import { forceSessionLogout, getSessionWithRefresh, recoverAfter401 } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -29,6 +29,7 @@ export default function Recarga() {
   const [amount, setAmount] = useState(0);
   const [shake, setShake] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const isComplete = digits.length === 12;
   const display = formatDisplay(digits);
@@ -39,6 +40,21 @@ export default function Recarga() {
   };
   const handleBackspace = () => setDigits(prev => prev.slice(0, -1));
   const handleClear = () => setDigits("");
+
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      const cleaned = (text ?? "").replace(/\D/g, "").slice(0, 12);
+      if (cleaned.length > 0) {
+        setDigits(cleaned);
+        setErrorMsg(null);
+      } else {
+        setErrorMsg("Nenhum código de recarga válido encontrado na área de transferência.");
+      }
+    } catch {
+      setErrorMsg("Não foi possível aceder à área de transferência. Autoriza o acesso ou digita o código.");
+    }
+  };
 
   const handleSubmit = async () => {
     if (!isComplete || submitting) return;
@@ -83,6 +99,12 @@ export default function Recarga() {
 
        if (!res.ok) {
          if (res.status === 401) forceSessionLogout("recharge_unauthorized");
+         try {
+           const errData = await res.json() as { error?: string };
+           setErrorMsg(errData?.error ?? null);
+         } catch {
+           setErrorMsg(null);
+         }
          setScreen("error");
          return;
        }
@@ -99,6 +121,7 @@ export default function Recarga() {
       setAmount(creditedAmount);
       setScreen("success");
     } catch {
+      setErrorMsg("Sem ligação ao servidor. Verifica a tua internet e tenta novamente.");
       setScreen("error");
     } finally {
       setSubmitting(false);
@@ -108,6 +131,7 @@ export default function Recarga() {
   const handleRetry = () => {
     setDigits("");
     setSubmitting(false);
+    setErrorMsg(null);
     setScreen("input");
   };
 
@@ -186,13 +210,37 @@ export default function Recarga() {
               </AnimatePresence>
             </motion.div>
 
-            <div className="flex items-center gap-2 mb-5 px-1">
+            <div className="flex items-center gap-2 mb-3 px-1">
               <Zap style={{ width: 12, height: 12, color: "#9ca3af", flexShrink: 0 }} />
               <p style={{ fontSize: 12, color: "#9ca3af" }}>
                 Exemplo:{" "}
                 <span className="font-mono" style={{ color: "#374151" }}>0000-0000-0000</span>
               </p>
             </div>
+
+            {errorMsg && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                className="mb-3 px-4 py-3 flex items-start gap-2"
+                style={{ background: "#fef2f2", border: "1px solid #fecaca" }}>
+                <XCircle style={{ width: 14, height: 14, color: "#dc2626", flexShrink: 0, marginTop: 1 }} />
+                <p style={{ fontSize: 12, color: "#dc2626", fontWeight: 500 }}>{errorMsg}</p>
+              </motion.div>
+            )}
+
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              onClick={handlePaste}
+              className="w-full h-12 font-semibold text-sm mb-5 flex items-center justify-center gap-2 transition-all"
+              style={{
+                background: "#f8fafc",
+                color: "#374151",
+                border: "1px solid #e5e7eb",
+                borderRadius: 0,
+              }}>
+              <ClipboardPaste style={{ width: 16, height: 16, color: "#374151" }} />
+              Colar código da área de transferência
+            </motion.button>
 
             <motion.button
               whileTap={isComplete ? { scale: 0.98 } : {}}
