@@ -878,8 +878,14 @@ export default function DamasGame() {
   const oppUrl   = sp.get("opp") ?? "";
 
   const oppColor: PColor = myColor === "w" ? "b" : "w";
-  const isBot    = sp.get("bot") === "1";
-  const botBal   = parseInt(sp.get("botbalance") ?? "0");
+  // Config do bot viaja por sessionStorage (URL limpa — o jogador nunca vê
+  // que está a jogar contra um bot).
+  const botSession = (() => {
+    try { return JSON.parse(sessionStorage.getItem(`wm_bot_session_${gameId}`) ?? "null") as { bot?: boolean; botBalance?: number } | null; }
+    catch { return null; }
+  })();
+  const isBot    = botSession?.bot === true;
+  const botBal   = Number(botSession?.botBalance ?? 0);
   const myNameUrl = sp.get("myname") ?? "";
   const playerName = myNameUrl ? decodeURIComponent(myNameUrl) : (profile?.full_name ?? "Jogador");
   const playerBal    = profile?.balance ? `${Number(profile.balance).toLocaleString("pt-MZ")} MT` : "0 MT";
@@ -1222,6 +1228,55 @@ export default function DamasGame() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turn, winner]);
 
+  // ── Continuação automática — adversário ausente no turno dele ─────────────
+  // O timer nunca pausa: se o adversário saiu (back/tab suspensa) e o tempo
+  // dele esgota, o sistema desconta 1 vida e joga um movimento aleatório
+  // válido por ele. Vidas a zero → derrota dele.
+  const oppAbsenceHandledRef = useRef<number>(0);
+  useEffect(() => {
+    if (winner || isBot || gameId === "local") return;
+    const iv = setInterval(() => {
+      if (winnerRef.current) return;
+      if (turnRef.current !== oppColor) return;
+      // Tempo do adversário esgotado há >20s sem resposta (30s timer + 20s folga)
+      const expireAt = oppTimerRecvAtRef.current + oppTimerRecvValRef.current * 1000;
+      const sinceExpire = Math.floor((Date.now() - expireAt) / 1000);
+      if (sinceExpire < 20) return;
+      const stamp = Math.floor(Date.now() / 1000);
+      if (oppAbsenceHandledRef.current === stamp) return;
+      oppAbsenceHandledRef.current = stamp;
+      // 1) Desconta 1 vida ao adversário
+      const remaining = Math.max(0, (livesRef.current[oppColor] ?? 3) - 1);
+      const newLives = { ...livesRef.current, [oppColor]: remaining };
+      livesRef.current = newLives;
+      setLives(newLives);
+      if (remaining <= 0) {
+        winnerRef.current = myColor;
+        setWinner(myColor);
+        setWinReason(`${opponentName} perdeu todas as vidas (ausente)`);
+        channelRef.current?.send({ type: "broadcast", event: "damas_timer_forfeit", payload: { player: oppColor, lives: 0, gameOver: true } });
+        return;
+      }
+      setWinReason(`${opponentName} ausente — o sistema joga por ele.`);
+      channelRef.current?.send({ type: "broadcast", event: "damas_timer_forfeit", payload: { player: oppColor, lives: remaining, gameOver: false, nextTurn: myColor } });
+      // 2) Sistema joga por ele: um movimento aleatório válido
+      const moves = aiGetAllMoves(boardRef.current, oppColor);
+      if (moves.length > 0) {
+        const pick = moves[Math.floor(Math.random() * moves.length)];
+        seqRef.current += 1;
+        channelRef.current?.send({ type: "broadcast", event: "damas_move", payload: {
+          from: pick.from, to: pick.to, captured: pick.captured, nextTurn: myColor, seq: seqRef.current,
+        }});
+        applyRemoteMove(pick.from, pick.to, pick.captured, myColor);
+      } else {
+        setTurn(myColor);
+        setTimers({ w: 30, b: 30 });
+      }
+    }, 5000);
+    return () => clearInterval(iv);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winner, isBot, gameId]);
+
   // ── Apply remote move ─────────────────────────────────────────────────────
   const applyRemoteMove = useCallback((from: Sq, to: Sq, captured: Sq[], nextTurn: PColor) => {
     // Compute new board eagerly from ref so boardRef stays in sync for resyncs
@@ -1326,16 +1381,33 @@ export default function DamasGame() {
     });
 
     ch.on("broadcast", { event: "damas_resync_req" }, () => {
-      if (winnerRef.current) return;
+      if (winnerRef.current) {
+        // Jogo terminado: responde mesmo assim para o outro lado ver a derrota
+        ch.send({
+          type: "broadcast", event: "damas_resync_state",
+          payload: { board: boardRef.current, turn: turnRef.current, seq: seqRef.current, lives: livesRef.current, winner: winnerRef.current },
+        });
+        return;
+      }
       ch.send({
         type: "broadcast", event: "damas_resync_state",
-        payload: { board: boardRef.current, turn: turnRef.current, seq: seqRef.current },
+        payload: { board: boardRef.current, turn: turnRef.current, seq: seqRef.current, lives: livesRef.current },
       });
     });
 
     ch.on("broadcast", { event: "damas_resync_state" }, ({ payload }) => {
-      const incoming = payload as { board: Board; turn: PColor; seq: number };
+      const incoming = payload as { board: Board; turn: PColor; seq: number; lives?: Record<PColor, number>; winner?: PColor | null };
       if (incoming.turn !== "w" && incoming.turn !== "b") return;
+      if (incoming.lives) {
+        livesRef.current = incoming.lives;
+        setLives(incoming.lives);
+      }
+      if (incoming.winner) {
+        winnerRef.current = incoming.winner;
+        setWinner(incoming.winner);
+        setWinReason(`${incoming.winner === myColor ? "Venceste" : `${opponentName} venceu`} — jogo terminado.`);
+        return;
+      }
       if ((incoming.seq ?? 0) >= seqRef.current) {
         setBoard(incoming.board);
         setTurn(incoming.turn);

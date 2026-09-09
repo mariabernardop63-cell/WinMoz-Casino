@@ -36,10 +36,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const auth = await authenticateUser(req);
   if (!auth) { res.status(401).json({ error: "Não autenticado" }); return; }
 
-  const { gameId, keepTurn, reopen } = (req.body ?? {}) as {
+  const { gameId, keepTurn, reopen, force } = (req.body ?? {}) as {
     gameId?: string;
     keepTurn?: boolean;
     reopen?: boolean;
+    force?: boolean;
   };
 
   if (!gameId || typeof gameId !== "string" || gameId.length > 128) {
@@ -106,14 +107,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const expectedTurn = m.current_turn ?? "blue";
+  let flippingForAbsent = false;
   if (expectedTurn !== myColor) {
-    res.status(423).json({ error: "Não é a tua vez" });
-    return;
+    // Auto-play continuation: a participant may flip a STALE turn (>30s,
+    // well past the 30s move timer) on behalf of an absent player so the
+    // game keeps flowing when someone leaves mid-turn. Without this the
+    // game would freeze forever waiting for a device that is gone.
+    let stale = false;
+    if (force && m.current_turn && m.turn_updated_at) {
+      stale = Date.now() - new Date(m.turn_updated_at).getTime() > 30_000;
+    }
+    if (!stale) {
+      res.status(423).json({ error: "Não é a tua vez", turn: expectedTurn });
+      return;
+    }
+    flippingForAbsent = true;
   }
 
-  const nextColor: PlayerColor = keepTurn
-    ? myColor
-    : myColor === "blue" ? "green" : "blue";
+  let nextColor: PlayerColor;
+  if (flippingForAbsent) {
+    // The absent player "played" — the turn moves to the requester.
+    nextColor = myColor;
+  } else {
+    nextColor = keepTurn
+      ? myColor
+      : myColor === "blue" ? "green" : "blue";
+  }
 
   const now = new Date().toISOString();
   const { error: updateErr } = await admin

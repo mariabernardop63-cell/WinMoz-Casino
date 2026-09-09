@@ -59,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const admin = getSupabaseAdmin();
 
-  if (gameId !== "local" && !gameId.startsWith("bot_")) {
+  if (gameId !== "local" && !gameId.startsWith("bot_") && !gameId.startsWith("wm")) {
     const { data: match, error: matchErr } = await admin
       .from("matches")
       .select("player1_id, player2_id, status, current_turn, turn_updated_at")

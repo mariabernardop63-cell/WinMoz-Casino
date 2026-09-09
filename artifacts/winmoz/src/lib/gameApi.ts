@@ -60,12 +60,14 @@ export interface DiceResult {
   value: number;
   error?: string;
   turnBlocked?: boolean;
+  serverTurn?: "blue" | "green";
 }
 
 export interface PassTurnResult {
   ok: boolean;
   turn?: "blue" | "green";
   error?: string;
+  serverTurn?: "blue" | "green";
 }
 
 export async function serverBet(
@@ -118,7 +120,10 @@ export async function rollLudoDice(
       if (!res.ok || typeof data.value !== "number" || !Number.isInteger(data.value) || data.value < 1 || data.value > 6) {
         // 423 = server says it's not this player's turn — a hard signal the
         // local turn state diverged and a resync is required.
-        if (res.status === 423) return { value: 0, error: (data.error as string) ?? "Não é a tua vez", turnBlocked: true };
+        if (res.status === 423) {
+          const st = data.turn as string | undefined;
+          return { value: 0, error: (data.error as string) ?? "Não é a tua vez", turnBlocked: true, serverTurn: st === "blue" || st === "green" ? st : undefined };
+        }
         return { value: 0, error: (data.error as string) ?? "Erro ao rolar o dado" };
       }
       return { value: data.value as number };
@@ -138,7 +143,8 @@ export async function rollLudoDice(
 export async function passLudoTurn(
   gameId: string,
   keepTurn: boolean,
-  reopen = false
+  reopen = false,
+  force = false
 ): Promise<PassTurnResult> {
   const token = await getToken();
   if (!token) return { ok: false, error: "Não autenticado" };
@@ -146,11 +152,12 @@ export async function passLudoTurn(
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 8_000);
     try {
-      const result = await postWithAuthRetry("/api/games/ludo-turn", { gameId, keepTurn, reopen }, controller.signal);
+      const result = await postWithAuthRetry("/api/games/ludo-turn", { gameId, keepTurn, reopen, force }, controller.signal);
       if (!result) return { ok: false, error: "Não autenticado" };
       const { res, data } = result;
       if (!res.ok || !data.ok) {
-        return { ok: false, error: (data.error as string) ?? "Erro ao passar a vez" };
+        const st = data.turn as string | undefined;
+        return { ok: false, error: (data.error as string) ?? "Erro ao passar a vez", serverTurn: st === "blue" || st === "green" ? st : undefined };
       }
       return { ok: true, turn: data.turn as "blue" | "green" | undefined };
     } finally {

@@ -1933,7 +1933,7 @@ router.post("/games/bet", async (req, res) => {
     if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
       res.status(400).json({ error: "Tipo de jogo inválido" }); return;
     }
-    const isLocalOrBotGame = gameId === "local" || gameId?.startsWith("bot_");
+    const isLocalOrBotGame = gameId === "local" || gameId?.startsWith("bot_") || gameId?.startsWith("wm");
     if (gameId && !isLocalOrBotGame && !UUID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
@@ -2086,6 +2086,105 @@ router.post("/games/win", async (req, res) => {
   }
 });
 
+/* ── Games: authoritative Ludo turn hand-off (port of Vercel api/games/ludo-turn) ── */
+router.post("/games/ludo-turn", async (req, res) => {
+  try {
+    const gate = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+    const { supabaseAdmin, userId } = gate;
+
+    const { gameId, keepTurn, reopen, force } = req.body as {
+      gameId?: string; keepTurn?: boolean; reopen?: boolean; force?: boolean;
+    };
+
+    if (!gameId || typeof gameId !== "string" || gameId.length > 128) {
+      res.status(400).json({ error: "ID de jogo inválido" }); return;
+    }
+    if (!UUID_RE.test(gameId)) {
+      res.status(400).json({ error: "ID de jogo inválido" }); return;
+    }
+
+    const { data: match, error: matchErr } = await supabaseAdmin
+      .from("matches")
+      .select("player1_id, player2_id, status, current_turn, turn_updated_at")
+      .eq("id", gameId)
+      .single();
+
+    if (matchErr || !match) { res.status(404).json({ error: "Partida não encontrada" }); return; }
+
+    const m = match as { player1_id: string; player2_id: string | null; status: string; current_turn: string | null; turn_updated_at: string | null };
+    if (m.player1_id !== userId && m.player2_id !== userId) {
+      res.status(403).json({ error: "Não és participante desta partida" }); return;
+    }
+
+    const myColor = m.player1_id === userId ? "blue" : "green";
+
+    if (reopen) {
+      if (m.status !== "finished") { res.json({ ok: true, turn: "blue" }); return; }
+      const now = new Date().toISOString();
+      const { error: updErr } = await supabaseAdmin
+        .from("matches")
+        .update({ status: "active", winner_id: null, current_turn: "blue", turn_updated_at: now, completed_at: null })
+        .eq("id", gameId);
+      if (updErr) {
+        req.log.error({ updErr }, "games/ludo-turn reopen error");
+        res.status(500).json({ error: "Erro ao reabrir partida" }); return;
+      }
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ ok: true, turn: "blue" });
+      return;
+    }
+
+    if (m.status === "finished") {
+      res.status(409).json({ error: "Partida já terminada" }); return;
+    }
+
+    const expectedTurn = m.current_turn ?? "blue";
+    const TURN_STALE_MS = 45_000;
+    let turnStale = false;
+    if (m.current_turn && m.turn_updated_at) {
+      turnStale = Date.now() - new Date(m.turn_updated_at).getTime() > TURN_STALE_MS;
+    }
+    let flippingForAbsent = false;
+    if (expectedTurn !== myColor) {
+      // Auto-play: participante pode virar um turno STALE (>30s) em nome
+      // do jogador ausente, para o jogo nunca congelar.
+      let stale = false;
+      if (force && m.current_turn && m.turn_updated_at) {
+        stale = Date.now() - new Date(m.turn_updated_at).getTime() > 30_000;
+      }
+      if (!stale && !turnStale) {
+        res.status(423).json({ error: "Não é a tua vez", turn: expectedTurn });
+        return;
+      }
+      flippingForAbsent = true;
+    }
+
+    let nextColor: string;
+    if (flippingForAbsent) {
+      nextColor = myColor;
+    } else {
+      nextColor = keepTurn ? myColor : (myColor === "blue" ? "green" : "blue");
+    }
+    const now = new Date().toISOString();
+    const { error: updateErr } = await supabaseAdmin
+      .from("matches")
+      .update({ current_turn: nextColor, turn_updated_at: now })
+      .eq("id", gameId)
+      .neq("status", "finished");
+    if (updateErr) {
+      req.log.error({ updateErr }, "games/ludo-turn update error");
+      res.status(500).json({ error: "Erro ao actualizar turno" }); return;
+    }
+
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ok: true, turn: nextColor, turnUpdatedAt: now });
+  } catch (err) {
+    req.log.error({ err }, "games/ludo-turn error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── Games: secure dice roll (port of Vercel api/games/ludo-dice) ── */
 router.post("/games/ludo-dice", async (req, res) => {
   try {
@@ -2101,20 +2200,39 @@ router.post("/games/ludo-dice", async (req, res) => {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
 
-    if (gameId !== "local" && !gameId.startsWith("bot_") && !UUID_RE.test(gameId)) {
+    if (gameId !== "local" && !gameId.startsWith("bot_") && !gameId.startsWith("wm") && !UUID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
 
-    if (gameId !== "local" && !gameId.startsWith("bot_")) {
+    if (gameId !== "local" && !gameId.startsWith("bot_") && !gameId.startsWith("wm")) {
       const { data: match } = await supabaseAdmin
-        .from("matches").select("player1_id, player2_id, status").eq("id", gameId).single();
+        .from("matches").select("player1_id, player2_id, status, current_turn, turn_updated_at").eq("id", gameId).single();
       if (match) {
-        const m = match as { player1_id: string; player2_id: string | null; status: string };
+        const m = match as { player1_id: string; player2_id: string | null; status: string; current_turn: string | null; turn_updated_at: string | null };
         if (m.player1_id !== userId && m.player2_id !== userId) {
           res.status(403).json({ error: "Não és participante desta partida" }); return;
         }
         if (m.status === "finished") {
           res.status(409).json({ error: "Partida já terminada" }); return;
+        }
+        // Authoritative turn enforcement — igual ao Vercel api/games/ludo-dice
+        const myColor = m.player1_id === userId ? "blue" : "green";
+        const expectedTurn = m.current_turn ?? "blue";
+        const TURN_STALE_MS = 45_000;
+        let turnStale = false;
+        if (m.current_turn && m.turn_updated_at) {
+          turnStale = Date.now() - new Date(m.turn_updated_at).getTime() > TURN_STALE_MS;
+        }
+        if (expectedTurn !== myColor && !turnStale) {
+          res.status(423).json({ error: "Não é a tua vez de jogar", turn: expectedTurn });
+          return;
+        }
+        if (turnStale || expectedTurn !== myColor) {
+          // Reclama o turno (stale ou início de partida)
+          await supabaseAdmin
+            .from("matches")
+            .update({ current_turn: myColor, turn_updated_at: new Date().toISOString() })
+            .eq("id", gameId);
         }
       }
     }

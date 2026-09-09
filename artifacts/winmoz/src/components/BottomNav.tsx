@@ -282,7 +282,8 @@ export default function BottomNav() {
     // so skip the DB check for them entirely to avoid false-clearing.
     const isRealMultiplayer = currentGame?.gameId
       && currentGame.gameId !== "local"
-      && !currentGame.gameId.startsWith("bot_");
+      && !currentGame.gameId.startsWith("bot_")
+      && !currentGame.gameId.startsWith("wm");
 
     if (isRealMultiplayer) {
       try {
@@ -291,12 +292,11 @@ export default function BottomNav() {
           .select("status")
           .eq("id", currentGame!.gameId)
           .single();
-        // Only clear if the server EXPLICITLY says the match ended.
-        // If data is null (record not found), show the resume optimistically.
+        // Jogo terminado → limpar o registo e NÃO abrir o modal de resume.
+        // Se data for null (registo não encontrado), mostrar optimistically.
         if (data && (data.status === "finished" || data.status === "cancelled")) {
           localStorage.removeItem("wm_active_game");
           setActiveGame(null);
-          setShowResume(true);
           return;
         }
       } catch { /* network error — show resume optimistically */ }

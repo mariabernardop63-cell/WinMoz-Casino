@@ -1138,8 +1138,14 @@ export default function ChessGame(){
   const oppFromUrl=sp.get("opp")??"";
 
   const opponentColor:PColor=myColor==="w"?"b":"w";
-  const isBot=sp.get("bot")==="1";
-  const botBal=parseInt(sp.get("botbalance")??"0");
+  // Config do bot viaja por sessionStorage (URL limpa — o jogador nunca vê
+  // que está a jogar contra um bot).
+  const botSession=(()=>{
+    try{return JSON.parse(sessionStorage.getItem(`wm_bot_session_${gameId}`)??"null") as {bot?:boolean;botBalance?:number}|null;}
+    catch{return null;}
+  })();
+  const isBot=botSession?.bot===true;
+  const botBal=Number(botSession?.botBalance??0);
   const myNameUrl=sp.get("myname")??"";
   const playerName=myNameUrl?decodeURIComponent(myNameUrl):(profile?.full_name??"Jogador");
   const opponentName=oppFromUrl?decodeURIComponent(oppFromUrl):"Adversário";
@@ -1173,6 +1179,8 @@ export default function ChessGame(){
   // Refs for realtime callbacks
   const boardRef=useRef(board);const turnRef=useRef(turn);
   const epRef=useRef(ep);const statusRef=useRef(status);
+  const winnerRef=useRef(winner);
+  useEffect(()=>{winnerRef.current=winner;},[winner]);
   const channelRef=useRef<ReturnType<typeof supabase.channel>|null>(null);
   const lastSeqRef=useRef<Record<string,number>>({});
   const betDeductedRef=useRef(
@@ -1444,15 +1452,21 @@ export default function ChessGame(){
     });
 
     ch.on("broadcast",{event:"chess_resync_req"},()=>{
-      if(statusRef.current==="checkmate"||statusRef.current==="stalemate")return;
+      // Responde mesmo com jogo terminado — o outro lado precisa ver a derrota
       ch.send({type:"broadcast",event:"chess_resync_state",payload:{
         board:boardRef.current,turn:turnRef.current,ep:epRef.current,
-        status:statusRef.current,
+        status:statusRef.current,winner:winnerRef.current,
       }});
     });
 
     ch.on("broadcast",{event:"chess_resync_state"},({payload})=>{
-      const p=payload as{board:Board;turn:PColor;ep:Sq|null;status:GameStatus};
+      const p=payload as{board:Board;turn:PColor;ep:Sq|null;status:GameStatus;winner?:PColor|null};
+      if(p.winner&&!winnerRef.current){
+        winnerRef.current=p.winner;
+        setWinner(p.winner);
+        setWinReason(p.winner===myColor?"Venceste — o jogo terminou.":`${opponentName} venceu — o jogo terminou.`);
+        setStatus("checkmate");
+      }
       setBoard(p.board);setTurn(p.turn);setEp(p.ep);setStatus(p.status);
       boardRef.current=p.board;turnRef.current=p.turn;epRef.current=p.ep;statusRef.current=p.status;
     });

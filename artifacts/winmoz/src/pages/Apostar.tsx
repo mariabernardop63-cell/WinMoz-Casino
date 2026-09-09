@@ -1629,12 +1629,19 @@ export default function Apostar() {
           setScreen("matched");
           const myEnc  = encodeURIComponent(profile?.full_name ?? "Jogador");
           const oppEnc = encodeURIComponent(botName);
-          const botGameId = `bot_${Date.now()}`;
+          // URL limpa: nada de "bot" no slug. O id real e os dados do bot
+          // viajam por sessionStorage com uma chave opaca.
+          const publicGameId = `wm${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+          try {
+            sessionStorage.setItem(`wm_bot_session_${publicGameId}`, JSON.stringify({
+              bot: true, botBalance: botBalance,
+            }));
+          } catch { /* noop */ }
           let dest: string;
           if (gameId === "xadrez") {
-            dest = `/xadrez-jogo?gameId=${botGameId}&color=white&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}&bot=1&botbalance=${botBalance}`;
+            dest = `/xadrez-jogo?gameId=${publicGameId}&color=white&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}`;
           } else {
-            dest = `/damas-jogo?gameId=${botGameId}&color=w&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}&bot=1&botbalance=${botBalance}`;
+            dest = `/damas-jogo?gameId=${publicGameId}&color=w&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}`;
           }
           setTimeout(() => setLocation(dest), 2200);
         }}
