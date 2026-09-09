@@ -1144,6 +1144,7 @@ export default function DamasGame() {
     }
   };
 
+  // Bot turn timer (visual countdown + safety auto-forfeit if bot hangs)
   // ── Timer expiry for bot (deducts bot life or forces turn back to user) ──────
   const botTimerExpiryRef = useRef<() => void>(() => {});
   botTimerExpiryRef.current = () => {
@@ -1165,21 +1166,44 @@ export default function DamasGame() {
   };
 
   // ── Timers ────────────────────────────────────────────────────────────────
-  // My turn timer (wall-clock based + visibilitychange catch-up)
+  // My turn timer (wall-clock based; NUNCA reinicia ao retomar — o início do
+  // turno persiste em sessionStorage, o countdown continua de onde parou)
+  const turnTimerKey = `wm_damas_timer_${gameId}_${myColor}`;
+  const prevTimerTurnRef = useRef<PColor|null>(_savedDamas?.turn ?? null);
   useEffect(() => {
-    if (winner || turn !== myColor || chainPiece) return;
-    channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:30 } });
-    const timerStart = Date.now();
+    if (winner || turn !== myColor) {
+      try { sessionStorage.removeItem(turnTimerKey); } catch { /* ignore */ }
+      return;
+    }
+    // Cadeia de captura a decorrer: timer em pausa visual, mantém o registo
+    if (chainPiece) return;
+    // Novo turno real? → começa agora. Retoma (back + voltar)? → continua.
+    const isNewTurn = prevTimerTurnRef.current !== turn;
+    prevTimerTurnRef.current = turn;
+    let start = 0;
+    if (!isNewTurn) {
+      try {
+        const saved = sessionStorage.getItem(turnTimerKey);
+        const parsed = saved ? parseInt(saved, 10) : 0;
+        if (parsed && parsed > Date.now() - 120_000) start = parsed; // sanidade <2min
+      } catch { /* ignore */ }
+    }
+    if (!start) {
+      start = Date.now();
+      try { sessionStorage.setItem(turnTimerKey, String(start)); } catch { /* ignore */ }
+    }
+    channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:Math.max(0, 30 - Math.floor((Date.now() - start) / 1000)) } });
     let firedExpiry = false;
     const fireExpiry = () => {
       if (firedExpiry) return;
       firedExpiry = true;
       clearInterval(tick);
-      channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:0 } });
+      const t0 = Math.max(0, 30 - Math.floor((Date.now() - start) / 1000));
+      channelRef.current?.send({ type:"broadcast", event:"damas_timer", payload:{ player:myColor, t:t0 } });
       setTimeout(() => timerExpiryRef.current(), 0);
     };
     const tick = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+      const elapsed = Math.floor((Date.now() - start) / 1000);
       const nv = Math.max(0, 30 - elapsed);
       setTimers(prev => ({ ...prev, [myColor]: nv }));
       if (nv <= 0) { fireExpiry(); return; }
@@ -1187,17 +1211,17 @@ export default function DamasGame() {
     }, 500);
     const onVisible = () => {
       if (document.visibilityState !== "visible") return;
-      const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+      const elapsed = Math.floor((Date.now() - start) / 1000);
       const nv = Math.max(0, 30 - elapsed);
       setTimers(prev => ({ ...prev, [myColor]: nv }));
       if (nv <= 0) fireExpiry();
     };
     document.addEventListener("visibilitychange", onVisible);
-    return () => { clearInterval(tick); document.removeEventListener("visibilitychange", onVisible); };
+    return () => { clearInterval(tick); document.removeEventListener("visibilitychange", onVisible);
+      // Sem remoção aqui: o user pode sair e retomar — countdown contínuo.
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turn, winner, chainPiece]);
-
-  // Bot turn timer (visual countdown + safety auto-forfeit if bot hangs)
   useEffect(() => {
     if (!isBot || winner || turn !== oppColor) return;
     const timerStart = Date.now();

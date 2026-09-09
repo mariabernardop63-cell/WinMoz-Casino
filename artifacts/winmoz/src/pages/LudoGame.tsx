@@ -2414,9 +2414,16 @@ export default function LudoGame() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[gameId,isBot,winner,phase]);
 
-  // ── Timer — counts down when it's MY turn; wall-clock based to survive tab-switches ──
+  // ── Timer — counts down when it's MY turn ─────────────────────────────────
+  // REGRA: o timer NUNCA reinicia. O início do turno persiste em
+  // sessionStorage — ao sair (back) e retomar, o countdown CONTINUA de onde
+  // parou (wall-clock). Só recomeça quando a vez muda (novo turno real).
   const autoPlayRef    = useRef<(()=>void)|null>(null);
   const timerStartRef  = useRef<number>(0);
+  const turnTimerKey   = `wm_ludo_timer_${gameId}_${myColor}`;
+  // Turno já "ancorado" pelo timer (evita reiniciar em mudanças de fase e
+  // permite retomar com o countdown contínuo)
+  const prevTimerTurnRef = useRef<Player|null>(_savedLudo?.turn ?? null);
   autoPlayRef.current  = () => {
     const l    = livesRef.current;
     const nb   = l[myColor] - 1;
@@ -2459,10 +2466,30 @@ export default function LudoGame() {
   },[turn, winner]);
 
   useEffect(() => {
-    setTimeLeft(30);
-    if (winner || (phase !== "roll" && phase !== "select") || turn !== myColor) return;
-    timerStartRef.current = Date.now();
-    channelRef.current?.send({ type:"broadcast", event:"ludo_timer", payload:{ player:myColor, t:30 } });
+    if (winner || (phase !== "roll" && phase !== "select") || turn !== myColor) {
+      try { sessionStorage.removeItem(turnTimerKey); } catch { /* ignore */ }
+      return;
+    }
+    // Novo turno real? → começa agora. Mudança de fase (roll↔select) ou
+    // retoma (back + voltar)? → o timer CONTINUA do início original.
+    const isNewTurn = prevTimerTurnRef.current !== turn;
+    prevTimerTurnRef.current = turn;
+    let start = 0;
+    if (!isNewTurn) {
+      try {
+        const saved = sessionStorage.getItem(turnTimerKey);
+        const parsed = saved ? parseInt(saved, 10) : 0;
+        if (parsed && parsed > Date.now() - 120_000) start = parsed; // sanidade <2min
+      } catch { /* ignore */ }
+    }
+    if (!start) {
+      start = Date.now();
+      try { sessionStorage.setItem(turnTimerKey, String(start)); } catch { /* ignore */ }
+    }
+    timerStartRef.current = start;
+    const remainingNow = Math.max(0, 30 - Math.floor((Date.now() - start) / 1000));
+    setTimeLeft(remainingNow);
+    channelRef.current?.send({ type:"broadcast", event:"ludo_timer", payload:{ player:myColor, t:remainingNow } });
 
     let firedExpiry = false;
     const fireExpiry = () => {
@@ -2493,11 +2520,16 @@ export default function LudoGame() {
     return () => {
       clearInterval(tick);
       document.removeEventListener("visibilitychange", onVisible);
+      // NÃO remover o registo aqui: o user pode sair (back) e retomar —
+      // o countdown tem de continuar. A limpeza acontece na mudança de
+      // turno, no fim do jogo ou no resetGame.
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turn, phase, winner, myColor]);
 
   function resetGame(){
+    try { sessionStorage.removeItem(turnTimerKey); } catch { /* ignore */ }
+    prevTimerTurnRef.current = null;
     betDeductedRef.current=false;
     winCreditedRef.current=false;
     rewardFiredRef.current=false;

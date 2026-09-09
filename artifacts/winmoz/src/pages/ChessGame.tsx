@@ -1172,9 +1172,29 @@ export default function ChessGame(){
   const[winner,setWinner]=useState<PColor|null>(null);
   const[winReason,setWinReason]=useState("");
   const[promotionPending,setPromotionPending]=useState<{from:Sq;to:Sq}|null>(null);
-  const[timers,setTimers]=useState<Record<PColor,number>>({w:600,b:600});
-  const timerTurnStartRef  = useRef<number>(Date.now());
+  // Relógios: ao sair (back) e retomar, o tempo NÃO reinicia — o countdown
+  // continua de onde parou (wall-clock). Persistidos em sessionStorage.
+  const timersKey = `wm_chess_timers_${gameId}`;
+  const savedTimers = (() => {
+    try {
+      const raw = sessionStorage.getItem(timersKey);
+      if (raw) {
+        const p = JSON.parse(raw) as { timers: Record<PColor,number>; start: number; turn: PColor };
+        if (p?.timers && p.start && p.turn && Date.now() - p.start < 3_600_000) {
+          const elapsed = Math.max(0, Math.floor((Date.now() - p.start) / 1000));
+          // O jogador em turno perde o tempo decorrido enquanto esteve fora
+          return { timers: { ...p.timers, [p.turn]: Math.max(0, (p.timers[p.turn] ?? 600) - elapsed) }, start: p.start, turn: p.turn as PColor };
+        }
+      }
+    } catch { /* ignore */ }
+    return null;
+  })();
+  const[timers,setTimers]=useState<Record<PColor,number>>(savedTimers?.timers ?? {w:600,b:600});
+  const timersRef=useRef(timers);
+  useEffect(()=>{timersRef.current=timers;},[timers]);
+  const timerTurnStartRef  = useRef<number>(savedTimers?.start ?? Date.now());
   const timerTurnValueRef  = useRef<number>(600);
+  const timerAnchorRef     = useRef<PColor|null>(savedTimers?.turn ?? null);
 
   // Refs for realtime callbacks
   const boardRef=useRef(board);const turnRef=useRef(turn);
@@ -1198,8 +1218,19 @@ export default function ChessGame(){
   useEffect(()=>{boardRef.current=board;},[board]);
   useEffect(()=>{
     turnRef.current=turn;
-    timerTurnStartRef.current = Date.now();
-    timerTurnValueRef.current = timers[turn];
+    // Ao montar (retomar), NÃO reancorar — o início do turno restaurado
+    // (timerTurnStartRef init) mantém o countdown contínuo. Só reancora
+    // quando a vez realmente muda durante a sessão.
+    if(timerAnchorRef.current!==turn){
+      if(timerAnchorRef.current!==null){
+        timerTurnStartRef.current = Date.now();
+        timerTurnValueRef.current = timers[turn];
+      } else {
+        // primeira execução: mantém o valor restaurado do sessionStorage
+        timerTurnValueRef.current = timers[turn];
+      }
+      timerAnchorRef.current = turn;
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[turn]);
   useEffect(()=>{epRef.current=ep;},[ep]);
@@ -1246,7 +1277,10 @@ export default function ChessGame(){
 
   // Persist game state for reconnection
   useEffect(()=>{
-    if(gameId==="local"||winner||status==="checkmate"||status==="stalemate")return;
+    if(gameId==="local"||winner||status==="checkmate"||status==="stalemate"){
+      try{sessionStorage.removeItem(timersKey);}catch{/* ignore */}
+      return;
+    }
     // sessionStorage reconnect state — only for multiplayer (non-bot)
     if(!isBot){
       try{
@@ -1255,6 +1289,13 @@ export default function ChessGame(){
         }));
       }catch{/* ignore */}
     }
+    // Relógios: guarda o tempo restante de cada jogador + início do turno
+    // actual. Ao retomar, o countdown CONTINUA de onde parou — nunca reinicia.
+    try{
+      sessionStorage.setItem(timersKey,JSON.stringify({
+        timers:timersRef.current, start:timerTurnStartRef.current, turn,
+      }));
+    }catch{/* ignore */}
     // Keep wm_active_game always current so Resume works even on native back-swipe
     if(BET>0){
       try{
@@ -1306,7 +1347,8 @@ export default function ChessGame(){
   // ── Timer countdown (wall-clock based — stays accurate in background tabs) ──
   useEffect(()=>{
     if(status!=="playing"&&status!=="check")return;
-    timerTurnStartRef.current = Date.now();
+    // NÃO reancora aqui: timerTurnStartRef mantém o início real do turno
+    // (restaurado do sessionStorage em caso de retoma).
     timerTurnValueRef.current = timers[turn];
     let firedExpiry = false;
     const fireExpiry = () => {
@@ -1525,6 +1567,10 @@ export default function ChessGame(){
   },[gameId,applyMoveToState]);
 
   function resetGame(){
+    try{sessionStorage.removeItem(timersKey);}catch{/* ignore */}
+    timerAnchorRef.current=null;
+    timerTurnStartRef.current=Date.now();
+    timerTurnValueRef.current=600;
     betDeductedRef.current=false;
     winCreditedRef.current=false;
     rewardFiredRef.current=false;
