@@ -296,10 +296,6 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
 
   const greeting = useMemo(() => getMozambiqueGreeting(), []);
-  const today = useMemo(
-    () => new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }),
-    [],
-  );
 
   async function handleResetRevenue() {
     if (!window.confirm("Tens a certeza? O Saldo Disponível será reposto a MT 0,00 no banco de dados. Esta acção não apaga os dados históricos.")) return;
@@ -423,8 +419,8 @@ export default function Dashboard() {
           >
             {greeting}, <span className="gz-gradient-text">Admin</span>
           </h1>
-          <p className="mt-1 text-[12.5px] font-medium capitalize" style={{ color: "var(--gz-text-muted)" }}>
-            Resumo da plataforma MOZBET · {today}
+          <p className="mt-1 text-[12.5px] font-medium" style={{ color: "var(--gz-text-muted)" }}>
+            Pronto para uma nova aventura épica?
           </p>
         </div>
         <div className="flex items-center gap-2">

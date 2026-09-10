@@ -3,13 +3,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
   CheckCircle2, XCircle, ChevronDown, ChevronUp,
-  Clock, Wallet, Gamepad2, RefreshCw, User, Phone, MessageSquare,
+  Clock, Wallet, Gamepad2, RefreshCw, User, Phone, MessageSquare, Inbox,
 } from "lucide-react";
 import { adminSupabase } from "@/admin/lib/supabase-api";
-import { supabase } from "@/lib/supabase";
 import { playAdminNotificationSound } from "@/admin/hooks/useAdminNotificationSound";
+import {
+  PageHeader, Card, SectionHeader, KpiTile, KpiGrid, RefreshButton, EmptyState, StatusPill,
+} from "@/admin/components/ui";
 
-const CYAN = "#00D4B4";
+const CYAN = "#0d9488";
+const GREEN = "#15803d";
+const RED = "#b91c1c";
 
 function fmtMZN(val: number) {
   return val.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -53,6 +57,7 @@ export default function DepositRequests() {
 
       if (error) throw error;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const enriched = (data ?? []).map((row: any) => {
         let _meta = { phone: "", confirmationMsg: "", userName: "Utilizador", mode: "deposit" };
         try { _meta = { ..._meta, ...JSON.parse(row.description ?? "{}") }; } catch { /* noop */ }
@@ -97,8 +102,10 @@ export default function DepositRequests() {
         .single();
 
       if (txErr || !txData) throw new Error("Pedido não encontrado");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((txData as any).status !== "pending") throw new Error("Pedido já processado");
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((txData as any).type === "manual_deposit" || (txData as any).type === "manual_bet") {
         const { data: profile, error: profErr } = await adminSupabase
           .from("profiles")
@@ -108,7 +115,9 @@ export default function DepositRequests() {
 
         if (profErr) throw new Error("Erro ao obter saldo do utilizador");
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const current = Number((profile as any)?.balance ?? 0);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const newBalance = Math.round((current + Number((txData as any).amount)) * 100) / 100;
 
         const { error: balErr } = await adminSupabase
@@ -132,9 +141,9 @@ export default function DepositRequests() {
           : `Aposta de ${fmtMZN(req.amount)} MZN aprovada — saldo creditado`
       );
       loadRequests();
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Admin] Approve error:", err);
-      toast.error(err?.message ?? "Erro ao aprovar pedido");
+      toast.error(err instanceof Error ? err.message : "Erro ao aprovar pedido");
     } finally {
       setProcessingId(null);
     }
@@ -152,6 +161,7 @@ export default function DepositRequests() {
         .single();
 
       if (txErr || !txData) throw new Error("Pedido não encontrado");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((txData as any).status !== "pending") throw new Error("Pedido já processado");
 
       const { error: upErr } = await adminSupabase
@@ -163,9 +173,9 @@ export default function DepositRequests() {
 
       toast.success("Pedido rejeitado");
       loadRequests();
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Admin] Reject error:", err);
-      toast.error(err?.message ?? "Erro ao rejeitar pedido");
+      toast.error(err instanceof Error ? err.message : "Erro ao rejeitar pedido");
     } finally {
       setProcessingId(null);
     }
@@ -177,208 +187,205 @@ export default function DepositRequests() {
     r.type === "manual_bet"
   );
 
+  const depositCount = requests.filter(r => r.type === "manual_deposit").length;
+  const betCount = requests.filter(r => r.type === "manual_bet").length;
+  const totalValue = requests.reduce((s, r) => s + Number(r.amount), 0);
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: "var(--gz-text-primary)" }}>Gestão de Depósitos</h1>
-          <p className="text-sm mt-1" style={{ color: "var(--gz-text-muted)" }}>
-            Pedidos manuais de depósito e aposta pendentes de aprovação
-          </p>
-        </div>
-        <button
-          onClick={() => { setLoading(true); loadRequests(); }}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:-translate-y-0.5 active:scale-95"
-          style={{
-            background: "var(--gz-bg-subtle)",
-            color: "var(--gz-text-muted)",
-            border: "1px solid var(--gz-border)",
-          }}>
-          <RefreshCw style={{ width: 14, height: 14 }} />
-          Actualizar
-        </button>
-      </div>
+    <div className="px-4 sm:px-5 pb-8 pt-5 max-w-[1400px] mx-auto">
+      <PageHeader
+        icon={Inbox}
+        title="Gestão de"
+        titleAccent="Depósitos"
+        subtitle="Pedidos manuais de depósito e aposta pendentes de aprovação"
+      >
+        <RefreshButton onClick={() => { setLoading(true); loadRequests(); }} loading={loading} />
+      </PageHeader>
 
-      {/* Stats */}
-      <div className="admin-responsive-grid grid gap-3 mb-6" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-        {[
-          { label: "Pendentes", val: requests.length, icon: Clock, color: "#18181b" },
-          { label: "Depósitos", val: requests.filter(r => r.type === "manual_deposit").length, icon: Wallet, color: CYAN },
-          { label: "Apostas", val: requests.filter(r => r.type === "manual_bet").length, icon: Gamepad2, color: "#71717a" },
-        ].map(stat => (
-          <div key={stat.label} className="gz-card rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: `${stat.color}18` }}>
-              <stat.icon style={{ width: 16, height: 16, color: stat.color }} />
-            </div>
-            <div>
-              <p className="text-xl sm:text-2xl font-bold" style={{ color: "var(--gz-text-primary)" }}>{stat.val}</p>
-              <p className="text-[10px] sm:text-xs" style={{ color: "var(--gz-text-muted)" }}>{stat.label}</p>
+      <div className="space-y-5">
+        {/* KPI panel */}
+        <Card>
+          <SectionHeader
+            icon={Clock}
+            title="Resumo de Pedidos"
+            subtitle="Actualiza em tempo real"
+            action={
+              <StatusPill label="AO VIVO" color="#0d9488" />
+            }
+          />
+          <KpiGrid>
+            <KpiTile label="Pendentes" value={requests.length} icon={Clock} accent="#52525b" hint="aguardando acção" />
+            <KpiTile label="Depósitos" value={depositCount} icon={Wallet} accent={CYAN} hint="pedidos de depósito" />
+            <KpiTile label="Apostas" value={betCount} icon={Gamepad2} accent="#71717a" hint="pedidos de aposta" />
+          </KpiGrid>
+        </Card>
+
+        {/* Filter tabs */}
+        <Card>
+          <div className="flex items-center gap-2 p-4 flex-wrap">
+            {[
+              { key: "all", label: `Todos (${requests.length})` },
+              { key: "deposit", label: `Depósitos (${depositCount})` },
+              { key: "bet", label: `Apostas (${betCount})` },
+            ].map(tab => (
+              <button key={tab.key}
+                onClick={() => setFilter(tab.key as "all" | "deposit" | "bet")}
+                className="px-4 py-2 rounded-xl text-[12.5px] font-bold transition-all"
+                style={{
+                  background: filter === tab.key ? CYAN : "var(--gz-bg-subtle)",
+                  color: filter === tab.key ? "#fff" : "var(--gz-text-muted)",
+                  border: `1px solid ${filter === tab.key ? CYAN : "var(--gz-border-subtle)"}`,
+                }}>
+                {tab.label}
+              </button>
+            ))}
+            <div className="ml-auto text-[12px] font-semibold" style={{ color: "var(--gz-text-muted)" }}>
+              Total pendente: <span style={{ color: "var(--gz-text-primary)" }}>{fmtMZN(totalValue)} MZN</span>
             </div>
           </div>
-        ))}
-      </div>
+        </Card>
 
-      {/* Filter tabs */}
-      <div className="flex gap-2 mb-5">
-        {[
-          { key: "all", label: "Todos" },
-          { key: "deposit", label: "Depósitos" },
-          { key: "bet", label: "Apostas" },
-        ].map(tab => (
-          <button key={tab.key}
-            onClick={() => setFilter(tab.key as "all" | "deposit" | "bet")}
-            className="px-4 py-2 rounded-xl text-sm font-medium transition-all"
-            style={{
-              background: filter === tab.key ? CYAN : "var(--gz-bg-subtle)",
-              color: filter === tab.key ? "#000" : "var(--gz-text-muted)",
-              border: `1px solid ${filter === tab.key ? CYAN : "var(--gz-border)"}`,
-            }}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+        {/* List */}
+        {loading ? (
+          <Card>
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 rounded-full border-2 animate-spin"
+                style={{ borderColor: "var(--gz-border-subtle)", borderTopColor: "var(--gz-text-muted)" }} />
+            </div>
+          </Card>
+        ) : filtered.length === 0 ? (
+          <Card>
+            <EmptyState icon={CheckCircle2} title="Nenhum pedido pendente" subtitle="Tudo em dia!" />
+          </Card>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <AnimatePresence>
+              {filtered.map(req => {
+                const meta = req._meta!;
+                const isDeposit = req.type === "manual_deposit";
+                const isExpanded = expandedId === req.id;
+                const isProcessing = processingId === req.id;
+                const accent = isDeposit ? CYAN : "#71717a";
 
-      {/* List */}
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 rounded-full border-2 animate-spin"
-            style={{ borderColor: "var(--gz-border)", borderTopColor: "var(--gz-text-muted)" }} />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4 gz-card">
-            <CheckCircle2 style={{ width: 28, height: 28, color: "var(--gz-text-tertiary)" }} />
-          </div>
-          <p className="text-sm" style={{ color: "var(--gz-text-muted)" }}>Nenhum pedido pendente</p>
-          <p className="text-xs mt-1" style={{ color: "var(--gz-text-tertiary)" }}>Tudo em dia!</p>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3">
-          <AnimatePresence>
-            {filtered.map(req => {
-              const meta = req._meta!;
-              const isDeposit = req.type === "manual_deposit";
-              const isExpanded = expandedId === req.id;
-              const isProcessing = processingId === req.id;
+                return (
+                  <motion.div
+                    key={req.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                    transition={{ duration: 0.2 }}
+                    className="gz-card overflow-hidden">
 
-              return (
-                <motion.div
-                  key={req.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.97 }}
-                  transition={{ duration: 0.2 }}
-                  className="gz-card rounded-2xl overflow-hidden">
-
-                  {/* Type badge */}
-                  <div className="flex items-center justify-between px-4 pt-4 pb-3"
-                    style={{ borderBottom: "1px solid var(--gz-border)" }}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ background: isDeposit ? `${CYAN}18` : "rgba(255,255,255,0.15)" }}>
-                        {isDeposit
-                          ? <Wallet style={{ width: 13, height: 13, color: CYAN }} />
-                          : <Gamepad2 style={{ width: 13, height: 13, color: "#71717a" }} />}
+                    {/* Type badge */}
+                    <div className="flex items-center justify-between px-5 py-3"
+                      style={{ borderBottom: "1px solid var(--gz-border-subtle)" }}>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                          style={{ background: `${accent}18` }}>
+                          {isDeposit
+                            ? <Wallet style={{ width: 13, height: 13, color: accent }} />
+                            : <Gamepad2 style={{ width: 13, height: 13, color: accent }} />}
+                        </div>
+                        <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: accent }}>
+                          {isDeposit ? "Depósito" : "Aposta"}
+                        </span>
+                        <StatusPill label="Pendente" color="#a16207" />
                       </div>
-                      <span className="text-xs font-bold uppercase tracking-wider"
-                        style={{ color: isDeposit ? CYAN : "#71717a" }}>
-                        {isDeposit ? "Depósito" : "Aposta"}
-                      </span>
+                      <span className="text-[11.5px] font-medium" style={{ color: "var(--gz-text-tertiary)" }}>{timeAgo(req.created_at)}</span>
                     </div>
-                    <span className="text-xs" style={{ color: "var(--gz-text-tertiary)" }}>{timeAgo(req.created_at)}</span>
-                  </div>
 
-                  {/* Main info */}
-                  <div className="px-4 py-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-2xl font-bold" style={{ color: "var(--gz-text-primary)" }}>
-                          {fmtMZN(Number(req.amount))} <span className="text-base font-medium" style={{ color: "var(--gz-text-tertiary)" }}>MZN</span>
-                        </p>
-                        <div className="flex items-center gap-3 mt-1.5">
-                          <div className="flex items-center gap-1.5">
-                            <User style={{ width: 11, height: 11, color: "var(--gz-text-tertiary)" }} />
-                            <span className="text-xs" style={{ color: "var(--gz-text-muted)" }}>{meta.userName}</span>
-                          </div>
-                          {meta.phone && (
+                    {/* Main info */}
+                    <div className="px-5 py-4">
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div>
+                          <p className="text-[24px] font-black tracking-tight tabular-nums" style={{ color: "var(--gz-text-primary)" }}>
+                            {fmtMZN(Number(req.amount))} <span className="text-[14px] font-semibold" style={{ color: "var(--gz-text-tertiary)" }}>MZN</span>
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 flex-wrap">
                             <div className="flex items-center gap-1.5">
-                              <Phone style={{ width: 11, height: 11, color: "var(--gz-text-tertiary)" }} />
-                              <span className="text-xs" style={{ color: "var(--gz-text-muted)" }}>{meta.phone}</span>
+                              <User style={{ width: 12, height: 12, color: "var(--gz-text-tertiary)" }} />
+                              <span className="text-[12px] font-medium" style={{ color: "var(--gz-text-muted)" }}>{meta.userName}</span>
                             </div>
+                            {meta.phone && (
+                              <div className="flex items-center gap-1.5">
+                                <Phone style={{ width: 12, height: 12, color: "var(--gz-text-tertiary)" }} />
+                                <span className="text-[12px] font-medium" style={{ color: "var(--gz-text-muted)" }}>{meta.phone}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2">
+                          {isProcessing ? (
+                            <div className="w-8 h-8 rounded-full border-2 animate-spin"
+                              style={{ borderColor: "var(--gz-border-subtle)", borderTopColor: "var(--gz-text-muted)" }} />
+                          ) : (
+                            <>
+                              <motion.button
+                                onClick={() => handleApprove(req)}
+                                whileTap={{ scale: 0.93 }}
+                                className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-[12.5px] font-bold"
+                                style={{ background: "rgba(21,128,61,.1)", border: "1px solid rgba(21,128,61,.22)", color: GREEN }}
+                                title="Aprovar">
+                                <CheckCircle2 style={{ width: 15, height: 15 }} />
+                                Aprovar
+                              </motion.button>
+                              <motion.button
+                                onClick={() => handleReject(req)}
+                                whileTap={{ scale: 0.93 }}
+                                className="flex items-center gap-1.5 h-10 px-4 rounded-xl text-[12.5px] font-bold"
+                                style={{ background: "rgba(185,28,28,.08)", border: "1px solid rgba(185,28,28,.2)", color: RED }}
+                                title="Rejeitar">
+                                <XCircle style={{ width: 15, height: 15 }} />
+                                Rejeitar
+                              </motion.button>
+                            </>
                           )}
                         </div>
                       </div>
 
-                      {/* Action buttons */}
-                      <div className="flex items-center gap-2">
-                        {isProcessing ? (
-                          <div className="w-8 h-8 rounded-full border-2 animate-spin"
-                            style={{ borderColor: "var(--gz-border)", borderTopColor: "var(--gz-text-muted)" }} />
-                        ) : (
-                          <>
-                            <motion.button
-                              onClick={() => handleApprove(req)}
-                              whileTap={{ scale: 0.93 }}
-                              className="w-10 h-10 rounded-full flex items-center justify-center"
-                              style={{ background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.25)" }}
-                              title="Aprovar">
-                              <CheckCircle2 style={{ width: 18, height: 18, color: "#22c55e" }} />
-                            </motion.button>
-                            <motion.button
-                              onClick={() => handleReject(req)}
-                              whileTap={{ scale: 0.93 }}
-                              className="w-10 h-10 rounded-full flex items-center justify-center"
-                              style={{ background: "rgba(0,0,0,0.12)", border: "1px solid rgba(0,0,0,0.2)" }}
-                              title="Rejeitar">
-                              <XCircle style={{ width: 18, height: 18, color: "#0a0a0a" }} />
-                            </motion.button>
-                          </>
+                      {/* Expand/collapse confirmation message */}
+                      <button
+                        onClick={() => setExpandedId(isExpanded ? null : req.id)}
+                        className="flex items-center gap-1.5 text-[11.5px] font-semibold mt-4 transition-colors"
+                        style={{ color: "var(--gz-text-tertiary)" }}>
+                        <MessageSquare style={{ width: 12, height: 12 }} />
+                        {isExpanded ? "Ocultar mensagem" : "Ver mensagem de confirmação"}
+                        {isExpanded
+                          ? <ChevronUp style={{ width: 12, height: 12 }} />
+                          : <ChevronDown style={{ width: 12, height: 12 }} />}
+                      </button>
+
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden">
+                            <div className="mt-3 p-3.5 rounded-xl text-[12px] leading-relaxed break-words"
+                              style={{
+                                background: "var(--gz-bg-subtle)",
+                                border: "1px solid var(--gz-border-subtle)",
+                                color: "var(--gz-text-secondary)",
+                              }}>
+                              {meta.confirmationMsg || <span style={{ color: "var(--gz-text-tertiary)", fontStyle: "italic" }}>Sem mensagem</span>}
+                            </div>
+                          </motion.div>
                         )}
-                      </div>
+                      </AnimatePresence>
                     </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
 
-                    {/* Expand/collapse confirmation message */}
-                    <button
-                      onClick={() => setExpandedId(isExpanded ? null : req.id)}
-                      className="flex items-center gap-1.5 text-xs transition-colors"
-                      style={{ color: "var(--gz-text-tertiary)" }}>
-                      <MessageSquare style={{ width: 12, height: 12 }} />
-                      {isExpanded ? "Ocultar mensagem" : "Ver mensagem de confirmação"}
-                      {isExpanded
-                        ? <ChevronUp style={{ width: 12, height: 12 }} />
-                        : <ChevronDown style={{ width: 12, height: 12 }} />}
-                    </button>
-
-                    <AnimatePresence>
-                      {isExpanded && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="overflow-hidden">
-                          <div className="mt-3 p-3 rounded-xl text-xs leading-relaxed break-words"
-                            style={{
-                              background: "var(--gz-bg-subtle)",
-                              border: "1px solid var(--gz-border)",
-                              color: "var(--gz-text-muted)",
-                              fontFamily: "system-ui",
-                            }}>
-                            {meta.confirmationMsg || <span style={{ color: "var(--gz-text-tertiary)", fontStyle: "italic" }}>Sem mensagem</span>}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-        </div>
-      )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

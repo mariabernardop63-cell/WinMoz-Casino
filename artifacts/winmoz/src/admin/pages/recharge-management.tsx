@@ -7,6 +7,9 @@ import {
   AlertTriangle, ShieldCheck, Download,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import {
+  PageHeader, Card, SectionHeader, KpiTile, KpiGrid, RefreshButton, StatusPill,
+} from "@/admin/components/ui";
 
 const ACCENT = "#18181b";
 
@@ -204,62 +207,47 @@ export default function RechargeManagement() {
   ], [stats]);
 
   return (
-    <div className="px-5 pb-10 pt-4 space-y-5">
+    <div className="px-4 sm:px-5 pb-8 pt-5 max-w-[1400px] mx-auto">
 
       {/* ── Header ── */}
-      <div className="gz-card p-5">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-[22px] font-black tracking-tight flex items-center gap-2.5" style={{ color: "var(--gz-text-primary)" }}>
-              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,0,0,.14)" }}>
-                <Ticket style={{ width: 18, height: 18, color: ACCENT }} />
-              </span>
-              Gestão de Recargas
-            </h1>
-            <p className="text-[12.5px] font-medium mt-1 flex items-center gap-1.5" style={{ color: "var(--gz-text-accent)" }}>
-              <ShieldCheck style={{ width: 13, height: 13 }} />
-              Códigos de 12 dígitos · uso seguro e atómico · só tu geras recargas
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => refetch()}
-              className="h-10 px-4 rounded-xl text-[12.5px] font-bold flex items-center gap-2 transition-all hover:opacity-80"
-              style={{ background: "rgba(0,0,0,.1)", color: ACCENT }}>
-              <RefreshCw style={{ width: 14, height: 14 }} className={isRefetching ? "animate-spin" : ""} />
-              Actualizar
-            </button>
-            <button
-              onClick={() => setShowCreate((v) => !v)}
-              className="h-10 px-5 rounded-xl text-[12.5px] font-bold text-white flex items-center gap-2 transition-all hover:opacity-90"
-              style={{ background: ACCENT, boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}>
-              <Plus style={{ width: 15, height: 15 }} />
-              Nova Recarga
-            </button>
-          </div>
+      <PageHeader
+        icon={Ticket}
+        title="Gestão de"
+        titleAccent="Recargas"
+        subtitle="Códigos de 12 dígitos · uso seguro e atómico · só tu geras recargas"
+      >
+        <div className="flex items-center gap-2">
+          <RefreshButton onClick={() => refetch()} loading={isRefetching} />
+          <button
+            onClick={() => setShowCreate((v) => !v)}
+            className="h-9 px-4 rounded-xl text-[12.5px] font-bold text-white flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95"
+            style={{ background: ACCENT, boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+            <Plus style={{ width: 15, height: 15 }} />
+            Nova Recarga
+          </button>
         </div>
-      </div>
+      </PageHeader>
 
-      {/* ── Stats ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        {statCards.map((s) => (
-          <div key={s.label} className="gz-card p-4 flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--gz-text-accent)" }}>{s.label}</span>
-              <s.icon style={{ width: 15, height: 15, color: s.color }} />
-            </div>
-            <span className="text-[19px] font-black leading-none" style={{ color: "var(--gz-text-primary)" }}>{s.value}</span>
-          </div>
-        ))}
-      </div>
+      <div className="space-y-5">
+        {/* ── Stats ── */}
+        <Card>
+          <SectionHeader
+            icon={Ticket}
+            title="Resumo de Recargas"
+            action={<StatusPill label="Actualiza automaticamente" color="#52525b" />}
+          />
+          <KpiGrid cols={3}>
+            {statCards.map((s) => (
+              <KpiTile key={s.label} label={s.label} value={s.value} icon={s.icon} accent={s.color} />
+            ))}
+          </KpiGrid>
+        </Card>
 
       {/* ── Create form ── */}
       {showCreate && (
-        <div className="gz-card p-5" style={{ border: `1px solid rgba(0,0,0,.3)` }}>
-          <div className="flex items-center gap-2 mb-4">
-            <Plus style={{ width: 16, height: 16, color: ACCENT }} />
-            <h2 className="text-[15px] font-black" style={{ color: "var(--gz-text-primary)" }}>Criar Novas Recargas</h2>
-          </div>
+        <Card>
+          <SectionHeader icon={Plus} title="Criar Novas Recargas" />
+          <div className="p-5">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
             <div>
               <label className="text-[11px] font-bold uppercase tracking-wide block mb-1.5" style={{ color: "var(--gz-text-accent)" }}>Valor (MZN) *</label>
@@ -267,7 +255,7 @@ export default function RechargeManagement() {
                 type="number" min="1" step="0.01" value={fAmount} onChange={(e) => setFAmount(e.target.value)}
                 placeholder="ex: 20"
                 className="gz-input w-full h-11 px-3.5 rounded-xl text-[13px] font-bold"
-                style={{ color: "var(--gz-text-primary)", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.1)" }}
+                style={{ color: "var(--gz-text-primary)", background: "var(--gz-bg-subtle)", border: "1px solid var(--gz-border-subtle)" }}
               />
             </div>
             <div>
@@ -276,7 +264,7 @@ export default function RechargeManagement() {
                 type="number" min="1" max="1000" value={fMaxUses} onChange={(e) => setFMaxUses(e.target.value)}
                 placeholder="1"
                 className="gz-input w-full h-11 px-3.5 rounded-xl text-[13px] font-bold"
-                style={{ color: "var(--gz-text-primary)", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.1)" }}
+                style={{ color: "var(--gz-text-primary)", background: "var(--gz-bg-subtle)", border: "1px solid var(--gz-border-subtle)" }}
               />
               <p className="text-[10.5px] mt-1 font-medium" style={{ color: "var(--gz-text-accent)" }}>
                 1 = uso único · 5 = até 5 utilizadores diferentes
@@ -288,7 +276,7 @@ export default function RechargeManagement() {
                 type="number" min="1" max="200" value={fQuantity} onChange={(e) => setFQuantity(e.target.value)}
                 placeholder="1"
                 className="gz-input w-full h-11 px-3.5 rounded-xl text-[13px] font-bold"
-                style={{ color: "var(--gz-text-primary)", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.1)" }}
+                style={{ color: "var(--gz-text-primary)", background: "var(--gz-bg-subtle)", border: "1px solid var(--gz-border-subtle)" }}
               />
               <p className="text-[10.5px] mt-1 font-medium" style={{ color: "var(--gz-text-accent)" }}>Máximo 200 por lote</p>
             </div>
@@ -298,7 +286,7 @@ export default function RechargeManagement() {
                 type="number" min="1" value={fExpiry} onChange={(e) => setFExpiry(e.target.value)}
                 placeholder="sem prazo"
                 className="gz-input w-full h-11 px-3.5 rounded-xl text-[13px] font-bold"
-                style={{ color: "var(--gz-text-primary)", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.1)" }}
+                style={{ color: "var(--gz-text-primary)", background: "var(--gz-bg-subtle)", border: "1px solid var(--gz-border-subtle)" }}
               />
             </div>
             <div>
@@ -307,7 +295,7 @@ export default function RechargeManagement() {
                 type="text" value={fNote} onChange={(e) => setFNote(e.target.value)}
                 placeholder="ex: campanha Setembro"
                 className="gz-input w-full h-11 px-3.5 rounded-xl text-[13px] font-bold"
-                style={{ color: "var(--gz-text-primary)", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.1)" }}
+                style={{ color: "var(--gz-text-primary)", background: "var(--gz-bg-subtle)", border: "1px solid var(--gz-border-subtle)" }}
               />
             </div>
           </div>
@@ -317,7 +305,7 @@ export default function RechargeManagement() {
               Códigos gerados com aleatoriedade criptográfica — únicos, 12 dígitos, só números
             </p>
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowCreate(false)} className="h-10 px-4 rounded-xl text-[12.5px] font-bold" style={{ background: "rgba(255,255,255,.06)", color: "var(--gz-text-primary)" }}>
+              <button onClick={() => setShowCreate(false)} className="h-10 px-4 rounded-xl text-[12.5px] font-bold" style={{ background: "var(--gz-bg-subtle)", color: "var(--gz-text-primary)" }}>
                 Cancelar
               </button>
               <button
@@ -330,7 +318,7 @@ export default function RechargeManagement() {
               </button>
             </div>
           </div>
-        </div>
+        </Card>
       )}
 
       {/* ── Generated codes modal ── */}
@@ -348,9 +336,9 @@ export default function RechargeManagement() {
             <p className="text-[12px] font-medium mb-4" style={{ color: "var(--gz-text-accent)" }}>
               Guarda estes códigos num local seguro. Partilha-os apenas com os utilizadores.
             </p>
-            <div className="rounded-xl overflow-hidden mb-4" style={{ border: "1px solid rgba(255,255,255,.1)" }}>
+            <div className="rounded-xl overflow-hidden mb-4" style={{ border: "1px solid var(--gz-border-subtle)" }}>
               {createdCodes.map((c, i) => (
-                <div key={c} className="flex items-center justify-between px-4 py-2.5" style={{ background: i % 2 === 0 ? "rgba(255,255,255,.03)" : "transparent", borderBottom: i < createdCodes.length - 1 ? "1px solid rgba(255,255,255,.06)" : "none" }}>
+                <div key={c} className="flex items-center justify-between px-4 py-2.5" style={{ background: i % 2 === 0 ? "var(--gz-bg-subtle)" : "transparent", borderBottom: i < createdCodes.length - 1 ? "1px solid var(--gz-border-subtle)" : "none" }}>
                   <span className="font-mono text-[14px] font-bold tracking-wider" style={{ color: "var(--gz-text-primary)" }}>{formatCode(c)}</span>
                   <button onClick={() => copyCode(c)} className="p-1.5 rounded-lg transition-all hover:opacity-80" style={{ background: "rgba(0,0,0,.12)" }} title="Copiar código">
                     <Copy style={{ width: 13, height: 13, color: ACCENT }} />
@@ -401,7 +389,7 @@ export default function RechargeManagement() {
                 : "Esta acção é permanente e não pode ser revertida."}
             </p>
             <div className="flex items-center gap-2">
-              <button onClick={() => setConfirmDelete(null)} className="flex-1 h-11 rounded-xl text-[12.5px] font-bold" style={{ background: "rgba(255,255,255,.06)", color: "var(--gz-text-primary)" }}>
+              <button onClick={() => setConfirmDelete(null)} className="flex-1 h-11 rounded-xl text-[12.5px] font-bold" style={{ background: "var(--gz-bg-subtle)", color: "var(--gz-text-primary)" }}>
                 Cancelar
               </button>
               <button
@@ -438,7 +426,7 @@ export default function RechargeManagement() {
               onChange={(e) => setSearchInput(e.target.value.replace(/[^\d ]/g, "").slice(0, 14))}
               placeholder="Procurar código (12 dígitos)…"
               className="gz-input w-full h-10 pl-9 pr-3 rounded-xl text-[12.5px] font-semibold"
-              style={{ color: "var(--gz-text-primary)", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.1)" }}
+              style={{ color: "var(--gz-text-primary)", background: "var(--gz-bg-subtle)", border: "1px solid var(--gz-border-subtle)" }}
             />
           </div>
         </form>
@@ -449,8 +437,8 @@ export default function RechargeManagement() {
               onClick={() => { setStatus(f.key); setPage(1); }}
               className="h-10 px-4 rounded-xl text-[12px] font-bold transition-all"
               style={status === f.key
-                ? { background: ACCENT, color: "#fff", boxShadow: "0 3px 10px rgba(0,0,0,.3)" }
-                : { background: "rgba(255,255,255,.05)", color: "var(--gz-text-accent)" }}>
+                ? { background: ACCENT, color: "#fff", boxShadow: "0 3px 10px rgba(0,0,0,.25)" }
+                : { background: "var(--gz-bg-subtle)", color: "var(--gz-text-muted)" }}>
               {f.label}
             </button>
           ))}
@@ -462,7 +450,7 @@ export default function RechargeManagement() {
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(255,255,255,.08)" }}>
+              <tr style={{ borderBottom: "1px solid var(--gz-border-subtle)", background: "var(--gz-bg-subtle)" }}>
                 {["Código", "Valor", "Usos", "Estado", "Criada em", "Validade", "Acções"].map((h) => (
                   <th key={h} className="px-4 py-3 text-[10.5px] font-black uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--gz-text-accent)" }}>{h}</th>
                 ))}
@@ -481,18 +469,18 @@ export default function RechargeManagement() {
                 const isExpanded = expandedId === c.id;
                 return (
                   <Fragment key={c.id}>
-                    <tr style={{ borderBottom: "1px solid rgba(255,255,255,.05)" }} className="transition-colors hover:bg-white/[.02]">
+                    <tr style={{ borderTop: "1px solid var(--gz-border-subtle)" }} className="transition-colors gz-tr">
                       <td className="px-4 py-3">
                         <button onClick={() => copyCode(c.code)} className="font-mono text-[13.5px] font-bold tracking-wider hover:opacity-75 flex items-center gap-2" style={{ color: "var(--gz-text-primary)" }} title="Copiar">
                           {formatCode(c.code)}
                           <Copy style={{ width: 11, height: 11, color: "var(--gz-text-accent)" }} />
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-[13px] font-black whitespace-nowrap" style={{ color: "#18181b" }}>{fmtMZN(c.amount)} MZN</td>
+                      <td className="px-4 py-3 text-[13px] font-black whitespace-nowrap" style={{ color: "var(--gz-text-primary)" }}>{fmtMZN(c.amount)} MZN</td>
                       <td className="px-4 py-3 min-w-[120px]">
                         <div className="flex items-center gap-2">
                           <span className="text-[12px] font-bold whitespace-nowrap" style={{ color: "var(--gz-text-primary)" }}>{c.used_count}/{c.max_uses}</span>
-                          <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,.08)" }}>
+                          <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--gz-bg-subtle)" }}>
                             <div className="h-full rounded-full" style={{ width: `${pct}%`, background: pct >= 100 ? "#94a3b8" : ACCENT }} />
                           </div>
                         </div>
@@ -541,14 +529,14 @@ export default function RechargeManagement() {
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr style={{ background: "rgba(0,0,0,.04)" }}>
+                      <tr style={{ background: "var(--gz-bg-subtle)" }}>
                         <td colSpan={7} className="px-4 py-3">
                           <p className="text-[11px] font-black uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: "var(--gz-text-accent)" }}>
                             <Users style={{ width: 12, height: 12 }} /> Utilizadores que usaram ({c.redemptions.length})
                           </p>
                           <div className="flex flex-col gap-1.5">
                             {c.redemptions.map((r) => (
-                              <div key={r.userId} className="flex items-center justify-between text-[12px] font-semibold px-3 py-2 rounded-lg" style={{ background: "rgba(255,255,255,.03)" }}>
+                              <div key={r.userId} className="flex items-center justify-between text-[12px] font-semibold px-3 py-2 rounded-lg" style={{ background: "var(--gz-bg-subtle)" }}>
                                 <span className="flex items-center gap-2" style={{ color: "var(--gz-text-primary)" }}>
                                   <CheckCircle2 style={{ width: 12, height: 12, color: "#15803d" }} />
                                   {r.userName}
@@ -571,18 +559,18 @@ export default function RechargeManagement() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid rgba(255,255,255,.08)" }}>
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderTop: "1px solid var(--gz-border-subtle)" }}>
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}
               className="h-9 px-4 rounded-xl text-[12px] font-bold disabled:opacity-30 transition-all"
-              style={{ background: "rgba(255,255,255,.05)", color: "var(--gz-text-primary)" }}>
+              style={{ background: "var(--gz-bg-subtle)", border: "1px solid var(--gz-border-subtle)", color: "var(--gz-text-primary)" }}>
               Anterior
             </button>
             <span className="text-[12px] font-bold" style={{ color: "var(--gz-text-accent)" }}>Página {page} de {totalPages}</span>
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
               className="h-9 px-4 rounded-xl text-[12px] font-bold disabled:opacity-30 transition-all"
-              style={{ background: "rgba(255,255,255,.05)", color: "var(--gz-text-primary)" }}>
+              style={{ background: "var(--gz-bg-subtle)", border: "1px solid var(--gz-border-subtle)", color: "var(--gz-text-primary)" }}>
               Seguinte
             </button>
           </div>

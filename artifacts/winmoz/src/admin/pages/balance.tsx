@@ -5,6 +5,9 @@ import {
   AlertTriangle, Clock, CheckCircle2, X, RefreshCw,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import {
+  PageHeader, Card, SectionHeader, KpiTile, KpiGrid, EmptyState,
+} from "@/admin/components/ui";
 
 const V1 = "#18181b";
 
@@ -48,11 +51,11 @@ function PlayerAvatar({ username, avatarUrl, size = 36 }: { username: string; av
     return (
       <img src={avatarUrl} alt={username}
         onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: "1.5px solid rgba(0,0,0,.12)" }} />
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: "1.5px solid var(--gz-border-subtle)" }} />
     );
   }
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: `#${color}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: size * 0.38, border: "1.5px solid rgba(0,0,0,.12)" }}>
+    <div style={{ width: size, height: size, borderRadius: "50%", background: `#${color}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: size * 0.38, border: "1.5px solid var(--gz-border-subtle)" }}>
       {initial}
     </div>
   );
@@ -214,11 +217,11 @@ export default function BalancePage() {
     doAdjust.mutate({ userId: selectedPlayer.id, amount: amt, type: adjType, reason: formReason, note: formNote });
   }
 
-  const totalCredits  = adjustments.filter(a => a.amount > 0).reduce((s, a) => s + a.amount, 0);
-  const totalDebits   = adjustments.filter(a => a.amount < 0).reduce((s, a) => s + Math.abs(a.amount), 0);
+  const totalCredits = adjustments.filter(a => a.amount > 0).reduce((s, a) => s + a.amount, 0);
+  const totalDebits  = adjustments.filter(a => a.amount < 0).reduce((s, a) => s + Math.abs(a.amount), 0);
 
   return (
-    <div className="px-5 pb-10 pt-4 space-y-5">
+    <div className="px-4 sm:px-5 pb-8 pt-5 max-w-[1400px] mx-auto">
 
       {/* Toast */}
       {toast && (
@@ -229,267 +232,251 @@ export default function BalancePage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="gz-card p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-[22px] font-black tracking-tight" style={{ color: "var(--gz-text-primary)" }}>Gestão de Saldos</h1>
-            <p className="text-[12.5px] font-medium mt-0.5" style={{ color: "var(--gz-text-accent)" }}>
-              Crédito e débito manual · Realtime
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => refetch()}
-              className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all hover:bg-zinc-100"
-              style={{ border: "1.5px solid rgba(0,0,0,.15)" }}>
-              <RefreshCw style={{ width: 13, height: 13, color: V1 }} />
-            </button>
-            <button onClick={() => setShowForm(v => !v)}
-              className="flex items-center gap-2 px-4 py-2 rounded-2xl text-[12.5px] font-bold text-white transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
-              style={{ background: `#18181b`, boxShadow: "0 4px 14px rgba(0,0,0,.3)" }}>
-              <Plus style={{ width: 13, height: 13 }} />
-              Novo Ajuste
-            </button>
-          </div>
+      <PageHeader
+        icon={Wallet}
+        title="Gestão de"
+        titleAccent="Saldos"
+        subtitle="Crédito e débito manual · actualização em tempo real"
+      >
+        <div className="flex items-center gap-2">
+          <button onClick={() => refetch()}
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95"
+            style={{ background: "var(--gz-bg-card-btn)", border: "1px solid var(--gz-border-subtle)" }}>
+            <RefreshCw style={{ width: 14, height: 14, color: "var(--gz-text-secondary)" }} />
+          </button>
+          <button onClick={() => setShowForm(v => !v)}
+            className="flex items-center gap-2 h-9 px-4 rounded-xl text-[12.5px] font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95"
+            style={{ background: "#18181b", boxShadow: "0 4px 14px rgba(0,0,0,.25)" }}>
+            <Plus style={{ width: 14, height: 14 }} />
+            Novo Ajuste
+          </button>
         </div>
-      </div>
+      </PageHeader>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="gz-card p-4">
-          <div className="flex items-center gap-2.5 mb-2">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(21,128,61,.08)" }}>
-              <TrendingUp style={{ width: 14, height: 14, color: "#15803d", strokeWidth: 1.8 }} />
-            </div>
-            <span className="text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Total Creditado</span>
-          </div>
-          <div className="text-[22px] font-black" style={{ color: "#15803d" }}>MT {totalCredits.toFixed(2)}</div>
-        </div>
-        <div className="gz-card p-4">
-          <div className="flex items-center gap-2.5 mb-2">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(185,28,28,.06)" }}>
-              <TrendingDown style={{ width: 14, height: 14, color: "#b91c1c", strokeWidth: 1.8 }} />
-            </div>
-            <span className="text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Total Debitado</span>
-          </div>
-          <div className="text-[22px] font-black" style={{ color: "#b91c1c" }}>MT {totalDebits.toFixed(2)}</div>
-        </div>
-      </div>
+      <div className="space-y-5">
+        {/* Summary */}
+        <Card>
+          <SectionHeader icon={TrendingUp} title="Resumo de Ajustes" subtitle="Total dos últimos 100 registos" />
+          <KpiGrid cols={2}>
+            <KpiTile label="Total Creditado" value={`MT ${totalCredits.toFixed(2)}`} icon={TrendingUp} accent="#15803d" hint="créditos aplicados" />
+            <KpiTile label="Total Debitado" value={`MT ${totalDebits.toFixed(2)}`} icon={TrendingDown} accent="#b91c1c" hint="débitos aplicados" />
+          </KpiGrid>
+        </Card>
 
-      {/* Adjustment form */}
-      {showForm && (
-        <div className="gz-card p-5 space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="text-[15px] font-bold" style={{ color: "var(--gz-text-primary)" }}>Novo Ajuste de Saldo</div>
-            <button onClick={resetForm} className="w-7 h-7 rounded-xl flex items-center justify-center hover:bg-gray-100 transition-colors">
-              <X style={{ width: 13, height: 13, color: "var(--gz-text-muted)" }} />
-            </button>
-          </div>
-
-          {/* Step 1 – Player search */}
-          <div>
-            <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>
-              Passo 1 — Procurar Jogador
-            </label>
-            {selectedPlayer ? (
-              <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
-                style={{ background: "rgba(21,128,61,.06)", border: "1.5px solid rgba(21,128,61,.2)" }}>
-                <PlayerAvatar username={selectedPlayer.username} avatarUrl={selectedPlayer.avatar_url} size={36} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13.5px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{selectedPlayer.username}</div>
-                  <div className="text-[11.5px] mt-0.5 font-medium" style={{ color: "#059669" }}>
-                    Saldo actual: MT {selectedPlayer.balance.toFixed(2)}
-                  </div>
-                </div>
-                <CheckCircle2 style={{ width: 16, height: 16, color: "#15803d", strokeWidth: 2 }} />
-                <button onClick={() => { setSelectedPlayer(null); setSearchQuery(""); }}
-                  className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors">
-                  <X style={{ width: 12, height: 12, color: "var(--gz-text-muted)" }} />
+        {/* Adjustment form */}
+        {showForm && (
+          <Card>
+            <SectionHeader
+              icon={Plus}
+              title="Novo Ajuste de Saldo"
+              action={
+                <button onClick={resetForm} className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
+                  style={{ background: "var(--gz-bg-subtle)" }}>
+                  <X style={{ width: 13, height: 13, color: "var(--gz-text-muted)" }} />
                 </button>
-              </div>
-            ) : (
-              <div className="relative">
-                <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl"
-                  style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.12)" }}>
-                  <Search style={{ width: 13, height: 13, color: "var(--gz-text-tertiary)" }} />
-                  <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Procurar por nome ou telefone..."
-                    className="flex-1 bg-transparent outline-none text-[13.5px] font-medium"
-                    style={{ color: "var(--gz-text-primary)" }} />
-                  {searching && <RefreshCw style={{ width: 11, height: 11, color: "var(--gz-text-muted)", animation: "spin 1s linear infinite" }} />}
-                </div>
-                {searchQuery.length >= 2 && (
-                  <div className="absolute left-0 right-0 top-full mt-1 z-20 py-1 rounded-2xl overflow-hidden"
-                    style={{ background: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,.1)", border: "1px solid rgba(0,0,0,.08)" }}>
-                    {searching ? (
-                      <div className="px-4 py-3 text-[12.5px]" style={{ color: "var(--gz-text-muted)" }}>A procurar...</div>
-                    ) : searchResults.length === 0 ? (
-                      <div className="px-4 py-3 text-[12.5px]" style={{ color: "var(--gz-text-muted)" }}>Nenhum jogador encontrado</div>
-                    ) : (
-                      searchResults.map(p => (
-                        <button key={p.id} onClick={() => { setSelectedPlayer(p); setSearchQuery(""); }}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-100 transition-colors text-left">
-                          <PlayerAvatar username={p.username} avatarUrl={p.avatar_url} size={30} />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[13px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{p.username}</div>
-                            <div className="text-[11px]" style={{ color: "var(--gz-text-muted)" }}>MT {p.balance.toFixed(2)}</div>
-                          </div>
-                        </button>
-                      ))
+              }
+            />
+            <div className="p-5 space-y-5">
+              {/* Step 1 – Player search */}
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-[0.08em] mb-2 block" style={{ color: "var(--gz-text-tertiary)" }}>
+                  Passo 1 — Procurar Jogador
+                </label>
+                {selectedPlayer ? (
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                    style={{ background: "rgba(21,128,61,.07)", border: "1.5px solid rgba(21,128,61,.22)" }}>
+                    <PlayerAvatar username={selectedPlayer.username} avatarUrl={selectedPlayer.avatar_url} size={36} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13.5px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{selectedPlayer.username}</div>
+                      <div className="text-[11.5px] mt-0.5 font-medium" style={{ color: "#059669" }}>
+                        Saldo actual: MT {selectedPlayer.balance.toFixed(2)}
+                      </div>
+                    </div>
+                    <CheckCircle2 style={{ width: 16, height: 16, color: "#15803d", strokeWidth: 2 }} />
+                    <button onClick={() => { setSelectedPlayer(null); setSearchQuery(""); }}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors" style={{ background: "var(--gz-bg-subtle)" }}>
+                      <X style={{ width: 12, height: 12, color: "var(--gz-text-muted)" }} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="flex items-center gap-2.5 px-3.5 rounded-xl"
+                      style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid var(--gz-border-subtle)" }}>
+                      <Search style={{ width: 13, height: 13, color: "var(--gz-text-tertiary)" }} />
+                      <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                        placeholder="Procurar por nome ou telefone..."
+                        className="flex-1 bg-transparent outline-none text-[13.5px] font-medium py-2.5"
+                        style={{ color: "var(--gz-text-primary)" }} />
+                      {searching && <RefreshCw style={{ width: 11, height: 11, color: "var(--gz-text-muted)", animation: "spin 1s linear infinite" }} />}
+                    </div>
+                    {searchQuery.length >= 2 && (
+                      <div className="absolute left-0 right-0 top-full mt-1 z-20 py-1 rounded-xl overflow-hidden"
+                        style={{ background: "var(--gz-bg-card)", boxShadow: "0 8px 32px rgba(0,0,0,.15)", border: "1px solid var(--gz-border-subtle)" }}>
+                        {searching ? (
+                          <div className="px-4 py-3 text-[12.5px]" style={{ color: "var(--gz-text-muted)" }}>A procurar...</div>
+                        ) : searchResults.length === 0 ? (
+                          <div className="px-4 py-3 text-[12.5px]" style={{ color: "var(--gz-text-muted)" }}>Nenhum jogador encontrado</div>
+                        ) : (
+                          searchResults.map(p => (
+                            <button key={p.id} onClick={() => { setSelectedPlayer(p); setSearchQuery(""); }}
+                              className="w-full flex items-center gap-3 px-4 py-2.5 transition-colors text-left hover:bg-[var(--gz-bg-subtle)]">
+                              <PlayerAvatar username={p.username} avatarUrl={p.avatar_url} size={30} />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[13px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{p.username}</div>
+                                <div className="text-[11px]" style={{ color: "var(--gz-text-muted)" }}>MT {p.balance.toFixed(2)}</div>
+                              </div>
+                            </button>
+                          ))
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {/* Step 2 – Type + amount */}
-          <div>
-            <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-2 block" style={{ color: "var(--gz-text-tertiary)" }}>
-              Passo 2 — Tipo de Ajuste
-            </label>
-            <div className="flex gap-3 mb-4">
-              {(["add", "subtract"] as const).map(t => (
-                <button key={t} onClick={() => setAdjType(t)}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-[13px] transition-all"
-                  style={{
-                    background: adjType === t ? (t === "add" ? "rgba(21,128,61,.08)" : "rgba(185,28,28,.06)") : "rgba(0,0,0,.05)",
-                    border: `1.5px solid ${adjType === t ? (t === "add" ? "rgba(21,128,61,.3)" : "rgba(185,28,28,.25)") : "rgba(0,0,0,.12)"}`,
-                    color: adjType === t ? (t === "add" ? "#059669" : "#dc2626") : "var(--gz-text-muted)",
-                  }}>
-                  {t === "add" ? <TrendingUp style={{ width: 14, height: 14 }} /> : <TrendingDown style={{ width: 14, height: 14 }} />}
-                  {t === "add" ? "Adicionar Crédito" : "Debitar Saldo"}
-                </button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+              {/* Step 2 – Type + amount */}
               <div>
-                <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Valor (MT)</label>
-                <input value={formAmount} onChange={e => setFormAmount(e.target.value)}
-                  placeholder="Ex: 50.00" type="number" step="0.01" min="0.01"
-                  className="w-full px-3.5 py-2.5 rounded-2xl text-[13.5px] font-medium outline-none"
-                  style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.12)", color: "var(--gz-text-primary)" }} />
-              </div>
-              <div>
-                <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Motivo</label>
-                <select value={formReason} onChange={e => setFormReason(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-2xl text-[13px] font-medium outline-none"
-                  style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.12)", color: "var(--gz-text-primary)" }}>
-                  {REASONS.map(r => <option key={r} value={r}>{REASON_LABELS[r] ?? r}</option>)}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Nota (opcional)</label>
-            <textarea value={formNote} onChange={e => setFormNote(e.target.value)}
-              placeholder="Observações adicionais..." rows={2}
-              className="w-full px-3.5 py-2.5 rounded-2xl text-[13.5px] font-medium outline-none resize-none"
-              style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.12)", color: "var(--gz-text-primary)" }} />
-          </div>
-
-          {selectedPlayer && parseFloat(formAmount) > 0 && (
-            <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl"
-              style={{
-                background: adjType === "add" ? "rgba(21,128,61,.06)" : "rgba(185,28,28,.06)",
-                border: `1px solid ${adjType === "add" ? "rgba(21,128,61,.2)" : "rgba(185,28,28,.2)"}`,
-              }}>
-              {adjType === "subtract"
-                ? <AlertTriangle style={{ width: 13, height: 13, color: "#a16207" }} />
-                : <CheckCircle2 style={{ width: 13, height: 13, color: "#15803d" }} />}
-              <span className="text-[12px] font-medium" style={{ color: adjType === "add" ? "#059669" : "#dc2626" }}>
-                {adjType === "add" ? "Adicionar" : "Debitar"} MT {parseFloat(formAmount || "0").toFixed(2)} de{" "}
-                <strong>{selectedPlayer.username}</strong>
-                {adjType === "subtract" && selectedPlayer.balance < parseFloat(formAmount || "0") && (
-                  <span className="text-amber-600"> · saldo insuficiente, ficará em MT 0.00</span>
-                )}
-              </span>
-            </div>
-          )}
-
-          <div className="flex gap-3">
-            <button onClick={resetForm}
-              className="flex-1 py-2.5 rounded-2xl text-[13px] font-bold transition-all"
-              style={{ background: "var(--gz-bg-subtle)", color: "var(--gz-text-muted)" }}>
-              Cancelar
-            </button>
-            <button onClick={handleSubmit}
-              disabled={doAdjust.isPending || !selectedPlayer}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[13px] font-bold text-white transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
-              style={{
-                background: adjType === "add" ? "#18181b" : `#18181b`,
-                opacity: (doAdjust.isPending || !selectedPlayer) ? 0.6 : 1,
-              }}>
-              {adjType === "add" ? <Plus style={{ width: 13, height: 13 }} /> : <Minus style={{ width: 13, height: 13 }} />}
-              {doAdjust.isPending ? "A processar..." : adjType === "add" ? "Adicionar Crédito" : "Debitar Saldo"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* History */}
-      <div className="gz-card overflow-hidden">
-        <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "rgba(0,0,0,.06)" }}>
-          <div className="flex items-center gap-2">
-            <Wallet style={{ width: 14, height: 14, color: V1, strokeWidth: 1.9 }} />
-            <span className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>
-              {adjustments.length} ajuste{adjustments.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          <span className="text-[11px] font-medium" style={{ color: "var(--gz-text-muted)" }}>Actualiza automaticamente</span>
-        </div>
-
-        {isLoading ? (
-          <div className="p-5 space-y-3">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="h-16 rounded-2xl animate-pulse" style={{ background: "var(--gz-bg-subtle)" }} />
-            ))}
-          </div>
-        ) : adjustments.length === 0 ? (
-          <div className="py-16 text-center">
-            <Wallet style={{ width: 32, height: 32, color: "var(--gz-text-tertiary)", strokeWidth: 1.3, margin: "0 auto 10px" }} />
-            <div className="text-[13px] font-medium" style={{ color: "var(--gz-text-accent)" }}>Nenhum ajuste ainda</div>
-            <div className="text-[11.5px] mt-1" style={{ color: "var(--gz-text-muted)" }}>Os ajustes que fizeres aparecerão aqui em tempo real</div>
-          </div>
-        ) : (
-          <div className="divide-y" style={{ borderColor: "rgba(0,0,0,.04)" }}>
-            {adjustments.map(adj => {
-              const isPos = adj.amount > 0;
-              return (
-                <div key={adj.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-zinc-100/40 transition-colors">
-                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: isPos ? "rgba(21,128,61,.08)" : "rgba(185,28,28,.08)" }}>
-                    {isPos
-                      ? <TrendingUp style={{ width: 14, height: 14, color: "#15803d", strokeWidth: 1.9 }} />
-                      : <TrendingDown style={{ width: 14, height: 14, color: "#b91c1c", strokeWidth: 1.9 }} />}
+                <label className="text-[11px] font-bold uppercase tracking-[0.08em] mb-2 block" style={{ color: "var(--gz-text-tertiary)" }}>
+                  Passo 2 — Tipo de Ajuste
+                </label>
+                <div className="flex gap-3 mb-4">
+                  {(["add", "subtract"] as const).map(t => (
+                    <button key={t} onClick={() => setAdjType(t)}
+                      className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-[13px] transition-all"
+                      style={{
+                        background: adjType === t ? (t === "add" ? "rgba(21,128,61,.1)" : "rgba(185,28,28,.08)") : "var(--gz-bg-subtle)",
+                        border: `1.5px solid ${adjType === t ? (t === "add" ? "rgba(21,128,61,.3)" : "rgba(185,28,28,.28)") : "var(--gz-border-subtle)"}`,
+                        color: adjType === t ? (t === "add" ? "#059669" : "#dc2626") : "var(--gz-text-muted)",
+                      }}>
+                      {t === "add" ? <TrendingUp style={{ width: 14, height: 14 }} /> : <TrendingDown style={{ width: 14, height: 14 }} />}
+                      {t === "add" ? "Adicionar Crédito" : "Debitar Saldo"}
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Valor (MT)</label>
+                    <input value={formAmount} onChange={e => setFormAmount(e.target.value)}
+                      placeholder="Ex: 50.00" type="number" step="0.01" min="0.01"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-[13.5px] font-medium outline-none"
+                      style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid var(--gz-border-subtle)", color: "var(--gz-text-primary)" }} />
                   </div>
-                  <PlayerAvatar username={adj.player_name} avatarUrl={adj.avatar_url} size={32} />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{adj.player_name}</div>
-                    <div className="text-[11px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>
-                      {REASON_LABELS[adj.reason] ?? adj.reason}
-                      {adj.note && <span className="ml-1.5 italic">· {adj.note}</span>}
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-[14px] font-bold" style={{ color: isPos ? "#15803d" : "#b91c1c" }}>
-                      {isPos ? "+" : ""}MT {Math.abs(adj.amount).toFixed(2)}
-                    </div>
-                    <div className="text-[10.5px] mt-0.5" style={{ color: "var(--gz-text-tertiary)" }}>
-                      {adj.balance_before.toFixed(2)} → {adj.balance_after.toFixed(2)}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0 text-[10.5px]" style={{ color: "var(--gz-text-tertiary)" }}>
-                    <Clock style={{ width: 9, height: 9 }} />
-                    {new Date(adj.created_at).toLocaleDateString("pt-BR")}
+                  <div>
+                    <label className="text-[11px] font-bold uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Motivo</label>
+                    <select value={formReason} onChange={e => setFormReason(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl text-[13px] font-medium outline-none"
+                      style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid var(--gz-border-subtle)", color: "var(--gz-text-primary)" }}>
+                      {REASONS.map(r => <option key={r} value={r}>{REASON_LABELS[r] ?? r}</option>)}
+                    </select>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Nota (opcional)</label>
+                <textarea value={formNote} onChange={e => setFormNote(e.target.value)}
+                  placeholder="Observações adicionais..." rows={2}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-[13.5px] font-medium outline-none resize-none"
+                  style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid var(--gz-border-subtle)", color: "var(--gz-text-primary)" }} />
+              </div>
+
+              {selectedPlayer && parseFloat(formAmount) > 0 && (
+                <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl"
+                  style={{
+                    background: adjType === "add" ? "rgba(21,128,61,.07)" : "rgba(185,28,28,.06)",
+                    border: `1px solid ${adjType === "add" ? "rgba(21,128,61,.2)" : "rgba(185,28,28,.2)"}`,
+                  }}>
+                  {adjType === "subtract"
+                    ? <AlertTriangle style={{ width: 13, height: 13, color: "#a16207" }} />
+                    : <CheckCircle2 style={{ width: 13, height: 13, color: "#15803d" }} />}
+                  <span className="text-[12px] font-medium" style={{ color: adjType === "add" ? "#059669" : "#dc2626" }}>
+                    {adjType === "add" ? "Adicionar" : "Debitar"} MT {parseFloat(formAmount || "0").toFixed(2)} de{" "}
+                    <strong>{selectedPlayer.username}</strong>
+                    {adjType === "subtract" && selectedPlayer.balance < parseFloat(formAmount || "0") && (
+                      <span className="text-amber-600"> · saldo insuficiente, ficará em MT 0.00</span>
+                    )}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button onClick={resetForm}
+                  className="flex-1 py-2.5 rounded-xl text-[13px] font-bold transition-all"
+                  style={{ background: "var(--gz-bg-subtle)", color: "var(--gz-text-muted)" }}>
+                  Cancelar
+                </button>
+                <button onClick={handleSubmit}
+                  disabled={doAdjust.isPending || !selectedPlayer}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95"
+                  style={{
+                    background: adjType === "add" ? "#15803d" : "#b91c1c",
+                    opacity: (doAdjust.isPending || !selectedPlayer) ? 0.6 : 1,
+                  }}>
+                  {adjType === "add" ? <Plus style={{ width: 13, height: 13 }} /> : <Minus style={{ width: 13, height: 13 }} />}
+                  {doAdjust.isPending ? "A processar..." : adjType === "add" ? "Adicionar Crédito" : "Debitar Saldo"}
+                </button>
+              </div>
+            </div>
+          </Card>
         )}
+
+        {/* History */}
+        <Card>
+          <SectionHeader
+            icon={Wallet}
+            title={`${adjustments.length} ajuste${adjustments.length !== 1 ? "s" : ""}`}
+            subtitle="Actualiza automaticamente"
+          />
+          {isLoading ? (
+            <div className="p-5 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: "var(--gz-bg-subtle)" }} />
+              ))}
+            </div>
+          ) : adjustments.length === 0 ? (
+            <EmptyState icon={Wallet} title="Nenhum ajuste ainda" subtitle="Os ajustes que fizeres aparecerão aqui em tempo real" />
+          ) : (
+            <div>
+              {adjustments.map((adj, idx) => {
+                const isPos = adj.amount > 0;
+                return (
+                  <div key={adj.id} className="flex items-center gap-4 px-5 py-3.5 gz-tr"
+                    style={{ borderTop: idx === 0 ? "none" : "1px solid var(--gz-border-subtle)" }}>
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                      style={{ background: isPos ? "rgba(21,128,61,.1)" : "rgba(185,28,28,.1)" }}>
+                      {isPos
+                        ? <TrendingUp style={{ width: 14, height: 14, color: "#15803d", strokeWidth: 1.9 }} />
+                        : <TrendingDown style={{ width: 14, height: 14, color: "#b91c1c", strokeWidth: 1.9 }} />}
+                    </div>
+                    <PlayerAvatar username={adj.player_name} avatarUrl={adj.avatar_url} size={32} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{adj.player_name}</div>
+                      <div className="text-[11px] mt-0.5 truncate" style={{ color: "var(--gz-text-muted)" }}>
+                        {REASON_LABELS[adj.reason] ?? adj.reason}
+                        {adj.note && <span className="ml-1.5 italic">· {adj.note}</span>}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-[14px] font-bold tabular-nums" style={{ color: isPos ? "#15803d" : "#b91c1c" }}>
+                        {isPos ? "+" : ""}MT {Math.abs(adj.amount).toFixed(2)}
+                      </div>
+                      <div className="text-[10.5px] mt-0.5 tabular-nums" style={{ color: "var(--gz-text-tertiary)" }}>
+                        {adj.balance_before.toFixed(2)} → {adj.balance_after.toFixed(2)}
+                      </div>
+                    </div>
+                    <div className="hidden sm:flex items-center gap-1 flex-shrink-0 text-[10.5px]" style={{ color: "var(--gz-text-tertiary)" }}>
+                      <Clock style={{ width: 9, height: 9 }} />
+                      {new Date(adj.created_at).toLocaleDateString("pt-BR")}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

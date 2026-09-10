@@ -20,10 +20,15 @@ import {
   Bot,
   Star,
   Ticket,
+  LogOut,
+  Moon,
+  Sun,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRef, useState, useEffect } from "react";
+import { useAdminTheme } from "@/admin/contexts/AdminThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* ── Navegação agrupada por secção (organização profissional) ── */
 const navSections: Array<{ items: Array<{ href: string; icon: LucideIcon; label: string }> }> = [
@@ -145,6 +150,13 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
   const navRef = useRef<HTMLElement>(null);
   const [canScrollUp, setCanScrollUp] = useState(false);
   const [canScrollDown, setCanScrollDown] = useState(false);
+  const { theme, toggleTheme } = useAdminTheme();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    window.location.href = "/";
+  };
 
   function checkScroll() {
     const el = navRef.current;
@@ -286,6 +298,28 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
             <Tooltip label="Configurações" />
           </div>
         </Link>
+
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          className="gz-nav-item w-full h-10 flex items-center justify-center cursor-pointer group"
+          title={theme === "dark" ? "Modo Claro" : "Modo Escuro"}
+        >
+          {theme === "dark"
+            ? <Sun style={{ width: 16, height: 16, strokeWidth: 1.6, color: "rgba(255,255,255,.55)", position: "relative", zIndex: 1 }} />
+            : <Moon style={{ width: 16, height: 16, strokeWidth: 1.6, color: "rgba(255,255,255,.55)", position: "relative", zIndex: 1 }} />}
+          <Tooltip label={theme === "dark" ? "Modo Claro" : "Modo Escuro"} />
+        </button>
+
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          className="gz-nav-item w-full h-10 flex items-center justify-center cursor-pointer group"
+          title="Terminar Sessão"
+        >
+          <LogOut style={{ width: 16, height: 16, strokeWidth: 1.6, color: "rgba(248,113,113,.75)", position: "relative", zIndex: 1 }} />
+          <Tooltip label="Terminar Sessão" />
+        </button>
       </div>
     </aside>
   );

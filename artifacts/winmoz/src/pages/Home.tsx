@@ -11,6 +11,35 @@ import { useBrand } from "@/lib/brand-context";
 import { useGetUserNotifications } from "@/admin/lib/supabase-api";
 
 /* ─────────────────────────────────────────────
+   PREMIUM SECTION HEADERS
+───────────────────────────────────────────── */
+function SectionHead({
+  title, icon: Icon, action, hint,
+}: {
+  title: string;
+  icon?: React.ElementType;
+  action?: React.ReactNode;
+  hint?: string;
+}) {
+  return (
+    <div className="flex items-end justify-between gap-3 mb-3.5">
+      <div className="flex items-center gap-2.5 min-w-0">
+        {Icon && (
+          <span className="home-icon-chip flex items-center justify-center flex-shrink-0">
+            <Icon className="w-[15px] h-[15px]" style={{ color: "#1d4ed8" }} strokeWidth={2.2} />
+          </span>
+        )}
+        <div className="min-w-0">
+          <h2 className="font-syne font-bold text-[15px] leading-tight text-slate-900 truncate">{title}</h2>
+          {hint && <p className="text-[10.5px] text-slate-400 mt-0.5 truncate">{hint}</p>}
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    SAQUES 24 HORAS — realistic, time-aware
 ───────────────────────────────────────────── */
 
@@ -63,16 +92,17 @@ function SaquesSection() {
 
   return (
     <section className="px-4 py-4 mb-2">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <TrendingUp className="w-4 h-4 text-emerald-600" />
-          <h2 className="font-syne font-bold text-base text-slate-900">Saques 24 Horas</h2>
-          <span className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded-full">
+      <SectionHead
+        title="Saques 24 Horas"
+        icon={TrendingUp}
+        hint="Levantamentos processados em tempo real"
+        action={
+          <span className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0">
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse inline-block" />
             AO VIVO
           </span>
-        </div>
-      </div>
+        }
+      />
       <div className="flex flex-col gap-2">
         <AnimatePresence initial={false}>
           {visible.map((saque) => (
@@ -82,7 +112,7 @@ function SaquesSection() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 8, scale: 0.97 }}
               transition={{ duration: 0.38, ease: "easeOut" }}
-              className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-slate-100 shadow-sm"
+              className="home-card flex items-center gap-3 p-3 rounded-2xl"
             >
               <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${saque.bg} flex items-center justify-center text-white font-syne font-bold text-sm flex-shrink-0 shadow-md`}>
                 {saque.initials}
@@ -156,10 +186,10 @@ export function AtualizacoesCards() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.06, duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
-          className="bg-white rounded-2xl border border-slate-100 shadow-sm flex gap-3"
+          className="home-card bg-white rounded-2xl flex gap-3"
           style={{ minHeight: 92, padding: "10px 10px 10px 10px" }}
         >
-          <div className="flex-shrink-0 rounded-xl overflow-hidden" style={{ width: 80, minHeight: 72 }}>
+          <div className="flex-shrink-0 rounded-xl overflow-hidden relative" style={{ width: 80, minHeight: 72 }}>
             {post.image ? (
               <img
                 src={post.image}
@@ -179,7 +209,10 @@ export function AtualizacoesCards() {
                 {post.content}
               </p>
             </div>
-            <span className="mt-2 text-slate-400" style={{ fontSize: 10.5 }}>{post.time}</span>
+            <span className="mt-2 text-slate-400 flex items-center gap-1" style={{ fontSize: 10.5 }}>
+              <span className="w-1 h-1 rounded-full bg-slate-300 inline-block" />
+              {post.time}
+            </span>
           </div>
         </motion.div>
       ))}
@@ -190,12 +223,17 @@ export function AtualizacoesCards() {
 function AtualizacoesSection() {
   return (
     <section className="px-4 pt-2 pb-4">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="font-syne font-bold text-base text-slate-900">Atualizações</h2>
-        <Link href="/explorar?tab=Novidades">
-          <button className="text-xs font-semibold text-violet-700 hover:underline font-syne">Ver mais</button>
-        </Link>
-      </div>
+      <SectionHead
+        title="Atualizações"
+        hint="Novidades e eventos da plataforma"
+        action={
+          <Link href="/explorar?tab=Novidades">
+            <button className="home-link-btn inline-flex items-center gap-1 text-[11.5px] font-semibold font-syne rounded-lg px-2.5 py-1">
+              Ver mais <ChevronRight className="w-3 h-3" />
+            </button>
+          </Link>
+        }
+      />
       <AtualizacoesCards />
     </section>
   );
@@ -1266,29 +1304,37 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-slate-900 w-full flex justify-center selection:bg-blue-100">
-      <div className="home-shell w-full max-w-[430px] flex flex-col relative pb-24 bg-[#F8F9FA]">
+    <div className="min-h-screen bg-[#F4F5F7] text-slate-900 w-full flex justify-center selection:bg-blue-100">
+      <div className="home-shell w-full max-w-[430px] flex flex-col relative pb-24 bg-[#F4F5F7]">
 
         {/* TOP NAV */}
-        <header className="home-header sticky top-0 z-50 flex items-center justify-between px-5 py-3.5 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm">
+        <header className="home-header sticky top-0 z-50 flex items-center justify-between px-5 py-3 bg-white/90 backdrop-blur-xl border-b border-slate-200/70">
           <WinMozLogo />
           <div className="flex items-center gap-5">
-            <nav className="home-desktop-links hidden items-center gap-6">
-              <Link href="/explorar" className="text-sm font-semibold text-slate-600 hover:text-blue-700 transition-colors">Jogos</Link>
-              <Link href="/depositar" className="text-sm font-semibold text-slate-600 hover:text-blue-700 transition-colors">Carteira</Link>
-              <Link href="/suporte" className="text-sm font-semibold text-slate-600 hover:text-blue-700 transition-colors">Suporte</Link>
+            <nav className="home-desktop-links hidden items-center gap-1">
+              {[
+                { href: "/explorar", label: "Jogos" },
+                { href: "/depositar", label: "Carteira" },
+                { href: "/suporte", label: "Suporte" },
+              ].map(l => (
+                <Link key={l.href} href={l.href}
+                  className="text-[13px] font-semibold text-slate-500 hover:text-blue-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-50">
+                  {l.label}
+                </Link>
+              ))}
             </nav>
             {isLoggedIn ? (
               <div className="flex items-center gap-2">
                 {/* Notification Bell */}
-                <button onClick={() => setLocation("/notificacoes")} className="relative flex items-center justify-center w-9 h-9 rounded-full bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all duration-200 shadow-sm">
+                <button onClick={() => setLocation("/notificacoes")}
+                  className="relative flex items-center justify-center w-9 h-9 rounded-full bg-slate-50 border border-slate-200 hover:bg-white hover:border-slate-300 hover:shadow-sm transition-all duration-200">
                   <Bell className="w-4 h-4 text-slate-600" />
                   {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />}
                 </button>
                 {/* Profile Icon */}
                 <button
                   onClick={() => setLocation("/perfil")}
-                  className="flex items-center justify-center w-9 h-9 rounded-full border-2 border-violet-400/50 hover:border-violet-500 transition-all duration-200 shadow-sm overflow-hidden"
+                  className="flex items-center justify-center w-9 h-9 rounded-full border-2 border-blue-500/40 hover:border-blue-600 transition-all duration-200 shadow-sm overflow-hidden"
                   style={{ background: "#1e1e2e" }}
                 >
                   {profile?.avatar_url
@@ -1298,7 +1344,7 @@ export default function Home() {
               </div>
             ) : (
               <Link href="/registar">
-                <span className="bg-blue-700 text-white font-semibold text-sm px-5 py-2 rounded-xl shadow-md font-syne tracking-wide cursor-pointer" style={{ display: "inline-block" }}>
+                <span className="home-cta-primary text-white font-bold text-[13px] px-5 py-2 rounded-xl font-syne tracking-wide cursor-pointer transition-all hover:-translate-y-0.5" style={{ display: "inline-block" }}>
                   Registar-se
                 </span>
               </Link>
@@ -1311,12 +1357,15 @@ export default function Home() {
 
         {/* JOGOS EM DESTAQUE */}
         <section className="px-4 py-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-syne font-bold text-base text-slate-900">Jogos em Destaque</h2>
-            <Link href="/explorar" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center">
-              Ver Todos <ChevronRight className="w-3 h-3 ml-0.5"/>
-            </Link>
-          </div>
+          <SectionHead
+            title="Jogos em Destaque"
+            hint="Escolhe o teu jogo e começa a ganhar"
+            action={
+              <Link href="/explorar" className="home-link-btn inline-flex items-center gap-1 text-[11.5px] font-semibold font-syne rounded-lg px-2.5 py-1">
+                Ver Todos <ChevronRight className="w-3 h-3" />
+              </Link>
+            }
+          />
 
           <div className="flex gap-3 overflow-x-auto pt-1 pb-1 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {!gamesReady ? (
@@ -1345,7 +1394,7 @@ export default function Home() {
                   if (game.id === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.id}`);
                 }}
-                className="home-featured-card min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md hover:shadow-xl hover:border-blue-200 transition-all duration-300 flex flex-col cursor-pointer"
+                className="home-featured-card home-game-card min-w-[148px] flex-shrink-0 bg-white rounded-2xl overflow-hidden flex flex-col cursor-pointer transition-all duration-300 group"
               >
                 <div
                   className="h-28 w-full relative overflow-hidden"
@@ -1364,10 +1413,10 @@ export default function Home() {
                         alt={game.name}
                         loading="lazy"
                         decoding="async"
-                        className="w-full h-full"
+                        className="w-full h-full transition-transform duration-500 group-hover:scale-105"
                         style={{ objectFit: game.imageFit || "cover", objectPosition: game.imagePos }}
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent"/>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"/>
                     </>
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-violet-700 via-purple-800 to-indigo-900 flex items-center justify-center">
@@ -1382,23 +1431,28 @@ export default function Home() {
                       </svg>
                     </div>
                   )}
-                  <div className="absolute top-2 right-2 bg-black/50 backdrop-blur-sm rounded-full px-2 py-0.5 flex items-center gap-1">
+                  <div className="absolute top-2 right-2 bg-black/55 backdrop-blur-md rounded-full px-2 py-0.5 flex items-center gap-1 border border-white/10">
                     <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400"/>
                     <span className="text-[10px] font-bold text-white">{game.rating}</span>
                   </div>
                   {(game as any).comingSoon && (
-                    <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm rounded-full px-2 py-0.5">
+                    <div className="absolute bottom-2 left-2 bg-black/65 backdrop-blur-md rounded-full px-2 py-0.5 border border-amber-400/30">
                       <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wide">Em Breve</span>
                     </div>
                   )}
                 </div>
 
                 <div className="p-3 flex flex-col flex-1">
-                  <h3 className="font-syne font-bold text-slate-900 text-sm tracking-wide">{game.name}</h3>
-                  <p className="text-[10px] font-semibold text-blue-700 mt-0.5 uppercase tracking-wider">{game.bet}</p>
-                  {game.id !== "bilhar" && <p className="text-[10px] text-slate-400 mt-0.5 mb-3">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} jogando</p>}
+                  <h3 className="font-syne font-bold text-slate-900 text-[13px] tracking-wide">{game.name}</h3>
+                  <p className="text-[10px] font-bold text-blue-700 mt-0.5 uppercase tracking-wider">{game.bet}</p>
+                  {game.id !== "bilhar" && (
+                    <p className="text-[10px] text-slate-400 mt-0.5 mb-3 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                      {formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} jogando
+                    </p>
+                  )}
                   <div className="mt-auto">
-                    <div className="w-full h-8 text-xs font-bold bg-blue-700 text-white rounded-lg flex items-center justify-center">
+                    <div className="home-cta-primary w-full h-8 text-xs font-bold text-white rounded-lg flex items-center justify-center transition-transform group-hover:scale-[1.02]">
                       Jogar
                     </div>
                   </div>
@@ -1412,12 +1466,15 @@ export default function Home() {
         <div className="home-secondary-grid">
         {/* POPULARES AGORA */}
         <section className="home-popular-section px-4 py-4 mb-4">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-syne font-bold text-base text-slate-900">Populares Agora</h2>
-            <Link href="/explorar" className="text-blue-700 text-xs font-semibold hover:underline inline-flex items-center">
-              Ver Todos <ChevronRight className="w-3 h-3 ml-0.5"/>
-            </Link>
-          </div>
+          <SectionHead
+            title="Populares Agora"
+            hint="Os jogos mais jogados neste momento"
+            action={
+              <Link href="/explorar" className="home-link-btn inline-flex items-center gap-1 text-[11.5px] font-semibold font-syne rounded-lg px-2.5 py-1">
+                Ver Todos <ChevronRight className="w-3 h-3" />
+              </Link>
+            }
+          />
 
           <motion.div variants={stagger} initial="hidden" animate="show" className="home-popular-list flex flex-col gap-2.5">
             {topGames.map((game) => (
@@ -1430,11 +1487,14 @@ export default function Home() {
                   if (game.gameRoute === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.gameRoute}`);
                 }}
-                className="flex items-center p-3 rounded-xl bg-white border border-slate-100 hover:border-blue-200 hover:shadow-md transition-all duration-200 group shadow-sm cursor-pointer"
+                className="home-list-row flex items-center p-3 rounded-2xl transition-all duration-200 group cursor-pointer"
               >
+                {/* Rank */}
+                <span className="home-rank w-5 text-center font-syne font-black text-[15px] flex-shrink-0">{game.rank}</span>
+
                 {/* Thumbnail */}
                 <div
-                  className="w-11 h-11 rounded-xl flex-shrink-0 relative overflow-hidden shadow-md"
+                  className="w-11 h-11 rounded-xl flex-shrink-0 relative overflow-hidden ml-1.5 home-thumb"
                   style={!game.image ? { background: `linear-gradient(135deg, ${game.from}, ${game.to})` } : {}}
                 >
                   {game.image ? (
@@ -1444,10 +1504,10 @@ export default function Home() {
                         alt={game.name}
                         loading="lazy"
                         decoding="async"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                         style={{ objectPosition: game.imagePos }}
                       />
-                      <div className="absolute inset-0 bg-black/15"/>
+                      <div className="absolute inset-0 bg-black/10"/>
                     </>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -1458,17 +1518,21 @@ export default function Home() {
 
                 <div className="ml-3 flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <h4 className="font-syne font-bold text-slate-900 text-sm truncate">{game.name}</h4>
+                    <h4 className="font-syne font-bold text-slate-900 text-[13.5px] truncate">{game.name}</h4>
                     {game.rank === 1 && (
                       <span className="bg-amber-50 text-amber-600 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-amber-200 flex items-center flex-shrink-0">
                         <Star className="w-2 h-2 mr-0.5 fill-amber-500 text-amber-500"/> #1
                       </span>
                     )}
                   </div>
-                  {game.id !== "bi" && <p className="text-[10px] text-slate-400 mt-0.5">{formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} apostadores ativos</p>}
+                  {game.id !== "bi" && (
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} apostadores ativos
+                    </p>
+                  )}
                 </div>
 
-                <div className="w-8 h-8 rounded-full bg-blue-700 text-white flex items-center justify-center shadow-md flex-shrink-0 pointer-events-none">
+                <div className="home-cta-primary w-8 h-8 rounded-full text-white flex items-center justify-center flex-shrink-0 pointer-events-none transition-transform group-hover:scale-110">
                   <Play className="w-3.5 h-3.5 ml-0.5"/>
                 </div>
               </motion.div>
@@ -1504,26 +1568,26 @@ export default function Home() {
               width: 52,
               height: 52,
               borderRadius: 999,
-              background: "linear-gradient(135deg, #7c3aed, #4c1d95)",
+              background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
               border: "none",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "0 6px 24px rgba(124,58,237,0.55), 0 2px 8px rgba(0,0,0,0.3)",
+              boxShadow: "0 6px 24px rgba(37,99,235,0.5), 0 2px 8px rgba(0,0,0,0.25)",
             }}
           >
             {/* Pulse ring */}
             <motion.span
               animate={{ scale: [1, 1.7, 1], opacity: [0.6, 0, 0.6] }}
               transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
-              style={{ position: "absolute", inset: 0, borderRadius: 999, border: "2px solid #7c3aed" }}
+              style={{ position: "absolute", inset: 0, borderRadius: 999, border: "2px solid #2563eb" }}
             />
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="white" fillOpacity="0.95" />
-              <circle cx="8.5" cy="11" r="1.5" fill="#7c3aed" />
-              <circle cx="12" cy="11" r="1.5" fill="#7c3aed" />
-              <circle cx="15.5" cy="11" r="1.5" fill="#7c3aed" />
+              <circle cx="8.5" cy="11" r="1.5" fill="#1d4ed8" />
+              <circle cx="12" cy="11" r="1.5" fill="#1d4ed8" />
+              <circle cx="15.5" cy="11" r="1.5" fill="#1d4ed8" />
             </svg>
           </motion.button>
 
