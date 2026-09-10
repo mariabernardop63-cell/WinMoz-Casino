@@ -2196,6 +2196,8 @@ export default function LudoGame() {
       if(p.stuckTurns){ stuckTurnsRef.current=p.stuckTurns; setStuckTurns(p.stuckTurns); }
       if(p.lives){ livesRef.current=p.lives; setLives(p.lives); }
       if(p.winner){
+        // Snapshot de estado: o vencedor pode ser qualquer um (estado final
+        // legítimo, ex.: timeout enquanto estava fora). Aplicado.
         winnerRef.current=p.winner;
         setWinner(p.winner);
         setPhase("done"); phaseRef.current="done";
@@ -2323,22 +2325,8 @@ export default function LudoGame() {
             }
           } catch { betDeductedRef.current = false; }
         }
-        // Only "blue" (first player) registers the match to avoid duplicates
-        if (myColor === "blue" && BET_AMOUNT > 0 && gameId !== "local") {
-          try {
-            await supabase.from("matches").upsert({
-              id: gameId,
-              game_type: "ludo",
-              player1_id: profile.id,
-              player1_name: playerName,
-              player2_name: opponentName,
-              bet_amount: BET_AMOUNT,
-              winner_payout: Math.floor(BET_AMOUNT * 2 * 0.90),
-              status: "active",
-              created_at: new Date().toISOString(),
-            }, { onConflict: "id" });
-          } catch { /* non-critical */ }
-        }
+        // A partida é registada APENAS pelo servidor (/api/games/bet) —
+        // escrita directa no browser está bloqueada por RLS (hardening v2).
       }
     });
 

@@ -29,18 +29,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const admin = getSupabaseAdmin();
 
-  // SECURITY: Atomically mark the match as finished BEFORE crediting.
-  // The .neq("status","finished") filter ensures only one concurrent call wins —
-  // any duplicate or race-condition call finds status already "finished" and is rejected.
+  // SECURITY (auditoria v2):
+  // 1) `paid_out` garante payout ÚNICO por partida — mesmo que a partida seja
+  //    reaberta/reiniciada, nunca paga duas vezes.
+  // 2) `player2_id NOT NULL` exige que a aposta do adversário tenha sido
+  //    escrowada — partidas solo não geram payout (elimina a máquina de
+  //    dinheiro "bet sozinho + win").
+  // 3) O update atómico (.neq status+paid_out) mantém a idempotência por
+  //    partida; quem chega segundo encontra paid_out=true e é rejeitado.
   const { data: updated, error: updateMatchErr } = await admin
     .from("matches")
     .update({
       winner_id: auth.userId,
       status: "finished",
       completed_at: new Date().toISOString(),
+      paid_out: true,
     })
     .eq("id", gameId)
+    .eq("paid_out", false) // payout único
     .neq("status", "finished") // atomic idempotency guard
+    .not("player2_id", "is", null) // exige adversário com aposta escrowada
     .or(`player1_id.eq.${auth.userId},player2_id.eq.${auth.userId}`) // SECURITY: only real participants
     .select("id, bet_amount, player1_id, player2_id, game_type")
     .maybeSingle();
@@ -52,10 +60,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!updated) {
-    // Either match not found, already finished, or caller is not a participant
     const { data: match } = await admin
       .from("matches")
-      .select("status, winner_id, player1_id, player2_id")
+      .select("status, winner_id, player1_id, player2_id, paid_out")
       .eq("id", gameId)
       .maybeSingle();
 
@@ -63,8 +70,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(404).json({ error: "Partida não encontrada" });
       return;
     }
-    if ((match as { status: string }).status === "finished") {
+    const row = match as { status: string; paid_out: boolean };
+    if (row.status === "finished" || row.paid_out) {
       res.status(409).json({ error: "Partida já terminada" });
+      return;
+    }
+    if (!row.player2_id) {
+      res.status(400).json({ error: "Partida sem adversário confirmado" });
       return;
     }
     // Caller is not a participant
@@ -80,7 +92,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     game_type: string;
   };
 
-  // SECURITY: payout is always calculated from the DB's bet_amount, never from client input
+  // SECURITY: payout is always calculated from the DB's bet_amount, never from client input.
+  // bet_amount é criado pelo servidor no momento da aposta (RLS impede edição).
   const verifiedBet = Math.abs(Number(m.bet_amount) || 0);
   if (verifiedBet <= 0) {
     res.status(400).json({ error: "Aposta inválida na partida" });
@@ -89,29 +102,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const payout = Math.min(Math.floor(verifiedBet * 2 * WIN_RATE), MAX_PAYOUT);
 
-  const { data: profile, error: profileError } = await admin
-    .from("profiles")
-    .select("balance")
-    .eq("id", auth.userId)
-    .single();
+  // Crédito ATÓMICO via RPC (hardening v2): nunca sobrescreve saldo concorrente
+  const { data: newBalanceRow, error: adjustError } = await admin
+    .rpc("adjust_balance", { p_user_id: auth.userId, p_delta: payout, p_min: 0 });
 
-  if (profileError || !profile) {
-    res.status(500).json({ error: "Erro ao carregar perfil" });
-    return;
-  }
-
-  const currentBalance = parseFloat(String((profile as { balance: number }).balance ?? 0));
-  const newBalance = Math.round((currentBalance + payout) * 100) / 100;
-
-  const { error: updateError } = await admin
-    .from("profiles")
-    .update({ balance: newBalance })
-    .eq("id", auth.userId);
-
-  if (updateError) {
+  if (adjustError || newBalanceRow === null || newBalanceRow === undefined) {
+    console.error("[games/win] Erro ao creditar saldo:", adjustError);
     res.status(500).json({ error: "Erro ao creditar saldo" });
     return;
   }
+  const newBalance = Number(newBalanceRow);
 
   await admin.from("transactions").insert({
     user_id: auth.userId,

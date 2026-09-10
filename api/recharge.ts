@@ -7,10 +7,16 @@ const ATTEMPT_WINDOW_MS = 15 * 60 * 1000; // 15 minutos
 const MAX_CODE_GUESSES = 10;            // tentativas globais por código
 
 function extractIp(req: VercelRequest): string {
+  // SECURITY (auditoria v2): NÃO confiar em X-Forwarded-For (client-controlled
+  // na primeira posição). Preferir headers definidos pela plataforma.
+  const real = (req.headers["x-real-ip"] as string) ?? "";
+  if (real) return real.trim();
+  const vercelFwd = (req.headers["x-vercel-forwarded-for"] as string) ?? "";
+  if (vercelFwd) return vercelFwd.split(",")[0].trim();
+  // Último recurso: último valor do XFF (a plataforma acrescenta o real no fim)
   const fwd = (req.headers["x-forwarded-for"] as string) ?? "";
-  const first = fwd.split(",")[0]?.trim();
-  if (first) return first;
-  return (req.headers["x-real-ip"] as string) ?? "unknown";
+  const parts = fwd.split(",").map(s => s.trim()).filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : "unknown";
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -49,24 +55,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
+    // ── Anti brute-force por IP + UTILIZADOR ───────────────────────────────
+    // (auditoria v2: IP sozinho era contornável; o user id é infalsificável)
+    const windowStart = new Date(Date.now() - ATTEMPT_WINDOW_MS).toISOString();
+    const { data: userFailures } = await admin
+      .from("recharge_attempts")
+      .select("id")
+      .eq("ip", `user:${auth.userId}`)
+      .eq("success", false)
+      .gte("created_at", windowStart);
+    if ((userFailures?.length ?? 0) >= MAX_ATTEMPTS_PER_IP) {
+      res.status(429).json({ error: "Demasiadas tentativas. Aguarda 15 minutos antes de tentar novamente." });
+      return;
+    }
+
     // ── Verificações de conta ──────────────────────────────────────────────
     const { data: profile } = await admin
       .from("profiles")
-      .select("balance, is_blocked")
+      .select("is_blocked")
       .eq("id", auth.userId)
       .single();
 
-    const p = profile as { balance: number; is_blocked?: boolean } | null;
+    const p = profile as { is_blocked?: boolean } | null;
     if (!p) { res.status(404).json({ error: "Perfil não encontrado" }); return; }
     if (p.is_blocked) { res.status(403).json({ error: "Conta bloqueada" }); return; }
 
-    // ── Anti adivinhação por código ────────────────────────────────────────
+    // ── Anti adivinhação por código (por código+IP: não bloqueável por terceiros) ──
     const { data: guessRow } = await admin
       .from("recharge_attempts")
       .select("id")
       .eq("code", cleanCode)
+      .eq("ip", rateKey)
       .eq("success", false)
-      .gte("created_at", new Date(Date.now() - ATTEMPT_WINDOW_MS).toISOString());
+      .gte("created_at", windowStart);
 
     if ((guessRow?.length ?? 0) >= MAX_CODE_GUESSES) {
       res.status(429).json({ error: "Este código foi bloqueado por tentativas excessivas." });
@@ -90,13 +111,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       finalResult = await redeemWithoutRpc(admin, cleanCode, auth.userId);
     }
 
-    // Registo da tentativa (audit trail)
-    await admin.from("recharge_attempts").insert({
-      ip: rateKey,
-      code: cleanCode,
-      success: Boolean(finalResult?.ok),
-      created_at: new Date().toISOString(),
-    });
+    // Registo da tentativa (audit trail) — uma linha por IP e uma por user
+    await admin.from("recharge_attempts").insert([
+      { ip: rateKey, code: cleanCode, success: Boolean(finalResult?.ok), created_at: new Date().toISOString() },
+      { ip: `user:${auth.userId}`, code: cleanCode, success: Boolean(finalResult?.ok), created_at: new Date().toISOString() },
+    ]);
 
     if (rpcError && !finalResult) {
       res.status(500).json({ error: "Sistema de recargas não inicializado. Contacta o suporte." });

@@ -47,24 +47,26 @@ function setSessionAuthenticated() {
   sessionStorage.setItem(SESSION_KEY, "1");
 }
 
-async function fetchSecurityPassword(): Promise<string> {
+async function verifySecurityPasswordOnServer(password: string): Promise<boolean | null> {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return "";
+    if (!session?.access_token) return null;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 8000);
     try {
       const res = await fetch("/api/admin/security-password", {
-        headers: { "Authorization": `Bearer ${session.access_token}` },
+        method: "POST",
+        headers: { "Authorization": `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
         signal: ctrl.signal,
       });
-      if (!res.ok) return "";
-      const data = await res.json() as { password?: string | null };
-      return data?.password ?? "";
+      if (!res.ok) return null;
+      const data = await res.json() as { valid?: boolean };
+      return data?.valid === true;
     } finally {
       clearTimeout(timer);
     }
-  } catch { return ""; }
+  } catch { return null; }
 }
 
 async function verifyAdminServer(): Promise<boolean> {
@@ -172,8 +174,8 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
     setLoading(true);
     setError("");
 
-    const [correctPw, isAdmin] = await Promise.all([
-      fetchSecurityPassword(),
+    const [pwValid, isAdmin] = await Promise.all([
+      verifySecurityPasswordOnServer(password),
       verifyAdminServerWithRetry(),
     ]);
 
@@ -184,9 +186,9 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
       return;
     }
 
-    const valid = correctPw
-      ? password === correctPw
-      : password.length >= 8;
+    // SECURITY (auditoria v2): comparação SEMPRE no servidor. Sem fallback
+    // "qualquer 8+ caracteres" — se o servidor não confirmar, falha.
+    const valid = pwValid === true;
 
     if (valid) {
       setBanState(null);

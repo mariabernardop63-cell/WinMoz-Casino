@@ -8,8 +8,6 @@ function getSupabaseAdmin() {
     "";
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.VITE_SUPABASE_SERVICE_ROLE ||
-    process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
     "";
   if (!url || !key) throw new Error("Missing Supabase service config");
   return createClient(url, key, {
@@ -51,7 +49,6 @@ export async function authenticateAdmin(
 
   const adminEmail =
     process.env.ADMIN_EMAIL ||
-    process.env.VITE_ADMIN_EMAIL ||
     "";
 
   if (adminEmail && auth.email === adminEmail) return auth;

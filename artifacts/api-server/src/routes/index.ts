@@ -605,8 +605,10 @@ router.post("/recharge", async (req, res) => {
     const userId = userData.user.id;
 
     // ── Anti brute-force por IP ──
-    const ipRaw = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
-      ?? (req.headers["x-real-ip"] as string) ?? req.ip ?? "unknown";
+    // SECURITY (auditoria v2): último valor do XFF (plataforma acrescenta o
+    // real no fim) + limite adicional por user id.
+    const xffParts = ((req.headers["x-forwarded-for"] as string) ?? "").split(",").map(s => s.trim()).filter(Boolean);
+    const ipRaw = (req.headers["x-real-ip"] as string)?.trim() || xffParts[xffParts.length - 1] || req.ip || "unknown";
     const windowStart = new Date(Date.now() - RECHARGE_ATTEMPT_WINDOW_MS).toISOString();
 
     const { data: ipFailures } = await supabaseAdmin
@@ -616,6 +618,17 @@ router.post("/recharge", async (req, res) => {
       .eq("success", false)
       .gte("created_at", windowStart);
     if ((ipFailures?.length ?? 0) >= RECHARGE_MAX_IP_FAILURES) {
+      res.status(429).json({ error: "Demasiadas tentativas. Aguarda 15 minutos." });
+      return;
+    }
+
+    const { data: userFailures } = await supabaseAdmin
+      .from("recharge_attempts")
+      .select("id")
+      .eq("ip", `user:${userId}`)
+      .eq("success", false)
+      .gte("created_at", windowStart);
+    if ((userFailures?.length ?? 0) >= RECHARGE_MAX_IP_FAILURES) {
       res.status(429).json({ error: "Demasiadas tentativas. Aguarda 15 minutos." });
       return;
     }
@@ -658,12 +671,10 @@ router.post("/recharge", async (req, res) => {
       finalResult = await redeemWithoutRpc(supabaseAdmin, cleanCode, userId);
     }
 
-    await supabaseAdmin.from("recharge_attempts").insert({
-      ip: ipRaw,
-      code: cleanCode,
-      success: Boolean(finalResult?.ok),
-      created_at: new Date().toISOString(),
-    });
+    await supabaseAdmin.from("recharge_attempts").insert([
+      { ip: ipRaw, code: cleanCode, success: Boolean(finalResult?.ok), created_at: new Date().toISOString() },
+      { ip: `user:${userId}`, code: cleanCode, success: Boolean(finalResult?.ok), created_at: new Date().toISOString() },
+    ]);
 
     if (rpcError && !finalResult) {
       res.status(500).json({ error: "Sistema de recargas não inicializado. Contacta o suporte." });

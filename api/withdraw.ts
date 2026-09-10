@@ -32,44 +32,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const totalDeduction = amount + WITHDRAWAL_FEE;
   const admin = getSupabaseAdmin();
 
-  // Check balance and blocked status
-  const { data: profile, error: profileError } = await admin
+  // Blocked status
+  const { data: blockedRow } = await admin
     .from("profiles")
-    .select("balance, is_blocked, full_name")
+    .select("is_blocked, full_name")
     .eq("id", auth.userId)
     .single();
 
-  if (profileError || !profile) {
+  const p = blockedRow as { is_blocked?: boolean; full_name?: string } | null;
+  if (!p) {
     res.status(500).json({ error: "Erro ao carregar perfil" });
     return;
   }
-
-  const p = profile as { balance: number; is_blocked?: boolean; full_name?: string };
-
   if (p.is_blocked) {
     res.status(403).json({ error: "Conta bloqueada" });
     return;
   }
 
-  const currentBalance = parseFloat(String(p.balance ?? 0));
-  if (currentBalance < totalDeduction) {
-    res.status(400).json({ error: `Saldo insuficiente. Necessário: ${totalDeduction} MT (${amount} + ${WITHDRAWAL_FEE} MT taxa)` });
+  // SECURITY (auditoria v2): dedução ATÓMICA via RPC — o saldo é decrementado
+  // no próprio UPDATE com guard de suficiência. Elimina double-spend de
+  // levantamentos concorrentes e a perda de créditos concorrentes.
+  const { data: balanceRow, error: adjustError } = await admin
+    .rpc("adjust_balance", { p_user_id: auth.userId, p_delta: -totalDeduction, p_min: 0 });
+
+  if (adjustError) {
+    console.error("[withdraw] Erro ao debitar saldo:", adjustError);
+    res.status(500).json({ error: "Erro ao debitar saldo" });
     return;
   }
-
-  const newBalance = Math.round((currentBalance - totalDeduction) * 100) / 100;
-
-  // SECURITY: Atomic deduction — only succeeds if balance is still sufficient
-  const { data: deducted, error: deductError } = await admin
-    .from("profiles")
-    .update({ balance: newBalance })
-    .eq("id", auth.userId)
-    .gte("balance", totalDeduction)
-    .select("balance")
-    .maybeSingle();
-
-  if (deductError || !deducted) {
-    res.status(400).json({ error: "Saldo insuficiente" });
+  const newBalance = balanceRow === null || balanceRow === undefined ? null : Number(balanceRow);
+  if (newBalance === null) {
+    res.status(400).json({ error: `Saldo insuficiente. Necessário: ${totalDeduction} MT (${amount} + ${WITHDRAWAL_FEE} MT taxa)` });
     return;
   }
 
@@ -94,11 +87,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .single();
 
   if (txError || !txRow) {
-    // Refund balance if transaction insert fails
+    // Refund balance atomically if transaction insert fails
     await admin
-      .from("profiles")
-      .update({ balance: currentBalance })
-      .eq("id", auth.userId);
+      .rpc("adjust_balance", { p_user_id: auth.userId, p_delta: totalDeduction, p_min: 0 });
 
     res.status(500).json({ error: "Erro ao registar levantamento. Tenta novamente." });
     return;
@@ -107,6 +98,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.json({
     success: true,
     withdrawalId: (txRow as { id: string }).id,
-    newBalance: (deducted as { balance: number }).balance,
+    newBalance,
   });
 }

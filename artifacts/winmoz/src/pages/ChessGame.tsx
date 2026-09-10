@@ -1332,15 +1332,10 @@ export default function ChessGame(){
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[winner]);
 
-  // Platform fee — recorded server-side by /api/games/win (platform_earnings)
+  // Resultado registado APENAS pelo servidor (/api/games/win actualiza a
+  // partida) — escrita directa no browser está bloqueada por RLS (hardening v2).
   useEffect(()=>{
-    if(!winner||BET<=0||gameId==="local"||myColor!=="w")return;
-    void supabase.from("matches").update({
-      status:"finished",
-      winner_name:winner==="w"?playerName:opponentName,
-      winner_id:winner==="w"?profile?.id:null,
-      completed_at:new Date().toISOString(),
-    }).eq("id",gameId);
+    if(!winner||BET<=0||gameId==="local")return;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[winner]);
 

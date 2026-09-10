@@ -53,14 +53,32 @@ async function handleDeposit(req: VercelRequest, res: VercelResponse) {
 
     if (action === "approve") {
       if (["manual_deposit", "manual_bet", "deposit"].includes(tx.type)) {
-        const { data: profile } = await admin.from("profiles").select("balance").eq("id", tx.user_id).single();
-        const current = Number((profile as { balance: number } | null)?.balance ?? 0);
-        const newBalance = Math.round((current + Number(tx.amount)) * 100) / 100;
-        const { error: balErr } = await admin.from("profiles").update({ balance: newBalance }).eq("id", tx.user_id);
-        if (balErr) { res.status(500).json({ error: "Erro ao creditar saldo" }); return; }
+        // SECURITY (auditoria v2): reclama a transacção pending→approved de
+        // forma condicional e credita via RPC atómico — duas aprovações
+        // concorrentes não creditam duas vezes.
+        const { data: claimed, error: claimErr } = await admin
+          .from("transactions")
+          .update({ status: "approved" })
+          .eq("id", id)
+          .eq("status", "pending")
+          .select("id, user_id, amount")
+          .maybeSingle();
+        if (claimErr) { res.status(500).json({ error: "Erro ao aprovar" }); return; }
+        const c = claimed as { id: string; user_id: string; amount: number } | null;
+        if (!c) { res.status(400).json({ error: "Pedido já processado" }); return; }
+
+        const { data: balRow, error: balErr } = await admin
+          .rpc("adjust_balance", { p_user_id: c.user_id, p_delta: Number(c.amount), p_min: 0 });
+        if (balErr || balRow === null || balRow === undefined) {
+          // Reverte a marcação para o admin poder tentar de novo
+          await admin.from("transactions").update({ status: "pending" }).eq("id", id);
+          res.status(500).json({ error: "Erro ao creditar saldo" });
+          return;
+        }
+      } else {
+        const { error: upErr } = await admin.from("transactions").update({ status: "approved" }).eq("id", id);
+        if (upErr) { res.status(500).json({ error: "Erro ao aprovar" }); return; }
       }
-      const { error: upErr } = await admin.from("transactions").update({ status: "approved" }).eq("id", id);
-      if (upErr) { res.status(500).json({ error: "Erro ao aprovar" }); return; }
     } else {
       const { error: upErr } = await admin.from("transactions").update({ status: "rejected" }).eq("id", id);
       if (upErr) { res.status(500).json({ error: "Erro ao rejeitar" }); return; }
@@ -134,20 +152,27 @@ async function handleVerify(req: VercelRequest, res: VercelResponse) {
 
 // ─── /api/admin/security-password ────────────────────────────────────────────
 async function handleSecurityPassword(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+  if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
   const auth = await authenticateAdmin(req);
   if (!auth) { res.status(403).json({ error: "Acesso negado" }); return; }
   try {
+    // SECURITY (auditoria v2): a password nunca sai do servidor.
+    // O cliente envia o candidato; respondemos apenas { valid: boolean }.
+    const { password } = (req.body ?? {}) as { password?: string };
+    const candidate = String(password ?? "");
+    if (!candidate) { res.status(400).json({ error: "password obrigatória" }); return; }
+
     const admin = getSupabaseAdmin();
     const { data, error } = await admin
       .from("platform_settings")
       .select("value")
       .eq("key", "admin_security_password")
       .maybeSingle();
-    if (error) { res.status(500).json({ error: error.message }); return; }
-    res.status(200).json({ password: (data as { value?: string } | null)?.value ?? null });
+    if (error) { res.status(500).json({ valid: false }); return; }
+    const stored = (data as { value?: string } | null)?.value ?? "";
+    res.status(200).json({ valid: stored.length > 0 && candidate === stored });
   } catch {
-    res.status(500).json({ error: "Erro interno" });
+    res.status(500).json({ valid: false });
   }
 }
 

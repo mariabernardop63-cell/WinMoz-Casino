@@ -19,33 +19,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const admin = getSupabaseAdmin();
 
   try {
-    // Look up referral relationship — who referred this user?
-    const { data: referral } = await admin
-      .from("referrals")
-      .select("referrer_id, bet_count")
-      .eq("referred_id", betUserId)
-      .maybeSingle();
+    // SECURITY (auditoria v2): incremento ATÓMICO do contador via RPC.
+    // O bónus só é pago se o UPDATE devolver linha (bet_count < max) —
+    // chamadas concorrentes não conseguem exceder o limite (era uma
+    // "máquina de dinheiro" com leitura-escrita separada).
+    const { data: incremented, error: incrError } = await admin
+      .rpc("increment_referral_bets", { p_referred: betUserId, p_max: AFFILIATE_MAX_BETS });
 
-    if (!referral) {
-      // No referral relationship — nothing to do
+    if (incrError) {
+      console.error("[record-bet-reward] Erro no contador atómico:", incrError.message);
       res.json({ ok: true, rewarded: false });
       return;
     }
 
-    const r = referral as { referrer_id: string; bet_count: number };
-    const currentBetCount = Number(r.bet_count ?? 0);
-
-    // Affiliate max bets check
-    if (currentBetCount >= AFFILIATE_MAX_BETS) {
-      res.json({ ok: true, rewarded: false, reason: "max_bets_reached" });
+    if (!incremented || (incremented as number[])?.length === 0) {
+      // Sem relação de referência, ou limite atingido (ou corrida perdida)
+      res.json({ ok: true, rewarded: false, reason: "no_referral_or_max_bets" });
       return;
     }
+
+    const { data: referral } = await admin
+      .from("referrals")
+      .select("referrer_id")
+      .eq("referred_id", betUserId)
+      .maybeSingle();
+
+    if (!referral) {
+      res.json({ ok: true, rewarded: false });
+      return;
+    }
+    const referrerId = (referral as { referrer_id: string }).referrer_id;
 
     // Check if referrer is an affiliate
     const { data: referrerProfile } = await admin
       .from("profiles")
-      .select("is_affiliate, balance")
-      .eq("id", r.referrer_id)
+      .select("is_affiliate")
+      .eq("id", referrerId)
       .maybeSingle();
 
     if (!referrerProfile) {
@@ -53,33 +62,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return;
     }
 
-    const rp = referrerProfile as { is_affiliate?: boolean; balance: number };
+    const rp = referrerProfile as { is_affiliate?: boolean };
     const reward = rp.is_affiliate ? AFFILIATE_REWARD : INVITE_REWARD;
-    const currentReferrerBalance = parseFloat(String(rp.balance ?? 0));
-    const newReferrerBalance = Math.round((currentReferrerBalance + reward) * 100) / 100;
 
-    // Credit the referrer
-    await admin
-      .from("profiles")
-      .update({ balance: newReferrerBalance })
-      .eq("id", r.referrer_id);
+    // Credit the referrer ATOMICALLY
+    const { error: creditError } = await admin
+      .rpc("adjust_balance", { p_user_id: referrerId, p_delta: reward, p_min: 0 });
+
+    if (creditError) {
+      console.error("[record-bet-reward] Erro ao creditar:", creditError.message);
+      res.json({ ok: true, rewarded: false });
+      return;
+    }
 
     // Record the reward transaction
     await admin.from("transactions").insert({
-      user_id: r.referrer_id,
+      user_id: referrerId,
       type: "win",
       amount: reward,
       description: `Bónus de convite — aposta do convidado`,
       status: "approved",
       created_at: new Date().toISOString(),
     });
-
-    // Increment bet count on the referral record
-    await admin
-      .from("referrals")
-      .update({ bet_count: currentBetCount + 1 })
-      .eq("referred_id", betUserId)
-      .eq("referrer_id", r.referrer_id);
 
     res.json({ ok: true, rewarded: true, reward });
   } catch (err) {

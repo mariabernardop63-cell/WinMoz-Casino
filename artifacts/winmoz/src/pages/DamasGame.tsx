@@ -1497,22 +1497,8 @@ export default function DamasGame() {
             }
           }catch{ betDeductedRef.current = false; }
         }
-        // Only player "w" (blue/first) registers the match to avoid duplicates
-        if (myColor === "w" && BET > 0 && gameId !== "local") {
-          try {
-            await supabase.from("matches").upsert({
-              id: gameId,
-              game_type: "dama",
-              player1_id: profile.id,
-              player1_name: playerName,
-              player2_name: opponentName,
-              bet_amount: BET,
-              winner_payout: Math.floor(BET * 2 * 0.90),
-              status: "active",
-              created_at: new Date().toISOString(),
-            }, { onConflict: "id" });
-          } catch { /* non-critical */ }
-        }
+        // A partida é registada APENAS pelo servidor (/api/games/bet) —
+        // escrita directa no browser está bloqueada por RLS (hardening v2).
       }
     });
 

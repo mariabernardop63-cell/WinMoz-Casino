@@ -1,10 +1,14 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { authenticateUser } from "../_lib/auth";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_LENGTH = 1000;
+
+// Rate limit em-memória (por instância; suficiente como primeira barreira)
+const rateMap = new Map<string, number[]>();
 
 const SYSTEM_PROMPT = `És a "Winner", assistente virtual oficial da Poker Winner (pokerwinner.online).
 
@@ -84,11 +88,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const allowedOrigin = process.env["ALLOWED_ORIGIN"] || process.env["VITE_APP_URL"] || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.setHeader("X-Content-Type-Options", "nosniff");
 
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
   if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  // SECURITY (auditoria v2): autenticação OBRIGATÓRIA — o endpoint era
+  // público e permitia abuso do custo da API por qualquer pessoa.
+  const auth = await authenticateUser(req);
+  if (!auth) { res.status(401).json({ error: "Não autenticado" }); return; }
+
+  // Rate limit por utilizador: 20 pedidos / 5 minutos (janela deslizante DB-free)
+  {
+    const key = `support:${auth.userId}`;
+    const now = Date.now();
+    const hits = (rateMap.get(key) ?? []).filter((t) => now - t < 5 * 60_000);
+    if (hits.length >= 20) {
+      res.status(429).json({ error: "Muitas mensagens. Aguarda um momento." });
+      return;
+    }
+    hits.push(now);
+    rateMap.set(key, hits);
+  }
 
   const groqKey = process.env["GROQ_API_KEY"];
 

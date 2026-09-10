@@ -15,9 +15,40 @@ async function readRawBody(req: VercelRequest): Promise<string> {
   });
 }
 
+/* SECURITY (auditoria v2): crédito de depósito ATÓMICO.
+   1) Marca a transacção pending → approved num UPDATE condicional: quem chega
+      segundo não devolve linha e NÃO credita (elimina multi-crédito de um
+      único pagamento via poll+webhook paralelos).
+   2) Credita o saldo via RPC adjust_balance (incremento atómico no SQL). */
+async function approveDepositAtomically(supabase: ReturnType<typeof createClient>, txId: string): Promise<{ ok: boolean; newBalance?: number; userId?: string; amount?: number }> {
+  const adminUrl = process.env["SUPABASE_URL"];
+  const adminKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!adminUrl || !adminKey) return { ok: false };
+
+  const { createClient } = await import("@supabase/supabase-js");
+  const admin = createClient(adminUrl, adminKey, { auth: { autoRefreshToken: false, persistSession: false } });
+
+  const { data: claimed } = await admin
+    .from("transactions")
+    .update({ status: "approved" })
+    .eq("id", txId)
+    .eq("status", "pending")
+    .select("id, user_id, amount")
+    .maybeSingle();
+
+  const tx = claimed as { id: string; user_id: string; amount: number } | null;
+  if (!tx) return { ok: false };
+
+  const { data: balRow, error: balErr } = await admin
+    .rpc("adjust_balance", { p_user_id: tx.user_id, p_delta: Number(tx.amount ?? 0), p_min: 0 });
+  if (balErr || balRow === null || balRow === undefined) return { ok: false, userId: tx.user_id, amount: Number(tx.amount ?? 0) };
+
+  return { ok: true, newBalance: Number(balRow), userId: tx.user_id, amount: Number(tx.amount ?? 0) };
+}
+
 function getSupabase() {
   const url = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"];
-  const key = process.env["SUPABASE_SERVICE_ROLE_KEY"] || process.env["VITE_SUPABASE_SERVICE_ROLE"] || process.env["VITE_SUPABASE_SERVICE_ROLE_KEY"];
+  const key = process.env["SUPABASE_SERVICE_ROLE_KEY"];
   if (!url || !key) return null;
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
@@ -207,12 +238,9 @@ async function handleInitiate(req: VercelRequest, res: VercelResponse, parsedBod
     }).eq("id", txId);
 
     if (mpesaSync && type === "deposit") {
-      const { data: profile } = await supabase.from("profiles").select("balance").eq("id", userId).maybeSingle();
-      const currentBalance = Number((profile as any)?.balance ?? 0);
-      const newBalance = currentBalance + Number(amount);
-      const { error: balErr } = await supabase.from("profiles").update({ balance: newBalance }).eq("id", userId);
-      if (balErr) console.error("[debito/initiate] Erro ao creditar saldo M-Pesa:", balErr);
-      else console.log(`[debito/initiate] ✓ M-Pesa +${amount} MZN → user OK`);
+      const result = await approveDepositAtomically(supabase, txId);
+      if (result.ok) console.log(`[debito/initiate] ✓ M-Pesa +${result.amount} MZN → user OK (atômico)`);
+      else console.error("[debito/initiate] Falha ao creditar saldo M-Pesa (não atómico)");
     }
 
     res.status(200).json({ ok: true, txId, paymentId: debitoPaymentId, sourceId, mpesaSync });
@@ -283,13 +311,14 @@ async function handleCheckStatus(req: VercelRequest, res: VercelResponse, parsed
     const isFailed  = ["failed", "expired", "cancelled", "rejected", "declined", "FAILED", "EXPIRED", "CANCELLED"].includes(remoteStatus);
 
     if (isSuccess && currentStatus === "pending") {
-      const { data: profile } = await supabase.from("profiles").select("balance").eq("id", (tx as any).user_id).maybeSingle();
-      const currentBalance = Number((profile as any)?.balance ?? 0);
-      const newBalance = currentBalance + Number((tx as any).amount ?? 0);
-      await supabase.from("profiles").update({ balance: newBalance }).eq("id", (tx as any).user_id);
-      await supabase.from("transactions").update({ status: "approved", description: JSON.stringify({ ...desc, approvedAt: new Date().toISOString(), approvedVia: "check-status" }) }).eq("id", txId);
-      console.log(`[debito/check-status] ✓ Aprovado via polling. tx: ${txId}`);
-      res.status(200).json({ status: "approved" }); return;
+      const result = await approveDepositAtomically(supabase, txId);
+      if (result.ok) {
+        console.log(`[debito/check-status] ✓ Aprovado via polling. tx: ${txId} (+${result.amount} MZN)`);
+        res.status(200).json({ status: "approved" }); return;
+      }
+      // Não conseguiu reclamar (já resolvida por outra chamada) — confirma estado
+      const { data: recheck } = await supabase.from("transactions").select("status").eq("id", txId).maybeSingle();
+      res.status(200).json({ status: (recheck as any)?.status ?? "pending" }); return;
     }
 
     if (isFailed && currentStatus === "pending") {
@@ -323,11 +352,18 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse, rawBody: s
   const configuredSecret = process.env["DEBITO_WEBHOOK_SECRET"];
   const receivedSig = (req.headers["x-webhook-signature"] as string) || "";
 
-  if (configuredSecret) {
-    if (!receivedSig) {
-      console.error("[debito/webhook] ✗ Assinatura em falta — pedido rejeitado");
-      res.status(401).json({ ok: false, error: "Unauthorized" }); return;
-    }
+  if (!configuredSecret) {
+    // SECURITY (auditoria v2): FAIL CLOSED — sem segredo configurado o
+    // endpoint não aprova nada (antes aceitava pedidos não-assinados =
+    // dinheiro falsificável por qualquer pessoa que descubra o URL).
+    console.error("[debito/webhook] ✗ DEBITO_WEBHOOK_SECRET não configurado — rejeitado (fail-closed)");
+    res.status(503).json({ ok: false, error: "Webhook não configurado" }); return;
+  }
+  if (!receivedSig) {
+    console.error("[debito/webhook] ✗ Assinatura em falta — pedido rejeitado");
+    res.status(401).json({ ok: false, error: "Unauthorized" }); return;
+  }
+  {
     const cleanSig = receivedSig.replace(/^(sha256=|v1=|sha1=|hmac=)/, "");
     const expectedSig = crypto.createHmac("sha256", configuredSecret).update(rawBody).digest("hex");
     if (!crypto.timingSafeEqual(
@@ -338,8 +374,6 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse, rawBody: s
       res.status(401).json({ ok: false, error: "Unauthorized" }); return;
     }
     console.log("[debito/webhook] ✓ HMAC válido");
-  } else {
-    console.warn("[debito/webhook] ⚠ DEBITO_WEBHOOK_SECRET não configurado — HMAC não validado");
   }
 
   const supabase = getSupabase();
@@ -381,18 +415,16 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse, rawBody: s
         }
       } catch { /* skip */ }
     }
-    if (!tx && results && results.length > 0) { tx = results[0]; console.log("[debito/webhook] Estratégia 2b → tx:", (tx as any).id); }
+    // SECURITY (auditoria v2): removido o fallback "2b" que tomava o resultado
+    // mais recente sem correspondência verificada — só IDs/references EXATAS.
   }
 
-  if (!tx && data?.amount) {
-    const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-    const { data: results } = await supabase.from("transactions").select("id, user_id, amount, description, status, created_at").eq("status", "pending").gte("created_at", thirtyMinAgo).order("created_at", { ascending: false }).limit(50);
-    const webhookAmt = Number(data.amount);
-    const candidates = (results ?? []).filter(t => Math.abs(Number((t as any).amount) - webhookAmt) < 0.5);
-    if (candidates.length >= 1) { tx = candidates[0]; console.log("[debito/webhook] Estratégia 3 (amount+recente) → tx:", (tx as any).id); }
-  }
+  // SECURITY (auditoria v2): removida a "Estratégia 3" (amount+recente) —
+  // aprovava a transacção pendente de OUTRO utilizador com o mesmo montante.
+  // Webhooks sem ID/reference exata ficam sem match → resposta ok (gateway
+  // não reintenta) e a transacção segue para revisão manual pelo admin.
 
-  if (!tx) { console.error("[debito/webhook] ✗ Transação não encontrada. id:", debitoId, "amount:", data?.amount); res.status(200).json({ ok: true }); return; }
+  if (!tx) { console.error("[debito/webhook] ✗ Transação não encontrada (sem ID/reference exata). id:", debitoId, "amount:", data?.amount); res.status(200).json({ ok: true }); return; }
 
   const txStatus = (tx as any).status as string;
   if (txStatus === "approved" || txStatus === "rejected") { console.log("[debito/webhook] Já resolvida:", txStatus); res.status(200).json({ ok: true }); return; }
@@ -404,14 +436,18 @@ async function handleWebhook(req: VercelRequest, res: VercelResponse, rawBody: s
 
   if (event === "payment.completed") {
     if (paymentType === "deposit") {
-      const { data: profile } = await supabase.from("profiles").select("balance").eq("id", (tx as any).user_id).maybeSingle();
-      const currentBalance = Number((profile as any)?.balance ?? 0);
-      const newBalance = currentBalance + Number((tx as any).amount);
-      const { error: balErr } = await supabase.from("profiles").update({ balance: newBalance }).eq("id", (tx as any).user_id);
-      if (balErr) { console.error("[debito/webhook] Erro ao creditar saldo:", balErr); res.status(200).json({ ok: true }); return; }
-      console.log(`[debito/webhook] ✓ +${(tx as any).amount} MZN → user ${(tx as any).user_id} (novo saldo: ${newBalance})`);
+      // SECURITY (auditoria v2): crédito ATÓMICO — marca pending→approved de
+      // forma condicional e credita via RPC. Poll + webhook paralelos não
+      // multiplicam o crédito de um único pagamento.
+      const result = await approveDepositAtomically(supabase, (tx as any).id);
+      if (!result.ok) {
+        console.error("[debito/webhook] Falha ao creditar (transacção já resolvida ou erro):", (tx as any).id);
+        res.status(200).json({ ok: true }); return;
+      }
+      console.log(`[debito/webhook] ✓ +${result.amount} MZN → user ${result.userId} (novo saldo: ${result.newBalance})`);
+    } else {
+      await supabase.from("transactions").update({ status: "approved", description: JSON.stringify({ ...desc, debitoPaymentId: debitoId || desc.debitoPaymentId, debitoReference: data?.reference || desc.debitoReference, completedAt: data?.paid_at || new Date().toISOString(), approvedVia: "webhook" }) }).eq("id", (tx as any).id);
     }
-    await supabase.from("transactions").update({ status: "approved", description: JSON.stringify({ ...desc, debitoPaymentId: debitoId || desc.debitoPaymentId, debitoReference: data?.reference || desc.debitoReference, completedAt: data?.paid_at || new Date().toISOString(), approvedVia: "webhook" }) }).eq("id", (tx as any).id);
     console.log(`[debito/webhook] ✓ TX APROVADA: ${(tx as any).id}`);
   } else {
     const failReason = buildFailReason(data, paymentMethod);

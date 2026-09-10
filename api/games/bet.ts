@@ -30,53 +30,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const admin = getSupabaseAdmin();
 
-  const { data: profile, error: profileError } = await admin
-    .from("profiles")
-    .select("balance, is_blocked")
-    .eq("id", auth.userId)
-    .single();
+  // SECURITY (auditoria v2): dedução ATÓMICA via RPC — incrementa no SQL,
+  // elimina double-spend (duas apostas concorrentes) e perda de créditos
+  // que aterram entre a leitura e a escrita.
+  const { data: balanceRow, error: adjustError } = await admin
+    .rpc("adjust_balance", { p_user_id: auth.userId, p_delta: -amount, p_min: 0 });
 
-  if (profileError || !profile) {
-    res.status(500).json({ error: "Erro ao carregar perfil" });
-    return;
-  }
-  if ((profile as { is_blocked?: boolean }).is_blocked) {
-    res.status(403).json({ error: "Conta bloqueada" });
-    return;
-  }
-
-  const currentBalance = parseFloat(String((profile as { balance: number }).balance ?? 0));
-  if (currentBalance < amount) {
-    res.status(400).json({ error: "Saldo insuficiente" });
-    return;
-  }
-
-  const newBalance = Math.round((currentBalance - amount) * 100) / 100;
-
-  // SECURITY: Atomic balance deduction — only succeeds if balance hasn't changed
-  // since we read it (prevents race conditions / double-spend)
-  const { data: updated, error: updateError } = await admin
-    .from("profiles")
-    .update({ balance: newBalance })
-    .eq("id", auth.userId)
-    .gte("balance", amount) // atomic guard: only deduct if balance is still sufficient
-    .select("balance")
-    .maybeSingle();
-
-  if (updateError) {
+  if (adjustError) {
+    console.error("[games/bet] Erro ao debitar saldo:", adjustError);
     res.status(500).json({ error: "Erro ao debitar saldo" });
     return;
   }
+  const newBalance = balanceRow === null || balanceRow === undefined ? null : Number(balanceRow);
 
-  if (!updated) {
-    // Balance changed between read and write (race condition blocked)
+  if (newBalance === null) {
     res.status(400).json({ error: "Saldo insuficiente" });
     return;
   }
 
   const txDesc = description || `Aposta (${gameType}) - ${amount} MT`;
 
-  await admin.from("transactions").insert({
+  const { error: txError } = await admin.from("transactions").insert({
     user_id: auth.userId,
     type: "bet",
     amount: -Math.abs(amount),
@@ -84,24 +58,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     status: "approved",
     created_at: new Date().toISOString(),
   });
-
-  if (gameId) {
-    await admin
-      .from("matches")
-      .upsert(
-        {
-          id: gameId,
-          game_type: gameType,
-          player1_id: auth.userId,
-          bet_amount: amount,
-          winner_payout: Math.floor(amount * 2 * 0.9),
-          status: "active",
-          created_at: new Date().toISOString(),
-        },
-        { onConflict: "id" }
-      )
-      .eq("player1_id", auth.userId);
+  if (txError) {
+    // Transacção é o registo de auditoria — falha não pode passar silenciosa
+    console.error("[games/bet] Erro ao registar transacção:", txError);
   }
 
-  res.json({ ok: true, newBalance: updated.balance });
+  if (gameId && /^[A-Za-z0-9_-]{6,64}$/.test(gameId)) {
+    // SECURITY (auditoria v2): nunca sobrescrever partida existente.
+    // Cria apenas se o id não existir (bot/local ids já podem existir).
+    const { data: existing } = await admin
+      .from("matches")
+      .select("id, player1_id, status")
+      .eq("id", gameId)
+      .maybeSingle();
+
+    if (!existing) {
+      await admin.from("matches").insert({
+        id: gameId,
+        game_type: gameType,
+        player1_id: auth.userId,
+        player1_name: (description || "").slice(0, 120) || null,
+        bet_amount: amount,
+        winner_payout: Math.floor(amount * 2 * 0.9),
+        status: "active",
+        created_at: new Date().toISOString(),
+      });
+    } else {
+      // Partida já existe (criada pelo fluxo de salas/matchmaking):
+      // só actualiza o valor da aposta se for o dono e estiver activa.
+      const e = existing as { player1_id: string; status: string };
+      if (e.player1_id === auth.userId && e.status === "active") {
+        await admin.from("matches").update({
+          bet_amount: amount,
+          winner_payout: Math.floor(amount * 2 * 0.9),
+        }).eq("id", gameId).eq("player1_id", auth.userId).eq("status", "active");
+      }
+    }
+  }
+
+  res.json({ ok: true, newBalance });
 }
