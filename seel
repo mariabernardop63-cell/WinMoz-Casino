@@ -1,0 +1,29 @@
+Getting started
+
+Quickstart
+
+Copy page
+From sign-in to first streamed reply in under two minutes.
+
+Quickstart
+Under two minutes from zero to a working setup.
+
+1. Sign in
+Head to tokenharbor.ai and sign in. The account is free and no card is needed; the wallet starts at $0. You can send real requests straight away on the free tier — model IDs ending in :free never charge your balance — and top up whenever you want the full paid catalog.
+
+2. Copy your Universal Key
+On the dashboard, the Universal Key card shows your key once. Copy it now — we store a salted hash, not the plaintext, so re-reveal isn't possible. Format is thk_live_….
+
+3. Point any OpenAI-compatible client at the gateway
+Three values:
+
+Field	Value
+Base URL	https://tokenharbor.ai/v1
+API key	The thk_live_… you just copied
+Model	Any id from /models. E.g. th-orchestra, claude-opus-5, deepseek-v4-flash
+Works with any OpenAI-compatible client — Cherry Studio, Cursor, ChatGPT Desktop, Continue, and the rest. Point the client's Base URL and API key at the two values above.
+
+Or hit it directly — see Chat APIs for Python, TypeScript, and shell.
+
+4. How you save
+There's no per-call cashback — you pay passthrough per-token cost plus an optional markup (0% by default). Savings come from the platform caches: repeated identical prompts within 5 minutes are billed $0 thanks to the exact cache, and long repeated prefixes get up to 90% off via the vendor's prompt cache. New accounts also get a first top-up match and other rewards. Hit a friction → Report bug from any page footer.
