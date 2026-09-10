@@ -11,10 +11,10 @@ const typeIcon: Record<string, React.ElementType> = {
 };
 
 const typeColor: Record<string, string> = {
-  withdrawal: "#f59e0b",
-  deposit: "#10b981",
-  new_user: "#6C5CE7",
-  report: "#ef4444",
+  withdrawal: "#a16207",
+  deposit: "#15803d",
+  new_user: "#18181b",
+  report: "#b91c1c",
 };
 
 export default function NotificationsDropdown() {
@@ -50,7 +50,7 @@ export default function NotificationsDropdown() {
       {total > 0 && (
         <span
           className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[8px] font-black text-white flex items-center justify-center"
-          style={{ background: "#6C5CE7", border: "1.5px solid hsl(248 50% 97%)" }}
+          style={{ background: "#18181b", border: "1.5px solid hsl(248 50% 97%)" }}
         >
           {total > 9 ? "9+" : total}
         </span>
@@ -63,14 +63,14 @@ export default function NotificationsDropdown() {
             background: "var(--gz-bg-card-btn)",
             borderRadius: 20,
             boxShadow: "0 20px 60px rgba(0,0,0,.12), 0 4px 16px rgba(0,0,0,.08)",
-            border: "1px solid rgba(108,92,231,.08)",
+            border: "1px solid rgba(0,0,0,.08)",
           }}
         >
-          <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+          <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "rgba(0,0,0,.06)" }}>
             <div>
               <div className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>Notificações</div>
               {total > 0 && (
-                <div className="text-[11px] font-medium mt-0.5" style={{ color: "#a78bfa" }}>
+                <div className="text-[11px] font-medium mt-0.5" style={{ color: "#71717a" }}>
                   {total} nova{total !== 1 ? "s" : ""}
                 </div>
               )}
@@ -83,14 +83,14 @@ export default function NotificationsDropdown() {
           <div className="max-h-[340px] overflow-y-auto">
             {/* Summary row */}
             {data && (
-              <div className="grid grid-cols-2 gap-2 p-4 border-b" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+              <div className="grid grid-cols-2 gap-2 p-4 border-b" style={{ borderColor: "rgba(0,0,0,.06)" }}>
                 {[
-                  { label: "Levantamentos", count: data.pendingWithdrawals, color: "#f59e0b" },
-                  { label: "Depósitos", count: data.newDeposits, color: "#10b981" },
-                  { label: "Novos users", count: data.newPlayers, color: "#6C5CE7" },
-                  { label: "Denúncias", count: data.pendingReports, color: "#ef4444" },
+                  { label: "Levantamentos", count: data.pendingWithdrawals, color: "#a16207" },
+                  { label: "Depósitos", count: data.newDeposits, color: "#15803d" },
+                  { label: "Novos users", count: data.newPlayers, color: "#18181b" },
+                  { label: "Denúncias", count: data.pendingReports, color: "#b91c1c" },
                 ].map(item => (
-                  <div key={item.label} className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(108,92,231,.04)" }}>
+                  <div key={item.label} className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(0,0,0,.04)" }}>
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: item.color }} />
                     <div>
                       <div className="text-[11px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{item.count}</div>
@@ -109,7 +109,7 @@ export default function NotificationsDropdown() {
               <div className="p-3 space-y-1">
                 {(data?.items ?? []).map((item, i) => {
                   const Icon = typeIcon[item.type] ?? Bell;
-                  const color = typeColor[item.type] ?? "#6C5CE7";
+                  const color = typeColor[item.type] ?? "#18181b";
                   return (
                     <div key={i} className="flex items-start gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors cursor-pointer">
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"

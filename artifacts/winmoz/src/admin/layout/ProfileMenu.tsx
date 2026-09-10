@@ -15,11 +15,11 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const ROLE_COLORS: Record<string, string> = {
-  super_admin: "#6C5CE7",
+  super_admin: "#18181b",
   admin: "#3b82f6",
-  financial: "#10b981",
-  moderator: "#f59e0b",
-  support: "#8b5cf6",
+  financial: "#15803d",
+  moderator: "#a16207",
+  support: "#3f3f46",
 };
 
 export default function ProfileMenu() {
@@ -43,7 +43,7 @@ export default function ProfileMenu() {
   }, []);
 
   const roleLabel = ROLE_LABELS[profile?.role ?? ""] ?? "Super Admin";
-  const roleColor = ROLE_COLORS[profile?.role ?? ""] ?? "#6C5CE7";
+  const roleColor = ROLE_COLORS[profile?.role ?? ""] ?? "#18181b";
 
   const displayName = profile?.name ?? user?.email ?? "Admin";
   const displayEmail = user?.email ?? profile?.email ?? "";
@@ -69,9 +69,9 @@ export default function ProfileMenu() {
         className="flex items-center gap-2.5 h-9 pl-1.5 pr-3 rounded-2xl transition-all hover:-translate-y-0.5 hover:shadow-md active:scale-95"
         style={{ background: "var(--gz-bg-card-btn)", boxShadow: "0 1px 3px rgba(0,0,0,.06), 0 2px 10px rgba(0,0,0,.06)" }}
       >
-        <div style={{ width: 26, height: 26, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(108,92,231,.18)" }}>
+        <div style={{ width: 26, height: 26, borderRadius: "50%", overflow: "hidden", border: "1.5px solid rgba(0,0,0,.18)" }}>
           <img
-            src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${displayUsername}&backgroundColor=6C5CE7`}
+            src={`https://api.dicebear.com/9.x/avataaars/svg?seed=${displayUsername}&backgroundColor=18181b`}
             alt="Admin"
             style={{ width: "100%", height: "100%", objectFit: "cover", background: "white" }}
           />
@@ -80,7 +80,7 @@ export default function ProfileMenu() {
           <span className="text-[12px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{displayName}</span>
           <span className="text-[10px] font-semibold mt-0.5" style={{ color: roleColor }}>{roleLabel}</span>
         </div>
-        <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#10b981", flexShrink: 0, boxShadow: "0 0 5px rgba(16,185,129,.5)" }} />
+        <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#15803d", flexShrink: 0, boxShadow: "0 0 5px rgba(21,128,61,.5)" }} />
         <ChevronDown className="w-3 h-3 text-gray-400" strokeWidth={2} style={{ transform: open ? "rotate(180deg)" : undefined, transition: "transform .2s" }} />
       </button>
 
@@ -91,10 +91,10 @@ export default function ProfileMenu() {
             background: "var(--gz-bg-card-btn)",
             borderRadius: 18,
             boxShadow: "0 20px 60px rgba(0,0,0,.12), 0 4px 16px rgba(0,0,0,.08)",
-            border: "1px solid rgba(108,92,231,.08)",
+            border: "1px solid rgba(0,0,0,.08)",
           }}
         >
-          <div className="px-4 py-3 border-b mb-1" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+          <div className="px-4 py-3 border-b mb-1" style={{ borderColor: "rgba(0,0,0,.06)" }}>
             <div className="text-[13px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{displayName}</div>
             <div className="text-[11px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>{displayEmail}</div>
             <span className="inline-flex items-center mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold"
@@ -106,21 +106,21 @@ export default function ProfileMenu() {
           {menuItems.map(item => (
             <Link key={item.href} href={item.href} onClick={() => setOpen(false)}>
               <div className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 transition-colors mx-1 rounded-xl">
-                <item.icon style={{ width: 14, height: 14, color: "#6C5CE7", strokeWidth: 1.9 }} />
+                <item.icon style={{ width: 14, height: 14, color: "#18181b", strokeWidth: 1.9 }} />
                 <span className="text-[13px] font-medium" style={{ color: "var(--gz-text-secondary)" }}>{item.label}</span>
               </div>
             </Link>
           ))}
 
-          <div className="border-t mx-2 my-1" style={{ borderColor: "rgba(108,92,231,.06)" }} />
+          <div className="border-t mx-2 my-1" style={{ borderColor: "rgba(0,0,0,.06)" }} />
 
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-red-50 transition-colors mx-auto rounded-xl"
             style={{ width: "calc(100% - 8px)", marginLeft: 4 }}
           >
-            <LogOut style={{ width: 14, height: 14, color: "#ef4444", strokeWidth: 1.9 }} />
-            <span className="text-[13px] font-medium" style={{ color: "#ef4444" }}>Terminar Sessão</span>
+            <LogOut style={{ width: 14, height: 14, color: "#b91c1c", strokeWidth: 1.9 }} />
+            <span className="text-[13px] font-medium" style={{ color: "#b91c1c" }}>Terminar Sessão</span>
           </button>
         </div>
       )}

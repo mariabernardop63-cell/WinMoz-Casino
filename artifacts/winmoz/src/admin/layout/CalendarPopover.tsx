@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Calendar, Trophy, Gamepad2, X } from "lucide-react";
 
 const EVENTS = [
-  { title: "Torneio de Dama — Fase Final", date: "2026-06-05", time: "20:00", prize: "R$ 5.000", icon: Trophy, color: "#6C5CE7" },
-  { title: "Torneio de Ludo — Eliminatórias", date: "2026-06-07", time: "18:00", prize: "R$ 2.500", icon: Gamepad2, color: "#a78bfa" },
-  { title: "Torneio Especial Fim de Semana", date: "2026-06-08", time: "16:00", prize: "R$ 10.000", icon: Trophy, color: "#f59e0b" },
-  { title: "Campeonato Mensal de Dama", date: "2026-06-15", time: "20:00", prize: "R$ 8.000", icon: Trophy, color: "#6C5CE7" },
-  { title: "Torneio Relâmpago de Ludo", date: "2026-06-20", time: "21:00", prize: "R$ 1.500", icon: Gamepad2, color: "#a78bfa" },
+  { title: "Torneio de Dama — Fase Final", date: "2026-06-05", time: "20:00", prize: "R$ 5.000", icon: Trophy, color: "#18181b" },
+  { title: "Torneio de Ludo — Eliminatórias", date: "2026-06-07", time: "18:00", prize: "R$ 2.500", icon: Gamepad2, color: "#71717a" },
+  { title: "Torneio Especial Fim de Semana", date: "2026-06-08", time: "16:00", prize: "R$ 10.000", icon: Trophy, color: "#a16207" },
+  { title: "Campeonato Mensal de Dama", date: "2026-06-15", time: "20:00", prize: "R$ 8.000", icon: Trophy, color: "#18181b" },
+  { title: "Torneio Relâmpago de Ludo", date: "2026-06-20", time: "21:00", prize: "R$ 1.500", icon: Gamepad2, color: "#71717a" },
 ];
 
 export default function CalendarPopover() {
@@ -36,7 +36,7 @@ export default function CalendarPopover() {
       {upcoming.length > 0 && (
         <span
           className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[8px] font-black text-white flex items-center justify-center"
-          style={{ background: "#10b981", border: "1.5px solid hsl(248 50% 97%)" }}
+          style={{ background: "#15803d", border: "1.5px solid #ffffff" }}
         >
           {upcoming.length}
         </span>
@@ -49,13 +49,13 @@ export default function CalendarPopover() {
             background: "var(--gz-bg-card-btn)",
             borderRadius: 20,
             boxShadow: "0 20px 60px rgba(0,0,0,.12), 0 4px 16px rgba(0,0,0,.08)",
-            border: "1px solid rgba(108,92,231,.08)",
+            border: "1px solid rgba(0,0,0,.08)",
           }}
         >
-          <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+          <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "rgba(0,0,0,.06)" }}>
             <div>
               <div className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>Torneios</div>
-              <div className="text-[11px] font-medium mt-0.5" style={{ color: "#a78bfa" }}>
+              <div className="text-[11px] font-medium mt-0.5" style={{ color: "#71717a" }}>
                 {upcoming.length} próximo{upcoming.length !== 1 ? "s" : ""}
               </div>
             </div>

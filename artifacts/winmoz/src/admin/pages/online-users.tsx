@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Users, Search, Wifi, WifiOff, Gamepad2, Clock, Ban } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-const V1 = "#6C5CE7";
+const V1 = "#18181b";
 
 export interface RealOnlinePlayer {
   id: string;
@@ -36,11 +36,11 @@ function mapProfile(p: Record<string, unknown>): RealOnlinePlayer {
 }
 
 const STATUS_MAP: Record<string, { label: string; color: string; bg: string }> = {
-  online:    { label: "Online",    color: "#10b981", bg: "rgba(16,185,129,.08)" },
-  in_game:   { label: "Em Jogo",  color: "#6C5CE7", bg: "rgba(108,92,231,.08)" },
-  idle:      { label: "Inactivo", color: "#f59e0b", bg: "rgba(245,158,11,.08)" },
+  online:    { label: "Online",    color: "#15803d", bg: "rgba(21,128,61,.08)" },
+  in_game:   { label: "Em Jogo",  color: "#18181b", bg: "rgba(0,0,0,.08)" },
+  idle:      { label: "Inactivo", color: "#a16207", bg: "rgba(161,98,7,.08)" },
   offline:   { label: "Offline",  color: "var(--gz-text-muted)", bg: "rgba(156,163,175,.08)" },
-  suspended: { label: "Bloqueado",color: "#ef4444", bg: "rgba(239,68,68,.08)"  },
+  suspended: { label: "Bloqueado",color: "#b91c1c", bg: "rgba(185,28,28,.08)"  },
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -55,7 +55,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function Avatar({ seed, avatarUrl, size = 36 }: { seed: string; avatarUrl?: string | null; size?: number }) {
-  const palette = ["6C5CE7", "7c3aed", "4f46e5", "0ea5e9", "10b981", "f59e0b"];
+  const palette = ["18181b", "52525b", "71717a", "a1a1aa", "d4d4d8", "e4e4e7"];
   const color = palette[(seed || "?").charCodeAt(0) % palette.length];
   const initials = ((seed || "?")[0] ?? "?").toUpperCase();
   if (avatarUrl) {
@@ -64,12 +64,12 @@ function Avatar({ seed, avatarUrl, size = 36 }: { seed: string; avatarUrl?: stri
         src={avatarUrl}
         alt={seed}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; (e.currentTarget.nextSibling as HTMLElement | null)?.removeAttribute("hidden"); }}
-        style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, objectFit: "cover", border: "1.5px solid rgba(108,92,231,.12)" }}
+        style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, objectFit: "cover", border: "1.5px solid rgba(0,0,0,.12)" }}
       />
     );
   }
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, background: `#${color}`, border: "1.5px solid rgba(108,92,231,.12)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: size * 0.4 }}>
+    <div style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0, background: `#${color}`, border: "1.5px solid rgba(0,0,0,.12)", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontWeight: 700, fontSize: size * 0.4 }}>
       {initials}
     </div>
   );
@@ -164,7 +164,7 @@ export default function OnlineUsersPage() {
           </div>
           <button onClick={() => refetch()}
             className="flex items-center gap-2 px-4 py-2 rounded-2xl text-[12.5px] font-bold text-white transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
-            style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(108,92,231,.3)" }}>
+            style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(0,0,0,.3)" }}>
             <Wifi style={{ width: 13, height: 13 }} />
             Actualizar
           </button>
@@ -173,9 +173,9 @@ export default function OnlineUsersPage() {
 
       <div className="flex gap-4 flex-wrap">
         <StatCard label="Total" value={counts.total} color={V1} />
-        <StatCard label="Online / Em Jogo" value={counts.online} color="#10b981" />
+        <StatCard label="Online / Em Jogo" value={counts.online} color="#15803d" />
         <StatCard label="Offline" value={counts.offline} color="var(--gz-text-muted)" />
-        <StatCard label="Bloqueados" value={counts.blocked} color="#ef4444" />
+        <StatCard label="Bloqueados" value={counts.blocked} color="#b91c1c" />
       </div>
 
       <div className="gz-card p-4 flex flex-wrap items-center gap-3">
@@ -194,7 +194,7 @@ export default function OnlineUsersPage() {
             <button key={f.key} onClick={() => setFilter(f.key)}
               className="px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all"
               style={{
-                background: filter === f.key ? V1 : "rgba(108,92,231,.07)",
+                background: filter === f.key ? V1 : "rgba(0,0,0,.07)",
                 color: filter === f.key ? "white" : "var(--gz-text-muted)",
               }}>
               {f.label}
@@ -204,7 +204,7 @@ export default function OnlineUsersPage() {
       </div>
 
       <div className="gz-card overflow-hidden">
-        <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+        <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "rgba(0,0,0,.06)" }}>
           <Users style={{ width: 14, height: 14, color: V1, strokeWidth: 1.9 }} />
           <span className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>
             {players.length} utilizador{players.length !== 1 ? "es" : ""}
@@ -223,9 +223,9 @@ export default function OnlineUsersPage() {
             <div className="text-[13px] font-medium" style={{ color: "var(--gz-text-accent)" }}>Nenhum utilizador encontrado</div>
           </div>
         ) : (
-          <div className="divide-y" style={{ borderColor: "rgba(108,92,231,.04)" }}>
+          <div className="divide-y" style={{ borderColor: "rgba(0,0,0,.04)" }}>
             {players.map(player => (
-              <div key={player.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-indigo-50/40 transition-colors group">
+              <div key={player.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-zinc-100/40 transition-colors group">
                 <Avatar seed={player.username} avatarUrl={player.avatarUrl} />
                 <div className="flex-1 min-w-0">
                   <div className="text-[13.5px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{player.username}</div>
@@ -249,7 +249,7 @@ export default function OnlineUsersPage() {
                   <Gamepad2 style={{ width: 14, height: 14, color: V1, strokeWidth: 1.8, opacity: 0.6 }} />
                 )}
                 {player.status === "suspended" && (
-                  <Ban style={{ width: 14, height: 14, color: "#ef4444", strokeWidth: 1.8, opacity: 0.7 }} />
+                  <Ban style={{ width: 14, height: 14, color: "#b91c1c", strokeWidth: 1.8, opacity: 0.7 }} />
                 )}
               </div>
             ))}

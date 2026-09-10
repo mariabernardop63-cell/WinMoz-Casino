@@ -24,10 +24,10 @@ function gameLabel(g: string) {
 
 function gameColor(g: string): string {
   const m: Record<string, string> = {
-    damas: "#f59e0b", ludo: "#22c55e", xadrez: "#8b5cf6",
-    chess: "#8b5cf6", bilhar: "#06b6d4", roleta: "#ec4899",
+    damas: "#a16207", ludo: "#15803d", xadrez: "#3f3f46",
+    chess: "#3f3f46", bilhar: "#52525b", roleta: "#71717a",
   };
-  return m[g?.toLowerCase()] ?? "#6366f1";
+  return m[g?.toLowerCase()] ?? "#3f3f46";
 }
 
 function elapsed(since: Date): string {
@@ -137,8 +137,8 @@ export default function GameManagement() {
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(99,102,241,0.15)", border: "1.5px solid rgba(99,102,241,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Gamepad2 style={{ width: 22, height: 22, color: "#818cf8" }} />
+          <div style={{ width: 44, height: 44, borderRadius: 14, background: "rgba(0,0,0,0.15)", border: "1.5px solid rgba(0,0,0,0.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Gamepad2 style={{ width: 22, height: 22, color: "#52525b" }} />
           </div>
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--gz-text-primary, #e8f0ff)", margin: 0 }}>Gestão de Jogos</h1>
@@ -150,8 +150,8 @@ export default function GameManagement() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 10, background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)" }}>
-            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", animation: "pulse 2s infinite" }} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#22c55e" }}>Live</span>
+            <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#15803d", animation: "pulse 2s infinite" }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d" }}>Live</span>
           </div>
           <button
             onClick={fetchQueue}
@@ -166,9 +166,9 @@ export default function GameManagement() {
       {/* Stats bar */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14, marginBottom: 24 }}>
         {[
-          { label: "Na fila agora", value: queue.length, icon: Search, color: "#818cf8" },
-          { label: "Última actualização", value: `${lastRefresh.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`, icon: Clock, color: "#06b6d4", small: true },
-          { label: "Jogos activos", value: "—", icon: Zap, color: "#f59e0b" },
+          { label: "Na fila agora", value: queue.length, icon: Search, color: "#52525b" },
+          { label: "Última actualização", value: `${lastRefresh.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`, icon: Clock, color: "#52525b", small: true },
+          { label: "Jogos activos", value: "—", icon: Zap, color: "#a16207" },
         ].map(({ label, value, icon: Icon, color, small }) => (
           <div key={label} style={{ padding: "16px 18px", borderRadius: 14, background: "var(--gz-bg-card, rgba(255,255,255,0.04))", border: "1px solid var(--gz-border, rgba(255,255,255,0.07))" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -196,14 +196,14 @@ export default function GameManagement() {
           </div>
         ) : queue.length === 0 ? (
           <div style={{ padding: "56px 20px", textAlign: "center" }}>
-            <div style={{ width: 56, height: 56, borderRadius: 18, background: "rgba(99,102,241,0.08)", border: "1.5px solid rgba(99,102,241,0.15)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
-              <Users style={{ width: 24, height: 24, color: "rgba(99,102,241,0.5)" }} />
+            <div style={{ width: 56, height: 56, borderRadius: 18, background: "rgba(0,0,0,0.08)", border: "1.5px solid rgba(0,0,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+              <Users style={{ width: 24, height: 24, color: "rgba(0,0,0,0.5)" }} />
             </div>
             <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 15, fontWeight: 700, margin: 0 }}>Fila vazia</p>
             <p style={{ color: "rgba(255,255,255,0.25)", fontSize: 12, marginTop: 4 }}>Nenhum jogador à espera de adversário neste momento</p>
             <div style={{ marginTop: 16, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-              <Wifi style={{ width: 13, height: 13, color: "#22c55e" }} />
-              <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 600 }}>Ligação em tempo real activa</span>
+              <Wifi style={{ width: 13, height: 13, color: "#15803d" }} />
+              <span style={{ fontSize: 11, color: "#15803d", fontWeight: 600 }}>Ligação em tempo real activa</span>
             </div>
           </div>
         ) : (
@@ -248,7 +248,7 @@ export default function GameManagement() {
                   </div>
 
                   {/* Bet */}
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#22c55e" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#15803d" }}>
                     {fmtMZN(entry.bet)}
                   </div>
 
@@ -262,16 +262,16 @@ export default function GameManagement() {
 
                   {/* Status */}
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: "rgba(251,191,36,0.12)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.25)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 20, background: "rgba(161,98,7,0.12)", color: "#fbbf24", border: "1px solid rgba(161,98,7,0.25)", textTransform: "uppercase", letterSpacing: "0.4px" }}>
                       À espera
                     </span>
                     {entry.source === "private" && (
-                      <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 20, background: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.25)", textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 20, background: "rgba(0,0,0,0.12)", color: "#52525b", border: "1px solid rgba(0,0,0,0.25)", textTransform: "uppercase", letterSpacing: "0.3px" }}>
                         Sala
                       </span>
                     )}
                     {entry.source === "public" && (
-                      <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 20, background: "rgba(34,197,94,0.1)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.2)", textTransform: "uppercase", letterSpacing: "0.3px" }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 20, background: "rgba(34,197,94,0.1)", color: "#15803d", border: "1px solid rgba(34,197,94,0.2)", textTransform: "uppercase", letterSpacing: "0.3px" }}>
                         Público
                       </span>
                     )}

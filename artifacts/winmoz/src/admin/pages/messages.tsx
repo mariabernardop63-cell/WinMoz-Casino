@@ -13,7 +13,7 @@ import {
 } from "@/admin/lib/supabase-api";
 import { supabase } from "@/lib/supabase";
 
-const V1 = "#6C5CE7";
+const V1 = "#18181b";
 
 function isRealPhoto(url: string | null | undefined): boolean {
   if (!url || url.trim() === "") return false;
@@ -31,10 +31,10 @@ function UserAvatar({ seed, avatarUrl, size = 40 }: { seed: string; avatarUrl?: 
       <img src={avatarUrl!} alt={seed}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
         style={{ width: size, height: size, borderRadius: "50%", flexShrink: 0,
-          background: "white", border: "2px solid rgba(108,92,231,.12)", objectFit: "cover" }} />
+          background: "white", border: "2px solid rgba(0,0,0,.12)", objectFit: "cover" }} />
     );
   }
-  const palette = ["#6C5CE7", "#7c3aed", "#4f46e5", "#0ea5e9", "#10b981", "#f59e0b"];
+  const palette = ["#18181b", "#18181b", "#4f46e5", "#52525b", "#15803d", "#a16207"];
   const bg = palette[seed.charCodeAt(0) % palette.length];
   const initials = seed
     .split(/\s+/)
@@ -45,7 +45,7 @@ function UserAvatar({ seed, avatarUrl, size = 40 }: { seed: string; avatarUrl?: 
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%", flexShrink: 0,
-      background: bg, border: "2px solid rgba(108,92,231,.12)",
+      background: bg, border: "2px solid rgba(0,0,0,.12)",
       display: "flex", alignItems: "center", justifyContent: "center",
       fontSize: Math.round(size * 0.38), fontWeight: 700, color: "#fff",
       lineHeight: 1, userSelect: "none",
@@ -71,12 +71,12 @@ function fmtTime(iso: string) {
 
 function SenderBadge({ sender }: { sender: "user" | "admin" | "ai" }) {
   if (sender === "ai") return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold" style={{ background: "rgba(14,165,233,.1)", color: "#0ea5e9" }}>
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold" style={{ background: "rgba(14,165,233,.1)", color: "#52525b" }}>
       <Bot style={{ width: 9, height: 9 }} />IA
     </span>
   );
   if (sender === "admin") return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold" style={{ background: "rgba(108,92,231,.1)", color: V1 }}>
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9.5px] font-bold" style={{ background: "rgba(0,0,0,.1)", color: V1 }}>
       <Shield style={{ width: 9, height: 9 }} />Admin
     </span>
   );
@@ -157,7 +157,7 @@ export default function Messages() {
   return (
     <div className="p-4 h-[calc(100vh-56px)] flex flex-col">
       <div className="flex items-center gap-3 mb-4">
-        <div className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(108,92,231,.35)" }}>
+        <div className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ background: `#18181b`, boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}>
           <MessageCircle className="w-4 h-4 text-white" />
         </div>
         <div>
@@ -169,15 +169,15 @@ export default function Messages() {
         {/* Realtime indicator */}
         <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-full" style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)" }}>
           <div className="w-2 h-2 rounded-full bg-green-400" style={{ animation: "pulse 2s infinite" }} />
-          <span className="text-[10px] font-semibold" style={{ color: "#16a34a" }}>REALTIME</span>
+          <span className="text-[10px] font-semibold" style={{ color: "#15803d" }}>REALTIME</span>
         </div>
       </div>
 
       <div className="flex-1 gz-card overflow-hidden flex" style={{ minHeight: 0 }}>
 
         {/* ── Conversation List ── */}
-        <div className={`w-full md:w-[290px] md:flex-shrink-0 flex flex-col border-r ${showList ? "flex" : "hidden md:flex"}`} style={{ borderColor: "rgba(108,92,231,.07)" }}>
-          <div className="p-3 border-b" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+        <div className={`w-full md:w-[290px] md:flex-shrink-0 flex flex-col border-r ${showList ? "flex" : "hidden md:flex"}`} style={{ borderColor: "rgba(0,0,0,.07)" }}>
+          <div className="p-3 border-b" style={{ borderColor: "rgba(0,0,0,.06)" }}>
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "var(--gz-bg-subtle)" }}>
               <Search style={{ width: 13, height: 13, color: "var(--gz-text-tertiary)" }} />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Procurar conversa..."
@@ -211,8 +211,8 @@ export default function Messages() {
 
             {filtered.map(c => (
               <button key={c.userId} onClick={() => handleSelect(c.userId)} className="w-full text-left transition-colors"
-                style={{ background: selectedUserId === c.userId ? "rgba(108,92,231,.06)" : "transparent" }}>
-                <div className="flex items-center gap-3 px-4 py-3.5 border-b" style={{ borderColor: "rgba(108,92,231,.04)" }}>
+                style={{ background: selectedUserId === c.userId ? "rgba(0,0,0,.06)" : "transparent" }}>
+                <div className="flex items-center gap-3 px-4 py-3.5 border-b" style={{ borderColor: "rgba(0,0,0,.04)" }}>
                   <div className="relative flex-shrink-0">
                     <UserAvatar seed={c.userName} avatarUrl={c.avatarUrl} size={40} />
                     {c.lastSender === "user" && c.unreadCount > 0 && (
@@ -226,12 +226,12 @@ export default function Messages() {
                     </div>
                     <div className="flex items-center justify-between gap-1">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        {c.lastSender === "ai" && <Bot style={{ width: 10, height: 10, color: "#0ea5e9", flexShrink: 0 }} />}
+                        {c.lastSender === "ai" && <Bot style={{ width: 10, height: 10, color: "#52525b", flexShrink: 0 }} />}
                         {c.lastSender === "admin" && <Shield style={{ width: 10, height: 10, color: V1, flexShrink: 0 }} />}
                         <span className="text-[11.5px] truncate" style={{ color: "var(--gz-text-muted)" }}>{c.lastMessage}</span>
                       </div>
                       {c.unreadCount > 0 && (
-                        <span className="ml-1 flex-shrink-0 w-5 h-5 rounded-full text-[10px] font-bold text-white flex items-center justify-center" style={{ background: "#ef4444" }}>{c.unreadCount}</span>
+                        <span className="ml-1 flex-shrink-0 w-5 h-5 rounded-full text-[10px] font-bold text-white flex items-center justify-center" style={{ background: "#b91c1c" }}>{c.unreadCount}</span>
                       )}
                     </div>
                   </div>
@@ -246,7 +246,7 @@ export default function Messages() {
           {selectedConv ? (
             <>
               {/* Chat header */}
-              <div className="flex items-center gap-3 px-5 py-3.5 border-b flex-shrink-0" style={{ borderColor: "rgba(108,92,231,.07)" }}>
+              <div className="flex items-center gap-3 px-5 py-3.5 border-b flex-shrink-0" style={{ borderColor: "rgba(0,0,0,.07)" }}>
                 <button className="md:hidden mr-1" onClick={() => setShowList(true)}>
                   <ChevronLeft style={{ width: 20, height: 20, color: "var(--gz-text-muted)" }} />
                 </button>
@@ -257,7 +257,7 @@ export default function Messages() {
                     {messages.length} mensagem{messages.length !== 1 ? "s" : ""} · suporte
                   </div>
                 </div>
-                <button className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-indigo-50">
+                <button className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:bg-zinc-100">
                   <MoreVertical style={{ width: 15, height: 15, color: "var(--gz-text-muted)" }} />
                 </button>
               </div>
@@ -266,7 +266,7 @@ export default function Messages() {
               <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
                 {loadingMsgs && (
                   <div className="flex items-center justify-center h-full">
-                    <div className="w-5 h-5 rounded-full border-2 border-indigo-300 border-t-indigo-600 animate-spin" />
+                    <div className="w-5 h-5 rounded-full border-2 border-zinc-200 border-t-zinc-800 animate-spin" />
                   </div>
                 )}
 
@@ -301,9 +301,9 @@ export default function Messages() {
                             style={{
                               borderRadius: msg.sender !== "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                               background: msg.sender === "admin"
-                                ? `linear-gradient(135deg, ${V1}, #4f46e5)`
+                                ? `#18181b`
                                 : msg.sender === "ai"
-                                  ? "linear-gradient(135deg, #0ea5e9, #06b6d4)"
+                                  ? "#3f3f46"
                                   : "var(--gz-bg-subtle)",
                               color: msg.sender !== "user" ? "#fff" : "var(--gz-text-primary)",
                             }}>
@@ -315,10 +315,10 @@ export default function Messages() {
                           </div>
                         </div>
                         {msg.sender === "admin" && (
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: `linear-gradient(135deg, ${V1}, #4f46e5)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 8, marginTop: 22, fontSize: 10, fontWeight: 800, color: "#fff" }}>A</div>
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: `#18181b`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 8, marginTop: 22, fontSize: 10, fontWeight: 800, color: "#fff" }}>A</div>
                         )}
                         {msg.sender === "ai" && (
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg, #0ea5e9, #06b6d4)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 8, marginTop: 22 }}>
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#3f3f46", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, marginLeft: 8, marginTop: 22 }}>
                             <Bot style={{ width: 14, height: 14, color: "#fff" }} />
                           </div>
                         )}
@@ -330,9 +330,9 @@ export default function Messages() {
               </div>
 
               {/* Input */}
-              <div className="px-5 py-3.5 border-t flex-shrink-0" style={{ borderColor: "rgba(108,92,231,.07)" }}>
+              <div className="px-5 py-3.5 border-t flex-shrink-0" style={{ borderColor: "rgba(0,0,0,.07)" }}>
                 <div className="flex items-end gap-3">
-                  <div className="flex-1 flex items-end gap-2 rounded-2xl px-4 py-2.5" style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,.1)" }}>
+                  <div className="flex-1 flex items-end gap-2 rounded-2xl px-4 py-2.5" style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.1)" }}>
                     <textarea
                       value={input}
                       onChange={e => setInput(e.target.value)}
@@ -348,8 +348,8 @@ export default function Messages() {
                     disabled={!input.trim() || sendMsg.isPending}
                     className="w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all hover:-translate-y-0.5 active:scale-95"
                     style={{
-                      background: input.trim() ? `linear-gradient(135deg, ${V1}, #4f46e5)` : "var(--gz-bg-subtle)",
-                      boxShadow: input.trim() ? "0 4px 12px rgba(108,92,231,.4)" : "none",
+                      background: input.trim() ? `#18181b` : "var(--gz-bg-subtle)",
+                      boxShadow: input.trim() ? "0 4px 12px rgba(0,0,0,.4)" : "none",
                     }}>
                     {sendMsg.isPending
                       ? <div className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
@@ -364,7 +364,7 @@ export default function Messages() {
             </>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center gap-4">
-              <div style={{ width: 64, height: 64, borderRadius: 22, background: "rgba(108,92,231,.07)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 64, height: 64, borderRadius: 22, background: "rgba(0,0,0,.07)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <MessageCircle style={{ width: 28, height: 28, color: V1, strokeWidth: 1.5, opacity: .5 }} />
               </div>
               <div className="text-center">
@@ -376,7 +376,7 @@ export default function Messages() {
                 </div>
               </div>
               {conversations.length > 0 && (
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-medium" style={{ background: "rgba(108,92,231,.07)", color: V1 }}>
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-medium" style={{ background: "rgba(0,0,0,.07)", color: V1 }}>
                   <MessageCircle style={{ width: 13, height: 13 }} />
                   {conversations.length} conversa{conversations.length !== 1 ? "s" : ""} no suporte
                 </div>

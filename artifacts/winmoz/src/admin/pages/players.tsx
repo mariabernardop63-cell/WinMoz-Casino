@@ -55,7 +55,7 @@ export default function Players() {
               placeholder="Buscar jogador..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-300"
             />
           </div>
           <div className="ml-auto text-sm text-gray-400">{filtered.length} jogadores</div>
@@ -87,7 +87,7 @@ export default function Players() {
                   <tr key={p.id} data-testid={`player-row-${p.id}`} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center text-white text-xs font-bold">
                           {((p.username || p.id || "?")[0] ?? "?").toUpperCase()}
                         </div>
                         <span className="font-medium text-gray-800">{p.username || "utilizador"}</span>
@@ -113,8 +113,8 @@ export default function Players() {
                           </button>
                         )}
                         <Link href={`/players/${p.id}`}>
-                          <button data-testid={`link-player-${p.id}`} className="w-7 h-7 rounded-lg bg-gray-50 hover:bg-indigo-50 flex items-center justify-center transition-colors">
-                            <ChevronRight className="w-4 h-4 text-gray-400 hover:text-indigo-500" />
+                          <button data-testid={`link-player-${p.id}`} className="w-7 h-7 rounded-lg bg-gray-50 hover:bg-zinc-100 flex items-center justify-center transition-colors">
+                            <ChevronRight className="w-4 h-4 text-gray-400 hover:text-zinc-600" />
                           </button>
                         </Link>
                       </div>

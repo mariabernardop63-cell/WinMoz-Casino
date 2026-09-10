@@ -5,7 +5,7 @@ import { CheckCircle, XCircle, Landmark, Clock, TrendingUp, List } from "lucide-
 import { toast } from "sonner";
 import { playAdminNotificationSound } from "@/admin/hooks/useAdminNotificationSound";
 
-const V1 = "#6C5CE7";
+const V1 = "#18181b";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
@@ -99,9 +99,9 @@ export default function Withdrawals() {
                 : "Tens a certeza que queres recusar este pedido?"
               }
             </p>
-            <div className="px-4 py-3 rounded-xl mb-5 text-center" style={{ background: "var(--gz-bg-subtle)", border: "1px solid rgba(108,92,231,.1)" }}>
+            <div className="px-4 py-3 rounded-xl mb-5 text-center" style={{ background: "var(--gz-bg-subtle)", border: "1px solid rgba(0,0,0,.1)" }}>
               <div className="text-[12px] font-medium" style={{ color: "var(--gz-text-muted)" }}>{confirmModal.playerName}</div>
-              <div className="text-[22px] font-black mt-0.5" style={{ color: confirmModal.type === "approve" ? "#059669" : "#ef4444" }}>
+              <div className="text-[22px] font-black mt-0.5" style={{ color: confirmModal.type === "approve" ? "#059669" : "#b91c1c" }}>
                 MT {confirmModal.amount.toFixed(2)}
               </div>
             </div>
@@ -124,7 +124,7 @@ export default function Withdrawals() {
       <div className="gz-card p-4 mb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-            style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(108,92,231,.35)" }}>
+            style={{ background: `#18181b`, boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}>
             <Landmark style={{ width: 18, height: 18, color: "white", strokeWidth: 1.9 }} />
           </div>
           <div>
@@ -140,7 +140,7 @@ export default function Withdrawals() {
       <div className="admin-responsive-grid grid gap-3 mb-4" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         <div className="gz-card p-3 sm:p-5">
           <div className="flex items-center gap-2 mb-1">
-            <Clock style={{ width: 14, height: 14, color: "#d97706", flexShrink: 0 }} />
+            <Clock style={{ width: 14, height: 14, color: "#71717a", flexShrink: 0 }} />
             <div className="text-[10px] sm:text-xs uppercase font-medium tracking-wide truncate" style={{ color: "var(--gz-text-muted)" }}>Pendentes</div>
           </div>
           <div className="text-xl sm:text-2xl font-bold text-amber-600">{pending.length}</div>
@@ -150,7 +150,7 @@ export default function Withdrawals() {
             <TrendingUp style={{ width: 14, height: 14, color: V1, flexShrink: 0 }} />
             <div className="text-[10px] sm:text-xs uppercase font-medium tracking-wide truncate" style={{ color: "var(--gz-text-muted)" }}>Volume MT</div>
           </div>
-          <div className="text-lg sm:text-2xl font-bold text-indigo-600">{totalPending.toFixed(0)}</div>
+          <div className="text-lg sm:text-2xl font-bold text-zinc-700">{totalPending.toFixed(0)}</div>
         </div>
         <div className="gz-card p-3 sm:p-5">
           <div className="flex items-center gap-2 mb-1">
@@ -163,12 +163,12 @@ export default function Withdrawals() {
 
       {/* Filter tabs */}
       <div className="gz-card overflow-hidden">
-        <div className="px-4 py-3 border-b flex items-center gap-2 overflow-x-auto" style={{ borderColor: "rgba(108,92,231,.06)", WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
+        <div className="px-4 py-3 border-b flex items-center gap-2 overflow-x-auto" style={{ borderColor: "rgba(0,0,0,.06)", WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
           {["all", "pending", "approved", "rejected"].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
               className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-xl transition-colors"
               style={statusFilter === s
-                ? { background: `linear-gradient(135deg, ${V1}, #4f46e5)`, color: "#fff" }
+                ? { background: `#18181b`, color: "#fff" }
                 : { background: "#f3f4f6", color: "#6b7280" }}>
               {s === "all" ? "Todos" : s === "pending" ? "Pendentes" : s === "approved" ? "Aprovados" : "Rejeitados"}
             </button>
@@ -176,7 +176,7 @@ export default function Withdrawals() {
         </div>
 
         {/* ── MOBILE: Card list (hidden on md+) ── */}
-        <div className="md:hidden divide-y" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+        <div className="md:hidden divide-y" style={{ borderColor: "rgba(0,0,0,.06)" }}>
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="p-4">
@@ -208,7 +208,7 @@ export default function Withdrawals() {
                       onClick={() => handleApprove(w.id as string, w.playerName, w.amount)}
                       disabled={approveWithdrawal.isPending || rejectWithdrawal.isPending}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-bold"
-                      style={{ background: "rgba(16,185,129,.1)", color: "#059669", border: "1px solid rgba(16,185,129,.2)" }}>
+                      style={{ background: "rgba(21,128,61,.1)", color: "#059669", border: "1px solid rgba(21,128,61,.2)" }}>
                       <CheckCircle style={{ width: 14, height: 14 }} />
                       Aprovar
                     </button>
@@ -216,7 +216,7 @@ export default function Withdrawals() {
                       onClick={() => handleReject(w.id as string, w.playerName, w.amount)}
                       disabled={approveWithdrawal.isPending || rejectWithdrawal.isPending}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[12px] font-bold"
-                      style={{ background: "rgba(239,68,68,.06)", color: "#ef4444", border: "1px solid rgba(239,68,68,.16)" }}>
+                      style={{ background: "rgba(185,28,28,.06)", color: "#b91c1c", border: "1px solid rgba(185,28,28,.16)" }}>
                       <XCircle style={{ width: 14, height: 14 }} />
                       Recusar
                     </button>
@@ -231,7 +231,7 @@ export default function Withdrawals() {
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(108,92,231,.06)" }}>
+              <tr style={{ borderBottom: "1px solid rgba(0,0,0,.06)" }}>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Jogador</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Valor (MT)</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Método</th>
@@ -249,7 +249,7 @@ export default function Withdrawals() {
                 <tr><td colSpan={6} className="px-5 py-10 text-center text-sm" style={{ color: "var(--gz-text-muted)" }}>Nenhum saque encontrado</td></tr>
               ) : (
                 list.map((w) => (
-                  <tr key={w.id} className="hover:bg-indigo-50/20 transition-colors" style={{ borderBottom: "1px solid rgba(108,92,231,.04)" }}>
+                  <tr key={w.id} className="hover:bg-zinc-100/20 transition-colors" style={{ borderBottom: "1px solid rgba(0,0,0,.04)" }}>
                     <td className="px-5 py-3.5 font-medium" style={{ color: "var(--gz-text-primary)" }}>{w.playerName}</td>
                     <td className="px-5 py-3.5 font-bold" style={{ color: V1 }}>MT {w.amount.toFixed(2)}</td>
                     <td className="px-5 py-3.5" style={{ color: "var(--gz-text-secondary)" }}>{w.method}{(w as any).phone ? <><br/><span className="text-xs">{(w as any).phone}</span></> : ""}</td>
@@ -262,14 +262,14 @@ export default function Withdrawals() {
                             onClick={() => handleApprove(w.id as string, w.playerName, w.amount)}
                             disabled={approveWithdrawal.isPending || rejectWithdrawal.isPending}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11.5px] font-bold transition-all hover:shadow-md"
-                            style={{ background: "rgba(16,185,129,.08)", color: "#059669", border: "1px solid rgba(16,185,129,.2)" }}>
+                            style={{ background: "rgba(21,128,61,.08)", color: "#059669", border: "1px solid rgba(21,128,61,.2)" }}>
                             <CheckCircle style={{ width: 12, height: 12 }} />Aprovar
                           </button>
                           <button
                             onClick={() => handleReject(w.id as string, w.playerName, w.amount)}
                             disabled={approveWithdrawal.isPending || rejectWithdrawal.isPending}
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[11.5px] font-bold transition-all hover:shadow-md"
-                            style={{ background: "rgba(239,68,68,.06)", color: "#ef4444", border: "1px solid rgba(239,68,68,.16)" }}>
+                            style={{ background: "rgba(185,28,28,.06)", color: "#b91c1c", border: "1px solid rgba(185,28,28,.16)" }}>
                             <XCircle style={{ width: 12, height: 12 }} />Recusar
                           </button>
                         </div>

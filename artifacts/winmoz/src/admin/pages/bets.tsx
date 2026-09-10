@@ -6,7 +6,7 @@ import { XCircle } from "lucide-react";
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     active: "bg-green-100 text-green-700",
-    settled: "bg-indigo-100 text-indigo-700",
+    settled: "bg-zinc-100 text-zinc-700",
     cancelled: "bg-gray-100 text-gray-500",
   };
   const labels: Record<string, string> = { active: "Ativa", settled: "Liquidada", cancelled: "Cancelada" };
@@ -14,7 +14,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function GameBadge({ game }: { game: string }) {
-  return <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${game === "dama" ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"}`}>{game}</span>;
+  return <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${game === "dama" ? "bg-zinc-100 text-zinc-700" : "bg-zinc-100 text-zinc-700"}`}>{game}</span>;
 }
 
 export default function Bets() {
@@ -42,8 +42,8 @@ export default function Bets() {
 
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
-          { label: "Total de Apostas", value: (bets ?? []).length, color: "text-indigo-600" },
-          { label: "Volume Total", value: `MT ${totalVolume.toFixed(2)}`, color: "text-purple-600" },
+          { label: "Total de Apostas", value: (bets ?? []).length, color: "text-zinc-700" },
+          { label: "Volume Total", value: `MT ${totalVolume.toFixed(2)}`, color: "text-zinc-700" },
           { label: "Total Pago", value: `MT ${totalPayout.toFixed(2)}`, color: "text-green-600" },
         ].map((s) => (
           <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
@@ -60,7 +60,7 @@ export default function Bets() {
               key={s}
               data-testid={`filter-bet-${s}`}
               onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${statusFilter === s ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${statusFilter === s ? "bg-zinc-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
             >
               {s === "all" ? "Todas" : s === "active" ? "Ativas" : s === "settled" ? "Liquidadas" : "Canceladas"}
             </button>

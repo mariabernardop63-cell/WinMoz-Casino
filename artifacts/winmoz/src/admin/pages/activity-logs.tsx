@@ -6,21 +6,21 @@ import {
 } from "lucide-react";
 import { api, type ActivityLog, type PaginatedResponse } from "@/admin/lib/api";
 
-const V1 = "#6C5CE7";
+const V1 = "#18181b";
 
 const ACTION_COLORS: Record<string, string> = {
-  login: "#10b981",
+  login: "#15803d",
   logout: "var(--gz-text-muted)",
-  profile_update: "#6C5CE7",
-  password_change: "#f59e0b",
-  player_suspend: "#ef4444",
-  player_reactivate: "#10b981",
+  profile_update: "#18181b",
+  password_change: "#a16207",
+  player_suspend: "#b91c1c",
+  player_reactivate: "#15803d",
   match_resolve: "#3b82f6",
-  withdrawal_approve: "#10b981",
-  withdrawal_reject: "#ef4444",
-  report_resolve: "#8b5cf6",
-  balance_adjustment: "#f59e0b",
-  bet_cancel: "#ef4444",
+  withdrawal_approve: "#15803d",
+  withdrawal_reject: "#b91c1c",
+  report_resolve: "#3f3f46",
+  balance_adjustment: "#a16207",
+  bet_cancel: "#b91c1c",
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -43,11 +43,11 @@ function LogRow({ log, isExpanded, onToggle }: {
   isExpanded: boolean;
   onToggle: () => void;
 }) {
-  const color = ACTION_COLORS[log.action] ?? "#6C5CE7";
+  const color = ACTION_COLORS[log.action] ?? "#18181b";
   const label = ACTION_LABELS[log.action] ?? log.action;
 
   return (
-    <div className="border-b transition-colors hover:bg-indigo-50/30 cursor-pointer" style={{ borderColor: "rgba(108,92,231,.04)" }} onClick={onToggle}>
+    <div className="border-b transition-colors hover:bg-zinc-100/30 cursor-pointer" style={{ borderColor: "rgba(0,0,0,.04)" }} onClick={onToggle}>
       <div className="flex items-center gap-4 px-5 py-3.5">
         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color, boxShadow: `0 0 6px ${color}66` }} />
         <div className="flex-1 min-w-0">
@@ -85,7 +85,7 @@ function LogRow({ log, isExpanded, onToggle }: {
       {isExpanded && log.detail && (
         <div className="px-5 pb-3.5">
           <div className="px-3.5 py-2.5 rounded-xl text-[12.5px] font-mono leading-relaxed"
-            style={{ background: "var(--gz-bg-subtle)", color: "var(--gz-text-secondary)", border: "1px solid rgba(108,92,231,.1)" }}>
+            style={{ background: "var(--gz-bg-subtle)", color: "var(--gz-text-secondary)", border: "1px solid rgba(0,0,0,.1)" }}>
             {log.detail}
           </div>
         </div>
@@ -124,7 +124,7 @@ export default function ActivityLogsPage() {
       <div className="gz-card p-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(108,92,231,.35)" }}>
+            style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}>
             <ClipboardList style={{ width: 18, height: 18, color: "white", strokeWidth: 1.9 }} />
           </div>
           <div>
@@ -151,7 +151,7 @@ export default function ActivityLogsPage() {
           {search && (
             <button onClick={() => { setSearch(""); setSearchInput(""); setPage(1); }}
               className="text-[11px] font-bold px-2.5 py-1 rounded-lg"
-              style={{ background: "rgba(239,68,68,.08)", color: "#ef4444" }}>
+              style={{ background: "rgba(185,28,28,.08)", color: "#b91c1c" }}>
               Limpar
             </button>
           )}
@@ -164,7 +164,7 @@ export default function ActivityLogsPage() {
             className="flex-1 px-3 py-1.5 rounded-xl text-[12px] font-bold outline-none transition-all"
             style={{
               background: "var(--gz-bg-subtle)",
-              border: "1.5px solid rgba(108,92,231,.12)",
+              border: "1.5px solid rgba(0,0,0,.12)",
               color: actionFilter === "all" ? "var(--gz-text-muted)" : V1,
             }}
           >
@@ -178,7 +178,7 @@ export default function ActivityLogsPage() {
 
       {/* Logs */}
       <div className="gz-card overflow-hidden">
-        <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+        <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "rgba(0,0,0,.06)" }}>
           <ClipboardList style={{ width: 14, height: 14, color: V1, strokeWidth: 1.9 }} />
           <span className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>
             {logs.length} de {data?.total ?? 0} registos
@@ -209,7 +209,7 @@ export default function ActivityLogsPage() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-5 py-4 border-t flex items-center justify-between" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+          <div className="px-5 py-4 border-t flex items-center justify-between" style={{ borderColor: "rgba(0,0,0,.06)" }}>
             <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
               className="px-4 py-1.5 rounded-xl text-[12.5px] font-bold transition-all"
               style={{ background: "var(--gz-bg-subtle)", color: page <= 1 ? "var(--gz-text-tertiary)" : V1 }}>

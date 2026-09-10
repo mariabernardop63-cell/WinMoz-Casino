@@ -38,7 +38,7 @@ export default function Ranking() {
                 </div>
                 <div className="font-semibold text-gray-800 text-sm">{entry.username}</div>
                 <div className="text-xs text-gray-400">{entry.wins}V · {entry.winRate}%</div>
-                <div className="text-xs font-bold text-indigo-600 mt-1">MT {entry.totalEarnings.toFixed(2)}</div>
+                <div className="text-xs font-bold text-zinc-700 mt-1">MT {entry.totalEarnings.toFixed(2)}</div>
               </div>
             );
           })}
@@ -52,7 +52,7 @@ export default function Ranking() {
               key={g}
               data-testid={`filter-ranking-${g}`}
               onClick={() => setGameFilter(g)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${gameFilter === g ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+              className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${gameFilter === g ? "bg-zinc-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
             >
               {g === "all" ? "Todos" : g.charAt(0).toUpperCase() + g.slice(1)}
             </button>
@@ -67,7 +67,7 @@ export default function Ranking() {
             (ranking ?? []).map((entry) => (
               <div key={entry.playerId} data-testid={`rank-row-${entry.playerId}`} className="px-5 py-4 flex items-center gap-4 hover:bg-gray-50/50 transition-colors">
                 <RankIcon rank={entry.rank} />
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-zinc-700 to-zinc-900 flex items-center justify-center text-white font-bold text-sm">
                   {((entry.username || "?")[0] ?? "?").toUpperCase()}
                 </div>
                 <div className="flex-1">
@@ -75,7 +75,7 @@ export default function Ranking() {
                   <div className="text-xs text-gray-400">{entry.wins}V / {entry.losses}D</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-sm font-bold text-indigo-600">{entry.winRate}%</div>
+                  <div className="text-sm font-bold text-zinc-700">{entry.winRate}%</div>
                   <div className="text-xs text-gray-400">Win Rate</div>
                 </div>
                 <div className="text-right">

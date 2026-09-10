@@ -7,11 +7,11 @@ import {
 } from "lucide-react";
 
 /* ─── colour tokens (mirror dashboard) ─── */
-const V1 = "#6C5CE7";
-const V2 = "#a78bfa";
-const V4 = "#f59e0b";
-const VG = "#10b981";
-const VR = "#ef4444";
+const V1 = "#18181b";
+const V2 = "#71717a";
+const V4 = "#a16207";
+const VG = "#15803d";
+const VR = "#b91c1c";
 
 function fmtMZN(val: number) {
   return `MT ${Number(val.toFixed(2)).toLocaleString("pt-PT")}`;
@@ -38,12 +38,12 @@ function Avatar({ seed, avatarUrl, size = 32 }: { seed: string; avatarUrl?: stri
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
         style={{
           width: size, height: size, borderRadius: "50%", flexShrink: 0,
-          objectFit: "cover", border: "1.5px solid rgba(108,92,231,.14)",
+          objectFit: "cover", border: "1.5px solid rgba(0,0,0,.14)",
         }}
       />
     );
   }
-  const palette = ["#6C5CE7", "#7c3aed", "#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899"];
+  const palette = ["#18181b", "#18181b", "#4f46e5", "#52525b", "#15803d", "#a16207", "#71717a"];
   const bg = palette[seed.charCodeAt(0) % palette.length];
   const initials = seed
     .split(/\s+/)
@@ -56,7 +56,7 @@ function Avatar({ seed, avatarUrl, size = 32 }: { seed: string; avatarUrl?: stri
       aria-label={seed}
       style={{
         width: size, height: size, borderRadius: "50%", flexShrink: 0,
-        background: bg, border: "1.5px solid rgba(108,92,231,.14)",
+        background: bg, border: "1.5px solid rgba(0,0,0,.14)",
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: Math.round(size * 0.38), fontWeight: 700, color: "#fff",
         lineHeight: 1, userSelect: "none",
@@ -118,9 +118,9 @@ function StatCard({ label, value, icon: Icon, color, badge }: {
 /* ─── Risk badge ─── */
 function RiskBadge({ risk }: { risk: "low" | "medium" | "high" }) {
   const map = {
-    low:    { label: "Baixo Risco",  bg: "rgba(16,185,129,.12)", color: VG, border: "rgba(16,185,129,.3)" },
-    medium: { label: "Suspeito",     bg: "rgba(245,158,11,.12)", color: V4, border: "rgba(245,158,11,.3)" },
-    high:   { label: "Alto Risco",   bg: "rgba(239,68,68,.12)",  color: VR, border: "rgba(239,68,68,.3)" },
+    low:    { label: "Baixo Risco",  bg: "rgba(21,128,61,.12)", color: VG, border: "rgba(21,128,61,.3)" },
+    medium: { label: "Suspeito",     bg: "rgba(161,98,7,.12)", color: V4, border: "rgba(161,98,7,.3)" },
+    high:   { label: "Alto Risco",   bg: "rgba(185,28,28,.12)",  color: VR, border: "rgba(185,28,28,.3)" },
   }[risk];
   return (
     <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
@@ -333,7 +333,7 @@ export default function AffiliatesPage() {
         <div className="flex items-end justify-between mt-4">
           <div>
             <div className="flex items-center gap-2.5 mb-1">
-              <div style={{ width: 34, height: 34, borderRadius: 12, background: `linear-gradient(135deg, ${V4}, #d97706)`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 6px 16px ${V4}44` }}>
+              <div style={{ width: 34, height: 34, borderRadius: 12, background: `#18181b`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 6px 16px ${V4}44` }}>
                 <Star style={{ width: 16, height: 16, color: "#fff", strokeWidth: 2 }} />
               </div>
               <h1 style={{ fontSize: 26, fontWeight: 900, letterSpacing: "-0.04em", lineHeight: 1.1, color: "var(--gz-text-primary)" }}>
@@ -347,7 +347,7 @@ export default function AffiliatesPage() {
           </div>
           <button onClick={loadData} disabled={loading}
             className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:-translate-y-0.5 active:scale-95"
-            style={{ background: "rgba(108,92,231,.07)", border: "1px solid rgba(108,92,231,.12)" }}
+            style={{ background: "rgba(0,0,0,.07)", border: "1px solid rgba(0,0,0,.12)" }}
             title="Actualizar">
             <RefreshCw style={{ width: 14, height: 14, color: V1, animation: loading ? "spin 1s linear infinite" : undefined }} />
           </button>
@@ -416,7 +416,7 @@ export default function AffiliatesPage() {
       {/* ── Fraud legend ── */}
       <div className="gz-glass p-4 flex items-center gap-6 flex-wrap animate-float-up" style={{ animationDelay: "100ms" }}>
         <div className="flex items-center gap-2">
-          <div style={{ width: 28, height: 28, borderRadius: 9, background: "rgba(167,139,250,.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ width: 28, height: 28, borderRadius: 9, background: "rgba(255,255,255,.1)", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Shield style={{ width: 13, height: 13, color: V2, strokeWidth: 1.9 }} />
           </div>
           <span className="text-[12px] font-bold" style={{ color: "var(--gz-text-secondary)" }}>Detecção de Fraude</span>
@@ -578,7 +578,7 @@ function UserCard({ user: u, toggling, onToggle, delay }: {
               onMouseLeave={() => setOpen(false)}>
               {["Ver perfil completo", "Ver histórico", "Exportar dados"].map(a => (
                 <button key={a} onClick={() => setOpen(false)}
-                  className="w-full text-left px-4 py-2.5 text-[12px] font-medium text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors flex items-center gap-2">
+                  className="w-full text-left px-4 py-2.5 text-[12px] font-medium text-gray-500 hover:bg-zinc-100 hover:text-zinc-700 transition-colors flex items-center gap-2">
                   <ChevronRight style={{ width: 11, height: 11 }} /> {a}
                 </button>
               ))}
@@ -616,7 +616,7 @@ function UserCard({ user: u, toggling, onToggle, delay }: {
           <div className="gz-progress-track h-1.5">
             <div style={{
               width: `${progressPct}%`, height: "100%", borderRadius: 100,
-              background: `linear-gradient(90deg, ${V4}, ${V2})`,
+              background: `#18181b`,
               transition: "width 1.2s ease",
             }} />
           </div>

@@ -19,45 +19,62 @@ import {
   InboxIcon,
   Bot,
   Star,
-  Gamepad2 as GamepadIcon,
   Ticket,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRef, useState, useEffect } from "react";
 
-const navItems = [
-  { href: "/",              icon: LayoutDashboard,  label: "Dashboard"          },
-  { href: "/matches",       icon: Gamepad2,          label: "Partidas"           },
-  { href: "/players",       icon: Users,             label: "Jogadores"          },
-  { href: "/transactions",  icon: ArrowLeftRight,    label: "Transação"          },
-  { href: "/messages",      icon: MessageCircle,     label: "Mensagem"           },
-  { href: "/reports",       icon: Flag,              label: "Denúncias"          },
-  { href: "/withdrawals",   icon: Landmark,          label: "Saques"             },
-  { href: "/deposit-requests", icon: InboxIcon,      label: "Gestão de Depósitos" },
-  { href: "/notifications", icon: Bell,              label: "Notificações"       },
-  { href: "/online-users",  icon: Wifi,              label: "Online Agora"       },
-  { href: "/balance",       icon: Wallet,            label: "Gestão de Saldos"   },
-  { href: "/block-users",   icon: UserX,             label: "Bloquear Usuários"  },
-  { href: "/security",      icon: ShieldCheck,       label: "Segurança"          },
-  { href: "/relatorios",    icon: BarChart3,         label: "Relatórios"         },
-  { href: "/bots",             icon: Bot,          label: "Gestão de Bots"     },
-  { href: "/affiliates",       icon: Star,         label: "Afiliados"           },
-  { href: "/game-management",  icon: GamepadIcon,  label: "Gestão de Jogos"    },
-  { href: "/recharge-management", icon: Ticket,    label: "Gestão de Recargas" },
+/* ── Navegação agrupada por secção (organização profissional) ── */
+const navSections: Array<{ items: Array<{ href: string; icon: LucideIcon; label: string }> }> = [
+  {
+    items: [
+      { href: "/",                 icon: LayoutDashboard,  label: "Dashboard"           },
+      { href: "/online-users",     icon: Wifi,             label: "Online Agora"        },
+      { href: "/players",          icon: Users,            label: "Jogadores"           },
+      { href: "/matches",          icon: Gamepad2,         label: "Partidas"            },
+    ],
+  },
+  {
+    items: [
+      { href: "/deposit-requests", icon: InboxIcon,        label: "Depósitos"           },
+      { href: "/withdrawals",      icon: Landmark,         label: "Saques"              },
+      { href: "/balance",          icon: Wallet,           label: "Saldos"              },
+      { href: "/transactions",     icon: ArrowLeftRight,   label: "Transações"          },
+      { href: "/recharge-management", icon: Ticket,        label: "Recargas"            },
+      { href: "/affiliates",       icon: Star,             label: "Afiliados"           },
+    ],
+  },
+  {
+    items: [
+      { href: "/game-management",  icon: Gamepad2,         label: "Gestão de Jogos"     },
+      { href: "/bots",             icon: Bot,              label: "Bots"                },
+      { href: "/notifications",    icon: Bell,             label: "Notificações"        },
+      { href: "/messages",         icon: MessageCircle,    label: "Mensagens"           },
+    ],
+  },
+  {
+    items: [
+      { href: "/reports",          icon: Flag,             label: "Denúncias"           },
+      { href: "/block-users",      icon: UserX,            label: "Bloquear Usuários"   },
+      { href: "/security",         icon: ShieldCheck,      label: "Segurança"           },
+      { href: "/relatorios",       icon: BarChart3,        label: "Relatórios"          },
+    ],
+  },
 ];
 
 function Tooltip({ label }: { label: string }) {
   return (
     <div
       className="pointer-events-none absolute left-[calc(100%+14px)] top-1/2 -translate-y-1/2
-                 px-3 py-1.5 rounded-xl text-[12px] font-semibold whitespace-nowrap
+                 px-3 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap
                  opacity-0 -translate-x-2
                  group-hover:opacity-100 group-hover:translate-x-0
                  transition-all duration-200 z-[999]"
       style={{
-        background: "rgba(15,12,32,.93)",
-        color: "#ede9fe",
-        boxShadow: "0 4px 20px rgba(0,0,0,.25), 0 0 0 1px rgba(108,92,231,.2)",
+        background: "#18181b",
+        color: "#fafafa",
+        boxShadow: "0 4px 20px rgba(0,0,0,.35), 0 0 0 1px rgba(255,255,255,.08)",
       }}
     >
       {label}
@@ -69,13 +86,53 @@ function Tooltip({ label }: { label: string }) {
           transform: "translateY(-50%)",
           borderTop: "4px solid transparent",
           borderBottom: "4px solid transparent",
-          borderRight: "5px solid rgba(15,12,32,.93)",
+          borderRight: "5px solid #18181b",
           display: "block",
           width: 0,
           height: 0,
         }}
       />
     </div>
+  );
+}
+
+function NavButton({ item, active, onClick }: { item: { href: string; icon: LucideIcon; label: string }; active: boolean; onClick?: () => void }) {
+  return (
+    <Link href={item.href} className="w-full flex-shrink-0" onClick={onClick}>
+      <div
+        className={cn(
+          "gz-nav-item w-full h-[40px] flex items-center justify-center cursor-pointer group",
+          active ? "active" : ""
+        )}
+        title={item.label}
+      >
+        {active && (
+          <span
+            style={{
+              position: "absolute",
+              left: -10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              width: 3,
+              height: 18,
+              borderRadius: "0 3px 3px 0",
+              background: "#fafafa",
+            }}
+          />
+        )}
+        <item.icon
+          style={{
+            width: 17,
+            height: 17,
+            strokeWidth: active ? 2 : 1.6,
+            color: active ? "#0a0a0a" : "rgba(255,255,255,.55)",
+            position: "relative",
+            zIndex: 1,
+          }}
+        />
+        <Tooltip label={item.label} />
+      </div>
+    </Link>
   );
 }
 
@@ -114,24 +171,28 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
     el.scrollBy({ top: dir === "up" ? -80 : 80, behavior: "smooth" });
   }
 
+  const isActive = (href: string) =>
+    location === href ||
+    (href !== "/" && location.startsWith(href));
+
   return (
     <aside
       className="gz-sidebar admin-sidebar flex flex-col items-center"
       style={{
-        width: 66,
+        width: 64,
         height: "100%",
-        borderRadius: 28,
-        padding: "14px 0 14px",
+        borderRadius: 22,
+        padding: "12px 0 12px",
       }}
     >
       {/* ── Scroll Up ── */}
       <button
         onClick={() => scrollNav("up")}
-        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-xl mb-1 transition-all"
+        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg mb-1 transition-all"
         style={{
-          opacity: canScrollUp ? 0.85 : 0.2,
+          opacity: canScrollUp ? 0.8 : 0.18,
           cursor: canScrollUp ? "pointer" : "default",
-          background: "rgba(255,255,255,.12)",
+          background: "rgba(255,255,255,.07)",
         }}
         title="Deslizar para cima"
         disabled={!canScrollUp}
@@ -139,70 +200,40 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         <ChevronUp style={{ width: 14, height: 14, color: "#fff" }} />
       </button>
 
-      {/* ── Nav ── */}
+      {/* ── Nav (agrupada) ── */}
       <nav
         ref={navRef}
-        className="flex-1 flex flex-col items-center gap-0.5 w-full px-2.5 z-10 overflow-y-auto"
+        className="flex-1 flex flex-col items-center gap-1 w-full px-2.5 z-10 overflow-y-auto"
         style={{ scrollbarWidth: "none" }}
         onScroll={checkScroll}
       >
-        {navItems.map((item, i) => {
-          const isActive =
-            location === item.href ||
-            (item.href !== "/" && location.startsWith(item.href));
-
-          return (
-            <Link key={`${item.href}-${i}`} href={item.href} className="w-full flex-shrink-0" onClick={onItemClick}>
+        {navSections.map((section, si) => (
+          <div key={si} className="w-full flex flex-col items-center gap-1">
+            {si > 0 && (
               <div
-                className={cn(
-                  "gz-nav-item w-full h-[42px] flex items-center justify-center cursor-pointer group",
-                  isActive ? "active" : ""
-                )}
-                style={{ animationDelay: `${i * 40}ms` }}
-              >
-                {isActive && (
-                  <span
-                    style={{
-                      position: "absolute",
-                      left: 0,
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      width: 3,
-                      height: 20,
-                      borderRadius: "0 3px 3px 0",
-                      background: "rgba(255,255,255,.95)",
-                      boxShadow: "0 0 8px rgba(255,255,255,.6)",
-                    }}
-                  />
-                )}
-
-                <item.icon
-                  style={{
-                    width: 17,
-                    height: 17,
-                    strokeWidth: isActive ? 2.2 : 1.65,
-                    color: isActive ? "#ffffff" : "rgba(255,255,255,.5)",
-                    position: "relative",
-                    zIndex: 1,
-                    filter: isActive ? "drop-shadow(0 0 6px rgba(255,255,255,.5))" : "none",
-                  }}
-                />
-
-                <Tooltip label={item.label} />
-              </div>
-            </Link>
-          );
-        })}
+                className="my-1 flex-shrink-0"
+                style={{
+                  width: 24,
+                  height: 1,
+                  background: "rgba(255,255,255,.1)",
+                }}
+              />
+            )}
+            {section.items.map((item) => (
+              <NavButton key={item.href} item={item} active={isActive(item.href)} onClick={onItemClick} />
+            ))}
+          </div>
+        ))}
       </nav>
 
       {/* ── Scroll Down ── */}
       <button
         onClick={() => scrollNav("down")}
-        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-xl mt-1 transition-all"
+        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg mt-1 transition-all"
         style={{
-          opacity: canScrollDown ? 0.85 : 0.2,
+          opacity: canScrollDown ? 0.8 : 0.18,
           cursor: canScrollDown ? "pointer" : "default",
-          background: "rgba(255,255,255,.12)",
+          background: "rgba(255,255,255,.07)",
         }}
         title="Deslizar para baixo"
         disabled={!canScrollDown}
@@ -215,9 +246,9 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
         <div
           className="mb-1"
           style={{
-            width: 28,
+            width: 24,
             height: 1,
-            background: "linear-gradient(90deg, transparent, rgba(255,255,255,.16), transparent)",
+            background: "rgba(255,255,255,.1)",
           }}
         />
 
@@ -232,13 +263,13 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
               <span
                 style={{
                   position: "absolute",
-                  left: 0,
+                  left: -10,
                   top: "50%",
                   transform: "translateY(-50%)",
                   width: 3,
                   height: 18,
                   borderRadius: "0 3px 3px 0",
-                  background: "rgba(255,255,255,.95)",
+                  background: "#fafafa",
                 }}
               />
             )}
@@ -246,8 +277,8 @@ export default function Sidebar({ onItemClick }: SidebarProps) {
               style={{
                 width: 16,
                 height: 16,
-                strokeWidth: 1.65,
-                color: location === "/settings" ? "#ffffff" : "rgba(255,255,255,.4)",
+                strokeWidth: 1.6,
+                color: location === "/settings" ? "#0a0a0a" : "rgba(255,255,255,.45)",
                 position: "relative",
                 zIndex: 1,
               }}

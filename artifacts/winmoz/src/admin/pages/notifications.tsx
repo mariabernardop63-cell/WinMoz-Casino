@@ -11,14 +11,14 @@ import {
   useGetNotificationHistory,
 } from "@/admin/lib/supabase-api";
 
-const V1 = "#6C5CE7";
+const V1 = "#18181b";
 
 type Tab = "criar" | "anuncios" | "historico";
 
 function Section({ title, open, onToggle, children }: { title: string; open: boolean; onToggle: () => void; children: React.ReactNode }) {
   return (
     <div className="gz-card overflow-hidden">
-      <button onClick={onToggle} className="w-full flex items-center justify-between px-5 py-4 text-left transition-colors hover:bg-indigo-50/30">
+      <button onClick={onToggle} className="w-full flex items-center justify-between px-5 py-4 text-left transition-colors hover:bg-zinc-100/30">
         <span className="text-[15px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{title}</span>
         {open ? <ChevronUp style={{ width: 16, height: 16, color: V1 }} /> : <ChevronDown style={{ width: 16, height: 16, color: "var(--gz-text-muted)" }} />}
       </button>
@@ -49,7 +49,7 @@ function InputField({ label, placeholder, value, onChange, type = "text" }: { la
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         className="w-full px-3.5 py-2.5 rounded-2xl outline-none text-[13px]"
-        style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,.12)", color: "var(--gz-text-primary)" }}
+        style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.12)", color: "var(--gz-text-primary)" }}
       />
     </div>
   );
@@ -187,7 +187,7 @@ export default function Notifications() {
       {/* Status toast */}
       {status === "ok" && (
         <div className="fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl"
-          style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, color: "#fff" }}>
+          style={{ background: `#18181b`, color: "#fff" }}>
           <CheckCircle2 style={{ width: 18, height: 18 }} />
           <span className="text-[13.5px] font-bold">
             {scheduleEnabled && scheduleDate ? "Notificação agendada!" : "Enviado com sucesso!"}
@@ -196,7 +196,7 @@ export default function Notifications() {
       )}
       {status === "error" && (
         <div className="fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl"
-          style={{ background: "#ef4444", color: "#fff" }}>
+          style={{ background: "#b91c1c", color: "#fff" }}>
           <AlertCircle style={{ width: 18, height: 18 }} />
           <span className="text-[13.5px] font-bold">Erro ao enviar. Tenta novamente.</span>
         </div>
@@ -206,7 +206,7 @@ export default function Notifications() {
       <div className="gz-card p-5 mb-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(108,92,231,.35)" }}>
+            style={{ background: `#18181b`, boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}>
             <Bell style={{ width: 18, height: 18, color: "white", strokeWidth: 1.9 }} />
           </div>
           <div>
@@ -224,7 +224,7 @@ export default function Notifications() {
           <button key={t.id} onClick={() => setActiveTab(t.id)}
             className="flex items-center gap-2 px-4 py-2 rounded-2xl text-[13px] font-bold whitespace-nowrap transition-all flex-shrink-0"
             style={activeTab === t.id
-              ? { background: `linear-gradient(135deg, ${V1}, #4f46e5)`, color: "#fff", boxShadow: "0 4px 12px rgba(108,92,231,.35)" }
+              ? { background: `#18181b`, color: "#fff", boxShadow: "0 4px 12px rgba(0,0,0,.35)" }
               : { background: "var(--gz-bg-subtle)", color: "var(--gz-text-muted)" }
             }>
             <t.icon style={{ width: 14, height: 14 }} />
@@ -243,11 +243,11 @@ export default function Notifications() {
 
             {/* Preview */}
             {notifTitle && (
-              <div className="mt-2 p-3.5 rounded-2xl" style={{ background: "rgba(108,92,231,.05)", border: "1.5px solid rgba(108,92,231,.12)" }}>
+              <div className="mt-2 p-3.5 rounded-2xl" style={{ background: "rgba(0,0,0,.05)", border: "1.5px solid rgba(0,0,0,.12)" }}>
                 <div className="text-[10px] font-black uppercase tracking-wider mb-2" style={{ color: "var(--gz-text-tertiary)" }}>Pré-visualização</div>
                 <div className="rounded-xl overflow-hidden" style={{ background: "linear-gradient(160deg, #1a0840, #2d1065)", padding: "12px 14px" }}>
                   <div style={{ display: "flex", alignItems: "flex-end", gap: 3, marginBottom: 8 }}>
-                    <div style={{ width: 4, height: 10, borderRadius: 2, background: "linear-gradient(to bottom, #a78bfa, #6C5CE7)" }} />
+                    <div style={{ width: 4, height: 10, borderRadius: 2, background: "linear-gradient(to bottom, #71717a, #18181b)" }} />
                     <div style={{ width: 4, height: 15, borderRadius: 2, background: "linear-gradient(to bottom, #f472b6, #c026d3)" }} />
                   </div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 3 }}>{notifTitle}</div>
@@ -267,8 +267,8 @@ export default function Notifications() {
                 <button key={t.id} onClick={() => setNotifTarget(t.id)}
                   className="p-3.5 rounded-2xl text-left transition-all"
                   style={{
-                    border: notifTarget === t.id ? `2px solid ${V1}` : "1.5px solid rgba(108,92,231,.12)",
-                    background: notifTarget === t.id ? "rgba(108,92,231,.07)" : "transparent",
+                    border: notifTarget === t.id ? `2px solid ${V1}` : "1.5px solid rgba(0,0,0,.12)",
+                    background: notifTarget === t.id ? "rgba(0,0,0,.07)" : "transparent",
                   }}>
                   <div className="w-8 h-8 rounded-xl mb-2 flex items-center justify-center" style={{ background: notifTarget === t.id ? `${V1}18` : "rgba(0,0,0,.04)" }}>
                     <t.icon style={{ width: 15, height: 15, color: notifTarget === t.id ? V1 : "#111" }} />
@@ -312,8 +312,8 @@ export default function Notifications() {
                     <button key={t.id} onClick={() => setAutomationTrigger(t.id)}
                       className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
                       style={{
-                        border: automationTrigger === t.id ? `1.5px solid ${V1}` : "1.5px solid rgba(108,92,231,.1)",
-                        background: automationTrigger === t.id ? "rgba(108,92,231,.06)" : "transparent",
+                        border: automationTrigger === t.id ? `1.5px solid ${V1}` : "1.5px solid rgba(0,0,0,.1)",
+                        background: automationTrigger === t.id ? "rgba(0,0,0,.06)" : "transparent",
                       }}>
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ background: automationTrigger === t.id ? `${V1}15` : "rgba(0,0,0,.04)" }}>
@@ -332,7 +332,7 @@ export default function Notifications() {
                   ))}
                   {notifTitle && (
                     <div className="mt-2 px-3 py-2.5 rounded-xl flex items-center gap-2 text-[12px]"
-                      style={{ background: "rgba(108,92,231,.06)", color: V1 }}>
+                      style={{ background: "rgba(0,0,0,.06)", color: V1 }}>
                       <Repeat style={{ width: 12, height: 12 }} />
                       Automação activa: "{notifTitle}" será enviado automaticamente
                     </div>
@@ -345,8 +345,8 @@ export default function Notifications() {
           <button onClick={handleSendNotif} disabled={!notifTitle.trim() || sendNotification.isPending}
             className="w-full py-3.5 rounded-2xl text-[14px] font-bold text-white flex items-center justify-center gap-2.5 transition-all hover:-translate-y-0.5 active:scale-95"
             style={{
-              background: notifTitle.trim() ? `linear-gradient(135deg, ${V1}, #4f46e5)` : "rgba(108,92,231,.2)",
-              boxShadow: notifTitle.trim() ? "0 6px 18px rgba(108,92,231,.4)" : "none",
+              background: notifTitle.trim() ? `#18181b` : "rgba(0,0,0,.2)",
+              boxShadow: notifTitle.trim() ? "0 6px 18px rgba(0,0,0,.4)" : "none",
               opacity: notifTitle.trim() ? 1 : 0.6,
             }}>
             {sendNotification.isPending
@@ -370,9 +370,9 @@ export default function Notifications() {
                 <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Imagem (URL)</label>
                 <div className="flex items-center gap-3">
                   {annImage && (
-                    <img src={annImage} alt="preview" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" style={{ border: "1.5px solid rgba(108,92,231,.15)" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    <img src={annImage} alt="preview" className="w-14 h-14 rounded-xl object-cover flex-shrink-0" style={{ border: "1.5px solid rgba(0,0,0,.15)" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   )}
-                  <div className="flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl" style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,.12)" }}>
+                  <div className="flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl" style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.12)" }}>
                     <ImageIcon style={{ width: 14, height: 14, color: V1, flexShrink: 0 }} />
                     <input value={annImage} onChange={e => setAnnImage(e.target.value)} placeholder="https://…" className="flex-1 bg-transparent outline-none text-[13px]" style={{ color: "var(--gz-text-primary)" }} />
                   </div>
@@ -381,7 +381,7 @@ export default function Notifications() {
 
               {/* Preview do anúncio — nova layout */}
               {annTitle && (
-                <div className="mt-1 rounded-2xl overflow-hidden" style={{ border: "1.5px solid rgba(108,92,231,.12)", background: "linear-gradient(160deg, #1a0840, #2d1065)" }}>
+                <div className="mt-1 rounded-2xl overflow-hidden" style={{ border: "1.5px solid rgba(0,0,0,.12)", background: "linear-gradient(160deg, #1a0840, #2d1065)" }}>
                   <div style={{ display: "flex", minHeight: 100 }}>
                     {annImage && (
                       <div style={{ width: 90, flexShrink: 0, overflow: "hidden" }}>
@@ -390,13 +390,13 @@ export default function Notifications() {
                     )}
                     <div style={{ flex: 1, padding: "14px 14px" }}>
                       <div style={{ display: "flex", alignItems: "flex-end", gap: 2, marginBottom: 6 }}>
-                        <div style={{ width: 4, height: 10, borderRadius: 2, background: "linear-gradient(to bottom, #a78bfa, #6C5CE7)" }} />
+                        <div style={{ width: 4, height: 10, borderRadius: 2, background: "linear-gradient(to bottom, #71717a, #18181b)" }} />
                         <div style={{ width: 4, height: 15, borderRadius: 2, background: "linear-gradient(to bottom, #f472b6, #c026d3)" }} />
                       </div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 3 }}>{annTitle}</div>
                       {annSubtitle && <div style={{ fontSize: 11, color: "rgba(255,255,255,.65)", marginBottom: 8 }}>{annSubtitle}</div>}
                       {annBtnLabel && (
-                        <div style={{ padding: "5px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: `linear-gradient(135deg, ${V1}, #4f46e5)`, color: "#fff", display: "inline-block" }}>{annBtnLabel}</div>
+                        <div style={{ padding: "5px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, background: `#18181b`, color: "#fff", display: "inline-block" }}>{annBtnLabel}</div>
                       )}
                     </div>
                   </div>
@@ -417,7 +417,7 @@ export default function Notifications() {
                   ].map(o => (
                     <button key={o.id} onClick={() => setAnnBtnType(o.id)}
                       className="flex items-center gap-2 p-3 rounded-xl text-[12.5px] font-semibold transition-all"
-                      style={{ border: annBtnType === o.id ? `1.5px solid ${V1}` : "1.5px solid rgba(108,92,231,.12)", color: annBtnType === o.id ? V1 : "var(--gz-text-muted)", background: annBtnType === o.id ? "rgba(108,92,231,.06)" : "transparent" }}>
+                      style={{ border: annBtnType === o.id ? `1.5px solid ${V1}` : "1.5px solid rgba(0,0,0,.12)", color: annBtnType === o.id ? V1 : "var(--gz-text-muted)", background: annBtnType === o.id ? "rgba(0,0,0,.06)" : "transparent" }}>
                       <o.icon style={{ width: 14, height: 14 }} />
                       {o.label}
                     </button>
@@ -443,8 +443,8 @@ export default function Notifications() {
                     <button key={t.id} onClick={() => setAnnAutomationTrigger(t.id)}
                       className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all"
                       style={{
-                        border: annAutomationTrigger === t.id ? `1.5px solid ${V1}` : "1.5px solid rgba(108,92,231,.1)",
-                        background: annAutomationTrigger === t.id ? "rgba(108,92,231,.06)" : "transparent",
+                        border: annAutomationTrigger === t.id ? `1.5px solid ${V1}` : "1.5px solid rgba(0,0,0,.1)",
+                        background: annAutomationTrigger === t.id ? "rgba(0,0,0,.06)" : "transparent",
                       }}>
                       <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ background: annAutomationTrigger === t.id ? `${V1}15` : "rgba(0,0,0,.04)" }}>
@@ -469,8 +469,8 @@ export default function Notifications() {
           <button onClick={handleSendAnn} disabled={!annTitle.trim() || sendNotification.isPending}
             className="w-full py-3.5 rounded-2xl text-[14px] font-bold text-white flex items-center justify-center gap-2.5 transition-all hover:-translate-y-0.5 active:scale-95"
             style={{
-              background: annTitle.trim() ? `linear-gradient(135deg, ${V1}, #4f46e5)` : "rgba(108,92,231,.2)",
-              boxShadow: annTitle.trim() ? "0 6px 18px rgba(108,92,231,.4)" : "none",
+              background: annTitle.trim() ? `#18181b` : "rgba(0,0,0,.2)",
+              boxShadow: annTitle.trim() ? "0 6px 18px rgba(0,0,0,.4)" : "none",
               opacity: annTitle.trim() ? 1 : 0.6,
             }}>
             {sendNotification.isPending
@@ -484,7 +484,7 @@ export default function Notifications() {
       {/* ── Tab: Histórico ── */}
       {activeTab === "historico" && (
         <div className="gz-card overflow-hidden">
-          <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+          <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(0,0,0,.06)" }}>
             <span className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>
               {loadingHistory ? "A carregar…" : `${history.length} enviada${history.length !== 1 ? "s" : ""}`}
             </span>
@@ -492,7 +492,7 @@ export default function Notifications() {
 
           {loadingHistory && (
             <div className="flex items-center justify-center py-10">
-              <div className="w-5 h-5 rounded-full border-2 border-indigo-300 border-t-indigo-600 animate-spin" />
+              <div className="w-5 h-5 rounded-full border-2 border-zinc-200 border-t-zinc-800 animate-spin" />
             </div>
           )}
 
@@ -503,22 +503,22 @@ export default function Notifications() {
             </div>
           )}
 
-          <div className="divide-y" style={{ borderColor: "rgba(108,92,231,.05)" }}>
+          <div className="divide-y" style={{ borderColor: "rgba(0,0,0,.05)" }}>
             {(history as Record<string, unknown>[]).map(h => {
               const isAnn = h.type === "announcement";
               return (
-                <div key={h.id as string} className="px-5 py-4 flex items-center gap-4 hover:bg-indigo-50/30 transition-colors">
+                <div key={h.id as string} className="px-5 py-4 flex items-center gap-4 hover:bg-zinc-100/30 transition-colors">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: isAnn ? "rgba(245,158,11,.08)" : "rgba(108,92,231,.08)" }}>
+                    style={{ background: isAnn ? "rgba(161,98,7,.08)" : "rgba(0,0,0,.08)" }}>
                     {isAnn
-                      ? <Megaphone style={{ width: 16, height: 16, color: "#f59e0b" }} />
+                      ? <Megaphone style={{ width: 16, height: 16, color: "#a16207" }} />
                       : <Bell style={{ width: 16, height: 16, color: V1 }} />
                     }
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
                       <span className="text-[13.5px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{h.title as string}</span>
-                      {isAnn && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: "rgba(245,158,11,.1)", color: "#d97706" }}>Anúncio</span>}
+                      {isAnn && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md" style={{ background: "rgba(161,98,7,.1)", color: "#71717a" }}>Anúncio</span>}
                     </div>
                     <div className="text-[11.5px] flex items-center gap-2" style={{ color: "var(--gz-text-muted)" }}>
                       <span>{fmtTarget(h.target as string)}</span>

@@ -3,7 +3,7 @@ import { useListReports, useResolveReport, getListReportsQueryKey } from "@/admi
 import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle, XCircle, Flag, Bug, CreditCard, User, HelpCircle, AlertTriangle, Hash } from "lucide-react";
 
-const V1 = "#6C5CE7";
+const V1 = "#18181b";
 
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   "Problema técnico":      Bug,
@@ -23,7 +23,7 @@ const PRIORITY_COLORS: Record<string, { bg: string; text: string; label: string 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     pending:   "bg-amber-100 text-amber-700",
-    reviewed:  "bg-indigo-100 text-indigo-700",
+    reviewed:  "bg-zinc-100 text-zinc-700",
     dismissed: "bg-gray-100 text-gray-500",
   };
   const labels: Record<string, string> = { pending: "Pendente", reviewed: "Revisado", dismissed: "Arquivado" };
@@ -101,7 +101,7 @@ export default function Reports() {
       <div className="gz-card p-5 mb-5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-            style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(108,92,231,.35)" }}>
+            style={{ background: `#18181b`, boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}>
             <Flag style={{ width: 18, height: 18, color: "white", strokeWidth: 1.9 }} />
           </div>
           <div>
@@ -116,8 +116,8 @@ export default function Reports() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-5">
         {[
-          { label: "Pendentes",  value: pendingCount,   color: "#d97706", bg: "rgba(217,119,6,.08)",  icon: AlertTriangle },
-          { label: "Revisadas",  value: reviewedCount,  color: "#059669", bg: "rgba(16,185,129,.08)", icon: CheckCircle   },
+          { label: "Pendentes",  value: pendingCount,   color: "#71717a", bg: "rgba(217,119,6,.08)",  icon: AlertTriangle },
+          { label: "Revisadas",  value: reviewedCount,  color: "#059669", bg: "rgba(21,128,61,.08)", icon: CheckCircle   },
           { label: "Arquivadas", value: dismissedCount, color: "#9ca3af", bg: "rgba(0,0,0,.04)",       icon: XCircle       },
         ].map(s => (
           <div key={s.label} className="gz-card p-4">
@@ -132,17 +132,17 @@ export default function Reports() {
 
       {/* Filter */}
       <div className="gz-card overflow-hidden">
-        <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+        <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "rgba(0,0,0,.06)" }}>
           {["all", "pending", "reviewed", "dismissed"].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${statusFilter === s ? "text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-              style={statusFilter === s ? { background: `linear-gradient(135deg, ${V1}, #4f46e5)` } : {}}>
+              style={statusFilter === s ? { background: `#18181b` } : {}}>
               {s === "all" ? "Todas" : s === "pending" ? "Pendentes" : s === "reviewed" ? "Revisadas" : "Arquivadas"}
             </button>
           ))}
         </div>
 
-        <div className="divide-y" style={{ borderColor: "rgba(108,92,231,.05)" }}>
+        <div className="divide-y" style={{ borderColor: "rgba(0,0,0,.05)" }}>
           {isLoading ? (
             Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="p-5 h-24 animate-pulse m-2 rounded-2xl" style={{ background: "var(--gz-bg-subtle)" }} />
@@ -164,19 +164,19 @@ export default function Reports() {
               const isTicket      = ticketId && ticketId.startsWith("WM-");
 
               return (
-                <div key={r.id} className="px-5 py-4 hover:bg-indigo-50/20 transition-colors">
+                <div key={r.id} className="px-5 py-4 hover:bg-zinc-100/20 transition-colors">
                   <div className="flex items-start gap-4">
 
                     {/* Category icon */}
                     <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: "rgba(108,92,231,.07)" }}>
+                      style={{ background: "rgba(0,0,0,.07)" }}>
                       <CategoryIcon category={categoryLabel} />
                     </div>
 
                     <div className="flex-1 min-w-0">
                       {/* Header row */}
                       <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                        <span className="text-[12.5px] font-black uppercase tracking-wide px-2 py-0.5 rounded-lg" style={{ background: "rgba(108,92,231,.08)", color: V1 }}>
+                        <span className="text-[12.5px] font-black uppercase tracking-wide px-2 py-0.5 rounded-lg" style={{ background: "rgba(0,0,0,.08)", color: V1 }}>
                           {categoryLabel}
                         </span>
                         <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full ${priorityInfo.bg} ${priorityInfo.text}`}>
@@ -195,7 +195,7 @@ export default function Reports() {
                       {/* Description */}
                       {r.description && (
                         <div className="text-[12.5px] leading-relaxed px-3.5 py-2.5 rounded-xl mb-2"
-                          style={{ background: "var(--gz-bg-subtle)", color: "var(--gz-text-secondary)", border: "1px solid rgba(108,92,231,.08)" }}>
+                          style={{ background: "var(--gz-bg-subtle)", color: "var(--gz-text-secondary)", border: "1px solid rgba(0,0,0,.08)" }}>
                           {r.description}
                         </div>
                       )}
@@ -221,7 +221,7 @@ export default function Reports() {
                         <button onClick={() => handleAction(r.id as string, "reviewed")}
                           disabled={resolveReport.isPending}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold transition-all hover:shadow-md"
-                          style={{ background: "rgba(16,185,129,.08)", color: "#059669", border: "1px solid rgba(16,185,129,.2)" }}>
+                          style={{ background: "rgba(21,128,61,.08)", color: "#059669", border: "1px solid rgba(21,128,61,.2)" }}>
                           <CheckCircle style={{ width: 13, height: 13 }} />
                           Resolver
                         </button>

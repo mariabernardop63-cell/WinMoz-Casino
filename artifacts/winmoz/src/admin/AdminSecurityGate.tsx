@@ -231,7 +231,7 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
   if (verifying) {
     return (
       <div style={{ minHeight: "100dvh", width: "100%", background: "linear-gradient(135deg, #0d0618 0%, #1a0533 100%)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ width: 36, height: 36, borderRadius: "50%", border: "3px solid rgba(124,58,237,0.25)", borderTopColor: "#7C3AED", animation: "admin_spin 0.8s linear infinite" }} />
+        <div style={{ width: 36, height: 36, borderRadius: "50%", border: "3px solid rgba(0,0,0,0.25)", borderTopColor: "#18181b", animation: "admin_spin 0.8s linear infinite" }} />
         <style>{`@keyframes admin_spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -243,15 +243,15 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
     return (
       <div style={{ minHeight: "100dvh", width: "100%", background: "linear-gradient(135deg, #0d0618 0%, #1a0533 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-          style={{ maxWidth: 380, width: "100%", textAlign: "center", background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 28, padding: "48px 32px", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
-          <div style={{ width: 72, height: 72, borderRadius: 22, background: "rgba(239,68,68,0.12)", border: "1.5px solid rgba(239,68,68,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
-            <AlertTriangle style={{ width: 32, height: 32, color: "#ef4444" }} />
+          style={{ maxWidth: 380, width: "100%", textAlign: "center", background: "rgba(185,28,28,0.06)", border: "1px solid rgba(185,28,28,0.2)", borderRadius: 28, padding: "48px 32px", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
+          <div style={{ width: 72, height: 72, borderRadius: 22, background: "rgba(185,28,28,0.12)", border: "1.5px solid rgba(185,28,28,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
+            <AlertTriangle style={{ width: 32, height: 32, color: "#b91c1c" }} />
           </div>
           <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 800, margin: "0 0 12px" }}>Acesso Permanentemente Bloqueado</h2>
           <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, lineHeight: 1.6, margin: 0 }}>
             Este dispositivo foi bloqueado permanentemente por múltiplas tentativas de acesso não autorizado.
           </p>
-          <div style={{ marginTop: 24, padding: "10px 16px", background: "rgba(239,68,68,0.08)", borderRadius: 12, fontSize: 11, color: "rgba(239,68,68,0.7)", fontFamily: "monospace" }}>
+          <div style={{ marginTop: 24, padding: "10px 16px", background: "rgba(185,28,28,0.08)", borderRadius: 12, fontSize: 11, color: "rgba(185,28,28,0.7)", fontFamily: "monospace" }}>
             DEVICE: {getDeviceId().slice(0, 16)}...
           </div>
         </motion.div>
@@ -263,15 +263,15 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
     return (
       <div style={{ minHeight: "100dvh", width: "100%", background: "linear-gradient(135deg, #0d0618 0%, #1a0533 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
-          style={{ maxWidth: 380, width: "100%", textAlign: "center", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 28, padding: "48px 32px", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
-          <div style={{ width: 72, height: 72, borderRadius: 22, background: "rgba(245,158,11,0.1)", border: "1.5px solid rgba(245,158,11,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
-            <Clock style={{ width: 32, height: 32, color: "#f59e0b" }} />
+          style={{ maxWidth: 380, width: "100%", textAlign: "center", background: "rgba(161,98,7,0.06)", border: "1px solid rgba(161,98,7,0.2)", borderRadius: 28, padding: "48px 32px", boxShadow: "0 32px 80px rgba(0,0,0,0.6)" }}>
+          <div style={{ width: 72, height: 72, borderRadius: 22, background: "rgba(161,98,7,0.1)", border: "1.5px solid rgba(161,98,7,0.3)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 24px" }}>
+            <Clock style={{ width: 32, height: 32, color: "#a16207" }} />
           </div>
           <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 800, margin: "0 0 12px" }}>Acesso Temporariamente Bloqueado</h2>
           <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, lineHeight: 1.6, margin: "0 0 24px" }}>Demasiadas tentativas falhadas.</p>
-          <div style={{ padding: "16px 24px", background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: 16 }}>
+          <div style={{ padding: "16px 24px", background: "rgba(161,98,7,0.08)", border: "1px solid rgba(161,98,7,0.2)", borderRadius: 16 }}>
             <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, marginBottom: 6, letterSpacing: "0.8px", textTransform: "uppercase" }}>Tempo Restante</div>
-            <div style={{ color: "#f59e0b", fontSize: 28, fontWeight: 800, fontFamily: "monospace", letterSpacing: "2px" }}>{formatCountdown(countdown)}</div>
+            <div style={{ color: "#a16207", fontSize: 28, fontWeight: 800, fontFamily: "monospace", letterSpacing: "2px" }}>{formatCountdown(countdown)}</div>
           </div>
         </motion.div>
       </div>
@@ -281,7 +281,7 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
   return (
     <div style={{ minHeight: "100dvh", width: "100%", background: "linear-gradient(135deg, #0d0618 0%, #1a0533 40%, #2d0f6b 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: "24px 16px", position: "relative", overflow: "hidden" }}>
       <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.18, 0.1] }} transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-        style={{ position: "absolute", top: "-15%", right: "-10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, #7C3AED 0%, transparent 70%)", pointerEvents: "none" }} />
+        style={{ position: "absolute", top: "-15%", right: "-10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, #18181b 0%, transparent 70%)", pointerEvents: "none" }} />
 
       <motion.div
         initial={{ opacity: 0, y: 24 }}
@@ -291,9 +291,9 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
       >
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <motion.div
-            animate={{ boxShadow: ["0 0 20px rgba(124,58,237,0.3)", "0 0 40px rgba(124,58,237,0.5)", "0 0 20px rgba(124,58,237,0.3)"] }}
+            animate={{ boxShadow: ["0 0 20px rgba(0,0,0,0.3)", "0 0 40px rgba(0,0,0,0.5)", "0 0 20px rgba(0,0,0,0.3)"] }}
             transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
-            style={{ width: 72, height: 72, borderRadius: 24, background: "linear-gradient(135deg, #7C3AED, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
+            style={{ width: 72, height: 72, borderRadius: 24, background: "linear-gradient(135deg, #18181b, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
             <Shield style={{ width: 32, height: 32, color: "#fff" }} />
           </motion.div>
           <h1 style={{ color: "#fff", fontSize: 26, fontWeight: 800, margin: "0 0 8px", letterSpacing: "-0.5px" }}>Acesso Restrito</h1>
@@ -301,14 +301,14 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
         </div>
 
         <div style={{ background: "rgba(255,255,255,0.04)", backdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 28, padding: "36px 28px", boxShadow: "0 32px 80px rgba(0,0,0,0.5)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 100, background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.2)", marginBottom: 28, width: "fit-content" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 100, background: "rgba(0,0,0,0.1)", border: "1px solid rgba(0,0,0,0.2)", marginBottom: 28, width: "fit-content" }}>
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399" }} />
             <span style={{ color: "rgba(255,255,255,0.6)", fontSize: 11, fontWeight: 600, letterSpacing: "0.5px" }}>VERIFICAÇÃO DE 2 FACTORES ACTIVA</span>
           </div>
 
           <label style={{ display: "block", marginBottom: 8, color: "rgba(255,255,255,0.6)", fontSize: 12, fontWeight: 600, letterSpacing: "0.5px" }}>PALAVRA-PASSE</label>
 
-          <div style={{ display: "flex", alignItems: "center", background: "rgba(255,255,255,0.05)", border: `1.5px solid ${error ? "rgba(239,68,68,0.5)" : "rgba(255,255,255,0.1)"}`, borderRadius: 14, overflow: "hidden", marginBottom: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", background: "rgba(255,255,255,0.05)", border: `1.5px solid ${error ? "rgba(185,28,28,0.5)" : "rgba(255,255,255,0.1)"}`, borderRadius: 14, overflow: "hidden", marginBottom: 8 }}>
             <div style={{ padding: "0 14px", color: "rgba(255,255,255,0.3)" }}><Lock style={{ width: 15, height: 15 }} /></div>
             <input
               type={showPw ? "text" : "password"}
@@ -328,8 +328,8 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
           <AnimatePresence>
             {error && (
               <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", marginBottom: 16 }}>
-                <AlertTriangle style={{ width: 12, height: 12, color: "#ef4444", flexShrink: 0 }} />
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 10, background: "rgba(185,28,28,0.1)", border: "1px solid rgba(185,28,28,0.2)", marginBottom: 16 }}>
+                <AlertTriangle style={{ width: 12, height: 12, color: "#b91c1c", flexShrink: 0 }} />
                 <span style={{ color: "#fca5a5", fontSize: 12 }}>{error}</span>
               </motion.div>
             )}
@@ -338,14 +338,14 @@ export default function AdminSecurityGate({ children }: { children: React.ReactN
           {attempts > 0 && attempts < MAX_ATTEMPTS && (
             <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
               {[...Array(MAX_ATTEMPTS)].map((_, i) => (
-                <div key={i} style={{ flex: 1, height: 3, borderRadius: 100, background: i < attempts ? "#ef4444" : "rgba(255,255,255,0.1)", transition: "background 0.3s" }} />
+                <div key={i} style={{ flex: 1, height: 3, borderRadius: 100, background: i < attempts ? "#b91c1c" : "rgba(255,255,255,0.1)", transition: "background 0.3s" }} />
               ))}
             </div>
           )}
 
           <motion.button onClick={handleSubmit} disabled={!password.trim() || loading}
             whileHover={{ scale: password.trim() ? 1.01 : 1 }} whileTap={{ scale: 0.98 }}
-            style={{ width: "100%", padding: "14px", borderRadius: 14, border: "none", cursor: password.trim() ? "pointer" : "default", background: password.trim() ? "linear-gradient(135deg, #7C3AED, #4f46e5)" : "rgba(255,255,255,0.05)", color: password.trim() ? "#fff" : "rgba(255,255,255,0.3)", fontSize: 14, fontWeight: 700, fontFamily: "inherit", transition: "all 0.2s", boxShadow: password.trim() ? "0 8px 24px rgba(124,58,237,0.4)" : "none" }}>
+            style={{ width: "100%", padding: "14px", borderRadius: 14, border: "none", cursor: password.trim() ? "pointer" : "default", background: password.trim() ? "linear-gradient(135deg, #18181b, #4f46e5)" : "rgba(255,255,255,0.05)", color: password.trim() ? "#fff" : "rgba(255,255,255,0.3)", fontSize: 14, fontWeight: 700, fontFamily: "inherit", transition: "all 0.2s", boxShadow: password.trim() ? "0 8px 24px rgba(0,0,0,0.4)" : "none" }}>
             {loading ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                 <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "admin_spin 0.8s linear infinite" }} />

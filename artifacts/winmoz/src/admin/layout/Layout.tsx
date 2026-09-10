@@ -80,8 +80,8 @@ function MobileBottomNav() {
     <nav
       className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around px-2 pb-safe"
       style={{
-        background: "linear-gradient(175deg, #7166ee 0%, #6C5CE7 45%, #5e4fdb 100%)",
-        boxShadow: "0 -4px 24px rgba(108,92,231,.35)",
+        background: "#0a0a0a",
+        boxShadow: "0 -4px 24px rgba(0,0,0,.35)",
         height: 60,
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }}
@@ -95,7 +95,7 @@ function MobileBottomNav() {
             <div
               className={cn(
                 "flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 rounded-xl transition-all",
-                isActive ? "bg-white/20" : "bg-transparent"
+                isActive ? "bg-white/15" : "bg-transparent"
               )}
               style={{ minWidth: 52 }}
             >
@@ -104,8 +104,8 @@ function MobileBottomNav() {
                   width: 20,
                   height: 20,
                   strokeWidth: isActive ? 2.2 : 1.6,
-                  color: isActive ? "#ffffff" : "rgba(255,255,255,.55)",
-                  filter: isActive ? "drop-shadow(0 0 5px rgba(255,255,255,.5))" : "none",
+                  color: isActive ? "#ffffff" : "rgba(255,255,255,.5)",
+                  filter: "none",
                 }}
               />
               <span
@@ -242,10 +242,10 @@ function TopBar({ onMenuClick, navPos, onNavPosChange }: TopBarProps) {
               className="flex items-center gap-2 px-3 py-2 rounded-2xl"
               style={{
                 background: "var(--gz-bg-card-btn)",
-                border: "1.5px solid rgba(108,92,231,.2)",
+                border: "1.5px solid rgba(0,0,0,.2)",
               }}
             >
-              <Search className="w-3.5 h-3.5 text-indigo-400" strokeWidth={2} />
+              <Search className="w-3.5 h-3.5 text-zinc-400" strokeWidth={2} />
               <input
                 autoFocus
                 placeholder="Buscar..."
@@ -286,13 +286,13 @@ function TopBar({ onMenuClick, navPos, onNavPosChange }: TopBarProps) {
               title={title}
               className="w-7 h-7 rounded-lg flex items-center justify-center transition-all active:scale-95"
               style={{
-                background: navPos === pos ? "rgba(108,92,231,0.18)" : "transparent",
-                border: navPos === pos ? "1px solid rgba(108,92,231,0.3)" : "1px solid transparent",
+                background: navPos === pos ? "rgba(0,0,0,0.18)" : "transparent",
+                border: navPos === pos ? "1px solid rgba(0,0,0,0.3)" : "1px solid transparent",
               }}
             >
               <Icon
                 className="w-3.5 h-3.5"
-                style={{ color: navPos === pos ? "#6C5CE7" : "#9ca3af" }}
+                style={{ color: navPos === pos ? "#18181b" : "#9ca3af" }}
                 strokeWidth={1.8}
               />
             </button>
@@ -315,9 +315,9 @@ function TopBar({ onMenuClick, navPos, onNavPosChange }: TopBarProps) {
           onClick={handleLogout}
           className="flex items-center gap-2 h-9 px-3 rounded-2xl transition-all active:scale-95"
           style={{
-            background: "rgba(239,68,68,.08)",
-            border: "1px solid rgba(239,68,68,.15)",
-            color: "#ef4444",
+            background: "rgba(0,0,0,.08)",
+            border: "1px solid rgba(0,0,0,.15)",
+            color: "#b91c1c",
           }}
           title="Terminar Sessão"
         >

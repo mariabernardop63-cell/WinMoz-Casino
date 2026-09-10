@@ -11,7 +11,7 @@ import {
 } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
 
-const V1 = "#6C5CE7";
+const V1 = "#18181b";
 type BlockType = "account" | "ip" | "device";
 
 function SeverityBadge({ severity }: { severity: string }) {
@@ -26,7 +26,7 @@ function SeverityBadge({ severity }: { severity: string }) {
 
 function TypeBadge({ type }: { type: BlockType }) {
   const map: Record<BlockType, { cls: string; label: string; icon: React.ElementType }> = {
-    account: { cls: "bg-purple-100 text-purple-700", label: "Conta",       icon: UserX  },
+    account: { cls: "bg-zinc-100 text-zinc-600", label: "Conta",       icon: UserX  },
     ip:      { cls: "bg-red-100 text-red-700",        label: "Endereço IP", icon: Globe  },
     device:  { cls: "bg-orange-100 text-orange-700",  label: "Dispositivo", icon: Lock   },
   };
@@ -109,14 +109,14 @@ export default function BlockUsers() {
       {/* Toasts */}
       {showSuccess && (
         <div className="fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl animate-float-up"
-          style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, color: "#fff" }}>
+          style={{ background: `#18181b`, color: "#fff" }}>
           <CheckCircle2 style={{ width: 18, height: 18 }} />
           <span className="text-[13.5px] font-bold">{showSuccess}</span>
         </div>
       )}
       {showError && (
         <div className="fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl"
-          style={{ background: "#ef4444", color: "#fff" }}>
+          style={{ background: "#b91c1c", color: "#fff" }}>
           <AlertTriangle style={{ width: 18, height: 18 }} />
           <span className="text-[13.5px] font-bold">{showError}</span>
         </div>
@@ -167,7 +167,7 @@ export default function BlockUsers() {
                   ].map(t => (
                     <button key={t.id} onClick={() => setBlockType(t.id)}
                       className="flex flex-col items-center gap-1.5 p-3 rounded-xl text-[12px] font-bold transition-all"
-                      style={{ border: blockType === t.id ? `1.5px solid ${V1}` : "1px solid #e5e7eb", background: blockType === t.id ? "rgba(108,92,231,.06)" : "#fff", color: blockType === t.id ? V1 : "#6b7280" }}>
+                      style={{ border: blockType === t.id ? `1.5px solid ${V1}` : "1px solid #e5e7eb", background: blockType === t.id ? "rgba(0,0,0,.06)" : "#fff", color: blockType === t.id ? V1 : "#6b7280" }}>
                       <t.icon style={{ width: 16, height: 16 }} />
                       {t.label}
                     </button>
@@ -185,7 +185,7 @@ export default function BlockUsers() {
                     value={blockSearch}
                     onChange={e => { setBlockSearch(e.target.value); setSelectedUserId(null); setSelectedUserName(""); }}
                     placeholder="Nome ou número de telefone…"
-                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl outline-none text-[13px] border border-gray-200 focus:border-indigo-400"
+                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl outline-none text-[13px] border border-gray-200 focus:border-zinc-500"
                   />
                 </div>
 
@@ -194,7 +194,7 @@ export default function BlockUsers() {
                   <div className="mt-1.5 rounded-xl border border-gray-100 overflow-hidden shadow-sm">
                     {searching && (
                       <div className="px-4 py-3 text-[12px] text-gray-400 flex items-center gap-2">
-                        <div className="w-3 h-3 rounded-full border-2 border-gray-300 border-t-indigo-400 animate-spin" />
+                        <div className="w-3 h-3 rounded-full border-2 border-gray-300 border-t-zinc-600 animate-spin" />
                         A procurar…
                       </div>
                     )}
@@ -203,9 +203,9 @@ export default function BlockUsers() {
                     )}
                     {searchResults.map(r => (
                       <button key={r.id} onClick={() => { setSelectedUserId(r.id); setSelectedUserName(r.name); setBlockSearch(r.name); }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-indigo-50 transition-colors text-left"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-100 transition-colors text-left"
                         style={{ borderBottom: "1px solid #f3f4f6" }}>
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(108,92,231,.1)" }}>
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,0,0,.1)" }}>
                           <User style={{ width: 13, height: 13, color: V1 }} />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -220,7 +220,7 @@ export default function BlockUsers() {
                 )}
 
                 {selectedUserId && (
-                  <div className="mt-2 px-3 py-2 rounded-xl flex items-center gap-2" style={{ background: "rgba(16,185,129,.07)", border: "1px solid rgba(16,185,129,.2)" }}>
+                  <div className="mt-2 px-3 py-2 rounded-xl flex items-center gap-2" style={{ background: "rgba(21,128,61,.07)", border: "1px solid rgba(21,128,61,.2)" }}>
                     <CheckCircle2 style={{ width: 13, height: 13, color: "#059669" }} />
                     <span className="text-[12px] font-bold text-green-700">Selecionado: {selectedUserName}</span>
                   </div>
@@ -237,7 +237,7 @@ export default function BlockUsers() {
                   ].map(d => (
                     <button key={d.id} onClick={() => setBlockDuration(d.id)}
                       className="py-2 rounded-xl text-[12px] font-semibold transition-all"
-                      style={{ border: blockDuration === d.id ? "1.5px solid #ef4444" : "1px solid #e5e7eb", background: blockDuration === d.id ? "rgba(239,68,68,.06)" : "#fff", color: blockDuration === d.id ? "#ef4444" : "#6b7280" }}>
+                      style={{ border: blockDuration === d.id ? "1.5px solid #b91c1c" : "1px solid #e5e7eb", background: blockDuration === d.id ? "rgba(185,28,28,.06)" : "#fff", color: blockDuration === d.id ? "#b91c1c" : "#6b7280" }}>
                       {d.label}
                     </button>
                   ))}
@@ -264,7 +264,7 @@ export default function BlockUsers() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl flex items-center justify-center"
-              style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(108,92,231,.35)" }}>
+              style={{ background: `#18181b`, boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}>
               <UserX style={{ width: 18, height: 18, color: "white", strokeWidth: 1.9 }} />
             </div>
             <div>
@@ -276,7 +276,7 @@ export default function BlockUsers() {
           </div>
           <button onClick={() => setShowBlockModal(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[13px] font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95"
-            style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)", boxShadow: "0 4px 12px rgba(239,68,68,.35)" }}>
+            style={{ background: "#0a0a0a", boxShadow: "0 4px 12px rgba(185,28,28,.35)" }}>
             <ShieldOff style={{ width: 14, height: 14 }} />
             Novo bloqueio
           </button>
@@ -286,9 +286,9 @@ export default function BlockUsers() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 mb-5">
         {[
-          { label: "Contas bloqueadas", value: isLoading ? "…" : blockedList.filter(u => u.blockType === "account").length, icon: UserX,        color: "#ef4444" },
+          { label: "Contas bloqueadas", value: isLoading ? "…" : blockedList.filter(u => u.blockType === "account").length, icon: UserX,        color: "#b91c1c" },
           { label: "IPs bloqueados",    value: isLoading ? "…" : blockedList.filter(u => u.blockType === "ip").length,      icon: Globe,        color: "#f97316" },
-          { label: "Dispositivos",      value: isLoading ? "…" : blockedList.filter(u => u.blockType === "device").length,  icon: Lock,         color: "#8b5cf6" },
+          { label: "Dispositivos",      value: isLoading ? "…" : blockedList.filter(u => u.blockType === "device").length,  icon: Lock,         color: "#3f3f46" },
           { label: "Total activos",     value: isLoading ? "…" : blockedList.length,                                         icon: AlertTriangle, color: V1       },
         ].map(s => (
           <div key={s.label} className="gz-card p-4">
@@ -306,7 +306,7 @@ export default function BlockUsers() {
         <Search style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Procurar por nome ou telefone…"
           className="flex-1 bg-transparent outline-none text-[13px]" style={{ color: "var(--gz-text-primary)" }} />
-        <div className="flex items-center gap-2 border-l pl-3" style={{ borderColor: "rgba(108,92,231,.08)" }}>
+        <div className="flex items-center gap-2 border-l pl-3" style={{ borderColor: "rgba(0,0,0,.08)" }}>
           <Filter style={{ width: 12, height: 12, color: "var(--gz-text-tertiary)" }} />
           <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as "all" | BlockType)}
             className="text-[12px] font-medium bg-transparent outline-none"
@@ -322,12 +322,12 @@ export default function BlockUsers() {
 
       {/* Blocked list */}
       <div className="gz-card overflow-hidden">
-        <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+        <div className="px-5 py-4 border-b" style={{ borderColor: "rgba(0,0,0,.06)" }}>
           <span className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>
             {isLoading ? "A carregar…" : `${filtered.length} bloqueio${filtered.length !== 1 ? "s" : ""} encontrado${filtered.length !== 1 ? "s" : ""}`}
           </span>
         </div>
-        <div className="divide-y" style={{ borderColor: "rgba(108,92,231,.05)" }}>
+        <div className="divide-y" style={{ borderColor: "rgba(0,0,0,.05)" }}>
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="p-5 h-16 animate-pulse m-2 rounded-2xl" style={{ background: "var(--gz-bg-subtle)" }} />
@@ -340,8 +340,8 @@ export default function BlockUsers() {
             </div>
           ) : filtered.map(u => (
             <div key={u.id} className="px-5 py-4 flex items-center gap-4 hover:bg-red-50/20 transition-colors">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(239,68,68,.08)" }}>
-                {u.blockType === "ip" ? <Globe style={{ width: 16, height: 16, color: "#ef4444" }} /> : u.blockType === "device" ? <Lock style={{ width: 16, height: 16, color: "#ef4444" }} /> : <UserX style={{ width: 16, height: 16, color: "#ef4444" }} />}
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(185,28,28,.08)" }}>
+                {u.blockType === "ip" ? <Globe style={{ width: 16, height: 16, color: "#b91c1c" }} /> : u.blockType === "device" ? <Lock style={{ width: 16, height: 16, color: "#b91c1c" }} /> : <UserX style={{ width: 16, height: 16, color: "#b91c1c" }} />}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-0.5">
@@ -358,7 +358,7 @@ export default function BlockUsers() {
               </div>
               <button onClick={() => setConfirmUnblockId(u.id)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all hover:shadow-md"
-                style={{ background: "rgba(16,185,129,.08)", color: "#059669", border: "1px solid rgba(16,185,129,.18)" }}>
+                style={{ background: "rgba(21,128,61,.08)", color: "#059669", border: "1px solid rgba(21,128,61,.18)" }}>
                 <Unlock style={{ width: 12, height: 12 }} />
                 Desbloquear
               </button>

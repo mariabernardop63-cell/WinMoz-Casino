@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-const V1 = "#6C5CE7";
+const V1 = "#18181b";
 
 const REASONS = [
   "bonus_win", "bonus_signup", "correction", "referral",
@@ -41,18 +41,18 @@ interface Adjustment {
 }
 
 function PlayerAvatar({ username, avatarUrl, size = 36 }: { username: string; avatarUrl?: string | null; size?: number }) {
-  const palette = ["6C5CE7", "7c3aed", "4f46e5", "0ea5e9", "10b981", "f59e0b"];
+  const palette = ["18181b", "52525b", "71717a", "a1a1aa", "d4d4d8", "e4e4e7"];
   const color = palette[(username || "?").charCodeAt(0) % palette.length];
   const initial = ((username || "?")[0] ?? "?").toUpperCase();
   if (avatarUrl) {
     return (
       <img src={avatarUrl} alt={username}
         onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
-        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: "1.5px solid rgba(108,92,231,.12)" }} />
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0, border: "1.5px solid rgba(0,0,0,.12)" }} />
     );
   }
   return (
-    <div style={{ width: size, height: size, borderRadius: "50%", background: `#${color}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: size * 0.38, border: "1.5px solid rgba(108,92,231,.12)" }}>
+    <div style={{ width: size, height: size, borderRadius: "50%", background: `#${color}`, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 700, fontSize: size * 0.38, border: "1.5px solid rgba(0,0,0,.12)" }}>
       {initial}
     </div>
   );
@@ -223,7 +223,7 @@ export default function BalancePage() {
       {/* Toast */}
       {toast && (
         <div className="fixed top-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl text-[13px] font-bold text-white animate-float-up"
-          style={{ background: toast.ok ? "#10b981" : "#ef4444", maxWidth: 320 }}>
+          style={{ background: toast.ok ? "#15803d" : "#b91c1c", maxWidth: 320 }}>
           {toast.ok ? <CheckCircle2 style={{ width: 15, height: 15, flexShrink: 0 }} /> : <AlertTriangle style={{ width: 15, height: 15, flexShrink: 0 }} />}
           {toast.msg}
         </div>
@@ -240,13 +240,13 @@ export default function BalancePage() {
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => refetch()}
-              className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all hover:bg-indigo-50"
-              style={{ border: "1.5px solid rgba(108,92,231,.15)" }}>
+              className="w-9 h-9 rounded-2xl flex items-center justify-center transition-all hover:bg-zinc-100"
+              style={{ border: "1.5px solid rgba(0,0,0,.15)" }}>
               <RefreshCw style={{ width: 13, height: 13, color: V1 }} />
             </button>
             <button onClick={() => setShowForm(v => !v)}
               className="flex items-center gap-2 px-4 py-2 rounded-2xl text-[12.5px] font-bold text-white transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
-              style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(108,92,231,.3)" }}>
+              style={{ background: `#18181b`, boxShadow: "0 4px 14px rgba(0,0,0,.3)" }}>
               <Plus style={{ width: 13, height: 13 }} />
               Novo Ajuste
             </button>
@@ -258,21 +258,21 @@ export default function BalancePage() {
       <div className="grid grid-cols-2 gap-4">
         <div className="gz-card p-4">
           <div className="flex items-center gap-2.5 mb-2">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(16,185,129,.08)" }}>
-              <TrendingUp style={{ width: 14, height: 14, color: "#10b981", strokeWidth: 1.8 }} />
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(21,128,61,.08)" }}>
+              <TrendingUp style={{ width: 14, height: 14, color: "#15803d", strokeWidth: 1.8 }} />
             </div>
             <span className="text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Total Creditado</span>
           </div>
-          <div className="text-[22px] font-black" style={{ color: "#10b981" }}>MT {totalCredits.toFixed(2)}</div>
+          <div className="text-[22px] font-black" style={{ color: "#15803d" }}>MT {totalCredits.toFixed(2)}</div>
         </div>
         <div className="gz-card p-4">
           <div className="flex items-center gap-2.5 mb-2">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(239,68,68,.06)" }}>
-              <TrendingDown style={{ width: 14, height: 14, color: "#ef4444", strokeWidth: 1.8 }} />
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(185,28,28,.06)" }}>
+              <TrendingDown style={{ width: 14, height: 14, color: "#b91c1c", strokeWidth: 1.8 }} />
             </div>
             <span className="text-[11.5px] font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Total Debitado</span>
           </div>
-          <div className="text-[22px] font-black" style={{ color: "#ef4444" }}>MT {totalDebits.toFixed(2)}</div>
+          <div className="text-[22px] font-black" style={{ color: "#b91c1c" }}>MT {totalDebits.toFixed(2)}</div>
         </div>
       </div>
 
@@ -293,7 +293,7 @@ export default function BalancePage() {
             </label>
             {selectedPlayer ? (
               <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
-                style={{ background: "rgba(16,185,129,.06)", border: "1.5px solid rgba(16,185,129,.2)" }}>
+                style={{ background: "rgba(21,128,61,.06)", border: "1.5px solid rgba(21,128,61,.2)" }}>
                 <PlayerAvatar username={selectedPlayer.username} avatarUrl={selectedPlayer.avatar_url} size={36} />
                 <div className="flex-1 min-w-0">
                   <div className="text-[13.5px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{selectedPlayer.username}</div>
@@ -301,7 +301,7 @@ export default function BalancePage() {
                     Saldo actual: MT {selectedPlayer.balance.toFixed(2)}
                   </div>
                 </div>
-                <CheckCircle2 style={{ width: 16, height: 16, color: "#10b981", strokeWidth: 2 }} />
+                <CheckCircle2 style={{ width: 16, height: 16, color: "#15803d", strokeWidth: 2 }} />
                 <button onClick={() => { setSelectedPlayer(null); setSearchQuery(""); }}
                   className="w-6 h-6 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors">
                   <X style={{ width: 12, height: 12, color: "var(--gz-text-muted)" }} />
@@ -310,7 +310,7 @@ export default function BalancePage() {
             ) : (
               <div className="relative">
                 <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl"
-                  style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,.12)" }}>
+                  style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.12)" }}>
                   <Search style={{ width: 13, height: 13, color: "var(--gz-text-tertiary)" }} />
                   <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                     placeholder="Procurar por nome ou telefone..."
@@ -320,7 +320,7 @@ export default function BalancePage() {
                 </div>
                 {searchQuery.length >= 2 && (
                   <div className="absolute left-0 right-0 top-full mt-1 z-20 py-1 rounded-2xl overflow-hidden"
-                    style={{ background: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,.1)", border: "1px solid rgba(108,92,231,.08)" }}>
+                    style={{ background: "#fff", boxShadow: "0 8px 32px rgba(0,0,0,.1)", border: "1px solid rgba(0,0,0,.08)" }}>
                     {searching ? (
                       <div className="px-4 py-3 text-[12.5px]" style={{ color: "var(--gz-text-muted)" }}>A procurar...</div>
                     ) : searchResults.length === 0 ? (
@@ -328,7 +328,7 @@ export default function BalancePage() {
                     ) : (
                       searchResults.map(p => (
                         <button key={p.id} onClick={() => { setSelectedPlayer(p); setSearchQuery(""); }}
-                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-indigo-50 transition-colors text-left">
+                          className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-zinc-100 transition-colors text-left">
                           <PlayerAvatar username={p.username} avatarUrl={p.avatar_url} size={30} />
                           <div className="flex-1 min-w-0">
                             <div className="text-[13px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{p.username}</div>
@@ -353,8 +353,8 @@ export default function BalancePage() {
                 <button key={t} onClick={() => setAdjType(t)}
                   className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-[13px] transition-all"
                   style={{
-                    background: adjType === t ? (t === "add" ? "rgba(16,185,129,.08)" : "rgba(239,68,68,.06)") : "rgba(108,92,231,.05)",
-                    border: `1.5px solid ${adjType === t ? (t === "add" ? "rgba(16,185,129,.3)" : "rgba(239,68,68,.25)") : "rgba(108,92,231,.12)"}`,
+                    background: adjType === t ? (t === "add" ? "rgba(21,128,61,.08)" : "rgba(185,28,28,.06)") : "rgba(0,0,0,.05)",
+                    border: `1.5px solid ${adjType === t ? (t === "add" ? "rgba(21,128,61,.3)" : "rgba(185,28,28,.25)") : "rgba(0,0,0,.12)"}`,
                     color: adjType === t ? (t === "add" ? "#059669" : "#dc2626") : "var(--gz-text-muted)",
                   }}>
                   {t === "add" ? <TrendingUp style={{ width: 14, height: 14 }} /> : <TrendingDown style={{ width: 14, height: 14 }} />}
@@ -368,13 +368,13 @@ export default function BalancePage() {
                 <input value={formAmount} onChange={e => setFormAmount(e.target.value)}
                   placeholder="Ex: 50.00" type="number" step="0.01" min="0.01"
                   className="w-full px-3.5 py-2.5 rounded-2xl text-[13.5px] font-medium outline-none"
-                  style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,.12)", color: "var(--gz-text-primary)" }} />
+                  style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.12)", color: "var(--gz-text-primary)" }} />
               </div>
               <div>
                 <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>Motivo</label>
                 <select value={formReason} onChange={e => setFormReason(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-2xl text-[13px] font-medium outline-none"
-                  style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,.12)", color: "var(--gz-text-primary)" }}>
+                  style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.12)", color: "var(--gz-text-primary)" }}>
                   {REASONS.map(r => <option key={r} value={r}>{REASON_LABELS[r] ?? r}</option>)}
                 </select>
               </div>
@@ -386,18 +386,18 @@ export default function BalancePage() {
             <textarea value={formNote} onChange={e => setFormNote(e.target.value)}
               placeholder="Observações adicionais..." rows={2}
               className="w-full px-3.5 py-2.5 rounded-2xl text-[13.5px] font-medium outline-none resize-none"
-              style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,.12)", color: "var(--gz-text-primary)" }} />
+              style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.12)", color: "var(--gz-text-primary)" }} />
           </div>
 
           {selectedPlayer && parseFloat(formAmount) > 0 && (
             <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl"
               style={{
-                background: adjType === "add" ? "rgba(16,185,129,.06)" : "rgba(239,68,68,.06)",
-                border: `1px solid ${adjType === "add" ? "rgba(16,185,129,.2)" : "rgba(239,68,68,.2)"}`,
+                background: adjType === "add" ? "rgba(21,128,61,.06)" : "rgba(185,28,28,.06)",
+                border: `1px solid ${adjType === "add" ? "rgba(21,128,61,.2)" : "rgba(185,28,28,.2)"}`,
               }}>
               {adjType === "subtract"
-                ? <AlertTriangle style={{ width: 13, height: 13, color: "#f59e0b" }} />
-                : <CheckCircle2 style={{ width: 13, height: 13, color: "#10b981" }} />}
+                ? <AlertTriangle style={{ width: 13, height: 13, color: "#a16207" }} />
+                : <CheckCircle2 style={{ width: 13, height: 13, color: "#15803d" }} />}
               <span className="text-[12px] font-medium" style={{ color: adjType === "add" ? "#059669" : "#dc2626" }}>
                 {adjType === "add" ? "Adicionar" : "Debitar"} MT {parseFloat(formAmount || "0").toFixed(2)} de{" "}
                 <strong>{selectedPlayer.username}</strong>
@@ -418,7 +418,7 @@ export default function BalancePage() {
               disabled={doAdjust.isPending || !selectedPlayer}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-2xl text-[13px] font-bold text-white transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
               style={{
-                background: adjType === "add" ? "linear-gradient(135deg,#10b981,#059669)" : `linear-gradient(135deg,${V1},#4f46e5)`,
+                background: adjType === "add" ? "#18181b" : `#18181b`,
                 opacity: (doAdjust.isPending || !selectedPlayer) ? 0.6 : 1,
               }}>
               {adjType === "add" ? <Plus style={{ width: 13, height: 13 }} /> : <Minus style={{ width: 13, height: 13 }} />}
@@ -430,7 +430,7 @@ export default function BalancePage() {
 
       {/* History */}
       <div className="gz-card overflow-hidden">
-        <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+        <div className="px-5 py-4 border-b flex items-center justify-between" style={{ borderColor: "rgba(0,0,0,.06)" }}>
           <div className="flex items-center gap-2">
             <Wallet style={{ width: 14, height: 14, color: V1, strokeWidth: 1.9 }} />
             <span className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>
@@ -453,16 +453,16 @@ export default function BalancePage() {
             <div className="text-[11.5px] mt-1" style={{ color: "var(--gz-text-muted)" }}>Os ajustes que fizeres aparecerão aqui em tempo real</div>
           </div>
         ) : (
-          <div className="divide-y" style={{ borderColor: "rgba(108,92,231,.04)" }}>
+          <div className="divide-y" style={{ borderColor: "rgba(0,0,0,.04)" }}>
             {adjustments.map(adj => {
               const isPos = adj.amount > 0;
               return (
-                <div key={adj.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-indigo-50/40 transition-colors">
+                <div key={adj.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-zinc-100/40 transition-colors">
                   <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: isPos ? "rgba(16,185,129,.08)" : "rgba(239,68,68,.08)" }}>
+                    style={{ background: isPos ? "rgba(21,128,61,.08)" : "rgba(185,28,28,.08)" }}>
                     {isPos
-                      ? <TrendingUp style={{ width: 14, height: 14, color: "#10b981", strokeWidth: 1.9 }} />
-                      : <TrendingDown style={{ width: 14, height: 14, color: "#ef4444", strokeWidth: 1.9 }} />}
+                      ? <TrendingUp style={{ width: 14, height: 14, color: "#15803d", strokeWidth: 1.9 }} />
+                      : <TrendingDown style={{ width: 14, height: 14, color: "#b91c1c", strokeWidth: 1.9 }} />}
                   </div>
                   <PlayerAvatar username={adj.player_name} avatarUrl={adj.avatar_url} size={32} />
                   <div className="flex-1 min-w-0">
@@ -473,7 +473,7 @@ export default function BalancePage() {
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <div className="text-[14px] font-bold" style={{ color: isPos ? "#10b981" : "#ef4444" }}>
+                    <div className="text-[14px] font-bold" style={{ color: isPos ? "#15803d" : "#b91c1c" }}>
                       {isPos ? "+" : ""}MT {Math.abs(adj.amount).toFixed(2)}
                     </div>
                     <div className="text-[10.5px] mt-0.5" style={{ color: "var(--gz-text-tertiary)" }}>

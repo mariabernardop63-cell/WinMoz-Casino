@@ -15,16 +15,16 @@ const ROLE_LABELS: Record<string, string> = {
   support: "Suporte",
 };
 const ROLE_COLORS: Record<string, string> = {
-  super_admin: "#6C5CE7",
+  super_admin: "#18181b",
   admin: "#3b82f6",
-  financial: "#10b981",
-  moderator: "#f59e0b",
-  support: "#8b5cf6",
+  financial: "#15803d",
+  moderator: "#a16207",
+  support: "#3f3f46",
 };
 
 const ADMIN_ROLES = ["super_admin", "admin", "financial", "moderator", "support"] as const;
 
-const V1 = "#6C5CE7";
+const V1 = "#18181b";
 
 function FieldInput({ label, icon: Icon, value, onChange, type = "text", disabled = false, placeholder }: {
   label: string; icon: React.ElementType; value: string; onChange?: (v: string) => void;
@@ -34,7 +34,7 @@ function FieldInput({ label, icon: Icon, value, onChange, type = "text", disable
     <div>
       <label className="text-[11px] font-black uppercase tracking-[0.08em] mb-1.5 block" style={{ color: "var(--gz-text-tertiary)" }}>{label}</label>
       <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-2xl"
-        style={{ background: disabled ? "rgba(108,92,231,.03)" : "rgba(108,92,231,.05)", border: "1.5px solid rgba(108,92,231,.12)" }}>
+        style={{ background: disabled ? "rgba(0,0,0,.03)" : "rgba(0,0,0,.05)", border: "1.5px solid rgba(0,0,0,.12)" }}>
         <Icon style={{ width: 14, height: 14, color: V1, strokeWidth: 1.9, flexShrink: 0, opacity: disabled ? 0.4 : 1 }} />
         <input
           type={type}
@@ -131,7 +131,7 @@ export default function AdminProfilePage() {
   const roleColor = ROLE_COLORS[profile?.role ?? ""] ?? V1;
   const avatarSrc = profile?.avatarUrl
     ? profile.avatarUrl
-    : `https://api.dicebear.com/9.x/avataaars/svg?seed=${profile?.username ?? "Admin"}&backgroundColor=6C5CE7`;
+    : `https://api.dicebear.com/9.x/avataaars/svg?seed=${profile?.username ?? "Admin"}&backgroundColor=18181b`;
 
   return (
     <div className="px-5 pb-10 pt-4">
@@ -140,7 +140,7 @@ export default function AdminProfilePage() {
         {/* Avatar card */}
         <div className="gz-card p-6 flex items-center gap-6">
           <div className="relative flex-shrink-0">
-            <div style={{ width: 72, height: 72, borderRadius: "50%", overflow: "hidden", border: "3px solid rgba(108,92,231,.18)" }}>
+            <div style={{ width: 72, height: 72, borderRadius: "50%", overflow: "hidden", border: "3px solid rgba(0,0,0,.18)" }}>
               <img
                 src={editMode && avatarUrl ? avatarUrl : avatarSrc}
                 alt={profile?.name}
@@ -150,7 +150,7 @@ export default function AdminProfilePage() {
             </div>
             <span style={{
               position: "absolute", bottom: 2, right: 2, width: 14, height: 14, borderRadius: "50%",
-              background: "#10b981", border: "2.5px solid white", boxShadow: "0 0 8px rgba(16,185,129,.5)",
+              background: "#15803d", border: "2.5px solid white", boxShadow: "0 0 8px rgba(21,128,61,.5)",
             }} />
           </div>
           <div className="flex-1 min-w-0">
@@ -172,7 +172,7 @@ export default function AdminProfilePage() {
           {!editMode && (
             <button onClick={handleEnterEdit}
               className="flex items-center gap-2 px-4 py-2 rounded-2xl text-[13px] font-bold text-white transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
-              style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(108,92,231,.35)" }}>
+              style={{ background: `#18181b`, boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}>
               <Edit3 style={{ width: 13, height: 13 }} />
               Editar
             </button>
@@ -193,7 +193,7 @@ export default function AdminProfilePage() {
                 <button onClick={handleSaveProfile}
                   disabled={updateProfile.isPending}
                   className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-[12.5px] font-bold text-white transition-all hover:-translate-y-0.5 active:scale-95"
-                  style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, opacity: updateProfile.isPending ? 0.7 : 1 }}>
+                  style={{ background: `#18181b`, opacity: updateProfile.isPending ? 0.7 : 1 }}>
                   <Save style={{ width: 12, height: 12 }} />
                   {updateProfile.isPending ? "A guardar..." : "Guardar"}
                 </button>
@@ -221,16 +221,16 @@ export default function AdminProfilePage() {
                 </label>
                 <div className="flex items-center gap-3">
                   {/* Live preview */}
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", flexShrink: 0, border: "2px solid rgba(108,92,231,.15)" }}>
+                  <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden", flexShrink: 0, border: "2px solid rgba(0,0,0,.15)" }}>
                     <img
-                      src={avatarUrl || `https://api.dicebear.com/9.x/avataaars/svg?seed=${profile?.username ?? "Admin"}&backgroundColor=6C5CE7`}
+                      src={avatarUrl || `https://api.dicebear.com/9.x/avataaars/svg?seed=${profile?.username ?? "Admin"}&backgroundColor=18181b`}
                       alt="preview"
                       style={{ width: "100%", height: "100%", objectFit: "cover", background: "white" }}
-                      onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/9.x/avataaars/svg?seed=${profile?.username ?? "Admin"}&backgroundColor=6C5CE7`; }}
+                      onError={e => { (e.target as HTMLImageElement).src = `https://api.dicebear.com/9.x/avataaars/svg?seed=${profile?.username ?? "Admin"}&backgroundColor=18181b`; }}
                     />
                   </div>
                   <div className="flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl"
-                    style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,.12)" }}>
+                    style={{ background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,.12)" }}>
                     <Image style={{ width: 14, height: 14, color: V1, strokeWidth: 1.9, flexShrink: 0 }} />
                     <input
                       type="url"
@@ -246,7 +246,7 @@ export default function AdminProfilePage() {
                         title="Remover avatar"
                         className="w-5 h-5 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors flex-shrink-0"
                       >
-                        <span style={{ color: "#ef4444", fontSize: 14, lineHeight: 1, fontWeight: 700 }}>×</span>
+                        <span style={{ color: "#b91c1c", fontSize: 14, lineHeight: 1, fontWeight: 700 }}>×</span>
                       </button>
                     )}
                   </div>
@@ -255,7 +255,7 @@ export default function AdminProfilePage() {
                   <button
                     onClick={() => setAvatarUrl("")}
                     className="mt-2 text-[11.5px] font-bold flex items-center gap-1.5 transition-colors hover:opacity-80"
-                    style={{ color: "#ef4444" }}
+                    style={{ color: "#b91c1c" }}
                   >
                     <span>✕</span> Remover avatar (usar gerado automaticamente)
                   </button>
@@ -276,7 +276,7 @@ export default function AdminProfilePage() {
                     <button key={r} onClick={() => setRole(r)}
                       className="px-3 py-1.5 rounded-xl text-[12px] font-bold transition-all"
                       style={{
-                        background: role === r ? V1 : "rgba(108,92,231,.07)",
+                        background: role === r ? V1 : "rgba(0,0,0,.07)",
                         color: role === r ? "white" : "var(--gz-text-muted)",
                       }}>
                       {ROLE_LABELS[r]}
@@ -288,8 +288,8 @@ export default function AdminProfilePage() {
           </div>
 
           {editMode && (
-            <div className="mt-4 flex items-center gap-2 px-3.5 py-2.5 rounded-xl" style={{ background: "rgba(16,185,129,.05)", border: "1px solid rgba(16,185,129,.15)" }}>
-              <CheckCircle2 style={{ width: 13, height: 13, color: "#10b981", strokeWidth: 2 }} />
+            <div className="mt-4 flex items-center gap-2 px-3.5 py-2.5 rounded-xl" style={{ background: "rgba(21,128,61,.05)", border: "1px solid rgba(21,128,61,.15)" }}>
+              <CheckCircle2 style={{ width: 13, height: 13, color: "#15803d", strokeWidth: 2 }} />
               <span className="text-[12px] font-medium" style={{ color: "#059669" }}>Edição activa — não esqueça de guardar</span>
             </div>
           )}
@@ -333,8 +333,8 @@ export default function AdminProfilePage() {
             disabled={changePassword.isPending}
             className="mt-5 w-full py-2.5 rounded-2xl text-[13px] font-bold text-white transition-all hover:-translate-y-0.5 hover:shadow-lg active:scale-95"
             style={{
-              background: `linear-gradient(135deg, ${V1}, #4f46e5)`,
-              boxShadow: "0 4px 14px rgba(108,92,231,.35)",
+              background: `#18181b`,
+              boxShadow: "0 4px 14px rgba(0,0,0,.35)",
               opacity: changePassword.isPending ? 0.7 : 1,
             }}
           >

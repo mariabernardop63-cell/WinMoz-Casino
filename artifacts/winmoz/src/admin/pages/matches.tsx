@@ -35,7 +35,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function GameBadge({ game }: { game: string }) {
   return (
-    <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${game === "dama" ? "bg-indigo-100 text-indigo-700" : "bg-purple-100 text-purple-700"}`}>
+    <span className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${game === "dama" ? "bg-zinc-100 text-zinc-700" : "bg-zinc-100 text-zinc-700"}`}>
       {game}
     </span>
   );
@@ -88,7 +88,7 @@ export default function Matches() {
               placeholder="Buscar jogadores..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-300 focus:border-zinc-200"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -102,7 +102,7 @@ export default function Matches() {
                 key={s.key}
                 data-testid={`filter-status-${s.key}`}
                 onClick={() => setStatusFilter(s.key)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${statusFilter === s.key ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${statusFilter === s.key ? "bg-zinc-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               >
                 {s.label}
               </button>
@@ -114,7 +114,7 @@ export default function Matches() {
                 key={g}
                 data-testid={`filter-game-${g}`}
                 onClick={() => setGameFilter(g)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${gameFilter === g ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
+                className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${gameFilter === g ? "bg-zinc-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
               >
                 {g === "all" ? "Todos" : g.charAt(0).toUpperCase() + g.slice(1)}
               </button>
@@ -156,8 +156,8 @@ export default function Matches() {
                     <td className="px-5 py-3.5"><GameBadge game={m.game} /></td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center">
-                          <Gamepad2 className="w-3 h-3 text-indigo-500" />
+                        <div className="w-6 h-6 rounded-full bg-zinc-100 flex items-center justify-center">
+                          <Gamepad2 className="w-3 h-3 text-zinc-600" />
                         </div>
                         <span className="font-medium text-gray-800">{m.player1Name}</span>
                         <span className="text-gray-300">vs</span>
@@ -170,8 +170,8 @@ export default function Matches() {
                     <td className="px-5 py-3.5 text-gray-400 text-xs">{new Date(m.createdAt).toLocaleDateString("pt-BR")}</td>
                     <td className="px-5 py-3.5">
                       <Link href={`/matches/${m.id}`}>
-                        <button data-testid={`link-match-${m.id}`} className="w-7 h-7 rounded-lg bg-gray-50 hover:bg-indigo-50 flex items-center justify-center transition-colors">
-                          <ChevronRight className="w-4 h-4 text-gray-400 hover:text-indigo-500" />
+                        <button data-testid={`link-match-${m.id}`} className="w-7 h-7 rounded-lg bg-gray-50 hover:bg-zinc-100 flex items-center justify-center transition-colors">
+                          <ChevronRight className="w-4 h-4 text-gray-400 hover:text-zinc-600" />
                         </button>
                       </Link>
                     </td>

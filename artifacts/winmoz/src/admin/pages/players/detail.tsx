@@ -40,7 +40,7 @@ export default function PlayerDetail() {
 
   return (
     <div className="p-6">
-      <button data-testid="button-back" onClick={() => setLocation("/players")} className="flex items-center gap-2 text-sm text-gray-500 hover:text-indigo-600 transition-colors mb-6">
+      <button data-testid="button-back" onClick={() => setLocation("/players")} className="flex items-center gap-2 text-sm text-gray-500 hover:text-zinc-700 transition-colors mb-6">
         <ArrowLeft className="w-4 h-4" /> Voltar
       </button>
 
@@ -48,7 +48,7 @@ export default function PlayerDetail() {
         <div className="flex-1 space-y-4">
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <div className="flex items-center gap-5 mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+              <div className="w-16 h-16 rounded-2xl bg-zinc-900 flex items-center justify-center text-white text-2xl font-bold shadow-lg">
                 {(player.username ?? "?")[0].toUpperCase()}
               </div>
               <div>
@@ -76,8 +76,8 @@ export default function PlayerDetail() {
               {[
                 { label: "Vitórias",        value: player.wins,                                    icon: Trophy,       color: "bg-green-100 text-green-600"   },
                 { label: "Derrotas",         value: player.losses,                                  icon: TrendingUp,   color: "bg-red-100 text-red-500"       },
-                { label: "Taxa de Vitória",  value: `${winRate}%`,                                  icon: TrendingUp,   color: "bg-indigo-100 text-indigo-600" },
-                { label: "Saldo",            value: `MT ${(player.balance ?? 0).toFixed(2)}`,       icon: Coins,        color: "bg-purple-100 text-purple-600" },
+                { label: "Taxa de Vitória",  value: `${winRate}%`,                                  icon: TrendingUp,   color: "bg-zinc-100 text-zinc-700" },
+                { label: "Saldo",            value: `MT ${(player.balance ?? 0).toFixed(2)}`,       icon: Coins,        color: "bg-zinc-100 text-zinc-700" },
               ].map((stat) => (
                 <div key={stat.label} className="bg-gray-50 rounded-xl p-4">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${stat.color}`}>
@@ -97,7 +97,7 @@ export default function PlayerDetail() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-400">Saldo</span>
-                <span className="font-semibold text-indigo-600">MT {(player.balance ?? 0).toFixed(2)}</span>
+                <span className="font-semibold text-zinc-700">MT {(player.balance ?? 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400 flex items-center gap-1"><Calendar className="w-3 h-3" /> Membro desde</span>

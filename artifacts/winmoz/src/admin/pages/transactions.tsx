@@ -3,12 +3,12 @@ import { useListTransactions, getListTransactionsQueryKey } from "@/admin/lib/su
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeftRight, ArrowUpRight, ArrowDownLeft, RefreshCw, RotateCcw } from "lucide-react";
 
-const V1 = "#6C5CE7";
+const V1 = "#18181b";
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, string> = {
     active:    "bg-yellow-100 text-yellow-700",
-    settled:   "bg-indigo-100 text-indigo-700",
+    settled:   "bg-zinc-100 text-zinc-700",
     cancelled: "bg-gray-100 text-gray-500",
     pending:   "bg-amber-100 text-amber-700",
     approved:  "bg-green-100 text-green-700",
@@ -37,8 +37,8 @@ function TypeLabel({ type }: { type: string }) {
 
 function GameBadge({ game }: { game: string }) {
   const colors: Record<string, string> = {
-    dama:   "bg-indigo-100 text-indigo-700",
-    ludo:   "bg-purple-100 text-purple-700",
+    dama:   "bg-zinc-100 text-zinc-700",
+    ludo:   "bg-zinc-100 text-zinc-600",
     xadrez: "bg-emerald-100 text-emerald-700",
     roleta: "bg-amber-100 text-amber-700",
   };
@@ -80,7 +80,7 @@ export default function Transactions() {
     <div className="p-6">
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-1">
-          <div className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${V1}, #4f46e5)`, boxShadow: "0 4px 14px rgba(108,92,231,.35)" }}>
+          <div className="w-9 h-9 rounded-2xl flex items-center justify-center" style={{ background: `#18181b`, boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}>
             <ArrowLeftRight className="w-4 h-4 text-white" />
           </div>
           <h1 className="text-2xl font-bold" style={{ color: "var(--gz-text-primary)" }}>Transações</h1>
@@ -90,8 +90,8 @@ export default function Transactions() {
 
       <div className="admin-responsive-grid grid gap-4 mb-6">
         {[
-          { label: "Total de Transações", value: totalEntries,                         color: "text-indigo-600" },
-          { label: "Volume Total",        value: `MT ${totalVolume.toFixed(2)}`,       color: "text-purple-600" },
+          { label: "Total de Transações", value: totalEntries,                         color: "text-zinc-700" },
+          { label: "Volume Total",        value: `MT ${totalVolume.toFixed(2)}`,       color: "text-zinc-600" },
           { label: "Total Pago",          value: `MT ${totalPayout.toFixed(2)}`,       color: "text-green-600" },
         ].map((s) => (
           <div key={s.label} className="gz-card p-5">
@@ -116,20 +116,20 @@ export default function Transactions() {
       </div>
 
       <div className="gz-card">
-        <div className="px-5 py-4 border-b flex items-center gap-2 flex-wrap" style={{ borderColor: "rgba(108,92,231,.06)" }}>
+        <div className="px-5 py-4 border-b flex items-center gap-2 flex-wrap" style={{ borderColor: "rgba(0,0,0,.06)" }}>
           <div className="flex items-center gap-2 mr-2">
             {["all", "active", "settled", "cancelled"].map(s => (
               <button key={s} onClick={() => setStatusFilter(s)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${statusFilter === s ? "text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
-                style={statusFilter === s ? { background: `linear-gradient(135deg, ${V1}, #4f46e5)` } : {}}>
+                style={statusFilter === s ? { background: `#18181b` } : {}}>
                 {s === "all" ? "Todas" : s === "active" ? "Activas" : s === "settled" ? "Concluídas" : "Canceladas"}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-2 border-l pl-2" style={{ borderColor: "rgba(108,92,231,.08)" }}>
+          <div className="flex items-center gap-2 border-l pl-2" style={{ borderColor: "rgba(0,0,0,.08)" }}>
             {["all", "bet", "deposit", "withdrawal"].map(t => (
               <button key={t} onClick={() => setTypeFilter(t)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${typeFilter === t ? "bg-indigo-50 text-indigo-600 border border-indigo-200" : "bg-gray-50 text-gray-500 hover:bg-gray-100"}`}>
+                className={`px-3 py-1.5 text-xs font-medium rounded-xl transition-colors ${typeFilter === t ? "bg-zinc-100 text-zinc-700 border border-zinc-200" : "bg-gray-50 text-gray-500 hover:bg-gray-100"}`}>
                 {t === "all" ? "Tipo: Todos" : t === "bet" ? "Apostas" : t === "deposit" ? "Depósitos" : "Levantamentos"}
               </button>
             ))}
@@ -139,7 +139,7 @@ export default function Transactions() {
               <button
                 onClick={resetFilters}
                 className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-xl transition-colors"
-                style={{ background: "rgba(108,92,231,.08)", color: V1 }}>
+                style={{ background: "rgba(0,0,0,.08)", color: V1 }}>
                 <RotateCcw className="w-3 h-3" />
                 Repor Filtros
               </button>
@@ -156,7 +156,7 @@ export default function Transactions() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: "1px solid rgba(108,92,231,.06)" }}>
+              <tr style={{ borderBottom: "1px solid rgba(0,0,0,.06)" }}>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Tipo</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>ID</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--gz-text-muted)" }}>Jogador</th>
@@ -177,7 +177,7 @@ export default function Transactions() {
                 <tr><td colSpan={9} className="px-5 py-10 text-center text-sm" style={{ color: "var(--gz-text-muted)" }}>Nenhuma transação encontrada</td></tr>
               ) : (
                 allTransactions.map((t) => (
-                  <tr key={t.id} className="hover:bg-indigo-50/30 transition-colors" style={{ borderBottom: "1px solid rgba(108,92,231,.04)" }}>
+                  <tr key={t.id} className="hover:bg-zinc-100/30 transition-colors" style={{ borderBottom: "1px solid rgba(0,0,0,.04)" }}>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "var(--gz-bg-subtle)" }}>

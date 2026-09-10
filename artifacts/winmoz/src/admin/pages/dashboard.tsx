@@ -30,10 +30,10 @@ function getMozambiqueGreeting(): string {
   return "Boa noite";
 }
 
-const V1 = "#6C5CE7";
-const V2 = "#a78bfa";
-const V3 = "#10b981";
-const V4 = "#f59e0b";
+const V1 = "#18181b";
+const V2 = "#71717a";
+const V3 = "#15803d";
+const V4 = "#a16207";
 const GRAD_DAMA   = "areaGradDama";
 const GRAD_LUDO   = "areaGradLudo";
 const GRAD_XADREZ = "areaGradXadrez";
@@ -43,9 +43,9 @@ function LiveDot() {
   return (
     <span className="relative inline-flex items-center justify-center w-2 h-2 flex-shrink-0">
       <span className="animate-pulse-ring absolute inset-0 rounded-full"
-        style={{ background: "rgba(16,185,129,.3)" }} />
+        style={{ background: "rgba(21,128,61,.3)" }} />
       <span className="animate-pulse-dot relative w-2 h-2 rounded-full"
-        style={{ background: "#10b981" }} />
+        style={{ background: "#15803d" }} />
     </span>
   );
 }
@@ -61,7 +61,7 @@ function NeonBadge({
 }
 
 function Avatar({ seed, size = 32 }: { seed: string; size?: number }) {
-  const palette = ["6C5CE7", "7c3aed", "4f46e5", "0ea5e9", "10b981", "f59e0b", "ec4899"];
+  const palette = ["18181b", "3f3f46", "52525b", "71717a", "a1a1aa", "d4d4d8", "f4f4f5"];
   const color = palette[seed.charCodeAt(0) % palette.length];
   return (
     <img
@@ -72,7 +72,7 @@ function Avatar({ seed, size = 32 }: { seed: string; size?: number }) {
         borderRadius: "50%",
         flexShrink: 0,
         background: "white",
-        border: "1.5px solid rgba(108,92,231,.14)",
+        border: "1.5px solid rgba(0,0,0,.14)",
       }}
     />
   );
@@ -120,8 +120,8 @@ function MoneyCard({
               onClick={onClear}
               title="Repor a zero no banco de dados"
               className="w-6 h-6 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-              style={{ background: "rgba(239,68,68,.08)" }}>
-              <Activity className="w-3 h-3" style={{ color: "#ef4444" }} />
+              style={{ background: "rgba(185,28,28,.08)" }}>
+              <Activity className="w-3 h-3" style={{ color: "#b91c1c" }} />
             </button>
           )}
           <button
@@ -136,7 +136,7 @@ function MoneyCard({
               style={{ background: "#ffffff", borderRadius: 14, boxShadow: "0 8px 28px rgba(0,0,0,.1)" }}>
               {["Ver detalhes", "Exportar", "Histórico"].map(a => (
                 <button key={a} onClick={() => setOpen(false)}
-                  className="w-full text-left px-3.5 py-2 text-[12px] font-medium text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+                  className="w-full text-left px-3.5 py-2 text-[12px] font-medium text-gray-500 hover:bg-zinc-100 hover:text-zinc-700 transition-colors">
                   {a}
                 </button>
               ))}
@@ -153,7 +153,7 @@ function MoneyCard({
         </div>
       </div>
       {suffix && <div className="text-[11px] font-medium mt-1.5" style={{ color: "var(--gz-text-muted)" }}>{suffix}</div>}
-      {cleared && <div className="text-[10px] font-semibold mt-1" style={{ color: "#ef4444" }}>Cache limpa — clique em ↻ para repor</div>}
+      {cleared && <div className="text-[10px] font-semibold mt-1" style={{ color: "#b91c1c" }}>Cache limpa — clique em ↻ para repor</div>}
     </div>
   );
 }
@@ -186,7 +186,7 @@ function StatCard({
               style={{ background: "#ffffff", borderRadius: 16, boxShadow: "0 8px 32px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06)" }}>
               {(actions ?? ["Ver detalhes", "Ver histórico", "Exportar"]).map(a => (
                 <button key={a} onClick={() => setOpen(false)}
-                  className="w-full text-left px-4 py-2.5 text-[12.5px] font-medium text-gray-500 hover:bg-indigo-50 hover:text-indigo-600 transition-colors first:rounded-t-xl last:rounded-b-xl">
+                  className="w-full text-left px-4 py-2.5 text-[12.5px] font-medium text-gray-500 hover:bg-zinc-100 hover:text-zinc-700 transition-colors first:rounded-t-xl last:rounded-b-xl">
                   {a}
                 </button>
               ))}
@@ -242,10 +242,10 @@ function MatchRow({ match, isLast }: {
   isLast: boolean;
 }) {
   const gameColors: Record<string, string> = {
-    dama:   `linear-gradient(135deg, ${V1}, #4f46e5)`,
-    ludo:   `linear-gradient(135deg, ${V2}, #8b5cf6)`,
-    xadrez: `linear-gradient(135deg, ${V3}, #059669)`,
-    roleta: `linear-gradient(135deg, ${V4}, #d97706)`,
+    dama:   `#18181b`,
+    ludo:   `#3f3f46`,
+    xadrez: `#52525b`,
+    roleta: `#71717a`,
   };
   const gameLetters: Record<string, string> = { dama: "D", ludo: "L", xadrez: "X", roleta: "R" };
 
@@ -257,7 +257,7 @@ function MatchRow({ match, isLast }: {
       <div className="flex items-center gap-2 flex-1 min-w-0">
         <Avatar seed={match.player1Name} size={28} />
         <span className="text-[13px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{match.player1Name}</span>
-        <span className="text-[9px] font-black px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: "rgba(108,92,231,.07)", color: V1, letterSpacing: "0.06em" }}>VS</span>
+        <span className="text-[9px] font-black px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: "rgba(0,0,0,.07)", color: V1, letterSpacing: "0.06em" }}>VS</span>
         <span className="text-[13px] font-bold truncate" style={{ color: "var(--gz-text-primary)" }}>{match.player2Name}</span>
         <Avatar seed={match.player2Name} size={28} />
       </div>
@@ -277,7 +277,7 @@ function ActionItem({ icon: Icon, title, sub, done }: {
 }) {
   return (
     <div className="gz-row flex items-center gap-3 px-4 py-3" style={{ marginBottom: 8 }}>
-      <div style={{ width: 34, height: 34, borderRadius: 11, background: done ? "rgba(16,185,129,.08)" : "rgba(0,0,0,.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <div style={{ width: 34, height: 34, borderRadius: 11, background: done ? "rgba(21,128,61,.08)" : "rgba(0,0,0,.05)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         <Icon style={{ width: 14, height: 14, strokeWidth: 1.9, color: done ? "#059669" : "#111" }} />
       </div>
       <div className="flex-1 min-w-0">
@@ -344,8 +344,8 @@ export default function Dashboard() {
   const dailyStats = [
     { label: "Ganho hoje",      value: `MT ${(stats?.todayEarnings ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: TrendingUp,  color: "#059669" },
     { label: "Transações",      value: stats?.todayTransactions ?? 0,    icon: ArrowLeftRight, color: V1 },
-    { label: "Usuários Online", value: stats?.onlinePlayers ?? 0,        icon: Users,          color: "#0ea5e9" },
-    { label: "Saídas",          value: `MT ${(stats?.todaySaidas ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: ArrowDownLeft, color: "#ef4444" },
+    { label: "Usuários Online", value: stats?.onlinePlayers ?? 0,        icon: Users,          color: "#52525b" },
+    { label: "Saídas",          value: `MT ${(stats?.todaySaidas ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`, icon: ArrowDownLeft, color: "#b91c1c" },
   ];
 
   return (
@@ -371,7 +371,7 @@ export default function Dashboard() {
               {[ChevronLeft, ChevronRight].map((Icon, i) => (
                 <button key={i}
                   className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:-translate-y-0.5 active:scale-95"
-                  style={{ background: "rgba(108,92,231,.07)", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
+                  style={{ background: "rgba(0,0,0,.07)", boxShadow: "0 1px 3px rgba(0,0,0,.04)" }}>
                   <Icon className="w-3.5 h-3.5" style={{ color: V1 }} strokeWidth={2.3} />
                 </button>
               ))}
@@ -450,10 +450,10 @@ export default function Dashboard() {
                   <stop offset="100%" stopColor={V4} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(108,92,231,.06)" vertical={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,.06)" vertical={false} />
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--gz-text-tertiary)", fontWeight: 700 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 10, fill: "var(--gz-text-tertiary)", fontWeight: 700 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<ChartTip />} cursor={{ stroke: "rgba(108,92,231,.1)", strokeWidth: 1 }} />
+              <Tooltip content={<ChartTip />} cursor={{ stroke: "rgba(0,0,0,.1)", strokeWidth: 1 }} />
               <Area type="monotoneX" dataKey="dama"   stroke={V1} strokeWidth={2.2} fill={`url(#${GRAD_DAMA})`}   dot={{ r: 3, fill: V1, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: V1, strokeWidth: 2, stroke: "#fff" }} />
               <Area type="monotoneX" dataKey="ludo"   stroke={V2} strokeWidth={2}   fill={`url(#${GRAD_LUDO})`}   strokeDasharray="6 3" dot={{ r: 3, fill: V2, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: V2, strokeWidth: 2, stroke: "#fff" }} />
               <Area type="monotoneX" dataKey="xadrez" stroke={V3} strokeWidth={2}   fill={`url(#${GRAD_XADREZ})`} strokeDasharray="4 2" dot={{ r: 3, fill: V3, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: V3, strokeWidth: 2, stroke: "#fff" }} />
@@ -466,7 +466,7 @@ export default function Dashboard() {
         <div>
           <div className="flex items-center justify-between mb-3.5">
             <div className="flex items-center gap-2.5">
-              <div style={{ width: 28, height: 28, borderRadius: 10, background: `linear-gradient(135deg, ${V1}, #4f46e5)`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 10px rgba(108,92,231,.35)" }}>
+              <div style={{ width: 28, height: 28, borderRadius: 10, background: `#18181b`, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 10px rgba(0,0,0,.35)" }}>
                 <Gamepad2 style={{ width: 13, height: 13, color: "white", strokeWidth: 2 }} />
               </div>
               <span className="text-[15px] font-bold" style={{ color: "var(--gz-text-primary)" }}>Partidas Recentes</span>
@@ -479,7 +479,7 @@ export default function Dashboard() {
 
           {(live ?? []).length === 0 ? (
             <div className="gz-card px-5 py-12 text-center">
-              <div style={{ width: 44, height: 44, borderRadius: 16, margin: "0 auto 12px", background: "rgba(108,92,231,.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ width: 44, height: 44, borderRadius: 16, margin: "0 auto 12px", background: "rgba(0,0,0,.06)", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <Gamepad2 style={{ width: 20, height: 20, color: V1, strokeWidth: 1.5, opacity: .4 }} />
               </div>
               <div className="text-[13px] font-medium" style={{ color: "var(--gz-text-accent)" }}>Nenhuma partida ao vivo</div>

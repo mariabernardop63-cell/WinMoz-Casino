@@ -196,7 +196,7 @@ async function loadSecurityData(): Promise<SecurityData> {
 }
 
 function SeverityDot({ severity }: { severity: string }) {
-  const color = severity === "high" ? "#dc2626" : severity === "medium" ? "#d97706" : "#6b7280";
+  const color = severity === "high" ? "#dc2626" : severity === "medium" ? "#71717a" : "#6b7280";
   return <span style={{ width: 7, height: 7, borderRadius: "50%", background: color, display: "inline-block", flexShrink: 0 }} />;
 }
 
@@ -218,13 +218,13 @@ function StatusBadge({ status }: { status: string }) {
 function ServiceStatus({ status }: { status: string }) {
   if (status === "online") return (
     <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "#374151" }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#16a34a", display: "inline-block" }} />
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#15803d", display: "inline-block" }} />
       Online
     </span>
   );
   if (status === "degraded") return (
     <span style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "#374151" }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#d97706", display: "inline-block" }} />
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#71717a", display: "inline-block" }} />
       Degradado
     </span>
   );

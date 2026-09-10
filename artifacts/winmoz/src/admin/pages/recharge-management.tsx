@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-const ACCENT = "#6C5CE7";
+const ACCENT = "#18181b";
 
 function fmtMZN(val: number) {
   return Number(val ?? 0).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -87,9 +87,9 @@ interface ListResponse {
 }
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  active:  { label: "Activa",           color: "#10b981", bg: "rgba(16,185,129,.12)" },
+  active:  { label: "Activa",           color: "#15803d", bg: "rgba(21,128,61,.12)" },
   expired: { label: "Expirada",         color: "#94a3b8", bg: "rgba(148,163,184,.14)" },
-  revoked: { label: "Revogada",         color: "#ef4444", bg: "rgba(239,68,68,.12)" },
+  revoked: { label: "Revogada",         color: "#b91c1c", bg: "rgba(185,28,28,.12)" },
 };
 
 const STATUS_FILTERS: Array<{ key: string; label: string }> = [
@@ -196,11 +196,11 @@ export default function RechargeManagement() {
 
   const statCards = useMemo(() => [
     { icon: Ticket,      label: "Total de Códigos",     value: String(stats?.total ?? 0),                      color: ACCENT },
-    { icon: CheckCircle2,label: "Activas",              value: String(stats?.active ?? 0),                     color: "#10b981" },
+    { icon: CheckCircle2,label: "Activas",              value: String(stats?.active ?? 0),                     color: "#15803d" },
     { icon: XCircle,     label: "Expiradas",            value: String(stats?.expired ?? 0),                    color: "#94a3b8" },
-    { icon: Ban,         label: "Revogadas",            value: String(stats?.revoked ?? 0),                    color: "#ef4444" },
-    { icon: Wallet,      label: "Valor Disponível",     value: `${fmtMZN(stats?.totalValueActive ?? 0)} MZN`,  color: "#00D4B4" },
-    { icon: TrendingUp,  label: "Total Recarregado",    value: `${fmtMZN(stats?.redeemedTotal ?? 0)} MZN`,     color: "#f59e0b" },
+    { icon: Ban,         label: "Revogadas",            value: String(stats?.revoked ?? 0),                    color: "#b91c1c" },
+    { icon: Wallet,      label: "Valor Disponível",     value: `${fmtMZN(stats?.totalValueActive ?? 0)} MZN`,  color: "#18181b" },
+    { icon: TrendingUp,  label: "Total Recarregado",    value: `${fmtMZN(stats?.redeemedTotal ?? 0)} MZN`,     color: "#a16207" },
   ], [stats]);
 
   return (
@@ -211,7 +211,7 @@ export default function RechargeManagement() {
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-[22px] font-black tracking-tight flex items-center gap-2.5" style={{ color: "var(--gz-text-primary)" }}>
-              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(108,92,231,.14)" }}>
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,0,0,.14)" }}>
                 <Ticket style={{ width: 18, height: 18, color: ACCENT }} />
               </span>
               Gestão de Recargas
@@ -225,14 +225,14 @@ export default function RechargeManagement() {
             <button
               onClick={() => refetch()}
               className="h-10 px-4 rounded-xl text-[12.5px] font-bold flex items-center gap-2 transition-all hover:opacity-80"
-              style={{ background: "rgba(108,92,231,.1)", color: ACCENT }}>
+              style={{ background: "rgba(0,0,0,.1)", color: ACCENT }}>
               <RefreshCw style={{ width: 14, height: 14 }} className={isRefetching ? "animate-spin" : ""} />
               Actualizar
             </button>
             <button
               onClick={() => setShowCreate((v) => !v)}
               className="h-10 px-5 rounded-xl text-[12.5px] font-bold text-white flex items-center gap-2 transition-all hover:opacity-90"
-              style={{ background: ACCENT, boxShadow: "0 4px 14px rgba(108,92,231,.35)" }}>
+              style={{ background: ACCENT, boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}>
               <Plus style={{ width: 15, height: 15 }} />
               Nova Recarga
             </button>
@@ -255,7 +255,7 @@ export default function RechargeManagement() {
 
       {/* ── Create form ── */}
       {showCreate && (
-        <div className="gz-card p-5" style={{ border: `1px solid rgba(108,92,231,.3)` }}>
+        <div className="gz-card p-5" style={{ border: `1px solid rgba(0,0,0,.3)` }}>
           <div className="flex items-center gap-2 mb-4">
             <Plus style={{ width: 16, height: 16, color: ACCENT }} />
             <h2 className="text-[15px] font-black" style={{ color: "var(--gz-text-primary)" }}>Criar Novas Recargas</h2>
@@ -313,7 +313,7 @@ export default function RechargeManagement() {
           </div>
           <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
             <p className="text-[11px] font-medium flex items-center gap-1.5" style={{ color: "var(--gz-text-accent)" }}>
-              <ShieldCheck style={{ width: 12, height: 12, color: "#10b981" }} />
+              <ShieldCheck style={{ width: 12, height: 12, color: "#15803d" }} />
               Códigos gerados com aleatoriedade criptográfica — únicos, 12 dígitos, só números
             </p>
             <div className="flex items-center gap-2">
@@ -324,7 +324,7 @@ export default function RechargeManagement() {
                 onClick={handleCreate}
                 disabled={createMutation.isPending}
                 className="h-10 px-5 rounded-xl text-[12.5px] font-bold text-white flex items-center gap-2 disabled:opacity-50 transition-all"
-                style={{ background: ACCENT, boxShadow: "0 4px 14px rgba(108,92,231,.35)" }}>
+                style={{ background: ACCENT, boxShadow: "0 4px 14px rgba(0,0,0,.35)" }}>
                 {createMutation.isPending ? <RefreshCw style={{ width: 14, height: 14 }} className="animate-spin" /> : <Plus style={{ width: 14, height: 14 }} />}
                 Gerar Recargas
               </button>
@@ -336,10 +336,10 @@ export default function RechargeManagement() {
       {/* ── Generated codes modal ── */}
       {createdCodes && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)" }}>
-          <div className="gz-card p-6 w-full max-w-lg max-h-[80vh] overflow-auto" style={{ border: `1.5px solid rgba(16,185,129,.4)` }}>
+          <div className="gz-card p-6 w-full max-w-lg max-h-[80vh] overflow-auto" style={{ border: `1.5px solid rgba(21,128,61,.4)` }}>
             <div className="flex items-center gap-2.5 mb-1">
-              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(16,185,129,.14)" }}>
-                <CheckCircle2 style={{ width: 18, height: 18, color: "#10b981" }} />
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(21,128,61,.14)" }}>
+                <CheckCircle2 style={{ width: 18, height: 18, color: "#15803d" }} />
               </span>
               <h2 className="text-[16px] font-black" style={{ color: "var(--gz-text-primary)" }}>
                 {createdCodes.length} recarga(s) criada(s)
@@ -352,7 +352,7 @@ export default function RechargeManagement() {
               {createdCodes.map((c, i) => (
                 <div key={c} className="flex items-center justify-between px-4 py-2.5" style={{ background: i % 2 === 0 ? "rgba(255,255,255,.03)" : "transparent", borderBottom: i < createdCodes.length - 1 ? "1px solid rgba(255,255,255,.06)" : "none" }}>
                   <span className="font-mono text-[14px] font-bold tracking-wider" style={{ color: "var(--gz-text-primary)" }}>{formatCode(c)}</span>
-                  <button onClick={() => copyCode(c)} className="p-1.5 rounded-lg transition-all hover:opacity-80" style={{ background: "rgba(108,92,231,.12)" }} title="Copiar código">
+                  <button onClick={() => copyCode(c)} className="p-1.5 rounded-lg transition-all hover:opacity-80" style={{ background: "rgba(0,0,0,.12)" }} title="Copiar código">
                     <Copy style={{ width: 13, height: 13, color: ACCENT }} />
                   </button>
                 </div>
@@ -362,13 +362,13 @@ export default function RechargeManagement() {
               <button
                 onClick={() => { navigator.clipboard.writeText(createdCodes.map(formatCode).join("\n")).then(() => toast.success("Todos os códigos copiados")); }}
                 className="flex-1 h-11 rounded-xl text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90"
-                style={{ background: "rgba(108,92,231,.12)", color: ACCENT }}>
+                style={{ background: "rgba(0,0,0,.12)", color: ACCENT }}>
                 <Copy style={{ width: 14, height: 14 }} /> Copiar Todos
               </button>
               <button
                 onClick={() => downloadCodes(createdCodes)}
                 className="flex-1 h-11 rounded-xl text-[12.5px] font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90"
-                style={{ background: "rgba(108,92,231,.12)", color: ACCENT }}>
+                style={{ background: "rgba(0,0,0,.12)", color: ACCENT }}>
                 <Download style={{ width: 14, height: 14 }} /> Descarregar .txt
               </button>
               <button
@@ -385,17 +385,17 @@ export default function RechargeManagement() {
       {/* ── Delete confirm modal ── */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,.6)", backdropFilter: "blur(4px)" }}>
-          <div className="gz-card p-6 w-full max-w-md" style={{ border: "1.5px solid rgba(239,68,68,.4)" }}>
+          <div className="gz-card p-6 w-full max-w-md" style={{ border: "1.5px solid rgba(185,28,28,.4)" }}>
             <div className="flex items-center gap-2.5 mb-3">
-              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(239,68,68,.12)" }}>
-                <AlertTriangle style={{ width: 18, height: 18, color: "#ef4444" }} />
+              <span className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(185,28,28,.12)" }}>
+                <AlertTriangle style={{ width: 18, height: 18, color: "#b91c1c" }} />
               </span>
               <h2 className="text-[16px] font-black" style={{ color: "var(--gz-text-primary)" }}>Eliminar recarga?</h2>
             </div>
             <p className="text-[12.5px] font-medium mb-1.5" style={{ color: "var(--gz-text-accent)" }}>
               Código <span className="font-mono font-bold" style={{ color: "var(--gz-text-primary)" }}>{formatCode(confirmDelete.code)}</span> — {fmtMZN(confirmDelete.amount)} MZN
             </p>
-            <p className="text-[12px] font-medium mb-5" style={{ color: "#ef4444" }}>
+            <p className="text-[12px] font-medium mb-5" style={{ color: "#b91c1c" }}>
               {confirmDelete.used_count > 0
                 ? `Esta recarga já foi usada ${confirmDelete.used_count}x. O histórico de usos será removido; as transacções financeiras mantêm-se.`
                 : "Esta acção é permanente e não pode ser revertida."}
@@ -408,7 +408,7 @@ export default function RechargeManagement() {
                 onClick={() => deleteMutation.mutate(confirmDelete.id)}
                 disabled={deleteMutation.isPending}
                 className="flex-1 h-11 rounded-xl text-[12.5px] font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-                style={{ background: "#ef4444" }}>
+                style={{ background: "#b91c1c" }}>
                 {deleteMutation.isPending ? <RefreshCw style={{ width: 14, height: 14 }} className="animate-spin" /> : <Trash2 style={{ width: 14, height: 14 }} />}
                 Eliminar
               </button>
@@ -419,10 +419,10 @@ export default function RechargeManagement() {
 
       {/* ── Filters ── */}
       {listError && (
-        <div className="gz-card p-4 flex items-start gap-3" style={{ background: "rgba(239,68,68,.06)", border: "1px solid rgba(239,68,68,.3)" }}>
-          <AlertTriangle style={{ width: 16, height: 16, color: "#ef4444", flexShrink: 0, marginTop: 1 }} />
+        <div className="gz-card p-4 flex items-start gap-3" style={{ background: "rgba(185,28,28,.06)", border: "1px solid rgba(185,28,28,.3)" }}>
+          <AlertTriangle style={{ width: 16, height: 16, color: "#b91c1c", flexShrink: 0, marginTop: 1 }} />
           <div>
-            <p className="text-[12.5px] font-bold" style={{ color: "#ef4444" }}>Erro ao carregar recargas</p>
+            <p className="text-[12.5px] font-bold" style={{ color: "#b91c1c" }}>Erro ao carregar recargas</p>
             <p className="text-[11.5px] font-medium mt-0.5" style={{ color: "var(--gz-text-accent)" }}>{(listError as Error).message}</p>
           </div>
         </div>
@@ -449,7 +449,7 @@ export default function RechargeManagement() {
               onClick={() => { setStatus(f.key); setPage(1); }}
               className="h-10 px-4 rounded-xl text-[12px] font-bold transition-all"
               style={status === f.key
-                ? { background: ACCENT, color: "#fff", boxShadow: "0 3px 10px rgba(108,92,231,.3)" }
+                ? { background: ACCENT, color: "#fff", boxShadow: "0 3px 10px rgba(0,0,0,.3)" }
                 : { background: "rgba(255,255,255,.05)", color: "var(--gz-text-accent)" }}>
               {f.label}
             </button>
@@ -488,7 +488,7 @@ export default function RechargeManagement() {
                           <Copy style={{ width: 11, height: 11, color: "var(--gz-text-accent)" }} />
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-[13px] font-black whitespace-nowrap" style={{ color: "#00D4B4" }}>{fmtMZN(c.amount)} MZN</td>
+                      <td className="px-4 py-3 text-[13px] font-black whitespace-nowrap" style={{ color: "#18181b" }}>{fmtMZN(c.amount)} MZN</td>
                       <td className="px-4 py-3 min-w-[120px]">
                         <div className="flex items-center gap-2">
                           <span className="text-[12px] font-bold whitespace-nowrap" style={{ color: "var(--gz-text-primary)" }}>{c.used_count}/{c.max_uses}</span>
@@ -509,7 +509,7 @@ export default function RechargeManagement() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-[12px] font-semibold whitespace-nowrap" style={{ color: "var(--gz-text-accent)" }}>{fmtDate(c.created_at)}</td>
-                      <td className="px-4 py-3 text-[12px] font-semibold whitespace-nowrap" style={{ color: c.expires_at && new Date(c.expires_at) < new Date() ? "#ef4444" : "var(--gz-text-accent)" }}>
+                      <td className="px-4 py-3 text-[12px] font-semibold whitespace-nowrap" style={{ color: c.expires_at && new Date(c.expires_at) < new Date() ? "#b91c1c" : "var(--gz-text-accent)" }}>
                         {c.expires_at ? fmtDate(c.expires_at) : "sem prazo"}
                       </td>
                       <td className="px-4 py-3">
@@ -519,16 +519,16 @@ export default function RechargeManagement() {
                               onClick={() => toggleMutation.mutate({ id: c.id, action: "disable" })}
                               disabled={toggleMutation.isPending}
                               className="p-2 rounded-lg transition-all hover:opacity-80 disabled:opacity-40" title="Revogar (impede uso)"
-                              style={{ background: "rgba(239,68,68,.1)" }}>
-                              <Ban style={{ width: 13, height: 13, color: "#ef4444" }} />
+                              style={{ background: "rgba(185,28,28,.1)" }}>
+                              <Ban style={{ width: 13, height: 13, color: "#b91c1c" }} />
                             </button>
                           ) : c.effectiveStatus === "revoked" ? (
                             <button
                               onClick={() => toggleMutation.mutate({ id: c.id, action: "enable" })}
                               disabled={toggleMutation.isPending}
                               className="p-2 rounded-lg transition-all hover:opacity-80 disabled:opacity-40" title="Reactivar"
-                              style={{ background: "rgba(16,185,129,.1)" }}>
-                              <RotateCcw style={{ width: 13, height: 13, color: "#10b981" }} />
+                              style={{ background: "rgba(21,128,61,.1)" }}>
+                              <RotateCcw style={{ width: 13, height: 13, color: "#15803d" }} />
                             </button>
                           ) : null}
                           <button
@@ -541,7 +541,7 @@ export default function RechargeManagement() {
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr style={{ background: "rgba(108,92,231,.04)" }}>
+                      <tr style={{ background: "rgba(0,0,0,.04)" }}>
                         <td colSpan={7} className="px-4 py-3">
                           <p className="text-[11px] font-black uppercase tracking-wide mb-2 flex items-center gap-1.5" style={{ color: "var(--gz-text-accent)" }}>
                             <Users style={{ width: 12, height: 12 }} /> Utilizadores que usaram ({c.redemptions.length})
@@ -550,7 +550,7 @@ export default function RechargeManagement() {
                             {c.redemptions.map((r) => (
                               <div key={r.userId} className="flex items-center justify-between text-[12px] font-semibold px-3 py-2 rounded-lg" style={{ background: "rgba(255,255,255,.03)" }}>
                                 <span className="flex items-center gap-2" style={{ color: "var(--gz-text-primary)" }}>
-                                  <CheckCircle2 style={{ width: 12, height: 12, color: "#10b981" }} />
+                                  <CheckCircle2 style={{ width: 12, height: 12, color: "#15803d" }} />
                                   {r.userName}
                                 </span>
                                 <span style={{ color: "var(--gz-text-accent)" }}>
@@ -590,10 +590,10 @@ export default function RechargeManagement() {
       </div>
 
       {/* ── Security note ── */}
-      <div className="gz-card p-4 flex items-start gap-3" style={{ background: "rgba(16,185,129,.04)", border: "1px solid rgba(16,185,129,.15)" }}>
-        <ShieldCheck style={{ width: 16, height: 16, color: "#10b981", flexShrink: 0, marginTop: 1 }} />
+      <div className="gz-card p-4 flex items-start gap-3" style={{ background: "rgba(21,128,61,.04)", border: "1px solid rgba(21,128,61,.15)" }}>
+        <ShieldCheck style={{ width: 16, height: 16, color: "#15803d", flexShrink: 0, marginTop: 1 }} />
         <div className="text-[11.5px] font-medium leading-relaxed" style={{ color: "var(--gz-text-accent)" }}>
-          <strong style={{ color: "#10b981" }}>Segurança:</strong> os códigos vivem numa tabela bloqueada por RLS — nenhum utilizador consegue ler, criar ou manipular recargas pelo browser.
+          <strong style={{ color: "#15803d" }}>Segurança:</strong> os códigos vivem numa tabela bloqueada por RLS — nenhum utilizador consegue ler, criar ou manipular recargas pelo browser.
           Cada uso é processado de forma atómica no servidor (impossível usar a mesma recarga duas vezes, mesmo em simultâneo), um utilizador nunca usa a mesma recarga duas vezes,
           tentativas falhadas são limitadas (anti brute-force) e cada uso fica registado no histórico acima e no extrato do utilizador.
         </div>

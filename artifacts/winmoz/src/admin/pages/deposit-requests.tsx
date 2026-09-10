@@ -203,9 +203,9 @@ export default function DepositRequests() {
       {/* Stats */}
       <div className="admin-responsive-grid grid gap-3 mb-6" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
         {[
-          { label: "Pendentes", val: requests.length, icon: Clock, color: "#f59e0b" },
+          { label: "Pendentes", val: requests.length, icon: Clock, color: "#18181b" },
           { label: "Depósitos", val: requests.filter(r => r.type === "manual_deposit").length, icon: Wallet, color: CYAN },
-          { label: "Apostas", val: requests.filter(r => r.type === "manual_bet").length, icon: Gamepad2, color: "#a78bfa" },
+          { label: "Apostas", val: requests.filter(r => r.type === "manual_bet").length, icon: Gamepad2, color: "#71717a" },
         ].map(stat => (
           <div key={stat.label} className="gz-card rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
             <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -277,13 +277,13 @@ export default function DepositRequests() {
                     style={{ borderBottom: "1px solid var(--gz-border)" }}>
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center"
-                        style={{ background: isDeposit ? `${CYAN}18` : "rgba(167,139,250,0.15)" }}>
+                        style={{ background: isDeposit ? `${CYAN}18` : "rgba(255,255,255,0.15)" }}>
                         {isDeposit
                           ? <Wallet style={{ width: 13, height: 13, color: CYAN }} />
-                          : <Gamepad2 style={{ width: 13, height: 13, color: "#a78bfa" }} />}
+                          : <Gamepad2 style={{ width: 13, height: 13, color: "#71717a" }} />}
                       </div>
                       <span className="text-xs font-bold uppercase tracking-wider"
-                        style={{ color: isDeposit ? CYAN : "#a78bfa" }}>
+                        style={{ color: isDeposit ? CYAN : "#71717a" }}>
                         {isDeposit ? "Depósito" : "Aposta"}
                       </span>
                     </div>
@@ -330,9 +330,9 @@ export default function DepositRequests() {
                               onClick={() => handleReject(req)}
                               whileTap={{ scale: 0.93 }}
                               className="w-10 h-10 rounded-full flex items-center justify-center"
-                              style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.2)" }}
+                              style={{ background: "rgba(0,0,0,0.12)", border: "1px solid rgba(0,0,0,0.2)" }}
                               title="Rejeitar">
-                              <XCircle style={{ width: 18, height: 18, color: "#ef4444" }} />
+                              <XCircle style={{ width: 18, height: 18, color: "#0a0a0a" }} />
                             </motion.button>
                           </>
                         )}

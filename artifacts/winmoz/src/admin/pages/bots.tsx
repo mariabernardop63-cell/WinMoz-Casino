@@ -21,20 +21,20 @@ let _sessionBotOverride = false;
 // ── Design tokens — alinhados com o tema claro do painel admin ────────────────
 const T = {
   bg:      "transparent",
-  surface: "rgba(108,92,231,0.04)",
-  surf2:   "rgba(108,92,231,0.08)",
-  border:  "rgba(108,92,231,0.1)",
-  border2: "rgba(108,92,231,0.18)",
+  surface: "rgba(0,0,0,0.04)",
+  surf2:   "rgba(0,0,0,0.08)",
+  border:  "rgba(0,0,0,0.1)",
+  border2: "rgba(0,0,0,0.18)",
   text:    "var(--gz-text-primary, #1a1a2e)",
   sub:     "var(--gz-text-muted, #64748b)",
   muted:   "rgba(0,0,0,0.35)",
-  teal:    "#14b8a6",
-  green:   "#22c55e",
-  red:     "#f43f5e",
-  amber:   "#f59e0b",
-  blue:    "#6366f1",
-  purple:  "#a855f7",
-  sky:     "#38bdf8",
+  teal:    "#52525b",
+  green:   "#18181b",
+  red:     "#0a0a0a",
+  amber:   "#71717a",
+  blue:    "#3f3f46",
+  purple:  "#71717a",
+  sky:     "#a1a1aa",
 };
 
 // ── Animated number ───────────────────────────────────────────────────────────
@@ -330,7 +330,7 @@ function LossLimitCard({
               autoFocus
               style={{
                 width: 80, padding: "5px 8px", borderRadius: 8,
-                border: `1.5px solid ${T.blue}`, background: "rgba(99,102,241,0.12)",
+                border: `1.5px solid ${T.blue}`, background: "rgba(0,0,0,0.12)",
                 color: T.text, fontSize: 13, fontWeight: 700, outline: "none",
               }} />
             <span style={{ fontSize: 11, color: T.sub }}>MT</span>
@@ -372,10 +372,10 @@ function LossLimitCard({
               style={{
                 height: "100%", borderRadius: 5,
                 background: pct >= 100
-                  ? `linear-gradient(90deg, ${T.red}, #e11d48)`
+                  ? `#0a0a0a`
                   : pct >= 80
-                    ? `linear-gradient(90deg, ${T.amber}, ${T.red})`
-                    : `linear-gradient(90deg, ${T.teal}, ${T.sky})`,
+                    ? `#52525b`
+                    : `#18181b`,
               }} />
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
@@ -510,7 +510,7 @@ export default function BotManagement() {
             transition={{ duration: 3, repeat: Infinity }}
             style={{
               width: 48, height: 48, borderRadius: 16,
-              background: `linear-gradient(135deg, ${T.blue}28, ${T.purple}18)`,
+              background: `rgba(0,0,0,.04)`,
               border: `1.5px solid ${T.blue}38`,
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
@@ -561,8 +561,8 @@ export default function BotManagement() {
             borderRadius: 12, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12,
             fontFamily: "'Inter', sans-serif",
             background: botsEnabled
-              ? `linear-gradient(135deg, ${T.teal}, #0f766e)`
-              : `linear-gradient(135deg, ${T.red}, #be123c)`,
+              ? `#18181b`
+              : `#0a0a0a`,
             color: "#fff",
             boxShadow: botsEnabled ? `0 6px 24px ${T.teal}38` : `0 6px 24px ${T.red}38`,
             transition: "all 0.3s",
@@ -583,7 +583,7 @@ export default function BotManagement() {
             style={{
               borderRadius: 14, padding: "13px 18px", marginBottom: 24,
               border: `1px solid ${isAutoDisabled ? T.amber + "44" : T.red + "44"}`,
-              background: isAutoDisabled ? "rgba(245,158,11,0.07)" : "rgba(244,63,94,0.07)",
+              background: isAutoDisabled ? "rgba(0,0,0,0.07)" : "rgba(244,63,94,0.07)",
               display: "flex", alignItems: "center", gap: 12,
             }}>
             {isAutoDisabled
@@ -634,8 +634,8 @@ export default function BotManagement() {
               style={{
                 borderRadius: 22, padding: "26px 26px 18px",
                 background: positive
-                  ? `linear-gradient(145deg, rgba(20,184,166,0.16) 0%, rgba(56,189,248,0.08) 100%)`
-                  : `linear-gradient(145deg, rgba(244,63,94,0.16) 0%, rgba(245,158,11,0.08) 100%)`,
+                  ? `rgba(0,0,0,.03)`
+                  : `rgba(0,0,0,.05)`,
                 border: `1.5px solid ${saldoColor}28`,
                 position: "relative", overflow: "hidden",
                 boxShadow: `0 8px 48px ${saldoColor}14`,
@@ -856,7 +856,7 @@ export default function BotManagement() {
                 background: data.autoDisable
                   ? "rgba(244,63,94,0.08)"
                   : data.surplus < -2
-                    ? "rgba(245,158,11,0.08)"
+                    ? "rgba(0,0,0,0.08)"
                     : T.surface,
                 border: `1px solid ${data.autoDisable ? T.red + "44" : data.surplus < -2 ? T.amber + "44" : T.border}`,
               }}>
@@ -943,7 +943,7 @@ export default function BotManagement() {
                   <div style={{ height: 4, borderRadius: 4, background: "rgba(255,255,255,0.05)", overflow: "hidden", marginTop: 10 }}>
                     <motion.div
                       animate={{ width: `${rate}%` }} transition={{ duration: 1, delay: g.delay + 0.3 }}
-                      style={{ height: "100%", borderRadius: 4, background: `linear-gradient(90deg, ${T.red}, ${g.color})` }} />
+                      style={{ height: "100%", borderRadius: 4, background: `#18181b` }} />
                   </div>
                 </motion.div>
               );

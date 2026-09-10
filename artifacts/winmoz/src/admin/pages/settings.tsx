@@ -15,9 +15,9 @@ function LockedToggle() {
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
       <div style={{
         width: 44, height: 24, borderRadius: 12,
-        background: "linear-gradient(135deg, #6C5CE7, #4f46e5)",
+        background: "linear-gradient(135deg, #18181b, #4f46e5)",
         position: "relative", flexShrink: 0,
-        boxShadow: "0 2px 8px rgba(108,92,231,0.35)",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.35)",
       }}>
         <div style={{
           position: "absolute", top: 2, right: 2, width: 20, height: 20,
@@ -47,10 +47,10 @@ function FunctionalToggle({
       onClick={() => !loading && onChange(settingKey, !value)}
       style={{
         width: 44, height: 24, borderRadius: 12,
-        background: value ? "linear-gradient(135deg, #6C5CE7, #4f46e5)" : "rgba(0,0,0,0.12)",
+        background: value ? "linear-gradient(135deg, #18181b, #4f46e5)" : "rgba(0,0,0,0.12)",
         position: "relative", border: "none", cursor: loading ? "wait" : "pointer",
         transition: "background 0.25s",
-        boxShadow: value ? "0 2px 8px rgba(108,92,231,0.35)" : "none",
+        boxShadow: value ? "0 2px 8px rgba(0,0,0,0.35)" : "none",
         flexShrink: 0,
       }}
     >
@@ -78,14 +78,14 @@ function SettingRow({
   locked?: boolean;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid rgba(108,92,231,0.06)" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
       <div style={{ flex: 1, minWidth: 0, paddingRight: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gz-text-primary)" }}>{label}</span>
           {locked && (
             <span style={{
               fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 100,
-              background: "rgba(108,92,231,0.08)", color: "#6C5CE7",
+              background: "rgba(0,0,0,0.08)", color: "#18181b",
               textTransform: "uppercase", letterSpacing: "0.5px",
             }}>
               OBRIGATÓRIO
@@ -170,7 +170,7 @@ function DebitoPaySection() {
     setSaving(false);
   };
 
-  const CYAN_COLOR = "#00D4B4";
+  const CYAN_COLOR = "#18181b";
   const spinStyle = { width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(0,0,0,0.2)", borderTopColor: "#000", animation: "spin 0.8s linear infinite" } as const;
   const inputBox = (borderColor = "rgba(0,212,180,0.2)") => ({
     flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
@@ -178,13 +178,13 @@ function DebitoPaySection() {
   } as const);
   const saveBtn = (active: boolean, saving: boolean, color = CYAN_COLOR) => ({
     padding: "10px 14px", borderRadius: 12, border: "none", cursor: active && !saving ? "pointer" : "default",
-    background: active && !saving ? `linear-gradient(135deg, ${color}, ${color}cc)` : "var(--gz-bg-subtle)",
+    background: active && !saving ? `#18181b` : "var(--gz-bg-subtle)",
     color: active && !saving ? "#000" : "var(--gz-text-tertiary)",
     fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
   } as const);
 
   return (
-    <SectionCard title="Debito Pay (Gateway)" icon={Zap} color="#00D4B4" bg="rgba(0,212,180,0.1)">
+    <SectionCard title="Debito Pay (Gateway)" icon={Zap} color="#18181b" bg="rgba(0,0,0,.04)">
       <div style={{ paddingTop: 12, display: "flex", flexDirection: "column", gap: 20 }}>
 
         {/* Webhook URL */}
@@ -198,7 +198,7 @@ function DebitoPaySection() {
             </span>
             <button onClick={copyWebhook}
               style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 8, border: "none", cursor: "pointer",
-                background: copiedWH ? "rgba(0,212,180,0.2)" : "rgba(0,212,180,0.1)",
+                background: copiedWH ? "rgba(0,212,180,0.2)" : "rgba(0,0,0,.04)",
                 color: CYAN_COLOR, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, fontFamily: "inherit" }}>
               {copiedWH ? <CheckCircle style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
               {copiedWH ? "Copiado!" : "Copiar"}
@@ -245,7 +245,7 @@ function DebitoPaySection() {
         {/* Wallet Code */}
         <div>
           <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-            Wallet Code <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 100, background: "rgba(0,212,180,0.1)", color: CYAN_COLOR, textTransform: "uppercase", letterSpacing: "0.5px", marginLeft: 4 }}>OBRIGATÓRIO</span>
+            Wallet Code <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 100, background: "rgba(0,0,0,.04)", color: CYAN_COLOR, textTransform: "uppercase", letterSpacing: "0.5px", marginLeft: 4 }}>OBRIGATÓRIO</span>
           </label>
           <div style={{ display: "flex", gap: 8 }}>
             <div style={inputBox()}>
@@ -604,7 +604,7 @@ export default function Settings() {
   if (isLoading) {
     return (
       <div style={{ padding: 24, display: "flex", alignItems: "center", justifyContent: "center", height: 400 }}>
-        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "3px solid rgba(108,92,231,0.2)", borderTopColor: "#6C5CE7", animation: "spin 0.8s linear infinite" }} />
+        <div style={{ width: 28, height: 28, borderRadius: "50%", border: "3px solid rgba(0,0,0,0.2)", borderTopColor: "#18181b", animation: "spin 0.8s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
@@ -616,7 +616,7 @@ export default function Settings() {
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 14, background: "linear-gradient(135deg, #6C5CE7, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(108,92,231,0.35)" }}>
+          <div style={{ width: 38, height: 38, borderRadius: 14, background: "linear-gradient(135deg, #18181b, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(0,0,0,0.35)" }}>
             <SettingsIcon style={{ width: 18, height: 18, color: "#fff" }} />
           </div>
           <div>
@@ -629,7 +629,7 @@ export default function Settings() {
       <div className="admin-settings-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
 
         {/* Notifications — all locked */}
-        <SectionCard title="Notificações" icon={Bell} color="#6C5CE7" bg="rgba(108,92,231,0.1)">
+        <SectionCard title="Notificações" icon={Bell} color="#18181b" bg="rgba(0,0,0,0.1)">
           <SettingRow label="Alertas de Anti-Fraude" description="Receber notificações de atividade suspeita" locked>
             <LockedToggle />
           </SettingRow>
@@ -642,7 +642,7 @@ export default function Settings() {
         </SectionCard>
 
         {/* Security — all locked */}
-        <SectionCard title="Segurança" icon={Shield} color="#8b5cf6" bg="rgba(139,92,246,0.1)">
+        <SectionCard title="Segurança" icon={Shield} color="#3f3f46" bg="rgba(255,255,255,0.1)">
           <SettingRow label="Anti-Fraude Automático" description="Detecção automática de padrões suspeitos" locked>
             <LockedToggle />
           </SettingRow>
@@ -655,7 +655,7 @@ export default function Settings() {
         </SectionCard>
 
         {/* Platform — functional */}
-        <SectionCard title="Plataforma" icon={Globe} color="#10b981" bg="rgba(16,185,129,0.1)">
+        <SectionCard title="Plataforma" icon={Globe} color="#18181b" bg="rgba(0,0,0,0.1)">
           <SettingRow label="Permitir Novos Cadastros" description="Habilitar registro de novos jogadores">
             <FunctionalToggle settingKey="allow_new_users" value={settings.allow_new_users ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
           </SettingRow>
@@ -668,7 +668,7 @@ export default function Settings() {
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {settings.maintenance_mode && (
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "rgba(239,68,68,0.1)", color: "#ef4444", textTransform: "uppercase" }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "rgba(0,0,0,0.1)", color: "#0a0a0a", textTransform: "uppercase" }}>
                   ACTIVO
                 </span>
               )}
@@ -687,7 +687,7 @@ export default function Settings() {
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {settings.poker_winner_mode && (
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "rgba(139,92,246,0.12)", color: "#8b5cf6", textTransform: "uppercase" }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "rgba(255,255,255,0.12)", color: "#3f3f46", textTransform: "uppercase" }}>
                   ACTIVO
                 </span>
               )}
@@ -697,15 +697,15 @@ export default function Settings() {
         </SectionCard>
 
         {/* Carteiras de Pagamento */}
-        <SectionCard title="Carteiras de Pagamento" icon={Wallet} color="#16a34a" bg="rgba(22,163,74,0.1)">
+        <SectionCard title="Carteiras de Pagamento" icon={Wallet} color="#15803d" bg="rgba(22,163,74,0.1)">
           <SettingRow
             label="M-Pesa"
             description={settings.mpesa_wallet_enabled ? "Carteira activa — os utilizadores podem depositar via M-Pesa" : "⚠️ Carteira INDISPONÍVEL — os utilizadores não conseguem escolher M-Pesa nos depósitos"}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, textTransform: "uppercase",
-                background: settings.mpesa_wallet_enabled ? "rgba(22,163,74,0.12)" : "rgba(239,68,68,0.1)",
-                color: settings.mpesa_wallet_enabled ? "#16a34a" : "#ef4444" }}>
+                background: settings.mpesa_wallet_enabled ? "rgba(22,163,74,0.12)" : "rgba(0,0,0,0.1)",
+                color: settings.mpesa_wallet_enabled ? "#15803d" : "#0a0a0a" }}>
                 {settings.mpesa_wallet_enabled ? "Activa" : "Indisponível"}
               </span>
               <FunctionalToggle settingKey="mpesa_wallet_enabled" value={settings.mpesa_wallet_enabled ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
@@ -717,8 +717,8 @@ export default function Settings() {
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, textTransform: "uppercase",
-                background: settings.emola_wallet_enabled ? "rgba(22,163,74,0.12)" : "rgba(239,68,68,0.1)",
-                color: settings.emola_wallet_enabled ? "#16a34a" : "#ef4444" }}>
+                background: settings.emola_wallet_enabled ? "rgba(22,163,74,0.12)" : "rgba(0,0,0,0.1)",
+                color: settings.emola_wallet_enabled ? "#15803d" : "#0a0a0a" }}>
                 {settings.emola_wallet_enabled ? "Activa" : "Indisponível"}
               </span>
               <FunctionalToggle settingKey="emola_wallet_enabled" value={settings.emola_wallet_enabled ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
@@ -727,7 +727,7 @@ export default function Settings() {
         </SectionCard>
 
         {/* Footer & App Download */}
-        <SectionCard title="Rodapé & App" icon={LayoutTemplate} color="#8b5cf6" bg="rgba(139,92,246,0.1)">
+        <SectionCard title="Rodapé & App" icon={LayoutTemplate} color="#3f3f46" bg="rgba(255,255,255,0.1)">
           <div style={{ paddingTop: 12, display: "flex", flexDirection: "column", gap: 16 }}>
 
             {/* Tagline */}
@@ -735,8 +735,8 @@ export default function Settings() {
               <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
                 Tagline do Rodapé
               </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(139,92,246,0.2)" }}>
-                <LayoutTemplate style={{ width: 14, height: 14, color: "#8b5cf6", flexShrink: 0 }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(255,255,255,0.2)" }}>
+                <LayoutTemplate style={{ width: 14, height: 14, color: "#3f3f46", flexShrink: 0 }} />
                 <input type="text" value={footerTagline} onChange={e => setFooterTagline(e.target.value)} placeholder="Ex: Joga. Aposta. Vence."
                   style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
               </div>
@@ -747,8 +747,8 @@ export default function Settings() {
               <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
                 Telefone de Contacto
               </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(139,92,246,0.2)" }}>
-                <Phone style={{ width: 14, height: 14, color: "#8b5cf6", flexShrink: 0 }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(255,255,255,0.2)" }}>
+                <Phone style={{ width: 14, height: 14, color: "#3f3f46", flexShrink: 0 }} />
                 <input type="text" value={footerPhone} onChange={e => setFooterPhone(e.target.value)} placeholder="Ex: +258 84 000 0000"
                   style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
               </div>
@@ -759,8 +759,8 @@ export default function Settings() {
               <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
                 E-mail de Contacto
               </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(139,92,246,0.2)" }}>
-                <Mail style={{ width: 14, height: 14, color: "#8b5cf6", flexShrink: 0 }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(255,255,255,0.2)" }}>
+                <Mail style={{ width: 14, height: 14, color: "#3f3f46", flexShrink: 0 }} />
                 <input type="email" value={footerEmail} onChange={e => setFooterEmail(e.target.value)} placeholder="Ex: suporte@mozbet.co.mz"
                   style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
               </div>
@@ -771,8 +771,8 @@ export default function Settings() {
               <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
                 Link de Download da App
               </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(139,92,246,0.2)" }}>
-                <Link2 style={{ width: 14, height: 14, color: "#8b5cf6", flexShrink: 0 }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(255,255,255,0.2)" }}>
+                <Link2 style={{ width: 14, height: 14, color: "#3f3f46", flexShrink: 0 }} />
                 <input type="url" value={footerAppUrl} onChange={e => setFooterAppUrl(e.target.value)} placeholder="https://play.google.com/..."
                   style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
               </div>
@@ -811,12 +811,12 @@ export default function Settings() {
             <button onClick={handleSaveFooter} disabled={savingFooter}
               style={{
                 padding: "11px 20px", borderRadius: 12, border: "none",
-                background: "linear-gradient(135deg, #8b5cf6, #6C5CE7)",
+                background: "linear-gradient(135deg, #3f3f46, #18181b)",
                 color: "#fff", fontWeight: 700, fontSize: 13,
                 display: "flex", alignItems: "center", gap: 8,
                 cursor: savingFooter ? "wait" : "pointer",
                 fontFamily: "inherit", alignSelf: "flex-start",
-                boxShadow: "0 4px 14px rgba(139,92,246,0.3)",
+                boxShadow: "0 4px 14px rgba(255,255,255,0.3)",
               }}>
               {savingFooter ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
               Guardar Rodapé
@@ -825,7 +825,7 @@ export default function Settings() {
         </SectionCard>
 
         {/* Database */}
-        <SectionCard title="Banco de Dados" icon={Database} color="#f59e0b" bg="rgba(245,158,11,0.1)">
+        <SectionCard title="Banco de Dados" icon={Database} color="#18181b" bg="rgba(0,0,0,0.1)">
           <SettingRow label="Backup Automático" description="Backup diário do banco de dados">
             <FunctionalToggle settingKey="backup_auto" value={settings.backup_auto ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
           </SettingRow>
@@ -861,7 +861,7 @@ export default function Settings() {
                 Alterar E-mail do Admin
               </label>
               <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,0.1)" }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,0.1)" }}>
                   <Mail style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
                   <input
                     type="email"
@@ -876,7 +876,7 @@ export default function Settings() {
                   disabled={!newEmail.trim() || savingEmail}
                   style={{
                     padding: "10px 14px", borderRadius: 12, border: "none", cursor: newEmail.trim() ? "pointer" : "default",
-                    background: newEmail.trim() ? "linear-gradient(135deg, #6C5CE7, #4f46e5)" : "var(--gz-bg-subtle)",
+                    background: newEmail.trim() ? "linear-gradient(135deg, #18181b, #4f46e5)" : "var(--gz-bg-subtle)",
                     color: newEmail.trim() ? "#fff" : "var(--gz-text-tertiary)",
                     fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
                   }}
@@ -891,7 +891,7 @@ export default function Settings() {
                 Alterar Palavra-Passe do Admin
               </label>
               <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,0.1)" }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,0.1)" }}>
                   <Key style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
                   <input
                     type={showPw ? "text" : "password"}
@@ -909,7 +909,7 @@ export default function Settings() {
                   disabled={newPw.length < 8 || savingPw}
                   style={{
                     padding: "10px 14px", borderRadius: 12, border: "none", cursor: newPw.length >= 8 ? "pointer" : "default",
-                    background: newPw.length >= 8 ? "linear-gradient(135deg, #6C5CE7, #4f46e5)" : "var(--gz-bg-subtle)",
+                    background: newPw.length >= 8 ? "linear-gradient(135deg, #18181b, #4f46e5)" : "var(--gz-bg-subtle)",
                     color: newPw.length >= 8 ? "#fff" : "var(--gz-text-tertiary)",
                     fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
                   }}
@@ -922,7 +922,7 @@ export default function Settings() {
         </SectionCard>
 
         {/* SMS Forwarder Configuration */}
-        <SectionCard title="Pagamentos SMS Forwarder" icon={Smartphone} color="#00D4B4" bg="rgba(0,212,180,0.1)">
+        <SectionCard title="Pagamentos SMS Forwarder" icon={Smartphone} color="#18181b" bg="rgba(0,0,0,.04)">
           <div style={{ paddingTop: 12 }}>
 
             {/* Webhook URL */}
@@ -931,13 +931,13 @@ export default function Settings() {
                 URL do Webhook SMS Forwarder
               </label>
               <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(0,212,180,0.05)", border: "1.5px solid rgba(0,212,180,0.2)" }}>
-                <span style={{ flex: 1, fontSize: 11, color: "#00D4B4", fontFamily: "monospace", overflowX: "auto", whiteSpace: "nowrap" }}>
+                <span style={{ flex: 1, fontSize: 11, color: "#18181b", fontFamily: "monospace", overflowX: "auto", whiteSpace: "nowrap" }}>
                   {webhookUrl}
                 </span>
                 <button onClick={copyWebhookUrl}
                   style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 8, border: "none", cursor: "pointer",
-                    background: copiedWebhook ? "rgba(0,212,180,0.2)" : "rgba(0,212,180,0.1)",
-                    color: "#00D4B4", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, fontFamily: "inherit" }}>
+                    background: copiedWebhook ? "rgba(0,212,180,0.2)" : "rgba(0,0,0,.04)",
+                    color: "#18181b", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, fontFamily: "inherit" }}>
                   {copiedWebhook ? <CheckCircle style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
                   {copiedWebhook ? "Copiado!" : "Copiar"}
                 </button>
@@ -970,7 +970,7 @@ export default function Settings() {
                   style={{
                     padding: "10px 14px", borderRadius: 12, border: "none",
                     cursor: webhookToken.trim() ? "pointer" : "default",
-                    background: webhookToken.trim() ? "linear-gradient(135deg, #00D4B4, #00b89c)" : "var(--gz-bg-subtle)",
+                    background: webhookToken.trim() ? "#18181b" : "var(--gz-bg-subtle)",
                     color: webhookToken.trim() ? "#000" : "var(--gz-text-tertiary)",
                     fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
                   }}>
@@ -978,7 +978,7 @@ export default function Settings() {
                 </button>
               </div>
               <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
-                Envia este token no header <code style={{ background: "rgba(0,212,180,0.1)", padding: "1px 5px", borderRadius: 4, fontFamily: "monospace" }}>Authorization: Bearer &lt;token&gt;</code> do app SMS Forwarder.
+                Envia este token no header <code style={{ background: "rgba(0,0,0,.04)", padding: "1px 5px", borderRadius: 4, fontFamily: "monospace" }}>Authorization: Bearer &lt;token&gt;</code> do app SMS Forwarder.
               </p>
             </div>
 
@@ -989,7 +989,7 @@ export default function Settings() {
               </label>
               <div style={{ display: "flex", gap: 8 }}>
                 <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(231,76,60,0.2)" }}>
-                  <Smartphone style={{ width: 14, height: 14, color: "#e74c3c", flexShrink: 0 }} />
+                  <Smartphone style={{ width: 14, height: 14, color: "#0a0a0a", flexShrink: 0 }} />
                   <input
                     type="text"
                     value={mpesaNum}
@@ -1002,7 +1002,7 @@ export default function Settings() {
                   style={{
                     padding: "10px 14px", borderRadius: 12, border: "none",
                     cursor: mpesaNum.trim() ? "pointer" : "default",
-                    background: mpesaNum.trim() ? "linear-gradient(135deg, #e74c3c, #c0392b)" : "var(--gz-bg-subtle)",
+                    background: mpesaNum.trim() ? "#18181b" : "var(--gz-bg-subtle)",
                     color: mpesaNum.trim() ? "#fff" : "var(--gz-text-tertiary)",
                     fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
                   }}>
@@ -1019,7 +1019,7 @@ export default function Settings() {
               </label>
               <div style={{ display: "flex", gap: 8 }}>
                 <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(231,76,60,0.2)" }}>
-                  <span style={{ fontSize: 13, color: "#e74c3c", flexShrink: 0 }}>👤</span>
+                  <span style={{ fontSize: 13, color: "#0a0a0a", flexShrink: 0 }}>👤</span>
                   <input
                     type="text"
                     value={mpesaName}
@@ -1032,7 +1032,7 @@ export default function Settings() {
                   style={{
                     padding: "10px 14px", borderRadius: 12, border: "none",
                     cursor: mpesaName.trim() ? "pointer" : "default",
-                    background: mpesaName.trim() ? "linear-gradient(135deg, #e74c3c, #c0392b)" : "var(--gz-bg-subtle)",
+                    background: mpesaName.trim() ? "#18181b" : "var(--gz-bg-subtle)",
                     color: mpesaName.trim() ? "#fff" : "var(--gz-text-tertiary)",
                     fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
                   }}>
@@ -1062,7 +1062,7 @@ export default function Settings() {
                   style={{
                     padding: "10px 14px", borderRadius: 12, border: "none",
                     cursor: emolaNum.trim() ? "pointer" : "default",
-                    background: emolaNum.trim() ? "linear-gradient(135deg, #34d399, #059669)" : "var(--gz-bg-subtle)",
+                    background: emolaNum.trim() ? "#18181b" : "var(--gz-bg-subtle)",
                     color: emolaNum.trim() ? "#fff" : "var(--gz-text-tertiary)",
                     fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
                   }}>
@@ -1092,7 +1092,7 @@ export default function Settings() {
                   style={{
                     padding: "10px 14px", borderRadius: 12, border: "none",
                     cursor: emolaName.trim() ? "pointer" : "default",
-                    background: emolaName.trim() ? "linear-gradient(135deg, #34d399, #059669)" : "var(--gz-bg-subtle)",
+                    background: emolaName.trim() ? "#18181b" : "var(--gz-bg-subtle)",
                     color: emolaName.trim() ? "#fff" : "var(--gz-text-tertiary)",
                     fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
                   }}>
@@ -1107,7 +1107,7 @@ export default function Settings() {
 
         {/* Ad Banner Script — full width */}
         <div style={{ gridColumn: "1 / -1" }}>
-          <SectionCard title="Banner de Anúncios" icon={LayoutTemplate} color="#f59e0b" bg="rgba(245,158,11,0.1)">
+          <SectionCard title="Banner de Anúncios" icon={LayoutTemplate} color="#18181b" bg="rgba(0,0,0,0.1)">
             <div style={{ paddingTop: 12 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
                 Script do Anúncio (Banner de Apostas &amp; Home)
@@ -1119,7 +1119,7 @@ export default function Settings() {
                 rows={6}
                 style={{
                   width: "100%", background: "var(--gz-bg-subtle)",
-                  border: "1.5px solid rgba(245,158,11,0.25)", borderRadius: 12,
+                  border: "1.5px solid rgba(0,0,0,0.25)", borderRadius: 12,
                   padding: "12px 14px", resize: "vertical", outline: "none",
                   fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace",
                   lineHeight: 1.6, boxSizing: "border-box",
@@ -1133,7 +1133,7 @@ export default function Settings() {
                 disabled={savingAdScript}
                 style={{
                   marginTop: 14, padding: "11px 20px", borderRadius: 12, border: "none",
-                  background: adBannerScript.trim() ? "linear-gradient(135deg, #f59e0b, #d97706)" : "var(--gz-bg-subtle)",
+                  background: adBannerScript.trim() ? "linear-gradient(135deg, #18181b, #71717a)" : "var(--gz-bg-subtle)",
                   color: adBannerScript.trim() ? "#000" : "var(--gz-text-tertiary)",
                   fontWeight: 700, fontSize: 13,
                   display: "flex", alignItems: "center", gap: 8,
@@ -1152,10 +1152,10 @@ export default function Settings() {
         <DebitoPaySection />
 
         {/* Security Gate Password */}
-        <SectionCard title="Senha da Porta de Segurança" icon={Lock} color="#8b5cf6" bg="rgba(139,92,246,0.1)">
+        <SectionCard title="Senha da Porta de Segurança" icon={Lock} color="#3f3f46" bg="rgba(255,255,255,0.1)">
           <div style={{ paddingTop: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(108,92,231,0.05)", border: "1px solid rgba(108,92,231,0.1)", marginBottom: 16 }}>
-              <Shield style={{ width: 14, height: 14, color: "#6C5CE7", flexShrink: 0 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.1)", marginBottom: 16 }}>
+              <Shield style={{ width: 14, height: 14, color: "#18181b", flexShrink: 0 }} />
               <span style={{ fontSize: 12, color: "var(--gz-text-muted)" }}>
                 Senha actual: <strong style={{ color: "var(--gz-text-primary)", fontFamily: "monospace" }}>{currentSecPw ? "●".repeat(currentSecPw.length) : "..."}</strong>
               </span>
@@ -1165,7 +1165,7 @@ export default function Settings() {
               Nova Senha de Segurança
             </label>
             <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(108,92,231,0.1)" }}>
+              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,0.1)" }}>
                 <Lock style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
                 <input
                   type={showSecPw ? "text" : "password"}
@@ -1183,7 +1183,7 @@ export default function Settings() {
                 disabled={secPw.length < 6 || savingSecPw}
                 style={{
                   padding: "10px 14px", borderRadius: 12, border: "none", cursor: secPw.length >= 6 ? "pointer" : "default",
-                  background: secPw.length >= 6 ? "linear-gradient(135deg, #8b5cf6, #6C5CE7)" : "var(--gz-bg-subtle)",
+                  background: secPw.length >= 6 ? "linear-gradient(135deg, #3f3f46, #18181b)" : "var(--gz-bg-subtle)",
                   color: secPw.length >= 6 ? "#fff" : "var(--gz-text-tertiary)",
                   fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
                 }}
@@ -1214,7 +1214,7 @@ export default function Settings() {
                 <button onClick={handleSaveVersion} disabled={!appVersion.trim() || savingVersion}
                   style={{ padding: "10px 14px", borderRadius: 12, border: "none",
                     cursor: appVersion.trim() && !savingVersion ? "pointer" : "default",
-                    background: appVersion.trim() ? "linear-gradient(135deg, #6366F1, #4f46e5)" : "var(--gz-bg-subtle)",
+                    background: appVersion.trim() ? "#18181b" : "var(--gz-bg-subtle)",
                     color: appVersion.trim() ? "#fff" : "var(--gz-text-tertiary)",
                     fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
                   {savingVersion ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
@@ -1246,7 +1246,7 @@ export default function Settings() {
               </p>
               <button onClick={handleSaveTerms} disabled={savingTerms}
                 style={{ marginTop: 12, padding: "11px 20px", borderRadius: 12, border: "none",
-                  background: termsContent.trim() ? "linear-gradient(135deg, #0ea5e9, #0284c7)" : "var(--gz-bg-subtle)",
+                  background: termsContent.trim() ? "#18181b" : "var(--gz-bg-subtle)",
                   color: termsContent.trim() ? "#fff" : "var(--gz-text-tertiary)", fontWeight: 700, fontSize: 13,
                   display: "flex", alignItems: "center", gap: 8, cursor: termsContent.trim() && !savingTerms ? "pointer" : "default", fontFamily: "inherit" }}>
                 {savingTerms ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
@@ -1258,7 +1258,7 @@ export default function Settings() {
 
         {/* Privacy Policy Editor */}
         <div style={{ gridColumn: "1 / -1" }}>
-          <SectionCard title="Política de Privacidade" icon={BookOpen} color="#10b981" bg="rgba(16,185,129,0.1)">
+          <SectionCard title="Política de Privacidade" icon={BookOpen} color="#18181b" bg="rgba(0,0,0,0.1)">
             <div style={{ paddingTop: 12 }}>
               <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
                 Conteúdo da Política de Privacidade (texto ou Markdown)
@@ -1266,7 +1266,7 @@ export default function Settings() {
               <textarea value={privacyContent} onChange={e => setPrivacyContent(e.target.value)}
                 placeholder={"# Política de Privacidade\n\n**Última actualização:** Junho 2025\n\n**1. Dados Recolhidos**\nRecolhemos os seguintes dados..."}
                 rows={12}
-                style={{ width: "100%", background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(16,185,129,0.25)",
+                style={{ width: "100%", background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,0.25)",
                   borderRadius: 12, padding: "12px 14px", resize: "vertical", outline: "none",
                   fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace",
                   lineHeight: 1.6, boxSizing: "border-box" }} />
@@ -1275,7 +1275,7 @@ export default function Settings() {
               </p>
               <button onClick={handleSavePrivacy} disabled={savingPrivacy}
                 style={{ marginTop: 12, padding: "11px 20px", borderRadius: 12, border: "none",
-                  background: privacyContent.trim() ? "linear-gradient(135deg, #10b981, #059669)" : "var(--gz-bg-subtle)",
+                  background: privacyContent.trim() ? "#18181b" : "var(--gz-bg-subtle)",
                   color: privacyContent.trim() ? "#fff" : "var(--gz-text-tertiary)", fontWeight: 700, fontSize: 13,
                   display: "flex", alignItems: "center", gap: 8, cursor: privacyContent.trim() && !savingPrivacy ? "pointer" : "default", fontFamily: "inherit" }}>
                 {savingPrivacy ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
@@ -1290,13 +1290,13 @@ export default function Settings() {
       {/* Footer info */}
       <div style={{
         marginTop: 24, borderRadius: 20, padding: "20px 24px",
-        background: "linear-gradient(135deg, #1a0533, #2d0f6b)",
+        background: "#0a0a0a",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexWrap: "wrap", gap: 12,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Wrench style={{ width: 17, height: 17, color: "#a78bfa" }} />
+            <Wrench style={{ width: 17, height: 17, color: "#71717a" }} />
           </div>
           <div>
             <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>MOZBET Admin v1.0</div>
