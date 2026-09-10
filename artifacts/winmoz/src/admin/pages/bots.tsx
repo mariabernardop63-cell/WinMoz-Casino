@@ -4,38 +4,56 @@ import { adminSupabase, useAdminRealtimeSync } from "@/admin/lib/supabase-api";
 import { adminReEnable } from "@/lib/botBrain";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer,
-  BarChart, Bar, Tooltip as RTooltip, XAxis,
+  AreaChart, Area, ResponsiveContainer,
+  BarChart, Bar, Cell, Tooltip as RTooltip,
 } from "recharts";
 import {
-  Bot, Power, PowerOff, RefreshCw, Brain, TrendingUp, TrendingDown,
-  Activity, Shield, AlertTriangle, CheckCircle2, ShieldOff,
-  Edit3, Check, X, Target, Zap, Flame, Crown, BarChart3,
-  ArrowUpRight, ArrowDownRight, Gamepad2,
+  Bot, Power, PowerOff, Brain, TrendingUp, TrendingDown,
+  CheckCircle2, AlertTriangle, ShieldOff, Edit3, Check, X,
+  Target, Zap, Shield, BarChart3, ArrowUpRight, ArrowDownRight,
+  Gamepad2, RefreshCw, Crown, Activity,
 } from "lucide-react";
 
-// Session-level flag — prevents the auto-disable loop when the admin
-// manually re-enables bots. Cleared on page refresh (intended).
 let _sessionBotOverride = false;
 
-// ── Design tokens — alinhados com o tema claro do painel admin ────────────────
+// ── Design tokens ─────────────────────────────────────────────────────────────
 const T = {
-  bg:      "transparent",
-  surface: "rgba(0,0,0,0.04)",
-  surf2:   "rgba(0,0,0,0.08)",
-  border:  "rgba(0,0,0,0.1)",
-  border2: "rgba(0,0,0,0.18)",
-  text:    "var(--gz-text-primary, #1a1a2e)",
-  sub:     "var(--gz-text-muted, #64748b)",
-  muted:   "rgba(0,0,0,0.35)",
-  teal:    "#52525b",
-  green:   "#18181b",
-  red:     "#0a0a0a",
-  amber:   "#71717a",
-  blue:    "#3f3f46",
-  purple:  "#71717a",
-  sky:     "#a1a1aa",
+  teal:   "#15803d",
+  green:  "#18181b",
+  red:    "#b91c1c",
+  amber:  "#a16207",
+  blue:   "#3f3f46",
+  purple: "#71717a",
 };
+
+// ── Section header (consistent with dashboard) ────────────────────────────────
+function SectionHeader({
+  icon: Icon, title, subtitle, action,
+}: {
+  icon: React.ElementType; title: string; subtitle?: string; action?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-5 py-3.5"
+      style={{ borderBottom: "1px solid var(--gz-border-subtle)" }}>
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div style={{
+          width: 28, height: 28, borderRadius: 9, flexShrink: 0,
+          background: "var(--gz-bg-subtle)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <Icon style={{ width: 14, height: 14, color: "var(--gz-text-secondary)", strokeWidth: 1.9 }} />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[13.5px] font-bold leading-tight" style={{ color: "var(--gz-text-primary)" }}>{title}</div>
+          {subtitle && (
+            <div className="text-[11px] font-medium mt-0.5 truncate" style={{ color: "var(--gz-text-muted)" }}>{subtitle}</div>
+          )}
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
 
 // ── Animated number ───────────────────────────────────────────────────────────
 function AnimNum({ value, prefix = "", suffix = "" }: { value: number; prefix?: string; suffix?: string }) {
@@ -65,16 +83,16 @@ function AnimNum({ value, prefix = "", suffix = "" }: { value: number; prefix?: 
   return <>{prefix}{display.toLocaleString("pt-MZ")}{suffix}</>;
 }
 
-// ── Donut chart ───────────────────────────────────────────────────────────────
-function DonutGauge({ pct, color, size = 80 }: { pct: number; color: string; size?: number }) {
+// ── Donut gauge ───────────────────────────────────────────────────────────────
+function DonutGauge({ pct, color, size = 90 }: { pct: number; color: string; size?: number }) {
   const r = (size - 14) / 2;
   const circ = 2 * Math.PI * r;
   const dash = (pct / 100) * circ;
   return (
     <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={7} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(0,0,0,0.07)" strokeWidth={7} />
       <motion.circle
-        cx={size/2} cy={size/2} r={r} fill="none"
+        cx={size / 2} cy={size / 2} r={r} fill="none"
         stroke={color} strokeWidth={7}
         strokeLinecap="round"
         strokeDasharray={circ}
@@ -91,16 +109,16 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   if (data.length < 2) return null;
   const pts = data.map((v, i) => ({ v, i }));
   return (
-    <ResponsiveContainer width="100%" height={52}>
+    <ResponsiveContainer width="100%" height={60}>
       <AreaChart data={pts} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
         <defs>
-          <linearGradient id={`sg-${color.replace("#","")}`} x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={`sg-${color.replace("#", "")}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor={color} stopOpacity={0.25} />
             <stop offset="95%" stopColor={color} stopOpacity={0} />
           </linearGradient>
         </defs>
         <Area type="monotone" dataKey="v" stroke={color} strokeWidth={2}
-          fill={`url(#sg-${color.replace("#","")})`} dot={false} />
+          fill={`url(#sg-${color.replace("#", "")})`} dot={false} />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -113,26 +131,44 @@ function MiniBar({ wins, losses }: { wins: number; losses: number }) {
     { name: "User", v: losses, fill: T.teal },
   ];
   return (
-    <ResponsiveContainer width="100%" height={40}>
-      <BarChart data={data} barSize={22} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+    <ResponsiveContainer width="100%" height={46}>
+      <BarChart data={data} barSize={24} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
         <Bar dataKey="v" radius={[4, 4, 0, 0]}>
           {data.map((d, i) => <Cell key={i} fill={d.fill} />)}
         </Bar>
         <RTooltip
-          contentStyle={{ background: "#1e2235", border: "none", borderRadius: 8, fontSize: 11 }}
+          contentStyle={{ background: "#18181b", border: "none", borderRadius: 8, fontSize: 11, color: "#fff" }}
           labelFormatter={() => ""} formatter={(v: number, n: string) => [`${v}`, n]} />
       </BarChart>
     </ResponsiveContainer>
   );
 }
 
-// ── Status pill ───────────────────────────────────────────────────────────────
-function Pill({ label, color, bg }: { label: string; color: string; bg: string }) {
+// ── KPI tile ──────────────────────────────────────────────────────────────────
+function KpiTile({ label, value, icon: Icon, accent, hint, suffix }: {
+  label: string; value: number; icon: React.ElementType;
+  accent: string; hint?: string; suffix?: string;
+}) {
   return (
-    <span style={{
-      fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
-      background: bg, color, whiteSpace: "nowrap",
-    }}>{label}</span>
+    <div className="px-5 py-4" style={{ background: "var(--gz-bg-card-btn)" }}>
+      <div className="flex items-center gap-2 mb-3">
+        <div style={{
+          width: 30, height: 30, borderRadius: 10, flexShrink: 0,
+          background: `${accent}16`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <Icon style={{ width: 15, height: 15, color: accent, strokeWidth: 1.9 }} />
+        </div>
+        <span className="text-[10.5px] font-bold uppercase tracking-[0.07em] truncate" style={{ color: "var(--gz-text-muted)" }}>
+          {label}
+        </span>
+      </div>
+      <div className="text-[22px] font-black tracking-[-0.03em] tabular-nums truncate" style={{ color: "var(--gz-text-primary)" }}>
+        <AnimNum value={value} />
+        {suffix && <span className="text-[13px] font-bold ml-1">{suffix}</span>}
+      </div>
+      {hint && <div className="text-[11px] font-medium mt-1" style={{ color: "var(--gz-text-muted)" }}>{hint}</div>}
+    </div>
   );
 }
 
@@ -205,13 +241,9 @@ async function fetchBotData() {
   const totalBotGanhou = botWins.reduce((s, m)  => s + Math.abs(m.amount ?? 0), 0);
   const totalBotPerdeu = userWins.reduce((s, m) => s + Math.floor(Math.abs(m.amount) * 2 * 0.90), 0);
   const saldoLiquido   = totalBotGanhou - totalBotPerdeu;
-  // surplus > 0 = bot ganha mais (BOM para a plataforma)
-  // surplus < 0 = users ganham mais (RISCO para a plataforma)
-  const surplus     = botWins.length - userWins.length;
-  // Auto-disable apenas quando users ganham muito mais do que o bot (≥ 3 vitórias a mais)
-  const autoDisable = surplus < -3;
+  const surplus        = botWins.length - userWins.length;
+  const autoDisable    = surplus < -3;
 
-  // Build 7-day sparkline for saldo
   const sparklDays = 14;
   const dayMs      = 86_400_000;
   const sparkline: number[] = [];
@@ -269,140 +301,99 @@ async function fetchBotData() {
   };
 }
 
+// ── Pill ──────────────────────────────────────────────────────────────────────
+function Pill({ label, color, bg }: { label: string; color: string; bg: string }) {
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: 20,
+      background: bg, color, whiteSpace: "nowrap",
+    }}>{label}</span>
+  );
+}
+
 // ── Loss Limit Card ───────────────────────────────────────────────────────────
-function LossLimitCard({
-  limit, setLimit, currentLoss,
-}: {
-  limit: number; setLimit: (v: number) => void;
-  currentLoss: number;
+function LossLimitCard({ limit, setLimit, currentLoss }: {
+  limit: number; setLimit: (v: number) => void; currentLoss: number;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft,   setDraft]   = useState(String(limit));
-  const pct    = limit > 0 ? Math.min(100, Math.round((currentLoss / limit) * 100)) : 0;
+  const pct = limit > 0 ? Math.min(100, Math.round((currentLoss / limit) * 100)) : 0;
 
-  // Keep draft in sync with external limit changes when not editing
   useEffect(() => { if (!editing) setDraft(String(limit)); }, [limit, editing]);
   const danger = pct >= 80;
   const color  = pct >= 100 ? T.red : pct >= 80 ? T.amber : T.teal;
 
   function save() {
     const v = parseInt(draft, 10);
-    if (!isNaN(v) && v > 0) {
-      setLimit(v);
-      setEditing(false);
-    } else {
-      setDraft(""); // clear to signal invalid input visually
-    }
+    if (!isNaN(v) && v > 0) { setLimit(v); setEditing(false); }
+    else setDraft("");
   }
 
   return (
-    <div style={{
-      background: T.surface, border: `1px solid ${danger ? T.red + "44" : T.border}`,
-      borderRadius: 20, padding: "22px 22px",
-      boxShadow: danger ? `0 0 28px ${T.red}18` : "none",
-    }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: `${color}18`, border: `1px solid ${color}30`,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <Target style={{ width: 16, height: 16, color }} />
-          </div>
-          <div>
-            <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: T.text }}>Limite de Perda</p>
-            <p style={{ margin: 0, fontSize: 11, color: T.sub }}>Bot desliga ao atingir</p>
-          </div>
-        </div>
-        {!editing ? (
-          <button onClick={() => { setDraft(String(limit)); setEditing(true); }} style={{
-            display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
-            borderRadius: 8, border: `1px solid ${T.border2}`,
-            background: T.surf2, cursor: "pointer", color: T.sub, fontSize: 11, fontWeight: 600,
-          }}>
+    <div className="gz-card overflow-hidden" style={{ border: danger ? `1px solid ${T.red}44` : undefined }}>
+      <SectionHeader
+        icon={Target}
+        title="Limite de Perda"
+        subtitle="Bots desligam automaticamente ao atingir"
+        action={!editing ? (
+          <button onClick={() => { setDraft(String(limit)); setEditing(true); }}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold"
+            style={{ background: "var(--gz-bg-subtle)", border: "1px solid var(--gz-border-subtle)", color: "var(--gz-text-secondary)" }}>
             <Edit3 style={{ width: 11, height: 11 }} /> Editar
           </button>
         ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <div className="flex items-center gap-1.5">
             <input type="number" value={draft} onChange={e => setDraft(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
               autoFocus
-              style={{
-                width: 80, padding: "5px 8px", borderRadius: 8,
-                border: `1.5px solid ${T.blue}`, background: "rgba(0,0,0,0.12)",
-                color: T.text, fontSize: 13, fontWeight: 700, outline: "none",
-              }} />
-            <span style={{ fontSize: 11, color: T.sub }}>MT</span>
-            <button onClick={save} style={{
-              width: 28, height: 28, borderRadius: 7, border: "none",
-              background: `${T.teal}25`, cursor: "pointer", color: T.teal,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}><Check style={{ width: 12, height: 12 }} /></button>
-            <button onClick={() => setEditing(false)} style={{
-              width: 28, height: 28, borderRadius: 7, border: "none",
-              background: `${T.red}20`, cursor: "pointer", color: T.red,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}><X style={{ width: 12, height: 12 }} /></button>
+              className="w-[72px] px-2 py-1 rounded-lg outline-none text-[13px] font-bold"
+              style={{ border: "1.5px solid var(--gz-text-tertiary)", background: "var(--gz-bg-subtle)", color: "var(--gz-text-primary)" }} />
+            <span className="text-[11px]" style={{ color: "var(--gz-text-muted)" }}>MT</span>
+            <button onClick={save} className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ background: `${T.teal}22`, color: T.teal, border: "none" }}>
+              <Check style={{ width: 12, height: 12 }} />
+            </button>
+            <button onClick={() => setEditing(false)} className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ background: `${T.red}20`, color: T.red, border: "none" }}>
+              <X style={{ width: 12, height: 12 }} />
+            </button>
           </div>
         )}
-      </div>
-
-      {/* Ring + numbers */}
-      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+      />
+      <div className="p-5 flex items-center gap-5">
         <div style={{ position: "relative", flexShrink: 0 }}>
-          <DonutGauge pct={pct} color={color} size={80} />
-          <div style={{
-            position: "absolute", inset: 0,
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <span style={{ fontSize: 14, fontWeight: 800, color, transform: "rotate(0deg)" }}>
-              {pct}%
-            </span>
+          <DonutGauge pct={pct} color={color} size={84} />
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 15, fontWeight: 800, color }}>{pct}%</span>
           </div>
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-            <span style={{ fontSize: 11, color: T.sub }}>Perda acumulada</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color }}>{currentLoss.toLocaleString()} MT</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between mb-1.5">
+            <span className="text-[11px]" style={{ color: "var(--gz-text-muted)" }}>Perda acumulada</span>
+            <span className="text-[12.5px] font-bold tabular-nums" style={{ color }}>{currentLoss.toLocaleString()} MT</span>
           </div>
-          <div style={{ height: 5, borderRadius: 5, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-            <motion.div
-              animate={{ width: `${pct}%` }} transition={{ duration: 1, ease: "easeOut" }}
-              style={{
-                height: "100%", borderRadius: 5,
-                background: pct >= 100
-                  ? `#0a0a0a`
-                  : pct >= 80
-                    ? `#52525b`
-                    : `#18181b`,
-              }} />
+          <div className="gz-progress-track h-1.5">
+            <motion.div animate={{ width: `${pct}%` }} transition={{ duration: 1, ease: "easeOut" }}
+              style={{ height: "100%", borderRadius: 100, background: color }} />
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-            <span style={{ fontSize: 9, color: T.muted }}>0 MT</span>
-            <span style={{ fontSize: 9, color: T.muted }}>Limite: {limit.toLocaleString()} MT</span>
+          <div className="flex justify-between mt-1.5">
+            <span className="text-[9.5px]" style={{ color: "var(--gz-text-tertiary)" }}>0 MT</span>
+            <span className="text-[9.5px]" style={{ color: "var(--gz-text-tertiary)" }}>Limite: {limit.toLocaleString()} MT</span>
           </div>
+          {pct >= 100 && (
+            <div className="flex items-center gap-2 mt-3 px-3 py-2 rounded-xl"
+              style={{ background: `${T.red}12`, border: `1px solid ${T.red}30` }}>
+              <AlertTriangle style={{ width: 12, height: 12, color: T.red, flexShrink: 0 }} />
+              <span className="text-[11px] font-semibold" style={{ color: T.red }}>Limite atingido — bots desligados</span>
+            </div>
+          )}
         </div>
       </div>
-
-      {pct >= 100 && (
-        <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-          style={{
-            marginTop: 14, padding: "9px 12px", borderRadius: 10,
-            background: "rgba(244,63,94,0.12)", border: "1px solid rgba(244,63,94,0.28)",
-            display: "flex", alignItems: "center", gap: 8,
-          }}>
-          <AlertTriangle style={{ width: 12, height: 12, color: T.red, flexShrink: 0 }} />
-          <span style={{ fontSize: 11, color: T.red, fontWeight: 600 }}>
-            Limite atingido — Bots desligados automaticamente
-          </span>
-        </motion.div>
-      )}
     </div>
   );
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════════
 export default function BotManagement() {
   useAdminRealtimeSync();
   const qc = useQueryClient();
@@ -437,7 +428,6 @@ export default function BotManagement() {
 
   useEffect(() => {
     if (!data) return;
-    // Skip auto-disable if the admin manually re-enabled this session
     if (_sessionBotOverride) return;
     if (data.autoDisable && localStorage.getItem("wm_bots_autodisabled") !== "true") {
       localStorage.setItem("wm_bots_disabled", "true");
@@ -455,7 +445,6 @@ export default function BotManagement() {
     qc.invalidateQueries({ queryKey: ["bot-stats-v4"] });
   }
 
-  // ── Loss limit watcher: fires whenever current loss reaches the configured limit ─
   const limitTriggeredRef = React.useRef(false);
   useEffect(() => {
     if (!botsEnabled) { limitTriggeredRef.current = false; return; }
@@ -472,7 +461,7 @@ export default function BotManagement() {
     const next = !botsEnabled;
     setToggling(true);
     if (next) {
-      _sessionBotOverride = true; // prevents auto-disable loop this session
+      _sessionBotOverride = true;
       adminReEnable();
       localStorage.removeItem("wm_bots_autodisabled");
       setLimitTriggered(false);
@@ -487,125 +476,81 @@ export default function BotManagement() {
   const isAutoDisabled = !botsEnabled && (data?.autoDisable || autoDisabledFlag || limitTriggered);
   const positive       = (data?.saldoLiquido ?? 0) >= 0;
   const saldoColor     = positive ? T.teal : T.red;
-
-  // ── Derived display values ────────────────────────────────────────────────
-  const winRatePct = data?.winRate ?? 0;
-  // Alta taxa de vitória do bot = BOM; baixa = risco para a plataforma
-  const winRateColor = winRatePct >= 60 ? T.teal : winRatePct >= 40 ? T.amber : T.red;
+  const winRatePct     = data?.winRate ?? 0;
+  const winRateColor   = winRatePct >= 60 ? T.teal : winRatePct >= 40 ? T.amber : T.red;
 
   return (
-    <div style={{
-      minHeight: "100%",
-      padding: "28px 24px 56px",
-      background: T.bg,
-      color: T.text,
-      fontFamily: "'Inter', sans-serif",
-    }}>
+    <div className="px-4 sm:px-5 pb-8 pt-5 max-w-[1600px] mx-auto">
 
-      {/* ═══ HEADER ═════════════════════════════════════════════════════════ */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <motion.div
-            animate={{ boxShadow: [`0 0 18px ${T.blue}28`, `0 0 36px ${T.blue}48`, `0 0 18px ${T.blue}28`] }}
-            transition={{ duration: 3, repeat: Infinity }}
-            style={{
-              width: 48, height: 48, borderRadius: 16,
-              background: `rgba(0,0,0,.04)`,
-              border: `1.5px solid ${T.blue}38`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-            <Brain style={{ width: 22, height: 22, color: T.blue }} />
-          </motion.div>
-          <div>
-            <h1 style={{
-              margin: 0, fontSize: 20, fontWeight: 800, letterSpacing: -0.5,
-              fontFamily: "'Syne', sans-serif", color: T.text,
-            }}>
-              Gestão de Bots
-            </h1>
-            <p style={{ margin: 0, fontSize: 11, color: T.sub }}>
-              Motor inteligente · actualiza a cada 15 s
-            </p>
-          </div>
+      {/* ═══ PAGE HEADER ═══ */}
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
+        <div>
+          <h1 className="text-[26px] font-black tracking-[-0.035em] leading-tight flex items-center gap-2.5" style={{ color: "var(--gz-text-primary)" }}>
+            <Brain style={{ width: 22, height: 22, strokeWidth: 2 }} />
+            Gestão de <span className="gz-gradient-text">Bots</span>
+          </h1>
+          <p className="mt-1 text-[12.5px] font-medium" style={{ color: "var(--gz-text-muted)" }}>
+            Motor inteligente · actualiza a cada 15 segundos
+          </p>
         </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {/* Status dot */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "7px 14px", borderRadius: 10,
-            background: T.surface, border: `1px solid ${T.border}`,
-          }}>
-            <span style={{
-              width: 7, height: 7, borderRadius: "50%",
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 px-3 h-9 rounded-xl"
+            style={{ background: "var(--gz-bg-card-btn)", border: "1px solid var(--gz-border-subtle)" }}>
+            <span className="w-2 h-2 rounded-full" style={{
               background: botsEnabled ? T.teal : T.red,
               boxShadow: botsEnabled ? `0 0 8px ${T.teal}` : `0 0 8px ${T.red}`,
               animation: botsEnabled ? "pulse-dot 2s ease-in-out infinite" : "none",
             }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: botsEnabled ? T.teal : T.red }}>
+            <span className="text-[11.5px] font-bold" style={{ color: botsEnabled ? T.teal : T.red }}>
               {botsEnabled ? "Online" : "Offline"}
             </span>
           </div>
-
-          <button onClick={() => refetch()} disabled={isFetching} title="Actualizar" style={{
-            width: 38, height: 38, borderRadius: 10, border: `1px solid ${T.border}`,
-            background: T.surface, cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <RefreshCw style={{ width: 14, height: 14, color: isFetching ? T.blue : T.sub,
+          <button onClick={() => refetch()} disabled={isFetching} title="Actualizar"
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all active:scale-95"
+            style={{ background: "var(--gz-bg-card-btn)", border: "1px solid var(--gz-border-subtle)" }}>
+            <RefreshCw style={{ width: 14, height: 14, color: isFetching ? T.blue : "var(--gz-text-muted)",
               animation: isFetching ? "spin 1s linear infinite" : "none" }} />
           </button>
-
-          <motion.button onClick={handleToggle} disabled={toggling} whileTap={{ scale: 0.94 }} style={{
-            display: "flex", alignItems: "center", gap: 7, padding: "10px 20px",
-            borderRadius: 12, border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12,
-            fontFamily: "'Inter', sans-serif",
-            background: botsEnabled
-              ? `#18181b`
-              : `#0a0a0a`,
-            color: "#fff",
-            boxShadow: botsEnabled ? `0 6px 24px ${T.teal}38` : `0 6px 24px ${T.red}38`,
-            transition: "all 0.3s",
-          }}>
+          <motion.button onClick={handleToggle} disabled={toggling} whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 px-4 h-9 rounded-xl text-[12.5px] font-bold text-white transition-all"
+            style={{
+              border: "none",
+              background: botsEnabled ? "#18181b" : T.red,
+              boxShadow: botsEnabled ? "0 6px 20px rgba(0,0,0,.25)" : `0 6px 20px ${T.red}40`,
+            }}>
             {botsEnabled
               ? <><Power style={{ width: 13, height: 13 }} />Desligar Bots</>
-              : <><PowerOff style={{ width: 13, height: 13 }} />Ligar Bots</>
-            }
+              : <><PowerOff style={{ width: 13, height: 13 }} />Ligar Bots</>}
           </motion.button>
         </div>
       </div>
 
-      {/* ═══ ALERT BANNER ═══════════════════════════════════════════════════ */}
+      {/* ═══ ALERT BANNER ═══ */}
       <AnimatePresence>
         {(!botsEnabled || isAutoDisabled) && (
           <motion.div
             initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
+            className="rounded-2xl px-4 py-3.5 mb-5 flex items-start gap-3"
             style={{
-              borderRadius: 14, padding: "13px 18px", marginBottom: 24,
-              border: `1px solid ${isAutoDisabled ? T.amber + "44" : T.red + "44"}`,
-              background: isAutoDisabled ? "rgba(0,0,0,0.07)" : "rgba(244,63,94,0.07)",
-              display: "flex", alignItems: "center", gap: 12,
+              border: `1px solid ${isAutoDisabled ? `${T.amber}44` : `${T.red}44`}`,
+              background: isAutoDisabled ? `${T.amber}0d` : `${T.red}0d`,
             }}>
             {isAutoDisabled
-              ? <AlertTriangle style={{ width: 16, height: 16, color: T.amber, flexShrink: 0 }} />
-              : <ShieldOff     style={{ width: 16, height: 16, color: T.red,   flexShrink: 0 }} />
-            }
+              ? <AlertTriangle style={{ width: 16, height: 16, color: T.amber, flexShrink: 0, marginTop: 1 }} />
+              : <ShieldOff style={{ width: 16, height: 16, color: T.red, flexShrink: 0, marginTop: 1 }} />}
             <div>
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 700,
-                color: isAutoDisabled ? T.amber : T.red }}>
+              <p className="text-[12.5px] font-bold" style={{ color: isAutoDisabled ? T.amber : T.red }}>
                 {limitTriggered
                   ? "Auto-desactivado — limite de perda financeira atingido"
                   : isAutoDisabled
-                    ? "Auto-desactivado — users estão a ganhar demasiado ao bot"
-                    : "Bots desactivados manualmente"
-                }
+                    ? "Auto-desactivado — utilizadores estão a ganhar demasiado ao bot"
+                    : "Bots desactivados manualmente"}
               </p>
               {data && (
-                <p style={{ margin: "3px 0 0", fontSize: 11, color: T.sub }}>
+                <p className="text-[11px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>
                   {limitTriggered
-                    ? `Perda acumulada ultrapassou ${lossLimit.toLocaleString()} MT. Reativa e revê os dados.`
-                    : `Users ganharam ${Math.abs(data.surplus)} jogos a mais do que o bot. Reativa manualmente.`
-                  }
+                    ? `Perda acumulada ultrapassou ${lossLimit.toLocaleString()} MT. Reactiva e revê os dados.`
+                    : `Utilizadores ganharam ${Math.abs(data.surplus)} jogos a mais do que o bot. Reactiva manualmente.`}
                 </p>
               )}
             </div>
@@ -613,438 +558,246 @@ export default function BotManagement() {
         )}
       </AnimatePresence>
 
-      {/* ═══ LOADING ════════════════════════════════════════════════════════ */}
+      {/* ═══ LOADING ═══ */}
       {isLoading ? (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "80px 0" }}>
-          <div style={{
-            width: 40, height: 40, borderRadius: "50%",
-            border: `3px solid ${T.blue}25`, borderTopColor: T.blue,
-            animation: "spin 1s linear infinite",
-          }} />
-          <p style={{ color: T.sub, fontSize: 13 }}>A carregar dados dos bots…</p>
+        <div className="gz-card flex flex-col items-center gap-3 py-20">
+          <div style={{ width: 36, height: 36, borderRadius: "50%", border: `3px solid ${T.blue}25`, borderTopColor: T.blue, animation: "spin 1s linear infinite" }} />
+          <p className="text-[13px]" style={{ color: "var(--gz-text-muted)" }}>A carregar dados dos bots...</p>
         </div>
       ) : data ? (
-        <>
+        <div className="space-y-5">
 
-          {/* ═══ ROW 1 · Hero + Ganhou + Perdeu ════════════════════════════ */}
-          <div style={{ display: "grid", gridTemplateColumns: "1.55fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
+          {/* ═══ KPI PANEL ═══ */}
+          <section className="gz-card overflow-hidden animate-float-up">
+            <SectionHeader
+              icon={Activity}
+              title="Resumo do Motor"
+              subtitle="Desempenho global dos bots"
+              action={
+                <span className="text-[11px] font-semibold" style={{ color: "var(--gz-text-muted)" }}>
+                  {data.finished} jogos finais
+                </span>
+              }
+            />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-px" style={{ background: "var(--gz-border-subtle)" }}>
+              <KpiTile label="Saldo Líquido"  value={data.saldoLiquido}   icon={positive ? TrendingUp : TrendingDown} accent={saldoColor} suffix="MT" hint={positive ? "Lucro da plataforma" : "Prejuízo actual"} />
+              <KpiTile label="Bot Ganhou"     value={data.totalBotGanhou} icon={TrendingUp}   accent={T.teal}  suffix="MT" hint={`${data.botWins} vitórias`} />
+              <KpiTile label="Bot Perdeu"     value={data.totalBotPerdeu} icon={TrendingDown} accent={T.red}   suffix="MT" hint={`${data.userWins} vitórias user`} />
+              <KpiTile label="Total Apostas"  value={data.allTotal}       icon={BarChart3}    accent={T.purple} hint={`${data.total} com bot`} />
+            </div>
+          </section>
 
-            {/* Hero: Saldo Líquido */}
-            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-              style={{
-                borderRadius: 22, padding: "26px 26px 18px",
-                background: positive
-                  ? `rgba(0,0,0,.03)`
-                  : `rgba(0,0,0,.05)`,
-                border: `1.5px solid ${saldoColor}28`,
-                position: "relative", overflow: "hidden",
-                boxShadow: `0 8px 48px ${saldoColor}14`,
-              }}>
-              {/* glow */}
-              <div style={{
-                position: "absolute", top: -30, right: -30, width: 140, height: 140,
-                borderRadius: "50%", background: `${saldoColor}12`, filter: "blur(40px)", pointerEvents: "none",
-              }} />
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", position: "relative" }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.4,
-                      textTransform: "uppercase", color: T.sub }}>Saldo Líquido do Bot</span>
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 20,
-                      background: `${saldoColor}20`, color: saldoColor,
-                    }}>TEMPO REAL</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-                    <span style={{
-                      fontSize: 44, fontWeight: 900, lineHeight: 1, color: saldoColor,
-                      fontFamily: "'Syne', sans-serif", textShadow: `0 0 28px ${saldoColor}40`,
-                    }}>
-                      <AnimNum value={data.saldoLiquido} prefix={positive ? "+" : ""} />
-                    </span>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: `${saldoColor}cc` }}>MT</span>
-                    <div style={{
-                      display: "flex", alignItems: "center", gap: 3,
-                      padding: "3px 8px", borderRadius: 8, marginLeft: 4,
-                      background: `${saldoColor}18`, border: `1px solid ${saldoColor}28`,
-                    }}>
-                      {positive
-                        ? <ArrowUpRight style={{ width: 12, height: 12, color: saldoColor }} />
-                        : <ArrowDownRight style={{ width: 12, height: 12, color: saldoColor }} />
-                      }
-                      <span style={{ fontSize: 10, fontWeight: 700, color: saldoColor }}>
-                        {positive ? "Lucro" : "Prejuízo"}
-                      </span>
+          {/* ═══ ANALYTICS ROW ═══ */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+            {/* Saldo hero + sparkline */}
+            <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
+              className="gz-card overflow-hidden lg:col-span-2">
+              <SectionHeader icon={TrendingUp} title="Saldo Líquido do Bot" subtitle="Evolução nos últimos 14 dias"
+                action={
+                  <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide px-2.5 py-1 rounded-full"
+                    style={{ background: `${saldoColor}16`, color: saldoColor }}>
+                    {positive ? <ArrowUpRight style={{ width: 11, height: 11 }} /> : <ArrowDownRight style={{ width: 11, height: 11 }} />}
+                    {positive ? "Lucro" : "Prejuízo"}
+                  </span>
+                }
+              />
+              <div className="p-5">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-[36px] font-black tracking-[-0.04em] leading-none tabular-nums" style={{ color: saldoColor }}>
+                    <AnimNum value={data.saldoLiquido} prefix={positive ? "+" : ""} />
+                  </span>
+                  <span className="text-[14px] font-bold" style={{ color: saldoColor }}>MT</span>
+                </div>
+                <p className="text-[11.5px] mt-1.5" style={{ color: "var(--gz-text-muted)" }}>
+                  {positive ? "A plataforma está a lucrar com os bots" : "A plataforma está a pagar mais do que recolhe"}
+                </p>
+                <div className="mt-4">
+                  <Sparkline data={data.sparkline} color={saldoColor} />
+                </div>
+                <div className="flex justify-between mt-1">
+                  <span className="text-[9.5px]" style={{ color: "var(--gz-text-tertiary)" }}>14 dias atrás</span>
+                  <span className="text-[9.5px]" style={{ color: "var(--gz-text-tertiary)" }}>hoje</span>
+                </div>
+              </div>
+            </motion.section>
+
+            {/* Win rate + Guardian */}
+            <div className="space-y-5">
+              <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }}
+                className="gz-card overflow-hidden">
+                <SectionHeader icon={Target} title="Taxa de Vitória" subtitle="Desempenho do bot nos jogos" />
+                <div className="p-5 flex flex-col items-center">
+                  <div style={{ position: "relative" }}>
+                    <DonutGauge pct={winRatePct} color={winRateColor} size={96} />
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span className="text-[20px] font-black tabular-nums" style={{ color: winRateColor }}>{winRatePct}%</span>
                     </div>
                   </div>
-                  <p style={{ margin: "8px 0 0", fontSize: 11, color: T.sub }}>
-                    {positive
-                      ? "A plataforma está a lucrar com os bots"
-                      : "A plataforma está a pagar mais do que recolhe"}
+                  <p className="text-[12px] font-bold mt-3" style={{ color: winRateColor }}>
+                    {winRatePct >= 60 ? "Bot dominante" : winRatePct >= 40 ? "Equilibrado" : "Bot em risco"}
                   </p>
                 </div>
-              </div>
-              {/* Sparkline */}
-              <div style={{ marginTop: 14, marginLeft: -6, marginRight: -6 }}>
-                <Sparkline data={data.sparkline} color={saldoColor} />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
-                <span style={{ fontSize: 9, color: T.muted }}>14 dias atrás</span>
-                <span style={{ fontSize: 9, color: T.muted }}>hoje</span>
-              </div>
-            </motion.div>
+              </motion.section>
 
-            {/* Bot Ganhou */}
-            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.07 }}
-              style={{
-                borderRadius: 22, padding: "26px 22px",
-                background: T.surface, border: `1px solid ${T.border}`,
-                position: "relative", overflow: "hidden",
-              }}>
-              <div style={{
-                position: "absolute", top: -20, right: -20, width: 90, height: 90,
-                borderRadius: "50%", background: `${T.teal}09`, pointerEvents: "none",
-              }} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: T.sub }}>
-                  Bot Ganhou
-                </span>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 9,
-                  background: `${T.teal}18`, border: `1px solid ${T.teal}28`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <TrendingUp style={{ width: 14, height: 14, color: T.teal }} />
-                </div>
-              </div>
-              <p style={{ margin: 0, fontSize: 32, fontWeight: 900, color: T.teal,
-                fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>
-                <AnimNum value={data.totalBotGanhou} />
-                <span style={{ fontSize: 13, fontWeight: 600, marginLeft: 4 }}>MT</span>
-              </p>
-              <p style={{ margin: "6px 0 0", fontSize: 11, color: T.sub }}>recolhido das apostas</p>
-              <div style={{
-                display: "flex", alignItems: "center", gap: 5, marginTop: 14,
-                padding: "6px 10px", borderRadius: 8, background: `${T.teal}12`,
-              }}>
-                <ArrowUpRight style={{ width: 11, height: 11, color: T.teal }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: T.teal }}>{data.botWins} vitórias</span>
-              </div>
-            </motion.div>
-
-            {/* Bot Perdeu */}
-            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.13 }}
-              style={{
-                borderRadius: 22, padding: "26px 22px",
-                background: T.surface, border: `1px solid ${T.border}`,
-                position: "relative", overflow: "hidden",
-              }}>
-              <div style={{
-                position: "absolute", top: -20, right: -20, width: 90, height: 90,
-                borderRadius: "50%", background: `${T.red}08`, pointerEvents: "none",
-              }} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase", color: T.sub }}>
-                  Bot Perdeu
-                </span>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 9,
-                  background: `${T.red}18`, border: `1px solid ${T.red}28`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <TrendingDown style={{ width: 14, height: 14, color: T.red }} />
-                </div>
-              </div>
-              <p style={{ margin: 0, fontSize: 32, fontWeight: 900, color: T.red,
-                fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>
-                <AnimNum value={data.totalBotPerdeu} />
-                <span style={{ fontSize: 13, fontWeight: 600, marginLeft: 4 }}>MT</span>
-              </p>
-              <p style={{ margin: "6px 0 0", fontSize: 11, color: T.sub }}>pago aos utilizadores</p>
-              <div style={{
-                display: "flex", alignItems: "center", gap: 5, marginTop: 14,
-                padding: "6px 10px", borderRadius: 8, background: `${T.red}12`,
-              }}>
-                <ArrowDownRight style={{ width: 11, height: 11, color: T.red }} />
-                <span style={{ fontSize: 11, fontWeight: 700, color: T.red }}>{data.userWins} vitórias user</span>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* ═══ ROW 2 · Win rate + Limit + Platform ════════════════════════ */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
-
-            {/* Win rate donut */}
-            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
-              style={{
-                borderRadius: 22, padding: "22px",
-                background: T.surface, border: `1px solid ${T.border}`,
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-              }}>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase",
-                color: T.sub, marginBottom: 14 }}>Taxa Vitória Bot</span>
-              <div style={{ position: "relative" }}>
-                <DonutGauge pct={winRatePct} color={winRateColor} size={90} />
-                <div style={{
-                  position: "absolute", inset: 0,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <span style={{ fontSize: 18, fontWeight: 900, color: winRateColor,
-                    fontFamily: "'Syne', sans-serif" }}>{winRatePct}%</span>
-                </div>
-              </div>
-              <div style={{ marginTop: 12, textAlign: "center" }}>
-                <p style={{ margin: 0, fontSize: 11, color: winRateColor, fontWeight: 700 }}>
-                  {winRatePct >= 60 ? "✓ Bot dominante" : winRatePct >= 40 ? "Equilibrado" : "⚠ Bot em risco"}
-                </p>
-                <p style={{ margin: "2px 0 0", fontSize: 10, color: T.muted }}>
-                  {data.finished} jogos finais
-                </p>
-              </div>
-            </motion.div>
-
-            {/* Loss limit */}
-            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}>
-              <LossLimitCard
-                limit={lossLimit} setLimit={setLossLimit}
-                currentLoss={currentLoss}
-              />
-            </motion.div>
-
-            {/* Total partidas */}
-            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.26 }}
-              style={{
-                borderRadius: 22, padding: "22px",
-                background: T.surface, border: `1px solid ${T.border}`,
-              }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.1, textTransform: "uppercase", color: T.sub }}>
-                  Total Geral
-                </span>
-                <div style={{
-                  width: 30, height: 30, borderRadius: 8,
-                  background: `${T.purple}18`, border: `1px solid ${T.purple}28`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <BarChart3 style={{ width: 13, height: 13, color: T.purple }} />
-                </div>
-              </div>
-              <p style={{ margin: 0, fontSize: 34, fontWeight: 900, color: T.purple,
-                fontFamily: "'Syne', sans-serif", lineHeight: 1 }}>
-                {data.allTotal}
-              </p>
-              <p style={{ margin: "5px 0 12px", fontSize: 11, color: T.sub }}>apostas na plataforma</p>
-              <div style={{ height: 1, background: T.border, marginBottom: 12 }} />
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <div>
-                  <p style={{ margin: 0, fontSize: 10, color: T.sub }}>com bot</p>
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: T.blue }}>{data.total}</p>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <p style={{ margin: 0, fontSize: 10, color: T.sub }}>ao vivo</p>
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: T.teal }}>{data.allActive}</p>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Auto-disable status */}
-            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-              style={{
-                borderRadius: 22, padding: "22px",
-                background: data.autoDisable
-                  ? "rgba(244,63,94,0.08)"
-                  : data.surplus < -2
-                    ? "rgba(0,0,0,0.08)"
-                    : T.surface,
-                border: `1px solid ${data.autoDisable ? T.red + "44" : data.surplus < -2 ? T.amber + "44" : T.border}`,
-              }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.1, textTransform: "uppercase", color: T.sub }}>
-                  Guardião
-                </span>
-                <div style={{
-                  width: 30, height: 30, borderRadius: 8,
-                  background: `${data.autoDisable ? T.red : T.teal}18`,
-                  border: `1px solid ${data.autoDisable ? T.red : T.teal}28`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <Shield style={{ width: 13, height: 13, color: data.autoDisable ? T.red : T.teal }} />
-                </div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                {data.autoDisable
-                  ? <AlertTriangle style={{ width: 18, height: 18, color: T.red }} />
-                  : data.surplus < -2
-                    ? <Zap style={{ width: 18, height: 18, color: T.amber }} />
-                    : <CheckCircle2 style={{ width: 18, height: 18, color: T.teal }} />
-                }
-                <span style={{
-                  fontSize: 14, fontWeight: 800,
-                  color: data.autoDisable ? T.red : data.surplus < -2 ? T.amber : T.teal,
-                  fontFamily: "'Syne', sans-serif",
-                }}>
-                  {data.autoDisable ? "DESLIGADO" : data.surplus < -2 ? "ATENÇÃO" : "SEGURO"}
-                </span>
-              </div>
-              <p style={{ margin: 0, fontSize: 11, color: T.sub }}>
-                {data.surplus >= 0
-                  ? <>Bot lidera: <strong style={{ color: T.teal }}>+{data.surplus}</strong> vitórias extra</>
-                  : <>Users lideram: <strong style={{ color: T.red }}>{data.surplus}</strong> vitórias extra</>
-                }
-              </p>
-              <p style={{ margin: "3px 0 0", fontSize: 10, color: T.muted }}>
-                desliga quando users ganham +3 jogos a mais
-              </p>
-            </motion.div>
-          </div>
-
-          {/* ═══ ROW 3 · Por jogo ═══════════════════════════════════════════ */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 16 }}>
-            {[
-              { icon: "🎮", label: "Damas",  data: data.dama,   color: T.blue,   delay: 0.34 },
-              { icon: "♟",  label: "Xadrez", data: data.xadrez, color: T.purple, delay: 0.38 },
-              { icon: "🎲", label: "Ludo",   data: data.ludo,   color: T.amber,  delay: 0.42 },
-            ].map(g => {
-              const fin  = g.data.botWins + g.data.userWins;
-              const rate = fin > 0 ? Math.round((g.data.botWins / fin) * 100) : 0;
-              return (
-                <motion.div key={g.label}
-                  initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: g.delay }}
-                  style={{
-                    borderRadius: 22, padding: "22px",
-                    background: T.surface, border: `1px solid ${T.border}`,
-                  }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{ fontSize: 22 }}>{g.icon}</span>
-                      <div>
-                        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: T.text }}>{g.label}</p>
-                        <p style={{ margin: 0, fontSize: 10, color: T.sub }}>{g.data.total} jogos totais</p>
-                      </div>
-                    </div>
-                    {g.data.active > 0 && (
-                      <span style={{
-                        fontSize: 9, fontWeight: 700, padding: "3px 9px", borderRadius: 20,
-                        background: `${T.teal}18`, color: T.teal, border: `1px solid ${T.teal}28`,
-                      }}>{g.data.active} ao vivo</span>
-                    )}
+              <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
+                className="gz-card overflow-hidden">
+                <SectionHeader icon={Shield} title="Guardião" subtitle="Protecção automática"
+                  action={
+                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full"
+                      style={{
+                        background: data.autoDisable ? `${T.red}16` : `${T.teal}16`,
+                        color: data.autoDisable ? T.red : T.teal,
+                      }}>
+                      {data.autoDisable ? "DESLIGADO" : data.surplus < -2 ? "ATENÇÃO" : "SEGURO"}
+                    </span>
+                  }
+                />
+                <div className="p-5 flex items-center gap-3">
+                  {data.autoDisable
+                    ? <AlertTriangle style={{ width: 20, height: 20, color: T.red, flexShrink: 0 }} />
+                    : data.surplus < -2
+                      ? <Zap style={{ width: 20, height: 20, color: T.amber, flexShrink: 0 }} />
+                      : <CheckCircle2 style={{ width: 20, height: 20, color: T.teal, flexShrink: 0 }} />}
+                  <div className="min-w-0">
+                    <p className="text-[12.5px] font-semibold" style={{ color: "var(--gz-text-primary)" }}>
+                      {data.surplus >= 0
+                        ? <>Bot lidera: <strong style={{ color: T.teal }}>+{data.surplus}</strong> vitórias</>
+                        : <>Users lideram: <strong style={{ color: T.red }}>{data.surplus}</strong> vitórias</>}
+                    </p>
+                    <p className="text-[10.5px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>
+                      desliga quando users ganham +3 jogos a mais
+                    </p>
                   </div>
-                  {/* Mini bar */}
-                  <MiniBar wins={g.data.botWins} losses={g.data.userWins} />
-                  <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-                    <span style={{ fontSize: 10, color: T.red, fontWeight: 600 }}>Bot: {g.data.botWins}</span>
-                    <span style={{ fontSize: 10, color: T.sub }}>Taxa: {rate}%</span>
-                    <span style={{ fontSize: 10, color: T.teal, fontWeight: 600 }}>User: {g.data.userWins}</span>
-                  </div>
-                  {/* Progress */}
-                  <div style={{ height: 4, borderRadius: 4, background: "rgba(255,255,255,0.05)", overflow: "hidden", marginTop: 10 }}>
-                    <motion.div
-                      animate={{ width: `${rate}%` }} transition={{ duration: 1, delay: g.delay + 0.3 }}
-                      style={{ height: "100%", borderRadius: 4, background: `#18181b` }} />
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-
-          {/* ═══ ROW 4 · Tabela de partidas ═════════════════════════════════ */}
-          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.46 }}
-            style={{
-              borderRadius: 22, overflow: "hidden",
-              background: T.surface, border: `1px solid ${T.border}`,
-            }}>
-            {/* Table header row */}
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              padding: "18px 24px 14px",
-              borderBottom: `1px solid ${T.border}`,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Crown style={{ width: 15, height: 15, color: T.amber }} />
-                <span style={{ fontSize: 14, fontWeight: 700, color: T.text }}>Últimas Partidas</span>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: "2px 9px", borderRadius: 20,
-                  background: `${T.blue}18`, color: T.blue,
-                }}>{data.recent.length}</span>
-              </div>
-              <button onClick={() => setShowRecent(s => !s)} style={{
-                display: "flex", alignItems: "center", gap: 5, padding: "6px 12px",
-                borderRadius: 8, border: `1px solid ${T.border2}`, background: T.surf2,
-                cursor: "pointer", color: T.sub, fontSize: 11, fontWeight: 600,
-              }}>
-                {showRecent ? <><ChevronUp style={{ width: 11, height: 11 }} />Recolher</> : <><ChevronDown style={{ width: 11, height: 11 }} />Expandir</>}
-              </button>
+                </div>
+              </motion.section>
             </div>
+          </div>
 
+          {/* ═══ LOSS LIMIT ═══ */}
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}>
+            <LossLimitCard limit={lossLimit} setLimit={setLossLimit} currentLoss={currentLoss} />
+          </motion.div>
+
+          {/* ═══ PER GAME ═══ */}
+          <section className="gz-card overflow-hidden animate-float-up" style={{ animationDelay: "180ms" }}>
+            <SectionHeader icon={Gamepad2} title="Desempenho por Jogo" subtitle="Vitórias e derrotas em cada modalidade" />
+            <table className="w-full">
+              <thead>
+                <tr style={{ background: "var(--gz-bg-subtle)" }}>
+                  {["Jogo", "Total", "Ao Vivo", "Bot", "User", "Taxa", ""].map((h, i) => (
+                    <th key={h || i}
+                      className={`px-5 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.06em] ${i >= 1 ? "text-right" : "text-left"}`}
+                      style={{ color: "var(--gz-text-muted)" }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { icon: "🎮", label: "Damas",  data: data.dama,   color: T.blue },
+                  { icon: "♟",  label: "Xadrez", data: data.xadrez, color: T.purple },
+                  { icon: "🎲", label: "Ludo",   data: data.ludo,   color: T.amber },
+                ].map(g => {
+                  const fin  = g.data.botWins + g.data.userWins;
+                  const rate = fin > 0 ? Math.round((g.data.botWins / fin) * 100) : 0;
+                  return (
+                    <tr key={g.label} className="gz-tr" style={{ borderTop: "1px solid var(--gz-border-subtle)" }}>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-[18px]">{g.icon}</span>
+                          <span className="text-[12.5px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{g.label}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-right text-[13px] font-bold tabular-nums" style={{ color: "var(--gz-text-primary)" }}>{g.data.total}</td>
+                      <td className="px-5 py-3 text-right">
+                        {g.data.active > 0
+                          ? <Pill label={`${g.data.active} ao vivo`} color={T.teal} bg={`${T.teal}16`} />
+                          : <span className="text-[12px]" style={{ color: "var(--gz-text-tertiary)" }}>—</span>}
+                      </td>
+                      <td className="px-5 py-3 text-right text-[13px] font-bold tabular-nums" style={{ color: T.red }}>{g.data.botWins}</td>
+                      <td className="px-5 py-3 text-right text-[13px] font-bold tabular-nums" style={{ color: T.teal }}>{g.data.userWins}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="gz-progress-track h-1.5 w-14">
+                            <div style={{ width: `${rate}%`, height: "100%", borderRadius: 100, background: g.color }} />
+                          </div>
+                          <span className="text-[11.5px] font-bold tabular-nums w-9 text-right" style={{ color: "var(--gz-text-muted)" }}>{rate}%</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 w-[120px]">
+                        <div className="w-[80px] ml-auto"><MiniBar wins={g.data.botWins} losses={g.data.userWins} /></div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </section>
+
+          {/* ═══ RECENT MATCHES ═══ */}
+          <motion.section initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }}
+            className="gz-card overflow-hidden">
+            <SectionHeader
+              icon={Crown}
+              title="Últimas Partidas"
+              subtitle={`${data.recent.length} partidas recentes`}
+              action={
+                <button onClick={() => setShowRecent(s => !s)}
+                  className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg"
+                  style={{ background: "var(--gz-bg-subtle)", border: "1px solid var(--gz-border-subtle)", color: "var(--gz-text-secondary)" }}>
+                  {showRecent ? "Recolher" : "Expandir"}
+                </button>
+              }
+            />
             <AnimatePresence>
               {showRecent && (
-                <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }}
-                  style={{ overflow: "hidden" }}>
-                  {/* Column headers */}
-                  <div style={{
-                    display: "grid",
-                    gridTemplateColumns: "36px 1fr 1fr 90px 80px 80px",
-                    gap: 8, padding: "10px 24px",
-                    background: "rgba(255,255,255,0.025)",
-                    borderBottom: `1px solid ${T.border}`,
-                  }}>
-                    {["", "Jogador", "Bot Adversário", "Aposta", "Resultado", "Data"].map((h, i) => (
-                      <span key={i} style={{
-                        fontSize: 10, fontWeight: 700, letterSpacing: 0.9, textTransform: "uppercase",
-                        color: T.muted,
-                      }}>{h}</span>
-                    ))}
+                <motion.div initial={{ height: 0 }} animate={{ height: "auto" }} exit={{ height: 0 }} style={{ overflow: "hidden" }}>
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[700px]">
+                      <thead>
+                        <tr style={{ background: "var(--gz-bg-subtle)" }}>
+                          {["Jogo", "Jogador", "Bot Adversário", "Aposta", "Resultado", "Data"].map((h, i) => (
+                            <th key={h}
+                              className={`px-5 py-2.5 text-[10.5px] font-bold uppercase tracking-[0.06em] ${i === 3 ? "text-right" : i >= 4 ? "text-right" : "text-left"}`}
+                              style={{ color: "var(--gz-text-muted)" }}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.recent.map(m => {
+                          const gameIcon = m.game_type === "xadrez" ? "♟" : m.game_type === "ludo" ? "🎲" : "🎮";
+                          const statusColor = m.isActive ? T.blue : m.botWon ? T.red : T.teal;
+                          const statusBg    = `${statusColor}16`;
+                          const statusLabel = m.isActive ? "Ao vivo" : m.botWon ? "Bot ganhou" : "User ganhou";
+                          const date = new Date(m.created_at);
+                          const dateStr = `${date.getDate()} ${date.toLocaleDateString("pt-MZ", { month: "short" })}`;
+                          return (
+                            <tr key={m.id} className="gz-tr" style={{ borderTop: "1px solid var(--gz-border-subtle)" }}>
+                              <td className="px-5 py-3 text-[17px]">{gameIcon}</td>
+                              <td className="px-5 py-3 text-[12.5px] font-semibold truncate max-w-[160px]" style={{ color: "var(--gz-text-primary)" }}>{m.player_name}</td>
+                              <td className="px-5 py-3 text-[12.5px] truncate max-w-[160px]" style={{ color: "var(--gz-text-muted)" }}>{m.bot_name}</td>
+                              <td className="px-5 py-3 text-right text-[12.5px] font-bold tabular-nums" style={{ color: T.amber }}>{m.bet_amount} MT</td>
+                              <td className="px-5 py-3 text-right"><Pill label={statusLabel} color={statusColor} bg={statusBg} /></td>
+                              <td className="px-5 py-3 text-right text-[11px]" style={{ color: "var(--gz-text-tertiary)" }}>{dateStr}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                  {/* Rows */}
-                  {data.recent.map((m, i) => {
-                    const gameIcon = m.game_type === "xadrez" ? "♟" : m.game_type === "ludo" ? "🎲" : "🎮";
-                    const statusColor = m.isActive ? T.sky : m.botWon ? T.red : T.teal;
-                    const statusBg    = m.isActive ? `${T.sky}18` : m.botWon ? `${T.red}18` : `${T.teal}18`;
-                    const statusLabel = m.isActive ? "Ao vivo" : m.botWon ? "Bot ganhou" : "User ganhou";
-                    const date = new Date(m.created_at);
-                    const dateStr = `${date.getDate()} ${date.toLocaleDateString("pt-MZ",{month:"short"})}`;
-                    return (
-                      <motion.div key={m.id}
-                        initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.025 }}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "36px 1fr 1fr 90px 80px 80px",
-                          gap: 8, padding: "12px 24px",
-                          borderBottom: i < data.recent.length - 1 ? `1px solid ${T.border}` : "none",
-                          alignItems: "center",
-                          transition: "background 0.15s",
-                        }}
-                        whileHover={{ backgroundColor: "rgba(255,255,255,0.028)" }}>
-                        <span style={{ fontSize: 17 }}>{gameIcon}</span>
-                        <span style={{
-                          fontSize: 12, fontWeight: 600, color: T.text,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>{m.player_name}</span>
-                        <span style={{
-                          fontSize: 12, color: T.sub,
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>{m.bot_name}</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: T.amber }}>
-                          {m.bet_amount} MT
-                        </span>
-                        <Pill label={statusLabel} color={statusColor} bg={statusBg} />
-                        <span style={{ fontSize: 11, color: T.muted }}>{dateStr}</span>
-                      </motion.div>
-                    );
-                  })}
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
-        </>
+          </motion.section>
+        </div>
       ) : (
-        <div style={{ textAlign: "center", padding: 60, color: T.muted }}>
-          <Bot style={{ width: 44, height: 44, margin: "0 auto 14px", opacity: 0.25 }} />
-          <p style={{ fontSize: 13 }}>Sem dados disponíveis</p>
+        <div className="gz-card flex flex-col items-center py-16">
+          <Bot style={{ width: 44, height: 44, marginBottom: 14, color: "var(--gz-text-tertiary)", opacity: 0.4 }} />
+          <p className="text-[13px]" style={{ color: "var(--gz-text-muted)" }}>Sem dados disponíveis</p>
         </div>
       )}
 
@@ -1054,12 +807,4 @@ export default function BotManagement() {
       `}</style>
     </div>
   );
-}
-
-// Needed for AnimatePresence toggle button
-function ChevronUp({ style }: { style?: React.CSSProperties }) {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 11, height: 11, ...style }}><polyline points="18 15 12 9 6 15"/></svg>;
-}
-function ChevronDown({ style }: { style?: React.CSSProperties }) {
-  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} style={{ width: 11, height: 11, ...style }}><polyline points="6 9 12 15 18 9"/></svg>;
 }

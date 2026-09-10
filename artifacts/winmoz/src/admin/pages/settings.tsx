@@ -1,15 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Settings as SettingsIcon, Bell, Shield, Globe, Database,
-  Bot, Lock, Mail, Key, Eye, EyeOff, CheckCircle, AlertCircle,
+  Bot, Lock, Mail, Key, Eye, EyeOff, CheckCircle,
   Save, Wrench, Smartphone, Copy, Link2, Phone, LayoutTemplate, Zap,
-  Tag, FileText, BookOpen, Wallet,
+  Tag, FileText, BookOpen, Wallet, Users,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useGetPlatformSettings, useUpdatePlatformSetting } from "@/admin/lib/supabase-api";
 import { toast } from "sonner";
 
-/* ── Locked toggle (always ON, cannot be disabled) ── */
+/* ══════════════════════════════════════════════════════════════
+   PRIMITIVES
+══════════════════════════════════════════════════════════════ */
+
 function LockedToggle() {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -30,12 +33,8 @@ function LockedToggle() {
   );
 }
 
-/* ── Functional toggle (connected to Supabase) ── */
 function FunctionalToggle({
-  settingKey,
-  value,
-  onChange,
-  loading,
+  settingKey, value, onChange, loading,
 }: {
   settingKey: string;
   value: boolean;
@@ -45,6 +44,7 @@ function FunctionalToggle({
   return (
     <button
       onClick={() => !loading && onChange(settingKey, !value)}
+      aria-label={settingKey}
       style={{
         width: 44, height: 24, borderRadius: 12,
         background: value ? "linear-gradient(135deg, #18181b, #4f46e5)" : "rgba(0,0,0,0.12)",
@@ -65,68 +65,188 @@ function FunctionalToggle({
   );
 }
 
-/* ── Setting row ── */
-function SettingRow({
-  label,
-  description,
-  children,
-  locked,
+function StatusTag({ active, labelOn, labelOff }: { active: boolean; labelOn: string; labelOff: string }) {
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 100,
+      textTransform: "uppercase", letterSpacing: "0.04em",
+      background: active ? "rgba(21,128,61,.1)" : "var(--gz-bg-subtle)",
+      color: active ? "#15803d" : "var(--gz-text-tertiary)",
+      border: `1px solid ${active ? "rgba(21,128,61,.2)" : "var(--gz-border-subtle)"}`,
+    }}>
+      {active ? labelOn : labelOff}
+    </span>
+  );
+}
+
+/* ── Card with section header ── */
+function Card({
+  id, title, description, icon: Icon, children,
 }: {
-  label: string;
-  description: string;
-  children: React.ReactNode;
-  locked?: boolean;
+  id?: string; title: string; description?: string;
+  icon: React.ElementType; children: React.ReactNode;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
-      <div style={{ flex: 1, minWidth: 0, paddingRight: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: "var(--gz-text-primary)" }}>{label}</span>
+    <section id={id} className="gz-card overflow-hidden scroll-mt-24">
+      <div className="flex items-center gap-3 px-5 py-4" style={{ borderBottom: "1px solid var(--gz-border-subtle)" }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: 11, flexShrink: 0,
+          background: "var(--gz-bg-subtle)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <Icon style={{ width: 16, height: 16, color: "var(--gz-text-secondary)", strokeWidth: 1.9 }} />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[14px] font-bold" style={{ color: "var(--gz-text-primary)" }}>{title}</div>
+          {description && (
+            <div className="text-[11.5px] font-medium mt-0.5" style={{ color: "var(--gz-text-muted)" }}>{description}</div>
+          )}
+        </div>
+      </div>
+      <div className="p-5">{children}</div>
+    </section>
+  );
+}
+
+/* ── Setting row inside a card ── */
+function SettingRow({
+  label, description, children, locked,
+}: {
+  label: string; description: string;
+  children: React.ReactNode; locked?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3.5"
+      style={{ borderBottom: "1px solid var(--gz-border-subtle)" }}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-semibold" style={{ color: "var(--gz-text-primary)" }}>{label}</span>
           {locked && (
             <span style={{
               fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 100,
-              background: "rgba(0,0,0,0.08)", color: "#18181b",
+              background: "var(--gz-bg-subtle)", color: "var(--gz-text-tertiary)",
               textTransform: "uppercase", letterSpacing: "0.5px",
             }}>
-              OBRIGATÓRIO
+              Obrigatório
             </span>
           )}
         </div>
-        <div style={{ fontSize: 11.5, color: "var(--gz-text-muted)", marginTop: 2 }}>{description}</div>
+        <div className="text-[11.5px] mt-0.5" style={{ color: "var(--gz-text-muted)" }}>{description}</div>
       </div>
-      <div>{children}</div>
+      <div className="flex-shrink-0">{children}</div>
     </div>
   );
 }
 
-/* ── Section card ── */
-function SectionCard({
-  title,
-  icon: Icon,
-  color,
-  bg,
-  children,
+/* ── Field label + input ── */
+function Field({
+  label, hint, badge, children,
 }: {
-  title: string;
-  icon: React.ElementType;
-  color: string;
-  bg: string;
-  children: React.ReactNode;
+  label: string; hint?: React.ReactNode; badge?: string; children: React.ReactNode;
 }) {
   return (
-    <div className="gz-card" style={{ padding: "20px 24px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 4 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 12, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon style={{ width: 17, height: 17, color }} />
-        </div>
-        <span style={{ fontWeight: 700, fontSize: 15, color: "var(--gz-text-primary)" }}>{title}</span>
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <label className="text-[12px] font-semibold" style={{ color: "var(--gz-text-secondary)", letterSpacing: "0.2px" }}>
+          {label}
+        </label>
+        {badge && (
+          <span style={{
+            fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 100,
+            background: "var(--gz-bg-subtle)", color: "var(--gz-text-tertiary)",
+            textTransform: "uppercase", letterSpacing: "0.5px",
+          }}>
+            {badge}
+          </span>
+        )}
       </div>
       {children}
+      {hint && (
+        <p className="text-[11px] mt-1.5 leading-relaxed" style={{ color: "var(--gz-text-tertiary)" }}>{hint}</p>
+      )}
     </div>
   );
 }
 
-/* ── Debito Pay Section (self-contained) ── */
+/* ── Text input with leading icon and optional trailing control ── */
+function TextInput({
+  icon: Icon, iconColor, value, onChange, placeholder, type = "text",
+  monospace, trailing, accent = "var(--gz-border-subtle)",
+}: {
+  icon?: React.ElementType; iconColor?: string;
+  value: string; onChange: (v: string) => void;
+  placeholder?: string; type?: string; monospace?: boolean;
+  trailing?: React.ReactNode; accent?: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 px-3.5 rounded-xl"
+      style={{ background: "var(--gz-bg-subtle)", border: `1.5px solid ${accent}` }}>
+      {Icon && <Icon style={{ width: 14, height: 14, color: iconColor ?? "var(--gz-text-tertiary)", flexShrink: 0 }} />}
+      <input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="flex-1 min-w-0 bg-transparent outline-none py-2.5"
+        style={{
+          fontSize: 13,
+          color: "var(--gz-text-primary)",
+          fontFamily: monospace ? "monospace" : "inherit",
+        }}
+      />
+      {trailing}
+    </div>
+  );
+}
+
+/* ── Save / action button ── */
+function SaveBtn({
+  onClick, disabled, saving, label, full,
+}: {
+  onClick: () => void; disabled?: boolean; saving?: boolean;
+  label?: string; full?: boolean;
+}) {
+  const active = !disabled;
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled || saving}
+      className="flex items-center justify-center gap-2 rounded-xl font-bold transition-all active:scale-[0.98]"
+      style={{
+        padding: label ? "10px 18px" : "10px 13px",
+        minWidth: label ? undefined : 44,
+        width: full ? "100%" : undefined,
+        border: "none",
+        background: active ? "#18181b" : "var(--gz-bg-subtle)",
+        color: active ? "#fff" : "var(--gz-text-tertiary)",
+        cursor: active && !saving ? "pointer" : "default",
+        fontSize: 12.5,
+      }}
+    >
+      {saving
+        ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,.35)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} />
+        : <Save style={{ width: 14, height: 14 }} />}
+      {label && <span>{label}</span>}
+    </button>
+  );
+}
+
+/* ── Eye toggle ── */
+function EyeBtn({ shown, onToggle }: { shown: boolean; onToggle: () => void }) {
+  return (
+    <button onClick={onToggle} type="button"
+      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gz-text-tertiary)", padding: 0, flexShrink: 0 }}>
+      {shown ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
+    </button>
+  );
+}
+
+const CYAN = "#18181b";
+const TEAL_INPUT = "rgba(0,212,180,0.2)";
+
+/* ══════════════════════════════════════════════════════════════
+   DEBITO PAY SECTION (self-contained)
+══════════════════════════════════════════════════════════════ */
 function DebitoPaySection() {
   const updateSetting = useUpdatePlatformSetting();
   const { data: platformSettings = {} } = useGetPlatformSettings();
@@ -170,168 +290,129 @@ function DebitoPaySection() {
     setSaving(false);
   };
 
-  const CYAN_COLOR = "#18181b";
-  const spinStyle = { width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(0,0,0,0.2)", borderTopColor: "#000", animation: "spin 0.8s linear infinite" } as const;
-  const inputBox = (borderColor = "rgba(0,212,180,0.2)") => ({
-    flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px",
-    borderRadius: 12, background: "var(--gz-bg-subtle)", border: `1.5px solid ${borderColor}`,
-  } as const);
-  const saveBtn = (active: boolean, saving: boolean, color = CYAN_COLOR) => ({
-    padding: "10px 14px", borderRadius: 12, border: "none", cursor: active && !saving ? "pointer" : "default",
-    background: active && !saving ? `#18181b` : "var(--gz-bg-subtle)",
-    color: active && !saving ? "#000" : "var(--gz-text-tertiary)",
-    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
-  } as const);
-
   return (
-    <SectionCard title="Debito Pay (Gateway)" icon={Zap} color="#18181b" bg="rgba(0,0,0,.04)">
-      <div style={{ paddingTop: 12, display: "flex", flexDirection: "column", gap: 20 }}>
+    <Card title="Debito Pay (Gateway)" description="Pagamentos automáticos via e-Mola" icon={Zap}>
+      <div className="flex flex-col gap-5">
 
         {/* Webhook URL */}
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-            URL do Webhook Debito Pay
-          </label>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(0,212,180,0.05)", border: "1.5px solid rgba(0,212,180,0.2)" }}>
-            <span style={{ flex: 1, fontSize: 11, color: CYAN_COLOR, fontFamily: "monospace", overflowX: "auto", whiteSpace: "nowrap" }}>
+        <Field
+          label="URL do Webhook Debito Pay"
+          hint={<>Configura esta URL no painel <strong>Debito Pay → Webhooks</strong>. Marca os eventos <code style={{ fontFamily: "monospace" }}>payment.completed</code> e <code style={{ fontFamily: "monospace" }}>payment.failed</code>.</>}
+        >
+          <div className="flex items-center gap-2 px-3.5 rounded-xl"
+            style={{ background: "rgba(0,212,180,0.05)", border: `1.5px solid ${TEAL_INPUT}` }}>
+            <span className="flex-1 text-[11px] overflow-x-auto whitespace-nowrap py-2.5"
+              style={{ color: CYAN, fontFamily: "monospace" }}>
               {webhookUrl}
             </span>
             <button onClick={copyWebhook}
-              style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 8, border: "none", cursor: "pointer",
-                background: copiedWH ? "rgba(0,212,180,0.2)" : "rgba(0,0,0,.04)",
-                color: CYAN_COLOR, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, fontFamily: "inherit" }}>
+              style={{
+                flexShrink: 0, padding: "4px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                background: copiedWH ? "rgba(0,212,180,0.2)" : "var(--gz-bg-subtle)",
+                color: CYAN, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, fontFamily: "inherit",
+              }}>
               {copiedWH ? <CheckCircle style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
               {copiedWH ? "Copiado!" : "Copiar"}
             </button>
           </div>
-          <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
-            Configura esta URL no painel <strong>Debito Pay → Webhooks</strong>. Marca todos os eventos: <code style={{ fontFamily: "monospace", background: "rgba(0,212,180,0.08)", padding: "1px 5px", borderRadius: 4 }}>payment.completed</code>, <code style={{ fontFamily: "monospace", background: "rgba(0,212,180,0.08)", padding: "1px 5px", borderRadius: 4 }}>payment.failed</code>.
-          </p>
-        </div>
+        </Field>
 
         {/* API Key info */}
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "12px 14px", borderRadius: 12, background: "rgba(0,212,180,0.05)", border: "1px solid rgba(0,212,180,0.15)" }}>
-          <Key style={{ width: 14, height: 14, color: CYAN_COLOR, flexShrink: 0, marginTop: 2 }} />
+        <div className="flex items-start gap-2.5 p-3.5 rounded-xl"
+          style={{ background: "rgba(0,212,180,0.05)", border: "1px solid rgba(0,212,180,0.15)" }}>
+          <Key style={{ width: 14, height: 14, color: CYAN, flexShrink: 0, marginTop: 2 }} />
           <div>
-            <p style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", marginBottom: 4 }}>API Key (SLACK_LIVE_API_KEY)</p>
-            <p style={{ fontSize: 11, color: "var(--gz-text-muted)", lineHeight: 1.5 }}>
-              A API Key está configurada como variável de ambiente <code style={{ fontFamily: "monospace", background: "rgba(0,212,180,0.08)", padding: "1px 5px", borderRadius: 4 }}>SLACK_LIVE_API_KEY</code> no painel do Vercel. Não é necessário inserir aqui.
+            <p className="text-[12px] font-semibold mb-1" style={{ color: "var(--gz-text-secondary)" }}>API Key (SLACK_LIVE_API_KEY)</p>
+            <p className="text-[11px] leading-relaxed" style={{ color: "var(--gz-text-muted)" }}>
+              A API Key está configurada como variável de ambiente no painel do Vercel. Não é necessário inserir aqui.
             </p>
           </div>
         </div>
 
-        {/* Public ID */}
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-            ID Público (Public Identifier)
-          </label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <div style={inputBox()}>
-              <Shield style={{ width: 14, height: 14, color: CYAN_COLOR, flexShrink: 0 }} />
-              <input type="text" value={publicId} onChange={e => setPublicId(e.target.value)}
-                placeholder="1e4d1d55-d740-447f-8cb4-8c8ce1bb0a0c"
-                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace" }} />
+        <Field label="ID Público (Public Identifier)" hint="O identificador público visível no painel Debito Pay.">
+          <div className="flex gap-2">
+            <div className="flex-1 min-w-0">
+              <TextInput icon={Shield} iconColor={CYAN} value={publicId} onChange={setPublicId}
+                placeholder="1e4d1d55-d740-447f-8cb4-8c8ce1bb0a0c" monospace accent={TEAL_INPUT} />
             </div>
-            <button onClick={() => saveKey("debito_public_id", publicId, setSavingPID, "Public ID")}
-              disabled={!publicId.trim() || savingPID} style={saveBtn(!!publicId.trim(), savingPID)}>
-              {savingPID ? <div style={spinStyle} /> : <Save style={{ width: 14, height: 14 }} />}
-            </button>
+            <SaveBtn onClick={() => saveKey("debito_public_id", publicId, setSavingPID, "Public ID")}
+              disabled={!publicId.trim()} saving={savingPID} />
           </div>
-          <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
-            O identificador público visível no painel Debito Pay. Pré-preenchido com o valor por defeito.
-          </p>
-        </div>
+        </Field>
 
-        {/* Wallet Code */}
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-            Wallet Code <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 100, background: "rgba(0,0,0,.04)", color: CYAN_COLOR, textTransform: "uppercase", letterSpacing: "0.5px", marginLeft: 4 }}>OBRIGATÓRIO</span>
-          </label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <div style={inputBox()}>
-              <Zap style={{ width: 14, height: 14, color: CYAN_COLOR, flexShrink: 0 }} />
-              <input type="text" value={walletCode} onChange={e => setWalletCode(e.target.value)}
-                placeholder="55291"
-                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "monospace" }} />
+        <Field label="Wallet Code" badge="Obrigatório"
+          hint="Código de 5 dígitos da carteira, visível em Debito Pay → Settings → API.">
+          <div className="flex gap-2">
+            <div className="flex-1 min-w-0">
+              <TextInput icon={Zap} iconColor={CYAN} value={walletCode} onChange={setWalletCode}
+                placeholder="55291" monospace accent={TEAL_INPUT} />
             </div>
-            <button onClick={() => saveKey("debito_wallet_code", walletCode, setSavingWC, "Wallet Code")}
-              disabled={!walletCode.trim() || savingWC} style={saveBtn(!!walletCode.trim(), savingWC)}>
-              {savingWC ? <div style={spinStyle} /> : <Save style={{ width: 14, height: 14 }} />}
-            </button>
+            <SaveBtn onClick={() => saveKey("debito_wallet_code", walletCode, setSavingWC, "Wallet Code")}
+              disabled={!walletCode.trim()} saving={savingWC} />
           </div>
-          <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
-            Código de 5 dígitos da carteira — visível em <strong>Debito Pay → Settings → API</strong>. Campo obrigatório em todos os pedidos de pagamento.
-          </p>
-        </div>
+        </Field>
 
-        {/* Webhook Secret */}
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-            Webhook Secret
-          </label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <div style={inputBox()}>
-              <Key style={{ width: 14, height: 14, color: CYAN_COLOR, flexShrink: 0 }} />
-              <input type={showWS ? "text" : "password"} value={webhookSecret}
-                onChange={e => setWebhookSecret(e.target.value)}
-                placeholder="Segredo fornecido pelo Debito Pay"
-                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
-              <button onClick={() => setShowWS(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gz-text-tertiary)", padding: 0 }}>
-                {showWS ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
-              </button>
+        <Field label="Webhook Secret"
+          hint={<>Encontras o segredo no painel Debito Pay em <strong>Webhooks → Webhook Secret</strong>.</>}>
+          <div className="flex gap-2">
+            <div className="flex-1 min-w-0">
+              <TextInput icon={Key} iconColor={CYAN} type={showWS ? "text" : "password"}
+                value={webhookSecret} onChange={setWebhookSecret}
+                placeholder="Segredo fornecido pelo Debito Pay" accent={TEAL_INPUT}
+                trailing={<EyeBtn shown={showWS} onToggle={() => setShowWS(v => !v)} />} />
             </div>
-            <button onClick={() => saveKey("debito_webhook_secret", webhookSecret, setSavingWS, "Webhook Secret")}
-              disabled={!webhookSecret.trim() || savingWS} style={saveBtn(!!webhookSecret.trim(), savingWS)}>
-              {savingWS ? <div style={spinStyle} /> : <Save style={{ width: 14, height: 14 }} />}
-            </button>
+            <SaveBtn onClick={() => saveKey("debito_webhook_secret", webhookSecret, setSavingWS, "Webhook Secret")}
+              disabled={!webhookSecret.trim()} saving={savingWS} />
           </div>
-          <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
-            Encontras o Webhook Secret no painel Debito Pay em <strong>Webhooks → Webhook Secret</strong>. Guarda aqui para validação de segurança.
-          </p>
-        </div>
+        </Field>
 
-        {/* API Base URL */}
-        <div>
-          <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-            URL Base da API (opcional)
-          </label>
-          <div style={{ display: "flex", gap: 8 }}>
-            <div style={inputBox()}>
-              <Link2 style={{ width: 14, height: 14, color: CYAN_COLOR, flexShrink: 0 }} />
-              <input type="url" value={apiBaseUrl} onChange={e => setApiBaseUrl(e.target.value)}
-                placeholder="https://api.debitopay.co.mz"
-                style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace" }} />
+        <Field label="URL Base da API" badge="Opcional"
+          hint={<>Deixa em branco para usar o padrão <code style={{ fontFamily: "monospace" }}>https://api.debitopay.co.mz</code>.</>}>
+          <div className="flex gap-2">
+            <div className="flex-1 min-w-0">
+              <TextInput icon={Link2} iconColor={CYAN} type="url" value={apiBaseUrl} onChange={setApiBaseUrl}
+                placeholder="https://api.debitopay.co.mz" monospace accent={TEAL_INPUT} />
             </div>
-            <button onClick={() => saveKey("debito_api_base_url", apiBaseUrl, setSavingBase, "URL Base")}
-              disabled={!apiBaseUrl.trim() || savingBase} style={saveBtn(!!apiBaseUrl.trim(), savingBase)}>
-              {savingBase ? <div style={spinStyle} /> : <Save style={{ width: 14, height: 14 }} />}
-            </button>
+            <SaveBtn onClick={() => saveKey("debito_api_base_url", apiBaseUrl, setSavingBase, "URL Base")}
+              disabled={!apiBaseUrl.trim()} saving={savingBase} />
           </div>
-          <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
-            Deixa em branco para usar o padrão: <code style={{ fontFamily: "monospace" }}>https://api.debitopay.co.mz</code>. Só altera se o Debito Pay fornecer uma URL diferente.
-          </p>
-        </div>
+        </Field>
 
-        {/* Status indicators */}
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 99, background: "rgba(52,211,153,0.12)", color: "#34d399", fontWeight: 600 }}>
-            ✓ e-Mola Activo
-          </span>
-          <span style={{ fontSize: 11, padding: "4px 10px", borderRadius: 99, background: "rgba(255,255,255,0.04)", color: "#52525b", fontWeight: 600 }}>
-            ⏳ M-Pesa Em Breve
+        <div className="flex gap-2 flex-wrap">
+          <StatusTag active labelOn="e-Mola Activo" labelOff="" />
+          <span style={{
+            fontSize: 10, padding: "3px 9px", borderRadius: 100, fontWeight: 700,
+            background: "var(--gz-bg-subtle)", color: "var(--gz-text-tertiary)",
+            border: "1px solid var(--gz-border-subtle)", textTransform: "uppercase", letterSpacing: "0.04em",
+          }}>
+            M-Pesa em breve
           </span>
         </div>
-
       </div>
-    </SectionCard>
+    </Card>
   );
 }
 
+/* ══════════════════════════════════════════════════════════════
+   NAV
+══════════════════════════════════════════════════════════════ */
+const NAV = [
+  { id: "plataforma",   label: "Plataforma",   icon: Globe           },
+  { id: "pagamentos",   label: "Pagamentos",   icon: Smartphone      },
+  { id: "notificacoes", label: "Notificações", icon: Bell            },
+  { id: "credenciais",  label: "Credenciais",  icon: Mail            },
+  { id: "aparencia",    label: "Aparência",    icon: LayoutTemplate  },
+  { id: "conteudo",     label: "Conteúdo",     icon: FileText        },
+  { id: "sistema",      label: "Sistema",      icon: Database        },
+] as const;
+
+/* ══════════════════════════════════════════════════════════════
+   PAGE
+══════════════════════════════════════════════════════════════ */
 export default function Settings() {
   const { data: platformSettings = {}, isLoading } = useGetPlatformSettings();
   const updateSetting = useUpdatePlatformSetting();
 
-  // Local state for platform toggles
   const [settings, setSettings] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -424,26 +505,26 @@ export default function Settings() {
   const [copiedWebhook, setCopiedWebhook] = useState(false);
 
   // Version control
-  const [appVersion, setAppVersion]     = useState("1.0.0");
+  const [appVersion, setAppVersion] = useState("1.0.0");
   const [savingVersion, setSavingVersion] = useState(false);
 
-  // Terms & Privacy content editors
-  const [termsContent,   setTermsContent]   = useState("");
+  // Terms & Privacy
+  const [termsContent, setTermsContent] = useState("");
   const [privacyContent, setPrivacyContent] = useState("");
-  const [savingTerms,    setSavingTerms]    = useState(false);
-  const [savingPrivacy,  setSavingPrivacy]  = useState(false);
+  const [savingTerms, setSavingTerms] = useState(false);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
 
-  // Footer settings
+  // Footer / Ad
   const [adBannerScript, setAdBannerScript] = useState("");
   const [savingAdScript, setSavingAdScript] = useState(false);
 
   const [footerTagline, setFooterTagline] = useState("Joga. Aposta. Vence.");
-  const [footerPhone, setFooterPhone]     = useState("");
-  const [footerEmail, setFooterEmail]     = useState("");
-  const [footerAppUrl, setFooterAppUrl]   = useState("");
+  const [footerPhone, setFooterPhone] = useState("");
+  const [footerEmail, setFooterEmail] = useState("");
+  const [footerAppUrl, setFooterAppUrl] = useState("");
   const [whatsappGroupUrl, setWhatsappGroupUrl] = useState("");
   const [rechargeWhatsapp, setRechargeWhatsapp] = useState("");
-  const [savingFooter, setSavingFooter]   = useState(false);
+  const [savingFooter, setSavingFooter] = useState(false);
 
   useEffect(() => {
     if (platformSettings["app_version"])             setAppVersion(platformSettings["app_version"]);
@@ -590,7 +671,6 @@ export default function Settings() {
     setSavingSecPw(true);
     try {
       await updateSetting.mutateAsync({ key: "admin_security_password", value: secPw });
-      // Also update session so admin doesn't get locked out
       sessionStorage.setItem("_wmz_gate", "1");
       setCurrentSecPw(secPw);
       setSecPw("");
@@ -601,719 +681,443 @@ export default function Settings() {
     setSavingSecPw(false);
   };
 
+  // Section navigation
+  const [activeSection, setActiveSection] = useState<string>(NAV[0].id);
+  const navRef = useRef<HTMLDivElement | null>(null);
+
+  const goTo = (id: string) => {
+    setActiveSection(id);
+    const el = document.getElementById(`sec-${id}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   if (isLoading) {
     return (
-      <div style={{ padding: 24, display: "flex", alignItems: "center", justifyContent: "center", height: 400 }}>
+      <div className="flex items-center justify-center" style={{ height: 400 }}>
         <div style={{ width: 28, height: 28, borderRadius: "50%", border: "3px solid rgba(0,0,0,0.2)", borderTopColor: "#18181b", animation: "spin 0.8s linear infinite" }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
+  const textareaStyle: React.CSSProperties = {
+    width: "100%",
+    background: "var(--gz-bg-subtle)",
+    border: "1.5px solid var(--gz-border-subtle)",
+    borderRadius: 12,
+    padding: "12px 14px",
+    resize: "vertical",
+    outline: "none",
+    fontSize: 12,
+    color: "var(--gz-text-primary)",
+    fontFamily: "monospace",
+    lineHeight: 1.6,
+    boxSizing: "border-box",
+  };
+
   return (
-    <div style={{ padding: "24px", maxWidth: 900 }}>
+    <div className="px-4 sm:px-5 pb-8 pt-5 max-w-[1400px] mx-auto">
 
-      {/* Header */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 14, background: "linear-gradient(135deg, #18181b, #4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 14px rgba(0,0,0,0.35)" }}>
-            <SettingsIcon style={{ width: 18, height: 18, color: "#fff" }} />
-          </div>
-          <div>
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: "var(--gz-text-primary)", margin: 0 }}>Configurações</h1>
-            <p style={{ fontSize: 12, color: "var(--gz-text-muted)", margin: 0 }}>Administração da plataforma Winmoz</p>
-          </div>
+      {/* ── Page header ── */}
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
+        <div>
+          <h1 className="text-[26px] font-black tracking-[-0.035em] leading-tight flex items-center gap-2.5" style={{ color: "var(--gz-text-primary)" }}>
+            <SettingsIcon style={{ width: 22, height: 22, strokeWidth: 2 }} />
+            <span className="gz-gradient-text">Configurações</span>
+          </h1>
+          <p className="mt-1 text-[12.5px] font-medium" style={{ color: "var(--gz-text-muted)" }}>
+            Administração da plataforma MOZBET
+          </p>
         </div>
       </div>
 
-      <div className="admin-settings-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div className="flex flex-col lg:flex-row gap-5">
 
-        {/* Notifications — all locked */}
-        <SectionCard title="Notificações" icon={Bell} color="#18181b" bg="rgba(0,0,0,0.1)">
-          <SettingRow label="Alertas de Anti-Fraude" description="Receber notificações de atividade suspeita" locked>
-            <LockedToggle />
-          </SettingRow>
-          <SettingRow label="Novos Saques Pendentes" description="Alertas para aprovação de saques" locked>
-            <LockedToggle />
-          </SettingRow>
-          <SettingRow label="Denúncias Novas" description="Notificações para novas denúncias" locked>
-            <LockedToggle />
-          </SettingRow>
-        </SectionCard>
-
-        {/* Security — all locked */}
-        <SectionCard title="Segurança" icon={Shield} color="#3f3f46" bg="rgba(255,255,255,0.1)">
-          <SettingRow label="Anti-Fraude Automático" description="Detecção automática de padrões suspeitos" locked>
-            <LockedToggle />
-          </SettingRow>
-          <SettingRow label="Verificação 2FA Admin" description="Autenticação de dois fatores para admins" locked>
-            <LockedToggle />
-          </SettingRow>
-          <SettingRow label="Log de Auditoria" description="Registrar todas as ações administrativas" locked>
-            <LockedToggle />
-          </SettingRow>
-        </SectionCard>
-
-        {/* Platform — functional */}
-        <SectionCard title="Plataforma" icon={Globe} color="#18181b" bg="rgba(0,0,0,0.1)">
-          <SettingRow label="Permitir Novos Cadastros" description="Habilitar registro de novos jogadores">
-            <FunctionalToggle settingKey="allow_new_users" value={settings.allow_new_users ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
-          </SettingRow>
-          <SettingRow label="Apostas Activas" description="Permitir realização de apostas na plataforma">
-            <FunctionalToggle settingKey="bets_active" value={settings.bets_active ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
-          </SettingRow>
-          <SettingRow
-            label="Modo Manutenção"
-            description={settings.maintenance_mode ? "⚠️ Plataforma OFFLINE para todos os users" : "Colocar plataforma em modo de manutenção"}
+        {/* ── Left nav ── */}
+        <aside className="lg:w-[220px] lg:flex-shrink-0">
+          <div
+            ref={navRef}
+            className="gz-card p-2 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible lg:sticky lg:top-20 hide-scrollbar"
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {settings.maintenance_mode && (
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "rgba(0,0,0,0.1)", color: "#0a0a0a", textTransform: "uppercase" }}>
-                  ACTIVO
-                </span>
-              )}
-              <FunctionalToggle settingKey="maintenance_mode" value={settings.maintenance_mode ?? false} onChange={handleToggle} loading={updateSetting.isPending} />
-            </div>
-          </SettingRow>
-          <SettingRow label="Modo IA no Suporte" description="Respostas automáticas via IA para mensagens de suporte">
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Bot style={{ width: 13, height: 13, color: settings.support_ai_mode ? "#0ea5e9" : "var(--gz-text-tertiary)" }} />
-              <FunctionalToggle settingKey="support_ai_mode" value={settings.support_ai_mode ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
-            </div>
-          </SettingRow>
-          <SettingRow
-            label="Modo Poker Winner"
-            description={settings.poker_winner_mode ? "🃏 Branding activo: POKER / Winner Online" : "Substituir 'MOZBET'→'POKER' e 'MOZAMBIQUE'→'Winner Online' em toda a plataforma"}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {settings.poker_winner_mode && (
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, background: "rgba(255,255,255,0.12)", color: "#3f3f46", textTransform: "uppercase" }}>
-                  ACTIVO
-                </span>
-              )}
-              <FunctionalToggle settingKey="poker_winner_mode" value={settings.poker_winner_mode ?? false} onChange={handleToggle} loading={updateSetting.isPending} />
-            </div>
-          </SettingRow>
-        </SectionCard>
-
-        {/* Carteiras de Pagamento */}
-        <SectionCard title="Carteiras de Pagamento" icon={Wallet} color="#15803d" bg="rgba(22,163,74,0.1)">
-          <SettingRow
-            label="M-Pesa"
-            description={settings.mpesa_wallet_enabled ? "Carteira activa — os utilizadores podem depositar via M-Pesa" : "⚠️ Carteira INDISPONÍVEL — os utilizadores não conseguem escolher M-Pesa nos depósitos"}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, textTransform: "uppercase",
-                background: settings.mpesa_wallet_enabled ? "rgba(22,163,74,0.12)" : "rgba(0,0,0,0.1)",
-                color: settings.mpesa_wallet_enabled ? "#15803d" : "#0a0a0a" }}>
-                {settings.mpesa_wallet_enabled ? "Activa" : "Indisponível"}
-              </span>
-              <FunctionalToggle settingKey="mpesa_wallet_enabled" value={settings.mpesa_wallet_enabled ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
-            </div>
-          </SettingRow>
-          <SettingRow
-            label="e-Mola"
-            description={settings.emola_wallet_enabled ? "Carteira activa — os utilizadores podem depositar via e-Mola" : "⚠️ Carteira INDISPONÍVEL — os utilizadores não conseguem escolher e-Mola nos depósitos"}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 100, textTransform: "uppercase",
-                background: settings.emola_wallet_enabled ? "rgba(22,163,74,0.12)" : "rgba(0,0,0,0.1)",
-                color: settings.emola_wallet_enabled ? "#15803d" : "#0a0a0a" }}>
-                {settings.emola_wallet_enabled ? "Activa" : "Indisponível"}
-              </span>
-              <FunctionalToggle settingKey="emola_wallet_enabled" value={settings.emola_wallet_enabled ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
-            </div>
-          </SettingRow>
-        </SectionCard>
-
-        {/* Footer & App Download */}
-        <SectionCard title="Rodapé & App" icon={LayoutTemplate} color="#3f3f46" bg="rgba(255,255,255,0.1)">
-          <div style={{ paddingTop: 12, display: "flex", flexDirection: "column", gap: 16 }}>
-
-            {/* Tagline */}
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
-                Tagline do Rodapé
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(255,255,255,0.2)" }}>
-                <LayoutTemplate style={{ width: 14, height: 14, color: "#3f3f46", flexShrink: 0 }} />
-                <input type="text" value={footerTagline} onChange={e => setFooterTagline(e.target.value)} placeholder="Ex: Joga. Aposta. Vence."
-                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
-              </div>
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
-                Telefone de Contacto
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(255,255,255,0.2)" }}>
-                <Phone style={{ width: 14, height: 14, color: "#3f3f46", flexShrink: 0 }} />
-                <input type="text" value={footerPhone} onChange={e => setFooterPhone(e.target.value)} placeholder="Ex: +258 84 000 0000"
-                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
-              </div>
-            </div>
-
-            {/* Email */}
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
-                E-mail de Contacto
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(255,255,255,0.2)" }}>
-                <Mail style={{ width: 14, height: 14, color: "#3f3f46", flexShrink: 0 }} />
-                <input type="email" value={footerEmail} onChange={e => setFooterEmail(e.target.value)} placeholder="Ex: suporte@mozbet.co.mz"
-                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
-              </div>
-            </div>
-
-            {/* App download URL */}
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
-                Link de Download da App
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(255,255,255,0.2)" }}>
-                <Link2 style={{ width: 14, height: 14, color: "#3f3f46", flexShrink: 0 }} />
-                <input type="url" value={footerAppUrl} onChange={e => setFooterAppUrl(e.target.value)} placeholder="https://play.google.com/..."
-                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
-              </div>
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 5 }}>URL para o botão "Descarregar App" no rodapé da página inicial.</p>
-            </div>
-
-            {/* WhatsApp Group URL */}
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
-                Link do Grupo do WhatsApp
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(37,211,102,0.25)" }}>
-                <Link2 style={{ width: 14, height: 14, color: "#25d366", flexShrink: 0 }} />
-                <input type="url" value={whatsappGroupUrl} onChange={e => setWhatsappGroupUrl(e.target.value)} placeholder="https://chat.whatsapp.com/..."
-                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
-              </div>
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 5 }}>URL exibido no botão "Grupo do WhatsApp" no menu de jogos.</p>
-            </div>
-
-            {/* WhatsApp Comprar Recargas */}
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 6, letterSpacing: "0.3px" }}>
-                WhatsApp — Comprar Recargas
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(37,211,102,0.25)" }}>
-                <Phone style={{ width: 14, height: 14, color: "#25d366", flexShrink: 0 }} />
-                <input value={rechargeWhatsapp} onChange={e => setRechargeWhatsapp(e.target.value)} placeholder="25884xxxxxxx (número com indicativo)"
-                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }} />
-              </div>
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 5 }}>
-                Número (258XXXXXXXXX) ou link wa.me — os utilizadores são levados aqui ao clicar em "Comprar Recarga" na tela de recarga.
-              </p>
-            </div>
-
-            {/* Save button */}
-            <button onClick={handleSaveFooter} disabled={savingFooter}
-              style={{
-                padding: "11px 20px", borderRadius: 12, border: "none",
-                background: "linear-gradient(135deg, #3f3f46, #18181b)",
-                color: "#fff", fontWeight: 700, fontSize: 13,
-                display: "flex", alignItems: "center", gap: 8,
-                cursor: savingFooter ? "wait" : "pointer",
-                fontFamily: "inherit", alignSelf: "flex-start",
-                boxShadow: "0 4px 14px rgba(255,255,255,0.3)",
-              }}>
-              {savingFooter ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-              Guardar Rodapé
-            </button>
-          </div>
-        </SectionCard>
-
-        {/* Database */}
-        <SectionCard title="Banco de Dados" icon={Database} color="#18181b" bg="rgba(0,0,0,0.1)">
-          <SettingRow label="Backup Automático" description="Backup diário do banco de dados">
-            <FunctionalToggle settingKey="backup_auto" value={settings.backup_auto ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
-          </SettingRow>
-          <SettingRow label="Cache de Consultas" description="Habilitar cache de consultas SQL">
-            <FunctionalToggle settingKey="query_cache" value={settings.query_cache ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
-          </SettingRow>
-          <SettingRow label="Logs de Query" description="Registrar todas as queries do sistema">
-            <FunctionalToggle settingKey="query_logs" value={settings.query_logs ?? false} onChange={handleToggle} loading={updateSetting.isPending} />
-          </SettingRow>
-        </SectionCard>
-
-        {/* Admin Credentials */}
-        <SectionCard title="Credenciais de Acesso" icon={Mail} color="#0ea5e9" bg="rgba(14,165,233,0.1)">
-          <div style={{ paddingTop: 12 }}>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                E-mail Atual (para identificação)
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(14,165,233,0.25)" }}>
-                <Mail style={{ width: 14, height: 14, color: "#0ea5e9", flexShrink: 0 }} />
-                <input
-                  type="email"
-                  value={adminEmail}
-                  onChange={e => setAdminEmail(e.target.value)}
-                  placeholder="teu@email-atual.com"
-                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
-                />
-              </div>
-              <p style={{ fontSize: 11, color: "var(--gz-text-muted)", margin: "5px 0 0" }}>Necessário para identificar a conta nos dois campos abaixo</p>
-            </div>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                Alterar E-mail do Admin
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,0.1)" }}>
-                  <Mail style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
-                  <input
-                    type="email"
-                    value={newEmail}
-                    onChange={e => setNewEmail(e.target.value)}
-                    placeholder="novo@email.com"
-                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
-                  />
-                </div>
+            {NAV.map(item => {
+              const active = activeSection === item.id;
+              return (
                 <button
-                  onClick={handleChangeEmail}
-                  disabled={!newEmail.trim() || savingEmail}
+                  key={item.id}
+                  onClick={() => goTo(item.id)}
+                  className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-[12.5px] font-semibold transition-all whitespace-nowrap flex-shrink-0 lg:w-full text-left"
                   style={{
-                    padding: "10px 14px", borderRadius: 12, border: "none", cursor: newEmail.trim() ? "pointer" : "default",
-                    background: newEmail.trim() ? "linear-gradient(135deg, #18181b, #4f46e5)" : "var(--gz-bg-subtle)",
-                    color: newEmail.trim() ? "#fff" : "var(--gz-text-tertiary)",
-                    fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
+                    background: active ? "var(--gz-bg-subtle)" : "transparent",
+                    color: active ? "var(--gz-text-primary)" : "var(--gz-text-muted)",
+                    border: active ? "1px solid var(--gz-border-subtle)" : "1px solid transparent",
                   }}
                 >
-                  {savingEmail ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
+                  <item.icon style={{ width: 15, height: 15, strokeWidth: active ? 2.1 : 1.8, flexShrink: 0 }} />
+                  {item.label}
                 </button>
-              </div>
-            </div>
+              );
+            })}
+          </div>
+        </aside>
 
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                Alterar Palavra-Passe do Admin
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,0.1)" }}>
-                  <Key style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
-                  <input
-                    type={showPw ? "text" : "password"}
-                    value={newPw}
-                    onChange={e => setNewPw(e.target.value)}
-                    placeholder="Nova palavra-passe (mín. 8 chars)"
-                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
-                  />
-                  <button onClick={() => setShowPw(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gz-text-tertiary)", padding: 0 }}>
-                    {showPw ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
-                  </button>
+        {/* ── Content ── */}
+        <div className="flex-1 min-w-0 space-y-5">
+
+          {/* ═══ PLATAFORMA ═══ */}
+          <div id="sec-plataforma" className="space-y-5 scroll-mt-24">
+            <Card title="Plataforma" description="Controlo geral do funcionamento da app" icon={Globe}>
+              <SettingRow label="Permitir Novos Cadastros" description="Habilitar registro de novos jogadores">
+                <FunctionalToggle settingKey="allow_new_users" value={settings.allow_new_users ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+              </SettingRow>
+              <SettingRow label="Apostas Activas" description="Permitir realização de apostas na plataforma">
+                <FunctionalToggle settingKey="bets_active" value={settings.bets_active ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+              </SettingRow>
+              <SettingRow
+                label="Modo Manutenção"
+                description={settings.maintenance_mode ? "Plataforma OFFLINE para todos os utilizadores" : "Colocar plataforma em modo de manutenção"}
+              >
+                <div className="flex items-center gap-2">
+                  <StatusTag active={!!settings.maintenance_mode} labelOn="Activo" labelOff="Inactivo" />
+                  <FunctionalToggle settingKey="maintenance_mode" value={settings.maintenance_mode ?? false} onChange={handleToggle} loading={updateSetting.isPending} />
                 </div>
-                <button
-                  onClick={handleChangePw}
-                  disabled={newPw.length < 8 || savingPw}
-                  style={{
-                    padding: "10px 14px", borderRadius: 12, border: "none", cursor: newPw.length >= 8 ? "pointer" : "default",
-                    background: newPw.length >= 8 ? "linear-gradient(135deg, #18181b, #4f46e5)" : "var(--gz-bg-subtle)",
-                    color: newPw.length >= 8 ? "#fff" : "var(--gz-text-tertiary)",
-                    fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
-                  }}
+              </SettingRow>
+              <SettingRow label="Modo IA no Suporte" description="Respostas automáticas via IA para mensagens de suporte">
+                <div className="flex items-center gap-2">
+                  <Bot style={{ width: 14, height: 14, color: settings.support_ai_mode ? "#0ea5e9" : "var(--gz-text-tertiary)" }} />
+                  <FunctionalToggle settingKey="support_ai_mode" value={settings.support_ai_mode ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+                </div>
+              </SettingRow>
+              <SettingRow
+                label="Modo Poker Winner"
+                description={settings.poker_winner_mode ? "Branding activo: POKER / Winner Online" : "Substituir 'MOZBET' → 'POKER' e 'MOZAMBIQUE' → 'Winner Online'"}
+              >
+                <div className="flex items-center gap-2">
+                  <StatusTag active={!!settings.poker_winner_mode} labelOn="Activo" labelOff="Inactivo" />
+                  <FunctionalToggle settingKey="poker_winner_mode" value={settings.poker_winner_mode ?? false} onChange={handleToggle} loading={updateSetting.isPending} />
+                </div>
+              </SettingRow>
+            </Card>
+
+            <Card title="Carteiras de Pagamento" description="Disponibilidade dos métodos de depósito" icon={Wallet}>
+              <SettingRow
+                label="M-Pesa"
+                description={settings.mpesa_wallet_enabled ? "Carteira activa — depósitos permitidos" : "Carteira indisponível — oculta nos depósitos"}
+              >
+                <div className="flex items-center gap-2">
+                  <StatusTag active={!!settings.mpesa_wallet_enabled} labelOn="Activa" labelOff="Indisponível" />
+                  <FunctionalToggle settingKey="mpesa_wallet_enabled" value={settings.mpesa_wallet_enabled ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+                </div>
+              </SettingRow>
+              <SettingRow
+                label="e-Mola"
+                description={settings.emola_wallet_enabled ? "Carteira activa — depósitos permitidos" : "Carteira indisponível — oculta nos depósitos"}
+              >
+                <div className="flex items-center gap-2">
+                  <StatusTag active={!!settings.emola_wallet_enabled} labelOn="Activa" labelOff="Indisponível" />
+                  <FunctionalToggle settingKey="emola_wallet_enabled" value={settings.emola_wallet_enabled ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+                </div>
+              </SettingRow>
+            </Card>
+          </div>
+
+          {/* ═══ PAGAMENTOS ═══ */}
+          <div id="sec-pagamentos" className="space-y-5 scroll-mt-24">
+            <Card title="SMS Forwarder" description="Confirmação automática de depósitos via SMS" icon={Smartphone}>
+              <div className="flex flex-col gap-5">
+                <Field
+                  label="URL do Webhook SMS Forwarder"
+                  hint={<>Configura esta URL na app <strong>SMS Forwarder</strong> (Android) para reencaminhar os SMS de confirmação M-Pesa / e-Mola.</>}
                 >
-                  {savingPw ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-                </button>
+                  <div className="flex items-center gap-2 px-3.5 rounded-xl"
+                    style={{ background: "var(--gz-bg-subtle)", border: `1.5px solid ${TEAL_INPUT}` }}>
+                    <span className="flex-1 text-[11px] overflow-x-auto whitespace-nowrap py-2.5"
+                      style={{ color: CYAN, fontFamily: "monospace" }}>
+                      {webhookUrl}
+                    </span>
+                    <button onClick={copyWebhookUrl}
+                      style={{
+                        flexShrink: 0, padding: "4px 10px", borderRadius: 8, border: "none", cursor: "pointer",
+                        background: copiedWebhook ? "rgba(0,212,180,0.2)" : "var(--gz-bg-subtle)",
+                        color: CYAN, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, fontFamily: "inherit",
+                      }}>
+                      {copiedWebhook ? <CheckCircle style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
+                      {copiedWebhook ? "Copiado!" : "Copiar"}
+                    </button>
+                  </div>
+                </Field>
+
+                <Field label="Token de Segurança do Webhook"
+                  hint={<>Enviado no header <code style={{ fontFamily: "monospace" }}>Authorization: Bearer &lt;token&gt;</code> da app.</>}>
+                  <div className="flex gap-2">
+                    <div className="flex-1 min-w-0">
+                      <TextInput icon={Key} type={showWebhookToken ? "text" : "password"}
+                        value={webhookToken} onChange={setWebhookToken}
+                        placeholder="Define um segredo para autenticar o webhook"
+                        trailing={<EyeBtn shown={showWebhookToken} onToggle={() => setShowWebhookToken(v => !v)} />} />
+                    </div>
+                    <SaveBtn onClick={handleSaveWebhookToken} disabled={!webhookToken.trim()} saving={savingWebhookToken} />
+                  </div>
+                </Field>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <Field label="Número M-Pesa da Plataforma" hint={<>Exemplo: <code style={{ fontFamily: "monospace" }}>84 612 3456</code>. Exibido na tela de depósito.</>}>
+                    <div className="flex gap-2">
+                      <div className="flex-1 min-w-0">
+                        <TextInput icon={Smartphone} value={mpesaNum} onChange={setMpesaNum}
+                          placeholder="84 XXX XXXX" trailing={undefined} />
+                      </div>
+                      <SaveBtn onClick={handleSaveMpesa} disabled={!mpesaNum.trim()} saving={savingMpesa} />
+                    </div>
+                  </Field>
+
+                  <Field label="Nome do Titular M-Pesa" hint="Nome exibido por baixo do número na tela de depósito.">
+                    <div className="flex gap-2">
+                      <div className="flex-1 min-w-0">
+                        <TextInput icon={Users} value={mpesaName} onChange={setMpesaName} placeholder="Ex: Celso Cristiano" />
+                      </div>
+                      <SaveBtn onClick={handleSaveMpesaName} disabled={!mpesaName.trim()} saving={savingMpesaName} />
+                    </div>
+                  </Field>
+
+                  <Field label="Número e-Mola da Plataforma" hint={<>Exemplo: <code style={{ fontFamily: "monospace" }}>87 123 4567</code>. Exibido na tela de depósito.</>}>
+                    <div className="flex gap-2">
+                      <div className="flex-1 min-w-0">
+                        <TextInput icon={Smartphone} value={emolaNum} onChange={setEmolaNum} placeholder="87 XXX XXXX" />
+                      </div>
+                      <SaveBtn onClick={handleSaveEmola} disabled={!emolaNum.trim()} saving={savingEmola} />
+                    </div>
+                  </Field>
+
+                  <Field label="Nome do Titular e-Mola" hint="Nome exibido por baixo do número na tela de depósito.">
+                    <div className="flex gap-2">
+                      <div className="flex-1 min-w-0">
+                        <TextInput icon={Users} value={emolaName} onChange={setEmolaName} placeholder="Ex: Celso Cristiano" />
+                      </div>
+                      <SaveBtn onClick={handleSaveEmolaName} disabled={!emolaName.trim()} saving={savingEmolaName} />
+                    </div>
+                  </Field>
+                </div>
               </div>
-            </div>
+            </Card>
+
+            <DebitoPaySection />
           </div>
-        </SectionCard>
 
-        {/* SMS Forwarder Configuration */}
-        <SectionCard title="Pagamentos SMS Forwarder" icon={Smartphone} color="#18181b" bg="rgba(0,0,0,.04)">
-          <div style={{ paddingTop: 12 }}>
+          {/* ═══ NOTIFICAÇÕES ═══ */}
+          <div id="sec-notificacoes" className="space-y-5 scroll-mt-24">
+            <Card title="Notificações" description="Alertas operacionais do painel" icon={Bell}>
+              <SettingRow label="Alertas de Anti-Fraude" description="Receber notificações de atividade suspeita" locked>
+                <LockedToggle />
+              </SettingRow>
+              <SettingRow label="Novos Saques Pendentes" description="Alertas para aprovação de saques" locked>
+                <LockedToggle />
+              </SettingRow>
+              <SettingRow label="Denúncias Novas" description="Notificações para novas denúncias" locked>
+                <LockedToggle />
+              </SettingRow>
+            </Card>
 
-            {/* Webhook URL */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                URL do Webhook SMS Forwarder
-              </label>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(0,212,180,0.05)", border: "1.5px solid rgba(0,212,180,0.2)" }}>
-                <span style={{ flex: 1, fontSize: 11, color: "#18181b", fontFamily: "monospace", overflowX: "auto", whiteSpace: "nowrap" }}>
-                  {webhookUrl}
-                </span>
-                <button onClick={copyWebhookUrl}
-                  style={{ flexShrink: 0, padding: "4px 10px", borderRadius: 8, border: "none", cursor: "pointer",
-                    background: copiedWebhook ? "rgba(0,212,180,0.2)" : "rgba(0,0,0,.04)",
-                    color: "#18181b", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", gap: 4, fontFamily: "inherit" }}>
-                  {copiedWebhook ? <CheckCircle style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
-                  {copiedWebhook ? "Copiado!" : "Copiar"}
-                </button>
-              </div>
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
-                Configura esta URL no app <strong>SMS Forwarder</strong> (Android) para que os SMS de confirmação M-Pesa/e-Mola sejam enviados automaticamente.
-              </p>
-            </div>
-
-            {/* Webhook Token */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                Token de Segurança do Webhook
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,212,180,0.15)" }}>
-                  <Key style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
-                  <input
-                    type={showWebhookToken ? "text" : "password"}
-                    value={webhookToken}
-                    onChange={e => setWebhookToken(e.target.value)}
-                    placeholder="Define um segredo para autenticar o webhook"
-                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
-                  />
-                  <button onClick={() => setShowWebhookToken(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gz-text-tertiary)", padding: 0 }}>
-                    {showWebhookToken ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
-                  </button>
-                </div>
-                <button onClick={handleSaveWebhookToken} disabled={!webhookToken.trim() || savingWebhookToken}
-                  style={{
-                    padding: "10px 14px", borderRadius: 12, border: "none",
-                    cursor: webhookToken.trim() ? "pointer" : "default",
-                    background: webhookToken.trim() ? "#18181b" : "var(--gz-bg-subtle)",
-                    color: webhookToken.trim() ? "#000" : "var(--gz-text-tertiary)",
-                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
-                  }}>
-                  {savingWebhookToken ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(0,0,0,0.2)", borderTopColor: "#000", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-                </button>
-              </div>
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
-                Envia este token no header <code style={{ background: "rgba(0,0,0,.04)", padding: "1px 5px", borderRadius: 4, fontFamily: "monospace" }}>Authorization: Bearer &lt;token&gt;</code> do app SMS Forwarder.
-              </p>
-            </div>
-
-            {/* M-Pesa Number */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                Número M-Pesa da Plataforma
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(231,76,60,0.2)" }}>
-                  <Smartphone style={{ width: 14, height: 14, color: "#0a0a0a", flexShrink: 0 }} />
-                  <input
-                    type="text"
-                    value={mpesaNum}
-                    onChange={e => setMpesaNum(e.target.value)}
-                    placeholder="84 XXX XXXX (sem prefixo +258)"
-                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
-                  />
-                </div>
-                <button onClick={handleSaveMpesa} disabled={!mpesaNum.trim() || savingMpesa}
-                  style={{
-                    padding: "10px 14px", borderRadius: 12, border: "none",
-                    cursor: mpesaNum.trim() ? "pointer" : "default",
-                    background: mpesaNum.trim() ? "#18181b" : "var(--gz-bg-subtle)",
-                    color: mpesaNum.trim() ? "#fff" : "var(--gz-text-tertiary)",
-                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
-                  }}>
-                  {savingMpesa ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-                </button>
-              </div>
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>Exemplo: <code style={{ fontFamily: "monospace" }}>84 612 3456</code>. Exibido aos utilizadores na tela de depósito.</p>
-            </div>
-
-            {/* M-Pesa Name */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                Nome do Titular M-Pesa
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(231,76,60,0.2)" }}>
-                  <span style={{ fontSize: 13, color: "#0a0a0a", flexShrink: 0 }}>👤</span>
-                  <input
-                    type="text"
-                    value={mpesaName}
-                    onChange={e => setMpesaName(e.target.value)}
-                    placeholder="Ex: Celso Cristiano"
-                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
-                  />
-                </div>
-                <button onClick={handleSaveMpesaName} disabled={!mpesaName.trim() || savingMpesaName}
-                  style={{
-                    padding: "10px 14px", borderRadius: 12, border: "none",
-                    cursor: mpesaName.trim() ? "pointer" : "default",
-                    background: mpesaName.trim() ? "#18181b" : "var(--gz-bg-subtle)",
-                    color: mpesaName.trim() ? "#fff" : "var(--gz-text-tertiary)",
-                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
-                  }}>
-                  {savingMpesaName ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-                </button>
-              </div>
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>Nome exibido por baixo do número M-Pesa na tela de depósito/aposta.</p>
-            </div>
-
-            {/* e-Mola Number */}
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                Número e-Mola da Plataforma
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(52,211,153,0.2)" }}>
-                  <Smartphone style={{ width: 14, height: 14, color: "#34d399", flexShrink: 0 }} />
-                  <input
-                    type="text"
-                    value={emolaNum}
-                    onChange={e => setEmolaNum(e.target.value)}
-                    placeholder="87 XXX XXXX (sem prefixo +258)"
-                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
-                  />
-                </div>
-                <button onClick={handleSaveEmola} disabled={!emolaNum.trim() || savingEmola}
-                  style={{
-                    padding: "10px 14px", borderRadius: 12, border: "none",
-                    cursor: emolaNum.trim() ? "pointer" : "default",
-                    background: emolaNum.trim() ? "#18181b" : "var(--gz-bg-subtle)",
-                    color: emolaNum.trim() ? "#fff" : "var(--gz-text-tertiary)",
-                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
-                  }}>
-                  {savingEmola ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-                </button>
-              </div>
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>Exemplo: <code style={{ fontFamily: "monospace" }}>87 123 4567</code>. Exibido aos utilizadores na tela de depósito.</p>
-            </div>
-
-            {/* e-Mola Name */}
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                Nome do Titular e-Mola
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(52,211,153,0.2)" }}>
-                  <span style={{ fontSize: 13, color: "#34d399", flexShrink: 0 }}>👤</span>
-                  <input
-                    type="text"
-                    value={emolaName}
-                    onChange={e => setEmolaName(e.target.value)}
-                    placeholder="Ex: Celso Cristiano"
-                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
-                  />
-                </div>
-                <button onClick={handleSaveEmolaName} disabled={!emolaName.trim() || savingEmolaName}
-                  style={{
-                    padding: "10px 14px", borderRadius: 12, border: "none",
-                    cursor: emolaName.trim() ? "pointer" : "default",
-                    background: emolaName.trim() ? "#18181b" : "var(--gz-bg-subtle)",
-                    color: emolaName.trim() ? "#fff" : "var(--gz-text-tertiary)",
-                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
-                  }}>
-                  {savingEmolaName ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-                </button>
-              </div>
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>Nome exibido por baixo do número e-Mola na tela de depósito/aposta.</p>
-            </div>
-
+            <Card title="Segurança" description="Proteções automáticas do sistema" icon={Shield}>
+              <SettingRow label="Anti-Fraude Automático" description="Detecção automática de padrões suspeitos" locked>
+                <LockedToggle />
+              </SettingRow>
+              <SettingRow label="Verificação 2FA Admin" description="Autenticação de dois fatores para admins" locked>
+                <LockedToggle />
+              </SettingRow>
+              <SettingRow label="Log de Auditoria" description="Registrar todas as ações administrativas" locked>
+                <LockedToggle />
+              </SettingRow>
+            </Card>
           </div>
-        </SectionCard>
 
-        {/* Ad Banner Script — full width */}
-        <div style={{ gridColumn: "1 / -1" }}>
-          <SectionCard title="Banner de Anúncios" icon={LayoutTemplate} color="#18181b" bg="rgba(0,0,0,0.1)">
-            <div style={{ paddingTop: 12 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                Script do Anúncio (Banner de Apostas &amp; Home)
-              </label>
-              <textarea
-                value={adBannerScript}
-                onChange={e => setAdBannerScript(e.target.value)}
-                placeholder={`<script>\n  atOptions = { 'key': '...', 'format': 'iframe', 'height': 50, 'width': 320 };\n</script>\n<script src="https://...invoke.js"></script>`}
-                rows={6}
-                style={{
-                  width: "100%", background: "var(--gz-bg-subtle)",
-                  border: "1.5px solid rgba(0,0,0,0.25)", borderRadius: 12,
-                  padding: "12px 14px", resize: "vertical", outline: "none",
-                  fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace",
-                  lineHeight: 1.6, boxSizing: "border-box",
-                }}
-              />
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
-                Cola aqui o script completo do anúncio (ex: Adsterra, Google AdSense). O banner será exibido automaticamente na tela de Apostas e acima dos Saques 24h na Home.
-              </p>
-              <button
-                onClick={handleSaveAdScript}
-                disabled={savingAdScript}
-                style={{
-                  marginTop: 14, padding: "11px 20px", borderRadius: 12, border: "none",
-                  background: adBannerScript.trim() ? "linear-gradient(135deg, #18181b, #71717a)" : "var(--gz-bg-subtle)",
-                  color: adBannerScript.trim() ? "#000" : "var(--gz-text-tertiary)",
-                  fontWeight: 700, fontSize: 13,
-                  display: "flex", alignItems: "center", gap: 8,
-                  cursor: adBannerScript.trim() && !savingAdScript ? "pointer" : "default",
-                  fontFamily: "inherit",
-                }}
+          {/* ═══ CREDENCIAIS ═══ */}
+          <div id="sec-credenciais" className="space-y-5 scroll-mt-24">
+            <Card title="Credenciais de Acesso" description="E-mail e palavra-passe do administrador" icon={Mail}>
+              <div className="flex flex-col gap-5">
+                <Field label="E-mail Atual" hint="Necessário para identificar a conta nos campos abaixo.">
+                  <TextInput icon={Mail} iconColor="#0ea5e9" type="email" value={adminEmail}
+                    onChange={setAdminEmail} placeholder="teu@email-atual.com" accent="rgba(14,165,233,0.25)" />
+                </Field>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <Field label="Alterar E-mail do Admin">
+                    <div className="flex gap-2">
+                      <div className="flex-1 min-w-0">
+                        <TextInput icon={Mail} type="email" value={newEmail} onChange={setNewEmail} placeholder="novo@email.com" />
+                      </div>
+                      <SaveBtn onClick={handleChangeEmail} disabled={!newEmail.trim()} saving={savingEmail} />
+                    </div>
+                  </Field>
+
+                  <Field label="Alterar Palavra-Passe do Admin">
+                    <div className="flex gap-2">
+                      <div className="flex-1 min-w-0">
+                        <TextInput icon={Key} type={showPw ? "text" : "password"} value={newPw}
+                          onChange={setNewPw} placeholder="Mín. 8 caracteres"
+                          trailing={<EyeBtn shown={showPw} onToggle={() => setShowPw(v => !v)} />} />
+                      </div>
+                      <SaveBtn onClick={handleChangePw} disabled={newPw.length < 8} saving={savingPw} />
+                    </div>
+                  </Field>
+                </div>
+              </div>
+            </Card>
+
+            <Card title="Senha da Porta de Segurança" description="Proteção de acesso ao painel admin" icon={Lock}>
+              <div className="flex flex-col gap-5">
+                <div className="flex items-center gap-2.5 p-3.5 rounded-xl"
+                  style={{ background: "var(--gz-bg-subtle)", border: "1px solid var(--gz-border-subtle)" }}>
+                  <Shield style={{ width: 14, height: 14, color: "var(--gz-text-secondary)", flexShrink: 0 }} />
+                  <span className="text-[12px]" style={{ color: "var(--gz-text-muted)" }}>
+                    Senha actual: <strong style={{ color: "var(--gz-text-primary)", fontFamily: "monospace" }}>
+                      {currentSecPw ? "●".repeat(currentSecPw.length) : "..."}
+                    </strong>
+                  </span>
+                </div>
+                <Field label="Nova Senha de Segurança" hint="Altera imediatamente — a nova senha é exigida no próximo acesso ao painel.">
+                  <div className="flex gap-2">
+                    <div className="flex-1 min-w-0">
+                      <TextInput icon={Lock} type={showSecPw ? "text" : "password"} value={secPw}
+                        onChange={setSecPw} placeholder="Mín. 6 caracteres"
+                        trailing={<EyeBtn shown={showSecPw} onToggle={() => setShowSecPw(v => !v)} />} />
+                    </div>
+                    <SaveBtn onClick={handleSaveSecPw} disabled={secPw.length < 6} saving={savingSecPw} />
+                  </div>
+                </Field>
+              </div>
+            </Card>
+          </div>
+
+          {/* ═══ APARÊNCIA ═══ */}
+          <div id="sec-aparencia" className="space-y-5 scroll-mt-24">
+            <Card title="Rodapé & App" description="Contactos e links exibidos na aplicação" icon={LayoutTemplate}>
+              <div className="flex flex-col gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <Field label="Tagline do Rodapé">
+                    <TextInput icon={LayoutTemplate} value={footerTagline} onChange={setFooterTagline} placeholder="Ex: Joga. Aposta. Vence." />
+                  </Field>
+                  <Field label="Telefone de Contacto">
+                    <TextInput icon={Phone} value={footerPhone} onChange={setFooterPhone} placeholder="Ex: +258 84 000 0000" />
+                  </Field>
+                  <Field label="E-mail de Contacto">
+                    <TextInput icon={Mail} type="email" value={footerEmail} onChange={setFooterEmail} placeholder="Ex: suporte@mozbet.co.mz" />
+                  </Field>
+                  <Field label="Link de Download da App" hint={<>URL do botão "Descarregar App" no rodapé da página inicial.</>}>
+                    <TextInput icon={Link2} type="url" value={footerAppUrl} onChange={setFooterAppUrl} placeholder="https://play.google.com/..." />
+                  </Field>
+                  <Field label="Link do Grupo do WhatsApp" hint={<>URL do botão "Grupo do WhatsApp" no menu de jogos.</>}>
+                    <TextInput icon={Link2} iconColor="#25d366" type="url" value={whatsappGroupUrl}
+                      onChange={setWhatsappGroupUrl} placeholder="https://chat.whatsapp.com/..." accent="rgba(37,211,102,0.25)" />
+                  </Field>
+                  <Field label="WhatsApp — Comprar Recargas"
+                    hint={<>Número (258XXXXXXXXX) ou link wa.me — destino do botão "Comprar Recarga".</>}>
+                    <TextInput icon={Phone} iconColor="#25d366" value={rechargeWhatsapp}
+                      onChange={setRechargeWhatsapp} placeholder="25884xxxxxxx" accent="rgba(37,211,102,0.25)" />
+                  </Field>
+                </div>
+                <div>
+                  <SaveBtn onClick={handleSaveFooter} saving={savingFooter} label="Guardar Rodapé" />
+                </div>
+              </div>
+            </Card>
+
+            <Card title="Banner de Anúncios" description="Script exibido na tela de Apostas e na Home" icon={LayoutTemplate}>
+              <Field
+                label="Script do Anúncio"
+                hint={<>Cola aqui o script completo (ex: Adsterra, Google AdSense). O banner é exibido automaticamente na tela de Apostas e acima dos Saques 24h na Home.</>}
               >
-                {savingAdScript ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(0,0,0,0.2)", borderTopColor: "#000", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-                Guardar Script de Anúncio
-              </button>
-            </div>
-          </SectionCard>
-        </div>
-
-        {/* Debito Pay Gateway */}
-        <DebitoPaySection />
-
-        {/* Security Gate Password */}
-        <SectionCard title="Senha da Porta de Segurança" icon={Lock} color="#3f3f46" bg="rgba(255,255,255,0.1)">
-          <div style={{ paddingTop: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "rgba(0,0,0,0.05)", border: "1px solid rgba(0,0,0,0.1)", marginBottom: 16 }}>
-              <Shield style={{ width: 14, height: 14, color: "#18181b", flexShrink: 0 }} />
-              <span style={{ fontSize: 12, color: "var(--gz-text-muted)" }}>
-                Senha actual: <strong style={{ color: "var(--gz-text-primary)", fontFamily: "monospace" }}>{currentSecPw ? "●".repeat(currentSecPw.length) : "..."}</strong>
-              </span>
-            </div>
-
-            <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-              Nova Senha de Segurança
-            </label>
-            <div style={{ display: "flex", gap: 8 }}>
-              <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,0.1)" }}>
-                <Lock style={{ width: 14, height: 14, color: "var(--gz-text-tertiary)", flexShrink: 0 }} />
-                <input
-                  type={showSecPw ? "text" : "password"}
-                  value={secPw}
-                  onChange={e => setSecPw(e.target.value)}
-                  placeholder="Nova senha (mín. 6 chars)"
-                  style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "inherit" }}
+                <textarea
+                  value={adBannerScript}
+                  onChange={e => setAdBannerScript(e.target.value)}
+                  placeholder={`<script>\n  atOptions = { 'key': '...', 'format': 'iframe', 'height': 50, 'width': 320 };\n</script>\n<script src="https://...invoke.js"></script>`}
+                  rows={6}
+                  style={textareaStyle}
                 />
-                <button onClick={() => setShowSecPw(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gz-text-tertiary)", padding: 0 }}>
-                  {showSecPw ? <EyeOff style={{ width: 13, height: 13 }} /> : <Eye style={{ width: 13, height: 13 }} />}
-                </button>
+              </Field>
+              <div className="mt-4">
+                <SaveBtn onClick={handleSaveAdScript} disabled={!adBannerScript.trim()} saving={savingAdScript} label="Guardar Script de Anúncio" />
               </div>
-              <button
-                onClick={handleSaveSecPw}
-                disabled={secPw.length < 6 || savingSecPw}
-                style={{
-                  padding: "10px 14px", borderRadius: 12, border: "none", cursor: secPw.length >= 6 ? "pointer" : "default",
-                  background: secPw.length >= 6 ? "linear-gradient(135deg, #3f3f46, #18181b)" : "var(--gz-bg-subtle)",
-                  color: secPw.length >= 6 ? "#fff" : "var(--gz-text-tertiary)",
-                  fontWeight: 600, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit",
-                }}
-              >
-                {savingSecPw ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-              </button>
-            </div>
-            <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 8 }}>
-              ⚠️ Altera imediatamente — a nova senha é exigida no próximo acesso ao painel.
-            </p>
+            </Card>
           </div>
-        </SectionCard>
 
-        {/* Version Control */}
-        <SectionCard title="Controlo de Versão" icon={Tag} color="#6366F1" bg="rgba(99,102,241,0.1)">
-          <div style={{ paddingTop: 12, display: "flex", flexDirection: "column", gap: 16 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                Versão da Aplicação
-              </label>
-              <div style={{ display: "flex", gap: 8 }}>
-                <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 12, background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(99,102,241,0.2)" }}>
-                  <Tag style={{ width: 14, height: 14, color: "#6366F1", flexShrink: 0 }} />
-                  <input type="text" value={appVersion} onChange={e => setAppVersion(e.target.value)}
-                    placeholder="1.0.0"
-                    style={{ flex: 1, background: "none", border: "none", outline: "none", fontSize: 13, color: "var(--gz-text-primary)", fontFamily: "monospace" }} />
+          {/* ═══ CONTEÚDO ═══ */}
+          <div id="sec-conteudo" className="space-y-5 scroll-mt-24">
+            <Card title="Termos de Serviço" description="Conteúdo exibido em /termos" icon={FileText}>
+              <Field label="Conteúdo (texto ou Markdown)" hint={<>Exibido na página <strong>/termos</strong>. Suporta Markdown básico.</>}>
+                <textarea value={termsContent} onChange={e => setTermsContent(e.target.value)}
+                  placeholder={"# Termos de Serviço\n\n**1. Aceitação dos Termos**\nAo aceder à plataforma MOZBET...\n\n**2. Elegibilidade**\nTens de ter 18 anos ou mais..."}
+                  rows={12} style={textareaStyle} />
+              </Field>
+              <div className="mt-4">
+                <SaveBtn onClick={handleSaveTerms} disabled={!termsContent.trim()} saving={savingTerms} label="Guardar Termos de Serviço" />
+              </div>
+            </Card>
+
+            <Card title="Política de Privacidade" description="Conteúdo exibido em /privacidade" icon={BookOpen}>
+              <Field label="Conteúdo (texto ou Markdown)" hint={<>Exibido na página <strong>/privacidade</strong>. Suporta Markdown básico.</>}>
+                <textarea value={privacyContent} onChange={e => setPrivacyContent(e.target.value)}
+                  placeholder={"# Política de Privacidade\n\n**Última actualização:** Junho 2025\n\n**1. Dados Recolhidos**\nRecolhemos os seguintes dados..."}
+                  rows={12} style={textareaStyle} />
+              </Field>
+              <div className="mt-4">
+                <SaveBtn onClick={handleSavePrivacy} disabled={!privacyContent.trim()} saving={savingPrivacy} label="Guardar Política de Privacidade" />
+              </div>
+            </Card>
+          </div>
+
+          {/* ═══ SISTEMA ═══ */}
+          <div id="sec-sistema" className="space-y-5 scroll-mt-24">
+            <Card title="Banco de Dados" description="Backups, cache e registos" icon={Database}>
+              <SettingRow label="Backup Automático" description="Backup diário do banco de dados">
+                <FunctionalToggle settingKey="backup_auto" value={settings.backup_auto ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+              </SettingRow>
+              <SettingRow label="Cache de Consultas" description="Habilitar cache de consultas SQL">
+                <FunctionalToggle settingKey="query_cache" value={settings.query_cache ?? true} onChange={handleToggle} loading={updateSetting.isPending} />
+              </SettingRow>
+              <SettingRow label="Logs de Query" description="Registrar todas as queries do sistema">
+                <FunctionalToggle settingKey="query_logs" value={settings.query_logs ?? false} onChange={handleToggle} loading={updateSetting.isPending} />
+              </SettingRow>
+            </Card>
+
+            <Card title="Controlo de Versão" description="Versão publicada da aplicação" icon={Tag}>
+              <Field label="Versão da Aplicação"
+                hint={<>Exibida nas Definições do utilizador e no rodapé do admin. Formato <code style={{ fontFamily: "monospace" }}>MAJOR.MINOR.PATCH</code>.</>}>
+                <div className="flex gap-2">
+                  <div className="flex-1 min-w-0">
+                    <TextInput icon={Tag} iconColor="#6366F1" value={appVersion} onChange={setAppVersion}
+                      placeholder="1.0.0" monospace accent="rgba(99,102,241,0.2)" />
+                  </div>
+                  <SaveBtn onClick={handleSaveVersion} disabled={!appVersion.trim()} saving={savingVersion} />
                 </div>
-                <button onClick={handleSaveVersion} disabled={!appVersion.trim() || savingVersion}
-                  style={{ padding: "10px 14px", borderRadius: 12, border: "none",
-                    cursor: appVersion.trim() && !savingVersion ? "pointer" : "default",
-                    background: appVersion.trim() ? "#18181b" : "var(--gz-bg-subtle)",
-                    color: appVersion.trim() ? "#fff" : "var(--gz-text-tertiary)",
-                    fontWeight: 700, fontSize: 12, display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-                  {savingVersion ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-                </button>
+              </Field>
+            </Card>
+          </div>
+
+          {/* ── Footer info ── */}
+          <div className="rounded-2xl px-5 py-4 flex items-center justify-between flex-wrap gap-3"
+            style={{ background: "#0a0a0a" }}>
+            <div className="flex items-center gap-3">
+              <div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Wrench style={{ width: 17, height: 17, color: "#a1a1aa" }} />
               </div>
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6 }}>
-                Versão exibida nas Definições do utilizador e no rodapé do admin. Use o formato <code style={{ fontFamily: "monospace" }}>MAJOR.MINOR.PATCH</code>.
-              </p>
+              <div>
+                <div className="font-bold text-[13.5px] text-white">MOZBET Admin</div>
+                <div className="text-[11px]" style={{ color: "rgba(255,255,255,0.4)" }}>Plataforma de jogos com apostas em tempo real</div>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              {[
+                { label: "API", status: "Online", color: "#34d399" },
+                { label: "DB", status: "Conectado", color: "#34d399" },
+                { label: "IA", status: settings.support_ai_mode ? "Activa" : "Desligada", color: settings.support_ai_mode ? "#0ea5e9" : "#6b7280" },
+              ].map(item => (
+                <div key={item.label} className="flex items-center gap-1.5">
+                  <span className="text-[10px] uppercase tracking-wide" style={{ color: "rgba(255,255,255,0.35)" }}>{item.label}</span>
+                  <span className="text-[10px] font-bold" style={{ color: item.color }}>{item.status}</span>
+                </div>
+              ))}
             </div>
           </div>
-        </SectionCard>
-
-        {/* Terms of Service Editor */}
-        <div style={{ gridColumn: "1 / -1" }}>
-          <SectionCard title="Termos de Serviço" icon={FileText} color="#0ea5e9" bg="rgba(14,165,233,0.1)">
-            <div style={{ paddingTop: 12 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                Conteúdo dos Termos de Serviço (texto ou Markdown)
-              </label>
-              <textarea value={termsContent} onChange={e => setTermsContent(e.target.value)}
-                placeholder={"# Termos de Serviço\n\n**1. Aceitação dos Termos**\nAo aceder à plataforma WinMoz...\n\n**2. Elegibilidade**\nTens de ter 18 anos ou mais..."}
-                rows={12}
-                style={{ width: "100%", background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(14,165,233,0.25)",
-                  borderRadius: 12, padding: "12px 14px", resize: "vertical", outline: "none",
-                  fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace",
-                  lineHeight: 1.6, boxSizing: "border-box" }} />
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
-                O conteúdo é exibido na página <strong>/termos</strong>. Suporta Markdown básico (**negrito**, # título, • listas).
-              </p>
-              <button onClick={handleSaveTerms} disabled={savingTerms}
-                style={{ marginTop: 12, padding: "11px 20px", borderRadius: 12, border: "none",
-                  background: termsContent.trim() ? "#18181b" : "var(--gz-bg-subtle)",
-                  color: termsContent.trim() ? "#fff" : "var(--gz-text-tertiary)", fontWeight: 700, fontSize: 13,
-                  display: "flex", alignItems: "center", gap: 8, cursor: termsContent.trim() && !savingTerms ? "pointer" : "default", fontFamily: "inherit" }}>
-                {savingTerms ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-                Guardar Termos de Serviço
-              </button>
-            </div>
-          </SectionCard>
-        </div>
-
-        {/* Privacy Policy Editor */}
-        <div style={{ gridColumn: "1 / -1" }}>
-          <SectionCard title="Política de Privacidade" icon={BookOpen} color="#18181b" bg="rgba(0,0,0,0.1)">
-            <div style={{ paddingTop: 12 }}>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "var(--gz-text-secondary)", display: "block", marginBottom: 8, letterSpacing: "0.3px" }}>
-                Conteúdo da Política de Privacidade (texto ou Markdown)
-              </label>
-              <textarea value={privacyContent} onChange={e => setPrivacyContent(e.target.value)}
-                placeholder={"# Política de Privacidade\n\n**Última actualização:** Junho 2025\n\n**1. Dados Recolhidos**\nRecolhemos os seguintes dados..."}
-                rows={12}
-                style={{ width: "100%", background: "var(--gz-bg-subtle)", border: "1.5px solid rgba(0,0,0,0.25)",
-                  borderRadius: 12, padding: "12px 14px", resize: "vertical", outline: "none",
-                  fontSize: 12, color: "var(--gz-text-primary)", fontFamily: "monospace",
-                  lineHeight: 1.6, boxSizing: "border-box" }} />
-              <p style={{ fontSize: 11, color: "var(--gz-text-tertiary)", marginTop: 6, lineHeight: 1.5 }}>
-                O conteúdo é exibido na página <strong>/privacidade</strong>. Suporta Markdown básico.
-              </p>
-              <button onClick={handleSavePrivacy} disabled={savingPrivacy}
-                style={{ marginTop: 12, padding: "11px 20px", borderRadius: 12, border: "none",
-                  background: privacyContent.trim() ? "#18181b" : "var(--gz-bg-subtle)",
-                  color: privacyContent.trim() ? "#fff" : "var(--gz-text-tertiary)", fontWeight: 700, fontSize: 13,
-                  display: "flex", alignItems: "center", gap: 8, cursor: privacyContent.trim() && !savingPrivacy ? "pointer" : "default", fontFamily: "inherit" }}>
-                {savingPrivacy ? <div style={{ width: 14, height: 14, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", animation: "spin 0.8s linear infinite" }} /> : <Save style={{ width: 14, height: 14 }} />}
-                Guardar Política de Privacidade
-              </button>
-            </div>
-          </SectionCard>
-        </div>
-
-      </div>
-
-      {/* Footer info */}
-      <div style={{
-        marginTop: 24, borderRadius: 20, padding: "20px 24px",
-        background: "#0a0a0a",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        flexWrap: "wrap", gap: 12,
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 12, background: "rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <Wrench style={{ width: 17, height: 17, color: "#71717a" }} />
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>MOZBET Admin v1.0</div>
-            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)" }}>Plataforma de jogos com apostas em tempo real</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 16 }}>
-          {[
-            { label: "API", status: "Online", color: "#34d399" },
-            { label: "DB", status: "Conectado", color: "#34d399" },
-            { label: "IA", status: settings.support_ai_mode ? "Activa" : "Desligada", color: settings.support_ai_mode ? "#0ea5e9" : "#6b7280" },
-          ].map(item => (
-            <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, textAlign: "center" }}>
-              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{item.label}</span>
-              <span style={{ fontSize: 10, color: item.color, fontWeight: 700 }}>{item.status}</span>
-            </div>
-          ))}
         </div>
       </div>
 
