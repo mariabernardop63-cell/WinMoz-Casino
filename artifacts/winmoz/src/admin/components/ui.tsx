@@ -1,10 +1,67 @@
 import React from "react";
 import { RefreshCw } from "lucide-react";
+import { motion } from "framer-motion";
 
 /* ══════════════════════════════════════════════════════════════
    Shared admin UI primitives — consistent across all admin pages.
    Everything uses --gz-* tokens so light/dark mode just works.
 ══════════════════════════════════════════════════════════════ */
+
+/* ── Rolling odometer digit ──
+   Each digit is a vertical strip 0–9; only the digits that actually
+   change roll. Digits that stay the same never move, so 200 → 201
+   keeps "20" still and just rolls the last "1" into place. Long
+   jumps (100 → 120) sweep quickly through every intermediate value. */
+function RollingDigit({ digit }: { digit: number }) {
+  return (
+    <span
+      className="inline-block overflow-hidden"
+      style={{ height: "1em", width: "0.6em", lineHeight: 1, verticalAlign: "baseline" }}
+    >
+      <motion.span
+        className="flex flex-col items-center"
+        initial={false}
+        animate={{ y: `${-digit * 10}%` }}
+        transition={{ type: "spring", stiffness: 260, damping: 30, mass: 0.6, restDelta: 0.001 }}
+        style={{ height: "10em", willChange: "transform" }}
+      >
+        {Array.from({ length: 10 }, (_, i) => (
+          <span key={i} style={{ height: "1em", lineHeight: 1 }}>{i}</span>
+        ))}
+      </motion.span>
+    </span>
+  );
+}
+
+export function RollingNumber({
+  value, decimals = 0, prefix, suffix, className = "", style,
+}: {
+  value: number; decimals?: number; prefix?: string; suffix?: string;
+  className?: string; style?: React.CSSProperties;
+}) {
+  const safe = Number.isFinite(value) ? value : 0;
+  const formatted = safe.toLocaleString("pt-BR", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  const chars = formatted.split("");
+  const len = chars.length;
+  return (
+    <span className={`inline-flex items-baseline tabular-nums ${className}`} style={style}>
+      {prefix && <span style={{ marginRight: "0.26em" }}>{prefix}</span>}
+      {chars.map((ch, i) => {
+        const key = `k${len - 1 - i}`;
+        if (ch >= "0" && ch <= "9") return <RollingDigit key={key} digit={Number(ch)} />;
+        return (
+          <span key={key} style={{ display: "inline-block", minWidth: "0.3em", textAlign: "center" }}>
+            {ch}
+          </span>
+        );
+      })}
+      {suffix && <span style={{ marginLeft: "0.26em" }}>{suffix}</span>}
+    </span>
+  );
+}
 
 export function SectionHeader({
   icon: Icon, title, subtitle, action,

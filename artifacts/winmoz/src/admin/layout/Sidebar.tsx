@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRef, useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAdminTheme } from "@/admin/contexts/AdminThemeContext";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -102,41 +103,67 @@ function Tooltip({ label }: { label: string }) {
 }
 
 function NavButton({ item, active, onClick }: { item: { href: string; icon: LucideIcon; label: string }; active: boolean; onClick?: () => void }) {
+  const [hovered, setHovered] = useState(false);
   return (
     <Link href={item.href} className="w-full flex-shrink-0" onClick={onClick}>
-      <div
+      <motion.div
+        onHoverStart={() => setHovered(true)}
+        onHoverEnd={() => setHovered(false)}
         className={cn(
-          "gz-nav-item w-full h-[40px] flex items-center justify-center cursor-pointer group",
+          "gz-nav-item relative w-full h-[40px] flex items-center justify-center cursor-pointer group",
           active ? "active" : ""
         )}
         title={item.label}
+        whileHover={{ scale: active ? 1 : 1.06 }}
+        whileTap={{ scale: 0.94 }}
+        animate={{ scale: active ? 1.04 : 1 }}
+        transition={{ type: "spring", stiffness: 420, damping: 26 }}
       >
-        {active && (
-          <span
+        <AnimatePresence>
+          {active && (
+            <motion.span
+              layoutId="gz-nav-active"
+              initial={{ opacity: 0, scaleY: 0.4 }}
+              animate={{ opacity: 1, scaleY: 1 }}
+              exit={{ opacity: 0, scaleY: 0.4 }}
+              transition={{ type: "spring", stiffness: 500, damping: 34 }}
+              style={{
+                position: "absolute",
+                left: -10,
+                top: "50%",
+                y: "-50%",
+                width: 3,
+                height: 18,
+                borderRadius: "0 3px 3px 0",
+                background: "#fafafa",
+              }}
+            />
+          )}
+        </AnimatePresence>
+        <motion.span
+          aria-hidden
+          className="absolute inset-0 rounded-xl pointer-events-none"
+          initial={false}
+          animate={{ opacity: active ? 0 : hovered ? 1 : 0 }}
+          transition={{ duration: 0.2 }}
+          style={{ background: "rgba(255,255,255,.07)" }}
+        />
+        <motion.div
+          animate={{ rotate: hovered && !active ? -6 : 0, scale: active ? 1.05 : 1 }}
+          transition={{ type: "spring", stiffness: 400, damping: 20 }}
+          style={{ position: "relative", zIndex: 1 }}
+        >
+          <item.icon
             style={{
-              position: "absolute",
-              left: -10,
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: 3,
-              height: 18,
-              borderRadius: "0 3px 3px 0",
-              background: "#fafafa",
+              width: 17,
+              height: 17,
+              strokeWidth: active ? 2 : 1.6,
+              color: active ? "#0a0a0a" : "rgba(255,255,255,.55)",
             }}
           />
-        )}
-        <item.icon
-          style={{
-            width: 17,
-            height: 17,
-            strokeWidth: active ? 2 : 1.6,
-            color: active ? "#0a0a0a" : "rgba(255,255,255,.55)",
-            position: "relative",
-            zIndex: 1,
-          }}
-        />
+        </motion.div>
         <Tooltip label={item.label} />
-      </div>
+      </motion.div>
     </Link>
   );
 }

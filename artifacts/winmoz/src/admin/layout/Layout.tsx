@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "./Sidebar";
 import {
   LayoutDashboard, Landmark, InboxIcon, Bell, Settings,
@@ -155,6 +156,7 @@ function MobileTopBar() {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   useAudioWarmup();
   useWithdrawalNotification();
+  const [location] = useLocation();
 
   return (
     <div style={{ minHeight: "100vh" }}>
@@ -175,7 +177,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           style={{ flex: 1, overflowX: "hidden", paddingBottom: "calc(70px + env(safe-area-inset-bottom, 0px))" }}
           className="lg:pb-0"
         >
-          {children}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
       <MobileBottomNav />

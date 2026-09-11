@@ -9,6 +9,7 @@ import {
   resetSaidas,
 } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
+import { motion, useScroll, useMotionValueEvent, AnimatePresence } from "framer-motion";
 import {
   AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -20,14 +21,8 @@ import {
   Gamepad2, ArrowUpRight, ArrowDownLeft, ArrowLeftRight,
   Wallet, TrendingUp, Activity, RefreshCw, ChevronRight,
 } from "lucide-react";
-import { useMemo } from "react";
-
-function getMozambiqueGreeting(): string {
-  const mozHour = (new Date().getUTCHours() + 2) % 24;
-  if (mozHour < 12) return "Bom dia";
-  if (mozHour < 18) return "Boa tarde";
-  return "Boa noite";
-}
+import { useRef, useState } from "react";
+import { RollingNumber } from "@/admin/components/ui";
 
 const V1 = "#18181b";
 const V2 = "#71717a";
@@ -70,8 +65,8 @@ function Avatar({ seed, size = 32 }: { seed: string; size?: number }) {
         width: size, height: size,
         borderRadius: "50%",
         flexShrink: 0,
-        background: "white",
-        border: "1.5px solid rgba(0,0,0,.14)",
+        background: "var(--gz-bg-subtle)",
+        border: "1.5px solid var(--gz-border-subtle)",
       }}
     />
   );
@@ -105,13 +100,29 @@ function SectionHeader({
 }
 
 function KpiTile({
-  label, value, icon: Icon, accent, badge, badgeVariant = "purple", hint, onReset,
+  label, value, icon: Icon, accent, badge, badgeVariant = "purple", hint, onReset, decimals, prefix, compact,
 }: {
-  label: string; value: string;
+  label: string; value: number;
   icon: React.ElementType; accent?: string;
   badge?: string; badgeVariant?: "live" | "purple" | "warn" | "danger";
-  hint?: string; onReset?: () => void;
+  hint?: string; onReset?: () => void; decimals?: number; prefix?: string; compact?: boolean;
 }) {
+  if (compact) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-0.5 px-2 py-2 text-center" style={{ background: "var(--gz-bg-card-btn)" }}>
+        <span className="text-[9px] font-bold uppercase tracking-[0.05em] truncate w-full" style={{ color: "var(--gz-text-tertiary)" }}>
+          {label}
+        </span>
+        <RollingNumber
+          value={value}
+          decimals={decimals}
+          prefix={prefix}
+          className="text-[14px] font-black tracking-[-0.02em]"
+          style={{ color: "var(--gz-text-primary)" }}
+        />
+      </div>
+    );
+  }
   return (
     <div className="relative px-5 py-4 group" style={{ background: "var(--gz-bg-card-btn)" }}>
       <div className="flex items-center justify-between mb-3">
@@ -143,12 +154,13 @@ function KpiTile({
           </button>
         )}
       </div>
-      <div
-        className="text-[21px] font-black tracking-[-0.03em] tabular-nums truncate"
+      <RollingNumber
+        value={value}
+        decimals={decimals}
+        prefix={prefix}
+        className="text-[21px] font-black tracking-[-0.03em]"
         style={{ color: "var(--gz-text-primary)" }}
-      >
-        {value}
-      </div>
+      />
       {(badge || hint) && (
         <div className="flex items-center gap-2 mt-2 min-h-[18px]">
           {badge && <NeonBadge variant={badgeVariant}>{badge}</NeonBadge>}
@@ -296,8 +308,6 @@ export default function Dashboard() {
   useAdminRealtimeSync();
   const queryClient = useQueryClient();
 
-  const greeting = useMemo(() => getMozambiqueGreeting(), []);
-
   async function handleResetRevenue() {
     if (!window.confirm("Tens a certeza? O Saldo Disponível será reposto a MT 0,00 no banco de dados. Esta acção não apaga os dados históricos.")) return;
     try {
@@ -334,6 +344,10 @@ export default function Dashboard() {
 
   const platformRevenue          = stats?.platformRevenue ?? 0;
   const totalApprovedWithdrawals = stats?.totalApprovedWithdrawals ?? 0;
+  const onlinePlayers            = stats?.onlinePlayers ?? 0;
+  const activeBets               = stats?.activeBets ?? 0;
+  const pendingWithdrawals       = stats?.pendingWithdrawals ?? 0;
+  const totalPlayers             = (stats as { totalPlayers?: number } | undefined)?.totalPlayers ?? 0;
 
   const damaM   = breakdown?.damaMatches ?? 0;
   const ludoM   = breakdown?.ludoMatches ?? 0;
@@ -341,64 +355,23 @@ export default function Dashboard() {
   const roletaM = Math.floor(ludoM * 0.4);
   const totalM  = damaM + ludoM + xadrezM + roletaM;
 
-  const mt = (n: number) => `MT ${n.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-
   const kpis = [
-    {
-      label: "Saldo Disponível",
-      value: mt(platformRevenue),
-      icon: Wallet,
-      accent: "#15803d",
-      hint: "Lucro da plataforma",
-      onReset: handleResetRevenue,
-    },
-    {
-      label: "Saídas",
-      value: mt(totalApprovedWithdrawals),
-      icon: ArrowDownLeft,
-      accent: "#b91c1c",
-      hint: "Levantamentos aprovados",
-      onReset: handleResetSaidas,
-    },
-    {
-      label: "Jogadores Online",
-      value: String(stats?.onlinePlayers ?? 0),
-      icon: Users,
-      accent: "#2563eb",
-      badge: "ativos",
-      badgeVariant: "live" as const,
-    },
-    {
-      label: "Apostas Ativas",
-      value: String(stats?.activeBets ?? 0),
-      icon: Coins,
-      accent: "#a16207",
-      badge: "pendente",
-      badgeVariant: "warn" as const,
-    },
-    {
-      label: "Saques Pendentes",
-      value: String(stats?.pendingWithdrawals ?? 0),
-      icon: Landmark,
-      accent: "#7c3aed",
-      badge: `${stats?.pendingWithdrawals ?? 0} aguard.`,
-      badgeVariant: "warn" as const,
-    },
-    {
-      label: "Utilizadores Registados",
-      value: String((stats as { totalPlayers?: number } | undefined)?.totalPlayers ?? 0),
-      icon: Users,
-      accent: "#0f766e",
-      badge: "total",
-      badgeVariant: "purple" as const,
-    },
+    { label: "Saldo Disponível",      value: platformRevenue,          icon: Wallet,        accent: "#15803d", hint: "Lucro da plataforma",      decimals: 2, prefix: "MT", onReset: handleResetRevenue },
+    { label: "Saídas",                value: totalApprovedWithdrawals, icon: ArrowDownLeft, accent: "#b91c1c", hint: "Levantamentos aprovados",  decimals: 2, prefix: "MT", onReset: handleResetSaidas },
+    { label: "Jogadores Online",      value: onlinePlayers,            icon: Users,         accent: "#2563eb", badge: "ativos",   badgeVariant: "live" as const },
+    { label: "Apostas Ativas",        value: activeBets,               icon: Coins,         accent: "#a16207", badge: "pendente", badgeVariant: "warn" as const },
+    { label: "Saques Pendentes",      value: pendingWithdrawals,       icon: Landmark,      accent: "#7c3aed", badge: "aguard.",  badgeVariant: "warn" as const },
+    { label: "Utilizadores Registados", value: totalPlayers,           icon: Users,         accent: "#0f766e", badge: "total",    badgeVariant: "purple" as const },
   ];
 
+  const mt = (n: number) => `MT ${n.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+  void mt;
+
   const dailyStats = [
-    { label: "Ganho hoje",      value: mt(stats?.todayEarnings ?? 0), icon: TrendingUp,     color: "#059669" },
-    { label: "Transações",      value: String(stats?.todayTransactions ?? 0), icon: ArrowLeftRight, color: V1 },
-    { label: "Usuários Online", value: String(stats?.onlinePlayers ?? 0), icon: Users,         color: "#52525b" },
-    { label: "Saídas",          value: mt(stats?.todaySaidas ?? 0), icon: ArrowDownLeft,      color: "#b91c1c" },
+    { label: "Ganho hoje",      value: stats?.todayEarnings ?? 0,        icon: TrendingUp,     color: "#059669", money: true },
+    { label: "Transações",      value: stats?.todayTransactions ?? 0,    icon: ArrowLeftRight, color: V1,        money: false },
+    { label: "Usuários Online", value: onlinePlayers,                    icon: Users,          color: "#52525b", money: false },
+    { label: "Saídas",          value: stats?.todaySaidas ?? 0,          icon: ArrowDownLeft,  color: "#b91c1c", money: true },
   ];
 
   const games = [
@@ -408,63 +381,110 @@ export default function Dashboard() {
     { label: "Roleta da Sorte", matches: roletaM, color: V4 },
   ];
 
+  /* ── Collapse-on-scroll behaviour ── */
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const { scrollY } = useScroll();
+  const [collapsed, setCollapsed] = useState(false);
+  useMotionValueEvent(scrollY, "change", (y) => {
+    const prev = scrollY.getPrevious() ?? 0;
+    if (y > 130 && y > prev) setCollapsed(true);
+    else if (y < prev - 4 || y <= 90) setCollapsed(false);
+  });
+
   return (
     <div className="px-4 sm:px-5 pb-8 pt-5 max-w-[1600px] mx-auto">
 
       {/* ═══════════ PAGE HEADER ═══════════ */}
-      <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
-        <div>
-          <h1
-            className="text-[26px] font-black tracking-[-0.035em] leading-tight"
-            style={{ color: "var(--gz-text-primary)" }}
+      <AnimatePresence>
+        {!collapsed && (
+          <motion.div
+            initial={{ opacity: 1, height: "auto" }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+            transition={{ duration: 0.32, ease: [0.4, 0, 0.2, 1] }}
+            className="overflow-hidden"
           >
-            {greeting}, <span className="gz-gradient-text">Admin</span>
-          </h1>
-          <p className="mt-1 text-[12.5px] font-medium" style={{ color: "var(--gz-text-muted)" }}>
-            Pronto para uma nova aventura épica?
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <LiveDot />
-          <NeonBadge variant="live">dados em tempo real</NeonBadge>
-        </div>
-      </div>
+            <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
+              <div>
+                <h1
+                  className="text-[26px] font-black tracking-[-0.035em] leading-tight"
+                  style={{ color: "var(--gz-text-primary)" }}
+                >
+                  Saudações, <span className="gz-gradient-text">Soberano</span>.
+                </h1>
+                <p className="mt-1 text-[12.5px] font-medium" style={{ color: "var(--gz-text-muted)" }}>
+                  O balanço do tesouro atingiu o ápice. Qual feudo financiaremos hoje?
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <LiveDot />
+                <NeonBadge variant="live">dados em tempo real</NeonBadge>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex flex-col lg:flex-row gap-5">
 
         {/* ═══════════ MAIN COLUMN ═══════════ */}
-        <div className="flex-1 min-w-0 space-y-5">
+        <div ref={scrollRef} className="flex-1 min-w-0 space-y-5">
 
-          {/* ── Unified KPI panel ── */}
-          <section className="gz-card overflow-hidden animate-float-up">
-            <SectionHeader
-              icon={Activity}
-              title="Resumo da Plataforma"
-              action={sLoad ? (
-                <span className="text-[11px] font-semibold" style={{ color: "var(--gz-text-muted)" }}>
-                  A carregar...
-                </span>
-              ) : undefined}
-            />
-            <div
-              className="grid grid-cols-2 md:grid-cols-3 gap-px"
-              style={{ background: "var(--gz-border-subtle)" }}
+          {/* ── Unified KPI panel (collapses + sticks on scroll) ── */}
+          <motion.div
+            layout
+            className="lg:sticky z-30"
+            style={{ top: collapsed ? 8 : 0 }}
+            transition={{ layout: { duration: 0.32, ease: [0.4, 0, 0.2, 1] } }}
+          >
+            <motion.section
+              layout
+              className="gz-card overflow-hidden"
+              animate={{ boxShadow: collapsed ? "0 10px 30px rgba(0,0,0,.14)" : "0 0 0 rgba(0,0,0,0)" }}
+              transition={{ duration: 0.3 }}
             >
-              {kpis.map((k) => (
-                <KpiTile
-                  key={k.label}
-                  label={k.label}
-                  value={k.value}
-                  icon={k.icon}
-                  accent={k.accent}
-                  badge={k.badge}
-                  badgeVariant={k.badgeVariant}
-                  hint={k.hint}
-                  onReset={k.onReset}
+              <motion.div layout>
+                <SectionHeader
+                  icon={Activity}
+                  title="Resumo da Plataforma"
+                  action={
+                    <div className="flex items-center gap-2">
+                      {sLoad && (
+                        <span className="text-[11px] font-semibold" style={{ color: "var(--gz-text-muted)" }}>
+                          A carregar...
+                        </span>
+                      )}
+                      <LiveDot />
+                    </div>
+                  }
                 />
-              ))}
-            </div>
-          </section>
+              </motion.div>
+              <motion.div
+                layout
+                className="grid grid-cols-3 lg:grid-cols-6 gap-px"
+                style={{ background: "var(--gz-border-subtle)" }}
+                transition={{ layout: { duration: 0.32, ease: [0.4, 0, 0.2, 1] } }}
+              >
+                {kpis.map((k) => (
+                  <motion.div layout key={k.label} className="min-w-0">
+                    <KpiTile
+                      label={k.label}
+                      value={k.value}
+                      icon={k.icon}
+                      accent={k.accent}
+                      badge={k.badge}
+                      badgeVariant={k.badgeVariant}
+                      hint={k.hint}
+                      onReset={k.onReset}
+                      decimals={k.decimals}
+                      prefix={k.prefix}
+                      compact={collapsed}
+                    />
+                  </motion.div>
+                ))}
+              </motion.div>
+            </motion.section>
+          </motion.div>
 
           {/* ── Area Chart — Estatística ── */}
           <section className="gz-card overflow-hidden animate-float-up" style={{ animationDelay: "80ms" }}>
@@ -508,10 +528,10 @@ export default function Dashboard() {
                   <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--gz-text-tertiary)", fontWeight: 700 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: "var(--gz-text-tertiary)", fontWeight: 700 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTip />} cursor={{ stroke: "rgba(0,0,0,.1)", strokeWidth: 1 }} />
-                  <Area type="monotoneX" dataKey="dama"   stroke={V1} strokeWidth={2.2} fill={`url(#${GRAD_DAMA})`}   dot={{ r: 3, fill: V1, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: V1, strokeWidth: 2, stroke: "#fff" }} />
-                  <Area type="monotoneX" dataKey="ludo"   stroke={V2} strokeWidth={2}   fill={`url(#${GRAD_LUDO})`}   strokeDasharray="6 3" dot={{ r: 3, fill: V2, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: V2, strokeWidth: 2, stroke: "#fff" }} />
-                  <Area type="monotoneX" dataKey="xadrez" stroke={V3} strokeWidth={2}   fill={`url(#${GRAD_XADREZ})`} strokeDasharray="4 2" dot={{ r: 3, fill: V3, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: V3, strokeWidth: 2, stroke: "#fff" }} />
-                  <Area type="monotoneX" dataKey="roleta" stroke={V4} strokeWidth={2}   fill={`url(#${GRAD_ROLETA})`} strokeDasharray="2 2" dot={{ r: 3, fill: V4, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5, fill: V4, strokeWidth: 2, stroke: "#fff" }} />
+                  <Area type="monotoneX" dataKey="dama"   stroke={V1} strokeWidth={2.2} fill={`url(#${GRAD_DAMA})`}   dot={{ r: 3, fill: V1, strokeWidth: 2, stroke: "var(--gz-bg-card)" }} activeDot={{ r: 5, fill: V1, strokeWidth: 2, stroke: "var(--gz-bg-card)" }} />
+                  <Area type="monotoneX" dataKey="ludo"   stroke={V2} strokeWidth={2}   fill={`url(#${GRAD_LUDO})`}   strokeDasharray="6 3" dot={{ r: 3, fill: V2, strokeWidth: 2, stroke: "var(--gz-bg-card)" }} activeDot={{ r: 5, fill: V2, strokeWidth: 2, stroke: "var(--gz-bg-card)" }} />
+                  <Area type="monotoneX" dataKey="xadrez" stroke={V3} strokeWidth={2}   fill={`url(#${GRAD_XADREZ})`} strokeDasharray="4 2" dot={{ r: 3, fill: V3, strokeWidth: 2, stroke: "var(--gz-bg-card)" }} activeDot={{ r: 5, fill: V3, strokeWidth: 2, stroke: "var(--gz-bg-card)" }} />
+                  <Area type="monotoneX" dataKey="roleta" stroke={V4} strokeWidth={2}   fill={`url(#${GRAD_ROLETA})`} strokeDasharray="2 2" dot={{ r: 3, fill: V4, strokeWidth: 2, stroke: "var(--gz-bg-card)" }} activeDot={{ r: 5, fill: V4, strokeWidth: 2, stroke: "var(--gz-bg-card)" }} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
@@ -592,11 +612,14 @@ export default function Dashboard() {
                         </span>
                       </div>
                     </td>
-                    <td
-                      className="px-5 py-3 text-right text-[13px] font-bold tabular-nums"
-                      style={{ color: "var(--gz-text-primary)" }}
-                    >
-                      {s.value}
+                    <td className="px-5 py-3 text-right">
+                      <RollingNumber
+                        value={s.value}
+                        decimals={s.money ? 2 : 0}
+                        prefix={s.money ? "MT" : undefined}
+                        className="text-[13px] font-bold justify-end"
+                        style={{ color: "var(--gz-text-primary)" }}
+                      />
                     </td>
                   </tr>
                 ))}
@@ -626,13 +649,17 @@ export default function Dashboard() {
                           <span className="text-[12px] font-semibold" style={{ color: "var(--gz-text-secondary)" }}>{g.label}</span>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-right text-[12.5px] font-bold tabular-nums" style={{ color: "var(--gz-text-primary)" }}>
-                        {g.matches}
+                      <td className="px-3 py-3 text-right">
+                        <RollingNumber value={g.matches} className="text-[12.5px] font-bold justify-end" style={{ color: "var(--gz-text-primary)" }} />
                       </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center justify-end gap-2">
                           <div className="gz-progress-track h-1.5 w-10">
-                            <div style={{ width: `${pct}%`, height: "100%", borderRadius: 100, background: g.color, transition: "width 1s ease" }} />
+                            <motion.div
+                              animate={{ width: `${pct}%` }}
+                              transition={{ duration: 0.8, ease: "easeOut" }}
+                              style={{ height: "100%", borderRadius: 100, background: g.color }}
+                            />
                           </div>
                           <span className="text-[11px] font-bold tabular-nums w-8 text-right" style={{ color: "var(--gz-text-muted)" }}>
                             {pct}%
@@ -644,7 +671,9 @@ export default function Dashboard() {
                 })}
                 <tr style={{ borderTop: "1px solid var(--gz-border-subtle)", background: "var(--gz-bg-subtle)" }}>
                   <td className="px-5 py-2.5 text-[11.5px] font-bold uppercase tracking-wide" style={{ color: "var(--gz-text-secondary)" }}>Total</td>
-                  <td className="px-3 py-2.5 text-right text-[12.5px] font-black tabular-nums" style={{ color: "var(--gz-text-primary)" }}>{totalM}</td>
+                  <td className="px-3 py-2.5 text-right">
+                    <RollingNumber value={totalM} className="text-[12.5px] font-black justify-end" style={{ color: "var(--gz-text-primary)" }} />
+                  </td>
                   <td className="px-5 py-2.5 text-right text-[11px] font-bold" style={{ color: "var(--gz-text-muted)" }}>100%</td>
                 </tr>
               </tbody>
@@ -654,7 +683,7 @@ export default function Dashboard() {
           {/* Ações Pendentes */}
           <section className="gz-card overflow-hidden animate-float-up" style={{ animationDelay: "180ms" }}>
             <SectionHeader icon={ClipboardList} title="Ações Pendentes" />
-            <ActionItem icon={Landmark}      title="Aprovar saques"      sub={`${stats?.pendingWithdrawals ?? 0} saques aguardando`} />
+            <ActionItem icon={Landmark}      title="Aprovar saques"      sub={`${pendingWithdrawals} saques aguardando`} />
             <ActionItem icon={ArrowUpRight}  title="Revisar denúncias"   sub={`${stats?.pendingReports ?? 0} denúncias novas`} />
             <ActionItem icon={AlertTriangle} title="Alertas de sistema"  sub="2 alertas críticos activos" />
             <ActionItem icon={ClipboardList} title="Relatório semanal"   sub="Gerar relatório de apostas" done />
