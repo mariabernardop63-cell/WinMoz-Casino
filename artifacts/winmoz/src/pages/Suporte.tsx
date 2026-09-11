@@ -5,7 +5,7 @@ import {
   ArrowLeft, Send, Image as ImageIcon, MoreVertical, CheckCheck,
   Users, Mail, Sparkles,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { BrandMark } from "@/components/BrandLogo";
 
@@ -16,12 +16,25 @@ const SUPPORT_EMAIL    = "support@pokerw.co.mz";
 const WHATSAPP_GROUP   = "https://chat.whatsapp.com/IreRFFLnFSKIEFNzjmKLv2";
 
 /* Chama o endpoint serverless Vercel — a chave da IA (b.ia) fica apenas no
-   servidor, nunca exposta no browser. */
+   servidor, nunca exposta no browser. O endpoint EXIGE autenticação (Bearer
+   token), por isso o pedido inclui sempre a sessão do utilizador. */
 async function callSupportAI(messages: Array<{ role: "user" | "assistant"; content: string }>): Promise<string> {
+  // O backend limita a conversa a 20 mensagens — envia só as últimas 16
+  const trimmed = messages.slice(-16);
+
+  const session = await getSessionWithRefresh();
+  const token = session?.access_token;
+  if (!token) {
+    return `A tua sessão expirou. Entra novamente para continuares o atendimento, ou fala connosco no WhatsApp: ${WHATSAPP_LABEL}.`;
+  }
+
   const res = await fetch("/api/support/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ messages: trimmed }),
   });
 
   const contentType = res.headers.get("content-type") ?? "";
@@ -35,6 +48,9 @@ async function callSupportAI(messages: Array<{ role: "user" | "assistant"; conte
 
   if (!res.ok) {
     console.error("[callSupportAI] Erro da API:", res.status, data);
+    if (res.status === 429) {
+      return "Estás a enviar mensagens muito rápido. Aguarda um momento e tenta novamente 🙂";
+    }
     return `Tive um problema a responder. Tenta novamente ou fala connosco no WhatsApp: ${WHATSAPP_LABEL}.`;
   }
 
