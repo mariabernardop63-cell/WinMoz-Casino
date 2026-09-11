@@ -9,7 +9,7 @@ import {
   resetSaidas,
 } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
-import { motion, useScroll, useMotionValueEvent, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   AreaChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -21,7 +21,6 @@ import {
   Gamepad2, ArrowUpRight, ArrowDownLeft, ArrowLeftRight,
   Wallet, TrendingUp, Activity, RefreshCw, ChevronRight,
 } from "lucide-react";
-import { useRef, useState } from "react";
 import { RollingNumber } from "@/admin/components/ui";
 
 const V1 = "#18181b";
@@ -365,54 +364,34 @@ export default function Dashboard() {
     { label: "Roleta da Sorte", matches: roletaM, color: V4 },
   ];
 
-  /* ── Collapse-on-scroll behaviour ── */
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const { scrollY } = useScroll();
-  const [collapsed, setCollapsed] = useState(false);
-  useMotionValueEvent(scrollY, "change", (y) => {
-    const prev = scrollY.getPrevious() ?? 0;
-    if (y > 130 && y > prev) setCollapsed(true);
-    else if (y < prev - 4 || y <= 90) setCollapsed(false);
-  });
+  /* ── scroll to top on manual scroll is not needed ── */
 
   return (
     <div className="px-4 sm:px-5 pb-8 pt-5 max-w-[1600px] mx-auto">
 
       {/* ═══════════ PAGE HEADER ═══════════ */}
-      <AnimatePresence>
-        {!collapsed && (
-          <motion.div
-            initial={{ opacity: 1, height: "auto" }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-            transition={{ duration: 0.32, ease: [0.4, 0, 0.2, 1] }}
-            className="overflow-hidden"
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
+        <div>
+          <h1
+            className="text-[26px] font-black tracking-[-0.035em] leading-tight"
+            style={{ color: "var(--gz-text-primary)" }}
           >
-            <div className="flex flex-wrap items-end justify-between gap-3 mb-5">
-              <div>
-                <h1
-                  className="text-[26px] font-black tracking-[-0.035em] leading-tight"
-                  style={{ color: "var(--gz-text-primary)" }}
-                >
-                  Saudações, <span className="gz-gradient-text">Soberano</span>.
-                </h1>
-                <p className="mt-1 text-[12.5px] font-medium" style={{ color: "var(--gz-text-muted)" }}>
-                  O balanço do tesouro atingiu o ápice. Qual feudo financiaremos hoje?
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <LiveDot />
-                <NeonBadge variant="live">dados em tempo real</NeonBadge>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            Saudações, <span className="gz-gradient-text">Soberano</span>.
+          </h1>
+          <p className="mt-1 text-[12.5px] font-medium" style={{ color: "var(--gz-text-muted)" }}>
+            O balanço do tesouro atingiu o ápice. Qual feudo financiaremos hoje?
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <LiveDot />
+          <NeonBadge variant="live">dados em tempo real</NeonBadge>
+        </div>
+      </div>
 
       <div className="flex flex-col lg:flex-row gap-5">
 
         {/* ═══════════ MAIN COLUMN ═══════════ */}
-        <div ref={scrollRef} className="flex-1 min-w-0 space-y-5">
+        <div className="flex-1 min-w-0 space-y-5">
 
           {/* ── Unified KPI panel ── */}
           <section className="gz-card overflow-hidden animate-float-up">
