@@ -318,6 +318,7 @@ export default function RechargeManagement() {
               </button>
             </div>
           </div>
+          </div>
         </Card>
       )}
 
@@ -585,6 +586,7 @@ export default function RechargeManagement() {
           Cada uso é processado de forma atómica no servidor (impossível usar a mesma recarga duas vezes, mesmo em simultâneo), um utilizador nunca usa a mesma recarga duas vezes,
           tentativas falhadas são limitadas (anti brute-force) e cada uso fica registado no histórico acima e no extrato do utilizador.
         </div>
+      </div>
       </div>
     </div>
   );

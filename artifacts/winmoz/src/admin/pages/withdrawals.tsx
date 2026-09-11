@@ -157,7 +157,7 @@ export default function Withdrawals() {
             <List style={{ width: 14, height: 14, color: "#6b7280", flexShrink: 0 }} />
             <div className="text-[10px] sm:text-xs uppercase font-medium tracking-wide truncate" style={{ color: "var(--gz-text-muted)" }}>Total</div>
           </div>
-          <div className="text-xl sm:text-2xl font-bold text-gray-700">{list.length}</div>
+          <div className="text-xl sm:text-2xl font-bold" style={{ color: "var(--gz-text-primary)" }}>{list.length}</div>
         </div>
       </div>
 
@@ -169,7 +169,7 @@ export default function Withdrawals() {
               className="flex-shrink-0 px-3 py-1.5 text-xs font-medium rounded-xl transition-colors"
               style={statusFilter === s
                 ? { background: `#18181b`, color: "#fff" }
-                : { background: "#f3f4f6", color: "#6b7280" }}>
+                : { background: "var(--gz-bg-subtle)", color: "var(--gz-text-muted)" }}>
               {s === "all" ? "Todos" : s === "pending" ? "Pendentes" : s === "approved" ? "Aprovados" : "Rejeitados"}
             </button>
           ))}

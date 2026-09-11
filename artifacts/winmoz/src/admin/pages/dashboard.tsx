@@ -172,12 +172,13 @@ function ChartTip({ active, payload, label }: {
   return (
     <div className="animate-float-up"
       style={{
-        background: "#ffffff",
+        background: "var(--gz-bg-card)",
         borderRadius: 14,
         padding: "10px 14px",
-        boxShadow: "0 8px 28px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06)",
+        border: "1px solid var(--gz-border-subtle)",
+        boxShadow: "0 8px 28px rgba(0,0,0,.18)",
       }}>
-      <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: V1 }}>
+      <div className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: "var(--gz-text-primary)" }}>
         {label}
       </div>
       {payload.map(p => (
