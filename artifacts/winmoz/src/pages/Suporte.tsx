@@ -13,7 +13,7 @@ import { BrandMark } from "@/components/BrandLogo";
 const WHATSAPP_SUPPORT = "258835030915";
 const WHATSAPP_LABEL   = "+258 83 503 0915";
 const SUPPORT_EMAIL    = "support@pokerw.co.mz";
-const WHATSAPP_GROUP   = "https://chat.whatsapp.com/IreRFFLnFSKIEFNzjmKLv2e";
+const WHATSAPP_GROUP   = "https://chat.whatsapp.com/IreRFFLnFSKIEFNzjmKLv2";
 
 /* Chama o endpoint serverless Vercel — a chave da IA (b.ia) fica apenas no
    servidor, nunca exposta no browser. */

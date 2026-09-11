@@ -8,6 +8,9 @@
     { "source": "/api/debito/:action", "destination": "/api/debito?_action=:action" },
     { "source": "/api/roleta/:action", "destination": "/api/roleta?_action=:action" },
     { "source": "/api/rooms/:action", "destination": "/api/rooms?_action=:action" },
+    { "source": "/api/games/:action", "destination": "/api/games?_action=:action" },
+    { "source": "/api/bet/:action", "destination": "/api/bet?_action=:action" },
+    { "source": "/api/record-bet-reward", "destination": "/api/games?_action=record-bet-reward" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

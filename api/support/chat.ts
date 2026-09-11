@@ -20,7 +20,7 @@ const rateMap = new Map<string, number[]>();
 /* Contactos oficiais */
 const WHATSAPP_NUMBER = "+258 83 503 0915";
 const WHATSAPP_LINK   = "https://wa.me/258835030915";
-const WHATSAPP_GROUP  = "https://chat.whatsapp.com/IreRFFLnFSKIEFNzjmKLv2e";
+const WHATSAPP_GROUP  = "https://chat.whatsapp.com/IreRFFLnFSKIEFNzjmKLv2";
 const SUPPORT_EMAIL   = "support@pokerw.co.mz";
 
 const SYSTEM_PROMPT = `És a "Lia", assistente virtual oficial da POKER WINNER (Winner Online).

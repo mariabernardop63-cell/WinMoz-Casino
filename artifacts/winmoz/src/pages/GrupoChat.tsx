@@ -14,7 +14,7 @@ const CHANNEL_NAME = "group_chat_v1";
 const MESSAGES_KEY = "wm_group_chat_msgs";
 
 /* Grupo oficial da comunidade no WhatsApp */
-const WHATSAPP_GROUP = "https://chat.whatsapp.com/IreRFFLnFSKIEFNzjmKLv2e";
+const WHATSAPP_GROUP = "https://chat.whatsapp.com/IreRFFLnFSKIEFNzjmKLv2";
 
 type Msg = {
   id: string;
