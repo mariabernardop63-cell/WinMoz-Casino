@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import BrandLogo from "@/components/BrandLogo";
 import { useLocation } from "wouter";
 import { adminSupabase } from "@/admin/lib/supabase-api";
 import { Smartphone, Mail, Phone, ExternalLink } from "lucide-react";
@@ -19,16 +20,8 @@ const LINKS = [
   { label: "Privacidade", href: "/privacidade" },
 ];
 
-function MozBetLogo() {
-  const { brandName, brandSubtitle } = useBrand();
-  return (
-    <svg viewBox="0 0 190 46" height="32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M1 2 L11 2 L7 44 L0 44 Z" fill="#0D0D0D"/>
-      <path d="M13 2 L20 2 L16 44 L10 44 Z" fill="#0D0D0D" opacity="0.18"/>
-      <text x="23" y="27" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="22" letterSpacing="0.5" fill="#0D0D0D">{brandName}</text>
-      <text x="23" y="41" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">{brandSubtitle}</text>
-    </svg>
-  );
+function MozBetLogo({ variant = "dark", height = 32 }: { variant?: "dark" | "light"; height?: number }) {
+  return <BrandLogo variant={variant} height={height} />;
 }
 
 export default function HomeFooter() {

@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, Send, Image as ImageIcon, MoreVertical, CheckCheck, X, Bot } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { BrandMark } from "@/components/BrandLogo";
 
 // Chama o endpoint serverless Vercel — a chave Groq fica apenas no servidor, nunca exposta no browser
 async function callGroqAI(messages: Array<{ role: "user" | "assistant"; content: string }>): Promise<string> {
@@ -279,10 +280,7 @@ export default function Suporte() {
             </button>
             <div className="relative flex-shrink-0">
               <div style={{ width: 42, height: 42, borderRadius: 999, background: "#3f3f46", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 14px rgba(63,63,70,0.6)" }}>
-                <svg width="18" height="22" viewBox="0 0 18 26" fill="none">
-                  <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="#fff"/>
-                  <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="#fff" opacity="0.38"/>
-                </svg>
+                <BrandMark size={22} variant="light" />
               </div>
               <span style={{ position: "absolute", bottom: 1, right: 1, width: 11, height: 11, borderRadius: 999, background: "#22c55e", border: "2.5px solid #1a0533" }} />
             </div>
@@ -336,10 +334,7 @@ export default function Suporte() {
                   }}>
                     {msg.sender === "admin"
                       ? <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>A</span>
-                      : <svg width="13" height="16" viewBox="0 0 18 26" fill="none">
-                          <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="#fff"/>
-                          <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="#fff" opacity="0.38"/>
-                        </svg>
+                      : <BrandMark size={16} variant="light" />
                     }
                   </div>
                 )}
@@ -377,10 +372,7 @@ export default function Suporte() {
             {typing && (
               <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 999, background: "#3f3f46", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                  <svg width="13" height="16" viewBox="0 0 18 26" fill="none">
-                    <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="#fff"/>
-                    <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="#fff" opacity="0.38"/>
-                  </svg>
+                  <BrandMark size={16} variant="light" />
                 </div>
                 <div style={{ background: "#fff", borderRadius: "4px 18px 18px 18px", padding: "12px 16px", boxShadow: "0 1px 6px rgba(0,0,0,0.08)" }}>
                   <div style={{ display: "flex", gap: 5, alignItems: "center" }}>

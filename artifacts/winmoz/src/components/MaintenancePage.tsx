@@ -21,19 +21,21 @@ function BrandMark() {
     <div
       aria-hidden="true"
       style={{
-        width: 38,
-        height: 38,
+        width: 44,
+        height: 44,
         display: "grid",
         placeItems: "center",
         background: "#111827",
-        color: "#fff",
+        borderRadius: 12,
         flexShrink: 0,
       }}
     >
-      <svg width="18" height="24" viewBox="0 0 18 26" fill="none">
-        <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="currentColor" />
-        <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="currentColor" opacity="0.48" />
-      </svg>
+      <img
+        src="/pokerwinner-logo-white.png"
+        alt=""
+        style={{ width: 28, height: "auto", display: "block", objectFit: "contain" }}
+        draggable={false}
+      />
     </div>
   );
 }

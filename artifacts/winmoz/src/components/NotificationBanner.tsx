@@ -4,14 +4,10 @@ import { ExternalLink } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGetUserNotifications, useMarkNotificationRead, UserNotification } from "@/admin/lib/supabase-api";
 import { useLocation } from "wouter";
+import { BrandMark } from "@/components/BrandLogo";
 
 function LogoBars() {
-  return (
-    <svg width="14" height="18" viewBox="0 0 18 26" fill="none">
-      <path d="M1 1 L9 1 L6 25 L-2 25 Z" fill="#fff" />
-      <path d="M11 1 L17 1 L14 25 L8 25 Z" fill="#fff" opacity="0.38" />
-    </svg>
-  );
+  return <BrandMark size={18} variant="light" />;
 }
 
 function CountdownButton({ onDismiss }: { onDismiss: () => void }) {

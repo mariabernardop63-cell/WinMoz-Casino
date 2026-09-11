@@ -1,20 +1,12 @@
 import { useState, useRef } from "react";
+import BrandLogo from "@/components/BrandLogo";
 import { useLocation, Link } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, EyeOff, X, ArrowLeft, ShieldCheck, Loader2, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useBrand } from "@/lib/brand-context";
 
-function WinMozLogo() {
-  const { brandName, brandSubtitle } = useBrand();
-  return (
-    <svg viewBox="0 0 190 44" height="36" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M1 2 L11 2 L7 42 L0 42 Z" fill="#0D0D0D" />
-      <path d="M13 2 L19 2 L15 42 L9 42 Z" fill="#0D0D0D" opacity="0.18" />
-      <text x="22" y="25" fontFamily="'Syne', sans-serif" fontWeight="800" fontSize="22" letterSpacing="0.5" fill="#0D0D0D">{brandName}</text>
-      <text x="22" y="39" fontFamily="'Syne', sans-serif" fontWeight="300" fontSize="11" letterSpacing="3" fill="#0D0D0D">{brandSubtitle}</text>
-    </svg>
-  );
+function WinMozLogo({ variant = "dark", height = 36 }: { variant?: "dark" | "light"; height?: number }) {
+  return <BrandLogo variant={variant} height={height} />;
 }
 
 const slideVariants = {
