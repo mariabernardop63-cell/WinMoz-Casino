@@ -17,15 +17,20 @@ const WHATSAPP_GROUP   = "https://chat.whatsapp.com/IreRFFLnFSKIEFNzjmKLv2";
 
 /* Chama o endpoint serverless Vercel — a chave da IA (b.ia) fica apenas no
    servidor, nunca exposta no browser. O endpoint EXIGE autenticação (Bearer
-   token), por isso o pedido inclui sempre a sessão do utilizador. */
-async function callSupportAI(messages: Array<{ role: "user" | "assistant"; content: string }>): Promise<string> {
+   token), por isso o pedido inclui sempre a sessão do utilizador.
+   Resiliência: se o provider falhar de forma transitória (o backend responde
+   `degraded: true`), repete uma vez automaticamente antes de mostrar erro. */
+async function callSupportAIMessage(messages: Array<{ role: "user" | "assistant"; content: string }>): Promise<{ reply: string; degraded: boolean }> {
   // O backend limita a conversa a 20 mensagens — envia só as últimas 16
   const trimmed = messages.slice(-16);
 
   const session = await getSessionWithRefresh();
   const token = session?.access_token;
   if (!token) {
-    return `A tua sessão expirou. Entra novamente para continuares o atendimento, ou fala connosco no WhatsApp: ${WHATSAPP_LABEL}.`;
+    return {
+      reply: `A tua sessão expirou. Entra novamente para continuares o atendimento, ou fala connosco no WhatsApp: ${WHATSAPP_LABEL}.`,
+      degraded: true,
+    };
   }
 
   const res = await fetch("/api/support/chat", {
@@ -41,20 +46,31 @@ async function callSupportAI(messages: Array<{ role: "user" | "assistant"; conte
   if (!contentType.includes("application/json")) {
     // Vercel served index.html instead of the function — function not deployed or routing issue
     console.error("[callSupportAI] Resposta não-JSON recebida. Status:", res.status, "Content-Type:", contentType);
-    return `O atendimento inteligente está temporariamente indisponível. Fala connosco no WhatsApp: ${WHATSAPP_LABEL}.`;
+    return { reply: `O atendimento inteligente está temporariamente indisponível. Fala connosco no WhatsApp: ${WHATSAPP_LABEL}.`, degraded: true };
   }
 
-  const data = await res.json() as { reply?: string; error?: string };
+  const data = await res.json() as { reply?: string; error?: string; degraded?: boolean };
 
   if (!res.ok) {
     console.error("[callSupportAI] Erro da API:", res.status, data);
     if (res.status === 429) {
-      return "Estás a enviar mensagens muito rápido. Aguarda um momento e tenta novamente 🙂";
+      return { reply: "Estás a enviar mensagens muito rápido. Aguarda um momento e tenta novamente 🙂", degraded: true };
     }
-    return `Tive um problema a responder. Tenta novamente ou fala connosco no WhatsApp: ${WHATSAPP_LABEL}.`;
+    return { reply: `Tive um problema a responder. Tenta novamente ou fala connosco no WhatsApp: ${WHATSAPP_LABEL}.`, degraded: true };
   }
 
-  return data.reply ?? "Desculpa, não consegui processar. Tenta novamente.";
+  return { reply: data.reply ?? "Desculpa, não consegui processar. Tenta novamente.", degraded: Boolean(data.degraded) };
+}
+
+async function callSupportAI(messages: Array<{ role: "user" | "assistant"; content: string }>): Promise<string> {
+  const first = await callSupportAIMessage(messages);
+  if (!first.degraded) return first.reply;
+
+  // Uma falha transitória do provider não deve chegar ao utilizador — repete
+  // uma vez após um pequeno intervalo.
+  await new Promise(r => setTimeout(r, 1200));
+  const second = await callSupportAIMessage(messages);
+  return second.reply;
 }
 
 const CYAN = "#00D4B4";
@@ -467,12 +483,13 @@ export default function Suporte() {
                   {msg.from === "support" && (
                     <div style={{
                       width: 30, height: 30, borderRadius: 999,
-                      background: msg.sender === "admin" ? "linear-gradient(135deg, #6C5CE7, #4f46e5)" : "#3f3f46",
+                      background: msg.sender === "admin" ? "linear-gradient(135deg, #1a0533, #3b1080)" : "#3f3f46",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       flexShrink: 0, boxShadow: "0 2px 8px rgba(63,63,70,0.45)", marginBottom: 2,
+                      overflow: "hidden",
                     }}>
                       {msg.sender === "admin"
-                        ? <span style={{ fontSize: 10, fontWeight: 800, color: "#fff" }}>A</span>
+                        ? <BrandMark size={16} variant="light" />
                         : <BrandMark size={15} variant="light" />
                       }
                     </div>
@@ -481,19 +498,17 @@ export default function Suporte() {
                     {msg.image && <img src={msg.image} alt="" style={{ borderRadius: 14, maxWidth: "100%", maxHeight: 200, objectFit: "cover", display: "block", marginBottom: 4, boxShadow: "0 2px 10px rgba(0,0,0,0.12)" }} />}
                     {msg.text && (
                       <div style={{
-                        background: msg.from === "support"
-                          ? msg.sender === "admin"
-                            ? "linear-gradient(135deg, #6C5CE7, #4C1D95)"
-                            : "#ffffff"
-                          : "linear-gradient(135deg, #7C3AED 0%, #4C1D95 100%)",
+                        background: msg.from === "support" ? "#ffffff" : "linear-gradient(135deg, #7C3AED 0%, #4C1D95 100%)",
                         borderRadius: msg.from === "support" ? "4px 16px 16px 16px" : "16px 4px 16px 16px",
                         padding: "11px 15px",
                         boxShadow: msg.from === "support" ? "0 1px 8px rgba(0,0,0,0.08)" : "0 3px 16px rgba(124,58,237,0.32)",
                       }}>
                         {msg.sender === "admin" && (
-                          <p style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontWeight: 700, marginBottom: 4, letterSpacing: "0.3px" }}>ADMIN · Equipa {localStorage.getItem("wm_brand_poker_winner") === "1" ? "Poker Winner" : "Mozbet"}</p>
+                          <p style={{ fontSize: 10, color: "#7c3aed", fontWeight: 800, marginBottom: 4, letterSpacing: "0.3px", display: "flex", alignItems: "center", gap: 4 }}>
+                            EQUIPA · {localStorage.getItem("wm_brand_poker_winner") === "1" ? "Poker Winner" : "Mozbet"}
+                          </p>
                         )}
-                        <p style={{ fontSize: 13.5, color: msg.from === "support" && msg.sender !== "admin" ? "#1f2937" : "#ffffff", lineHeight: 1.65, margin: 0, whiteSpace: "pre-line", wordBreak: "break-word" }}>{msg.text}</p>
+                        <p style={{ fontSize: 13.5, color: msg.from === "support" ? "#1f2937" : "#ffffff", lineHeight: 1.65, margin: 0, whiteSpace: "pre-line", wordBreak: "break-word" }}>{msg.text}</p>
                       </div>
                     )}
                     <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, justifyContent: msg.from === "user" ? "flex-end" : "flex-start", padding: "0 2px" }}>
