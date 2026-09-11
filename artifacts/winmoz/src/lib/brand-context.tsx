@@ -12,7 +12,8 @@ const defaults: BrandConfig = {
   isPokerWinner: true,
   brandName: "POKER",
   brandSubtitle: "Winner Online",
-  whatsappUrl: "",
+  // Grupo oficial da comunidade (fallback — pode ser substituído no admin)
+  whatsappUrl: "https://chat.whatsapp.com/IreRFFLnFSKIEFNzjmKLv2e",
 };
 
 const BrandContext = createContext<BrandConfig>(defaults);
@@ -28,7 +29,9 @@ function buildConfig(map: Record<string, string>): BrandConfig {
     isPokerWinner: isPW,
     brandName: isPW ? "POKER" : "MOZBET",
     brandSubtitle: isPW ? "Winner Online" : "MOZAMBIQUE",
-    whatsappUrl: ensureAbsoluteUrl(map["whatsapp_group_url"] ?? ""),
+    whatsappUrl: ensureAbsoluteUrl(
+      map["whatsapp_group_url"] ?? "https://chat.whatsapp.com/IreRFFLnFSKIEFNzjmKLv2e"
+    ),
   };
 }
 

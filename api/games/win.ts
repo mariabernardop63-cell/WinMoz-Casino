@@ -4,6 +4,19 @@ import { authenticateUser, getSupabaseAdmin, setCorsHeaders } from "../_lib/auth
 const WIN_RATE = 0.90;
 const MAX_PAYOUT = 200000;
 
+/* ── Guardas de payout de bots ────────────────────────────────────────────────
+   Partidas contra bots têm player2_id = NULL (o bot não tem conta). O payout
+   excede a escrow do jogador (a "casa" cobre o lado do bot), por isso é
+   limitado:
+   - id TEM de começar por "wmb_" (gerado pelo servidor em /games/bot-session)
+   - duração mínima da partida: 90s (uma partida real demora minutos)
+   - limite diário: 25 vitórias pagas contra bots por utilizador
+   Sem estas guardas, "bet sozinho + win" voltava a ser uma máquina de dinheiro.
+   ──────────────────────────────────────────────────────────────────────────── */
+const BOT_ID_PREFIX = "wmb_";
+const BOT_MIN_DURATION_MS = 90_000;
+const BOT_DAILY_WIN_CAP = 25;
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
   if (req.method === "OPTIONS") { res.status(204).end(); return; }
@@ -29,14 +42,64 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const admin = getSupabaseAdmin();
 
-  // SECURITY (auditoria v2):
-  // 1) `paid_out` garante payout ÚNICO por partida — mesmo que a partida seja
-  //    reaberta/reiniciada, nunca paga duas vezes.
-  // 2) `player2_id NOT NULL` exige que a aposta do adversário tenha sido
-  //    escrowada — partidas solo não geram payout (elimina a máquina de
-  //    dinheiro "bet sozinho + win").
-  // 3) O update atómico (.neq status+paid_out) mantém a idempotência por
-  //    partida; quem chega segundo encontra paid_out=true e é rejeitado.
+  // 1) Ler a partida para decidir o caminho (2 jogadores vs bot)
+  const { data: matchRow } = await admin
+    .from("matches")
+    .select("id, status, paid_out, player1_id, player2_id, bet_amount, created_at")
+    .eq("id", gameId)
+    .maybeSingle();
+
+  if (!matchRow) {
+    res.status(404).json({ error: "Partida não encontrada" });
+    return;
+  }
+  const m0 = matchRow as {
+    status: string; paid_out: boolean;
+    player1_id: string; player2_id: string | null;
+    bet_amount: number; created_at: string;
+  };
+
+  if (m0.player1_id !== auth.userId && m0.player2_id !== auth.userId) {
+    res.status(403).json({ error: "Não és participante desta partida" });
+    return;
+  }
+  if (m0.status === "finished" || m0.paid_out) {
+    res.status(409).json({ error: "Partida já terminada" });
+    return;
+  }
+
+  const isBotMatch = m0.player2_id === null;
+
+  // 2) Guardas para partidas de bot
+  if (isBotMatch) {
+    if (!gameId.startsWith(BOT_ID_PREFIX)) {
+      // Ids "solo" sem marca de bot continuam bloqueados (anti money-printing)
+      res.status(400).json({ error: "Partida sem adversário confirmado" });
+      return;
+    }
+    const createdAt = new Date(m0.created_at).getTime();
+    if (Number.isFinite(createdAt) && Date.now() - createdAt < BOT_MIN_DURATION_MS) {
+      res.status(400).json({ error: "A partida ainda não pode ser fechada" });
+      return;
+    }
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const { count: paidToday } = await admin
+      .from("matches")
+      .select("id", { count: "exact", head: true })
+      .eq("player1_id", auth.userId)
+      .is("player2_id", null)
+      .eq("paid_out", true)
+      .gte("completed_at", startOfDay.toISOString());
+
+    if ((paidToday ?? 0) >= BOT_DAILY_WIN_CAP) {
+      res.status(429).json({ error: "Limite diário de vitórias contra bots atingido" });
+      return;
+    }
+  }
+
+  // 3) Claim atómico do payout — único por partida
+  //    (`paid_out` garante payout ÚNICO mesmo que a partida seja reaberta)
   const { data: updated, error: updateMatchErr } = await admin
     .from("matches")
     .update({
@@ -46,9 +109,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       paid_out: true,
     })
     .eq("id", gameId)
-    .eq("paid_out", false) // payout único
-    .neq("status", "finished") // atomic idempotency guard
-    .not("player2_id", "is", null) // exige adversário com aposta escrowada
+    .eq("paid_out", false)       // payout único
+    .neq("status", "finished")   // atomic idempotency guard
     .or(`player1_id.eq.${auth.userId},player2_id.eq.${auth.userId}`) // SECURITY: only real participants
     .select("id, bet_amount, player1_id, player2_id, game_type")
     .maybeSingle();
@@ -60,6 +122,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!updated) {
+    // Perdeu a corrida atómica — reconcilia o estado para a mensagem certa
     const { data: match } = await admin
       .from("matches")
       .select("status, winner_id, player1_id, player2_id, paid_out")
@@ -70,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(404).json({ error: "Partida não encontrada" });
       return;
     }
-    const row = match as { status: string; paid_out: boolean };
+    const row = match as { status: string; paid_out: boolean; player2_id: string | null };
     if (row.status === "finished" || row.paid_out) {
       res.status(409).json({ error: "Partida já terminada" });
       return;
@@ -79,7 +142,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ error: "Partida sem adversário confirmado" });
       return;
     }
-    // Caller is not a participant
     res.status(403).json({ error: "Não és participante desta partida" });
     return;
   }
@@ -93,7 +155,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   };
 
   // SECURITY: payout is always calculated from the DB's bet_amount, never from client input.
-  // bet_amount é criado pelo servidor no momento da aposta (RLS impede edição).
   const verifiedBet = Math.abs(Number(m.bet_amount) || 0);
   if (verifiedBet <= 0) {
     res.status(400).json({ error: "Aposta inválida na partida" });

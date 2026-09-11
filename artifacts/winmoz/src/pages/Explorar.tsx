@@ -227,6 +227,7 @@ function SalaTab() {
   const [roomRole, setRoomRole] = useState<"creator" | "joiner">("creator");
   const [activeGameId, setActiveGameId] = useState("damas");
   const [activeBet, setActiveBet] = useState(0);
+  const [activeCreatorId, setActiveCreatorId] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -248,27 +249,27 @@ function SalaTab() {
   const onlineCount = getSalaOnlineCount(tick);
   const activeRoomCount = 358 + Math.min(myRooms.filter(r => r.status === "waiting").length, 50);
 
-  async function deductBalance(amount: number, desc: string): Promise<boolean> {
-    if (!user?.id) return false;
+  async function deductBalance(amount: number, desc: string): Promise<{ ok: boolean; error?: string }> {
+    if (!user?.id) return { ok: false, error: "Não autenticado" };
     try {
       /* SECURITY: balance mutations go through the server-side API with atomic
          guards — the browser must never write to profiles.balance directly */
       const session = await getSessionWithRefresh();
       const token = session?.access_token;
-      if (!token) return false;
+      if (!token) return { ok: false, error: "Sessão expirada" };
       const res = await fetch("/api/bet/deduct", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ amount, description: desc }),
       });
       const data = await res.json() as { ok?: boolean; error?: string };
-      if (!res.ok || !data.ok) return false;
+      if (!res.ok || !data.ok) return { ok: false, error: data.error ?? "Erro ao debitar saldo" };
       refreshProfile();
-      return true;
-    } catch { return false; }
+      return { ok: true };
+    } catch { return { ok: false, error: "Erro de ligação" }; }
   }
 
-  async function refundBalance(amount: number, code: string) {
+  async function refundBalance(amount: number, code: string, refId?: string) {
     if (!user?.id || amount <= 0) return;
     try {
       const session = await getSessionWithRefresh();
@@ -277,11 +278,33 @@ function SalaTab() {
       const res = await fetch("/api/bet/refund", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-        body: JSON.stringify({ amount, description: `Reembolso sala ${code}` }),
+        body: JSON.stringify({ amount, description: `Reembolso sala ${code}`, refId }),
       });
       const data = await res.json() as { ok?: boolean };
       if (res.ok && data.ok) refreshProfile();
     } catch { /* ignore */ }
+  }
+
+  /* Registo server-side da partida (idempotente) — fecha o "buraco negro" de
+     payout das salas: sem linha em `matches` o vencedor nunca recebia. */
+  function registerSalaMatch(gameRoom: string, bet: number) {
+    if (!user?.id || !gameRoom || bet <= 0) return;
+    const [idA, idB] = gameRoom.split("_");
+    if (!idA || !idB) return;
+    const opponentId = idA === user.id ? idB : idA;
+    if (opponentId === user.id) return;
+    const tokenPromise = getSessionWithRefresh();
+    tokenPromise.then(async (session) => {
+      const token = session?.access_token;
+      if (!token) return;
+      try {
+        await fetch("/api/games/match", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+          body: JSON.stringify({ gameId: gameRoom, gameType: activeGameId, betAmount: bet, opponentId }),
+        });
+      } catch { /* best-effort — o adversário também tenta */ }
+    }).catch(() => {});
   }
 
   function navigateToGame(gameId: string, color: string, oppName: string, bet: number, gameRoom: string) {
@@ -291,6 +314,8 @@ function SalaTab() {
     try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameRoom}`,  "1"); } catch {}
     try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameRoom}`, "1"); } catch {}
     try { sessionStorage.setItem(`wm_bet_deducted_chess_${gameRoom}`, "1"); } catch {}
+    /* Registo server-side da partida (idempotente; ambos os lados tentam) */
+    registerSalaMatch(gameRoom, bet);
     let dest = "/explorar";
     if (gameId === "ludo") dest = `/ludo-jogo?gameId=${gameRoom}&color=${color}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
     else if (gameId === "xadrez") dest = `/xadrez-jogo?gameId=${gameRoom}&color=${color === "blue" ? "white" : "black"}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
@@ -345,9 +370,20 @@ function SalaTab() {
   // Countdown when waiting
   useEffect(() => {
     if (view !== "room-waiting" || waitFound) return;
-    if (waitRemaining <= 0) { refundBalance(activeBet, activeCode); setView("main"); return; }
+    if (waitRemaining <= 0) {
+      // SECURITY: mesmo guarda anti-duplo-reembolso do botão cancelar — a
+      // expiração e um clique no mesmo tick não podem reembolsar duas vezes.
+      if (refundingRef.current) return;
+      refundingRef.current = true;
+      const updated = myRooms.map(r => r.code === activeCode ? { ...r, status: "expired" as const } : r);
+      saveRooms(updated); setMyRooms(updated);
+      refundBalance(activeBet, activeCode, `sala-${activeCode}`);
+      setView("main");
+      return;
+    }
     const t = setInterval(() => setWaitRemaining(r => r - 1), 1000);
     return () => clearInterval(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, waitRemaining, waitFound]);
 
   // ── JOIN LOADING — fetch creator's game/bet from channel presence ──────────
@@ -369,6 +405,7 @@ function SalaTab() {
           done = true;
           setActiveGameId(creatorInfo.gameId);
           setActiveBet(creatorInfo.betAmount);
+          setActiveCreatorId(ids[0]);
           supabase.removeChannel(ch);
           setView("join-confirm");
           return;
@@ -452,7 +489,7 @@ function SalaTab() {
             /* Mark room as expired FIRST — prevents double-refund on rapid clicks */
             const updated = myRooms.map(r => r.code === activeCode ? { ...r, status: "expired" as const } : r);
             saveRooms(updated); setMyRooms(updated);
-            await refundBalance(activeBet, activeCode);
+            await refundBalance(activeBet, activeCode, `sala-${activeCode}`);
             refundingRef.current = false;
             setView("main");
           }}
@@ -525,8 +562,13 @@ function SalaTab() {
             if (!selectedBet || !selectedGame) return;
             setError(""); setLoading(true);
             try {
-              const ok = await deductBalance(selectedBet, `Criação de sala – ${selectedGame.name}`);
-              if (!ok) { setError("Saldo insuficiente. Por favor recarregue a sua conta."); setLoading(false); return; }
+              const result = await deductBalance(selectedBet, `Criação de sala – ${selectedGame.name}`);
+              if (!result.ok) {
+                setError(result.error === "Saldo insuficiente"
+                  ? "Saldo insuficiente. Por favor recarregue a sua conta."
+                  : "Não foi possível criar a sala. Tenta novamente.");
+                setLoading(false); return;
+              }
               const code = genRoomCode();
               const rec: RoomRecord = { code, gameId: selectedGame.id, gameName: selectedGame.name, betAmount: selectedBet, createdAt: Date.now(), status: "waiting" };
               const updated = [rec, ...loadRooms()];
@@ -620,8 +662,13 @@ function SalaTab() {
         <button disabled={loading}
           onClick={async () => {
             setError(""); setLoading(true);
-            const ok = await deductBalance(activeBet, `Entrada em sala ${activeCode}`);
-            if (!ok) { setError("Saldo insuficiente. Por favor recarregue a sua conta."); setLoading(false); return; }
+            const result = await deductBalance(activeBet, `Entrada em sala ${activeCode}`);
+            if (!result.ok) {
+              setError(result.error === "Saldo insuficiente"
+                ? "Saldo insuficiente. Por favor recarregue a sua conta."
+                : "Não foi possível entrar na sala. Tenta novamente.");
+              setLoading(false); return;
+            }
             setLoading(false); setWaitRemaining(300); setWaitFound(false); setRoomRole("joiner"); setView("room-waiting");
           }}
           className="w-full py-4 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 text-white"

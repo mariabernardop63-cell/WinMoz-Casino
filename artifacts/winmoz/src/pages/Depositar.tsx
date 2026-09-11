@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import {
   ChevronLeft, X, CheckCircle2, XCircle, AlertTriangle,
-  RotateCcw, Phone, Loader2, AlertCircle,
+  RotateCcw, Phone, Loader2, AlertCircle, Ticket,
 } from "lucide-react";
 import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -11,6 +11,12 @@ import { useAuth } from "@/contexts/AuthContext";
 const CYAN = "#00D4B4";
 const EMOLA_GREEN = "#16a34a";
 const MPESA_RED = "#dc2626";
+
+/* ── Estado dos depósitos directos ──
+   Os depósitos por gateway (M-Pesa / e-Mola USSD) estão temporariamente
+   indisponíveis — "em breve". Por agora, a Poker Winner carrega saldo
+   apenas via RECARGA (código comprado no WhatsApp oficial). */
+const DIRECT_DEPOSIT_ENABLED = false;
 
 function fmtMZN(val: number) {
   const str = val.toFixed(2);
@@ -340,7 +346,7 @@ export default function Depositar() {
                 <span style={{ opacity: 0.4 }}>|</span>
               </span>
             </div>
-            <p style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 4 }}>Mín: 10 MZN (M-Pesa) · 50 MZN (e-Mola) · Máx: 1.000.000 MZN</p>
+            <p style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 4 }}>Mín: 10 MZN · Máx: 1.000.000 MZN</p>
           </div>
 
           <div className="px-5 pt-5 pb-3">
@@ -422,8 +428,8 @@ export default function Depositar() {
               Selecciona a tua carteira móvel
             </p>
 
-            {/* e-Mola — disponibilidade controlada pelo admin */}
-            {walletsAvailable.emola ? (
+            {/* e-Mola — indisponível (em breve) */}
+            {DIRECT_DEPOSIT_ENABLED && walletsAvailable.emola ? (
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={() => { setProvider("emola"); setScreen("phone"); }}
@@ -461,20 +467,20 @@ export default function Depositar() {
                 </div>
                 <div className="text-left">
                   <p style={{ fontWeight: 700, color: "#9ca3af", fontSize: 15, letterSpacing: "0.5px", fontFamily: "'Syne', sans-serif" }}>e-Mola</p>
-                  <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Temporariamente indisponível</p>
+                  <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Em breve — depósito directo</p>
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#fef2f2", color: "#ef4444", letterSpacing: "0.5px" }}>
-                  INDISPONÍVEL
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#fffbeb", color: "#b45309", letterSpacing: "0.5px" }}>
+                  EM BREVE
                 </span>
-                <AlertCircle style={{ width: 16, height: 16, color: "#ef4444" }} />
+                <AlertCircle style={{ width: 16, height: 16, color: "#b45309" }} />
               </div>
             </div>
             )}
 
-            {/* M-Pesa — disponibilidade controlada pelo admin */}
-            {walletsAvailable.mpesa ? (
+            {/* M-Pesa — indisponível (em breve) */}
+            {DIRECT_DEPOSIT_ENABLED && walletsAvailable.mpesa ? (
             <motion.button
               whileTap={{ scale: 0.98 }}
               onClick={() => { setProvider("mpesa"); setScreen("phone"); }}
@@ -512,24 +518,70 @@ export default function Depositar() {
                 </div>
                 <div className="text-left">
                   <p style={{ fontWeight: 700, color: "#9ca3af", fontSize: 15, letterSpacing: "0.5px", fontFamily: "'Syne', sans-serif" }}>M-Pesa</p>
-                  <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Temporariamente indisponível</p>
+                  <p style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>Em breve — depósito directo</p>
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#fef2f2", color: "#ef4444", letterSpacing: "0.5px" }}>
-                  INDISPONÍVEL
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#fffbeb", color: "#b45309", letterSpacing: "0.5px" }}>
+                  EM BREVE
                 </span>
-                <AlertCircle style={{ width: 16, height: 16, color: "#ef4444" }} />
+                <AlertCircle style={{ width: 16, height: 16, color: "#b45309" }} />
               </div>
             </div>
             )}
 
-            <div className="p-4" style={{ background: "#f8fafc", border: "1px solid #e5e7eb" }}>
+            {/* ── Recarga — método activo ── */}
+            <motion.button
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setLocation("/recarga")}
+              className="w-full p-5 mb-3 flex items-center justify-between transition-all"
+              style={{
+                background: "linear-gradient(135deg, #0a0a0a 0%, #1f1235 100%)",
+                border: "1.5px solid #7C3AED",
+                borderRadius: 0,
+                cursor: "pointer",
+                boxShadow: "0 8px 24px rgba(124,58,237,0.25)",
+              }}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 flex items-center justify-center overflow-hidden"
+                  style={{ background: "rgba(124,58,237,0.16)", border: "1px solid rgba(124,58,237,0.4)" }}>
+                  <Ticket style={{ width: 24, height: 24, color: "#c4b5fd" }} />
+                </div>
+                <div className="text-left">
+                  <p style={{ fontWeight: 700, color: "#ffffff", fontSize: 15, letterSpacing: "0.5px", fontFamily: "'Syne', sans-serif" }}>Depósito por Recarga</p>
+                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", marginTop: 2 }}>Compra a recarga e insere o código</p>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", background: "#22c55e", color: "#fff", letterSpacing: "0.5px" }}>
+                  ACTIVO
+                </span>
+                <CheckCircle2 style={{ width: 16, height: 16, color: "#22c55e" }} />
+              </div>
+            </motion.button>
+
+            <div className="p-4" style={{ background: "#f8fafc", border: "1px solid #e5e7eb", marginBottom: 12 }}>
               <div className="flex items-start gap-3">
                 <span style={{ fontSize: 14, marginTop: 1 }}>ℹ️</span>
                 <p style={{ fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
-                  O pagamento é processado pelo gateway seguro <strong style={{ color: "#374151" }}>Debito Pay</strong>.
-                  M-Pesa confirma instantaneamente; e-Mola envia um pedido USSD para confirmares com o teu PIN.
+                  Em breve os depósitos directos por M-Pesa/e-Mola voltarão a funcionar.
+                  De momento, a <strong style={{ color: "#374151" }}>Poker Winner</strong> usa o método de
+                  <strong style={{ color: "#374151" }}> depósito por recarga</strong>: compras a recarga no
+                  WhatsApp oficial e inseres o código aqui na app — o saldo entra imediatamente.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-4" style={{ background: "#fff7ed", border: "1px solid #fed7aa" }}>
+              <div className="flex items-start gap-3">
+                <span style={{ fontSize: 14, marginTop: 1 }}>💬</span>
+                <p style={{ fontSize: 12, color: "#9a6b2f", lineHeight: 1.6 }}>
+                  Compra a tua recarga no WhatsApp oficial:
+                  <a href="https://wa.me/258835030915" target="_blank" rel="noopener noreferrer"
+                    style={{ color: "#b45309", fontWeight: 700, textDecoration: "underline" }}>
+                    {" "}+258 83 503 0915
+                  </a>
+                  {" "}— ou entra no grupo da comunidade para dicas e sorteios.
                 </p>
               </div>
             </div>

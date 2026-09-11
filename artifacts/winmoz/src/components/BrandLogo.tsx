@@ -29,7 +29,7 @@ export default function BrandLogo({
   const subSize = Math.round(height * 0.3);
 
   return (
-    <div className={`flex items-center gap-[0.45em] ${className}`} style={{ fontSize: height }}>
+    <div className={`flex items-center ${className}`} style={{ fontSize: height }}>
       <img
         src={symbolSrc}
         alt={brandName}
@@ -39,6 +39,8 @@ export default function BrandLogo({
           display: "block",
           flexShrink: 0,
           objectFit: "contain",
+          marginRight: "0.16em",
+          marginTop: "-0.06em",
           filter: variant === "light" ? "drop-shadow(0 1px 2px rgba(0,0,0,.35))" : "none",
         }}
         draggable={false}

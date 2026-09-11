@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, getSessionWithRefresh } from "@/lib/supabase";
+import { API_BASE } from "@/lib/apiBase";
 import { serverBet, serverWin } from "@/lib/gameApi";
 import AdBanner from "@/components/AdBanner";
 // ─── Sound helpers ─────────────────────────────────────────────────────────────
@@ -1186,6 +1187,9 @@ export default function ChessGame(){
   const[rematchRequester,setRematchRequester]=useState("");
   const[botThinking,setBotThinking]=useState(false);
   const opponentBal=isBot&&botBal?`${botBal} MT`:"—";
+  // Bot rematch simulation: a bot that won accepts up to 3 revanches; if it
+  // lost, only 1. O contador vive em sessionStorage (wm_bot_rematch) porque a
+  // revanche navega para uma nova partida (remount).
 
   useEffect(()=>{boardRef.current=board;},[board]);
   useEffect(()=>{
@@ -1211,6 +1215,13 @@ export default function ChessGame(){
   // ── Bot: deduct bet once on mount — server-side ───────────────────────────────
   useEffect(()=>{
     if(!isBot||!profile?.id||BET<=0||betDeductedRef.current)return;
+    // Idempotência: em revanche a aposta já foi debitada pelo
+    // /api/games/bot-session — a flag evita cobrar duas vezes.
+    try{
+      if(sessionStorage.getItem(`wm_bet_deducted_chess_${gameId}`)==="1"){
+        betDeductedRef.current=true;return;
+      }
+    }catch{/* noop */}
     betDeductedRef.current=true;
     (async()=>{
       try{
@@ -1570,8 +1581,51 @@ export default function ChessGame(){
   }
 
   async function handleReplay(){
-    if(isBot){setLocation("/apostar/xadrez");return;}
     if(gameId==="local"||BET===0){resetGame();return;}
+    if(isBot){
+      if(!profile?.id){setRematchPhase("no_balance");return;}
+      // ── Simulate a human opponent accepting/declining a rematch ──
+      // Contador em sessionStorage (sobrevive ao remount da revanche).
+      let st={count:0,lastWon:null as boolean|null};
+      try{
+        const raw=sessionStorage.getItem("wm_bot_rematch");
+        if(raw){const p=JSON.parse(raw);if(p&&typeof p.count==="number")st=p;}
+      }catch{/* noop */}
+      const botWon=winner===opponentColor;
+      if(st.lastWon!==botWon){st.count=0;st.lastWon=botWon;}
+      const maxRematches=botWon?3:1;
+      const willAccept=st.count<maxRematches;
+      setRematchPhase("checking");
+      setTimeout(()=>{
+        if(!willAccept){setRematchPhase("declined");return;}
+        setRematchPhase("waiting");
+        setTimeout(async()=>{
+          try{
+            // Sessão de bot criada no SERVIDOR (débito atómico + partida "wmb_")
+            const session=await getSessionWithRefresh();
+            const token=session?.access_token;
+            if(!token){setRematchPhase("no_balance");return;}
+            const res=await fetch(`${API_BASE}/games/bot-session`,{
+              method:"POST",
+              headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
+              body:JSON.stringify({gameType:"xadrez",betAmount:BET}),
+            });
+            const json=await res.json() as {ok?:boolean;gameId?:string;botName?:string;botBalance?:number;error?:string};
+            if(!res.ok||!json.ok||!json.gameId){setRematchPhase("no_balance");return;}
+            st.count+=1;
+            try{sessionStorage.setItem("wm_bot_rematch",JSON.stringify(st));}catch{/* noop */}
+            try{sessionStorage.setItem(`wm_bet_deducted_chess_${json.gameId}`,"1");}catch{/* noop */}
+            try{sessionStorage.setItem(`wm_bot_session_${json.gameId}`,JSON.stringify({bot:true,botBalance:json.botBalance??200}));}catch{/* noop */}
+            await refreshProfile();
+            setRematchPhase("idle");
+            const myEnc=encodeURIComponent(profile?.full_name??"Jogador");
+            const oppEnc=encodeURIComponent(json.botName??opponentName);
+            setLocation(`/xadrez-jogo?gameId=${json.gameId}&color=${myColor}&bet=${BET}&opp=${oppEnc}&myname=${myEnc}`);
+          }catch{setRematchPhase("no_balance");}
+        },900+Math.random()*700);
+      },700+Math.random()*600);
+      return;
+    }
     if(!profile?.id){setRematchPhase("no_balance");return;}
     if(!channelRef.current){setRematchPhase("no_balance");return;}
     setRematchPhase("checking");

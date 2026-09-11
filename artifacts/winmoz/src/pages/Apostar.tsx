@@ -763,7 +763,7 @@ function MatchmakingScreen({
 }: {
   onCancel: () => void;
   onMatched: (gameId: string, color: string, oppName: string) => void;
-  onBotMatch?: (botName: string, botBalance: number) => void;
+  onBotMatch?: (botName: string, botBalance: number, gameId: string) => void;
   userId: string;
   displayName: string;
   betAmount: number;
@@ -882,7 +882,24 @@ function MatchmakingScreen({
         const info = pickBotInfo();
         setBotInfo(info);
         setFound(true);
-        setTimeout(() => { onBotMatch && onBotMatch(info.name, info.balance); }, 2000);
+        // SECURITY: a sessão de bot é criada no SERVIDOR — o débito é atómico
+        // e o id da partida é gerado server-side ("wmb_"), permitindo o payout
+        // guardado no /api/games/win. Ids gerados no browser não são pagáveis.
+        setTimeout(async () => {
+          try {
+            const session = await getSessionWithRefresh();
+            const token = session?.access_token;
+            if (!token) { onCancel(); return; }
+            const res = await fetch(`${API_BASE}/games/bot-session`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+              body: JSON.stringify({ gameType, betAmount }),
+            });
+            const json = await res.json() as { ok?: boolean; gameId?: string; botName?: string; botBalance?: number; error?: string };
+            if (!res.ok || !json.ok || !json.gameId) { onCancel(); return; }
+            onBotMatch && onBotMatch(json.botName ?? info.name, json.botBalance ?? info.balance, json.gameId);
+          } catch { onCancel(); }
+        }, 2000);
       }
     }
     const t = setInterval(() => setRemaining(r => r - 1), 1000);
@@ -1625,13 +1642,14 @@ export default function Apostar() {
           }
           setTimeout(() => setLocation(dest), 2200);
         }}
-        onBotMatch={(botName, botBalance) => {
+        onBotMatch={(botName, botBalance, serverGameId) => {
           setScreen("matched");
           const myEnc  = encodeURIComponent(profile?.full_name ?? "Jogador");
           const oppEnc = encodeURIComponent(botName);
-          // URL limpa: nada de "bot" no slug. O id real e os dados do bot
-          // viajam por sessionStorage com uma chave opaca.
-          const publicGameId = `wm${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+          // O id real vem do servidor (/api/games/bot-session) — sem ele a
+          // partida não seria pagável, por isso só navegamos com gameId válido.
+          if (!serverGameId) { setScreen("bet"); return; }
+          const publicGameId = serverGameId;
           try {
             sessionStorage.setItem(`wm_bot_session_${publicGameId}`, JSON.stringify({
               bot: true, botBalance: botBalance,

@@ -47,8 +47,10 @@ export function useAdminRealtimeSync() {
   const qc = useQC();
 
   useEffect(() => {
-    const channel = supabase
-      .channel("admin-realtime-v2")
+    // Primary: Postgres change subscriptions. If the tables are in the
+    // `supabase_realtime` publication and RLS allows it, these fire instantly.
+    const channel = adminSupabase
+      .channel("admin-realtime-v3")
       .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, () => {
         qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
         qc.invalidateQueries({ queryKey: ["matches"] });
@@ -63,6 +65,7 @@ export function useAdminRealtimeSync() {
         qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
         qc.invalidateQueries({ queryKey: ["withdrawals"] });
         qc.invalidateQueries({ queryKey: ["transactions"] });
+        qc.invalidateQueries({ queryKey: ["balance-adjustments"] });
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "reports" }, () => {
         qc.invalidateQueries({ queryKey: ["reports"] });
@@ -71,7 +74,27 @@ export function useAdminRealtimeSync() {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Safety net: guarantees the dashboard KPIs refresh even if the realtime
+    // publication or RLS prevents change events from being delivered.
+    const poll = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    }, 5000);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+        qc.invalidateQueries({ queryKey: ["withdrawals"] });
+        qc.invalidateQueries({ queryKey: ["transactions"] });
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      adminSupabase.removeChannel(channel);
+      clearInterval(poll);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [qc]);
 }
 
@@ -197,8 +220,9 @@ export function useGetDashboardStats() {
         todayOnline:              (onlineProfiles as unknown[]).length,
       };
     },
-    refetchInterval: 8000,
-    staleTime: 3000,
+    refetchInterval: 5000,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 }
 

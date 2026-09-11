@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { evaluateBotDifficulty } from "@/lib/botBrain";
 import { serverBet, serverWin } from "@/lib/gameApi";
+import { API_BASE } from "@/lib/apiBase";
 import AdBanner from "@/components/AdBanner";
 // ─── Sound helpers ────────────────────────────────────────────────────────────
 function playDamasCapture() {
@@ -73,6 +74,41 @@ const inB = (r: number, c: number) => r >= 0 && r < 8 && c >= 0 && c < 8;
 const isLight = (r: number, c: number) => (r + c) % 2 === 0;
 const sqKey = (r: number, c: number) => `${r},${c}`;
 const opp = (c: PColor): PColor => c === "w" ? "b" : "w";
+
+// ─── Crown icon (professional SVG, replaces the 👑 emoji) ──────────────────────
+function CrownIcon({ size = 16, tone = "light", fluid = false }: { size?: number; tone?: "light" | "dark"; fluid?: boolean }) {
+  const gid = tone === "light" ? "damaCrownLight" : "damaCrownDark";
+  const metal = tone === "light" ? ["#FFE9A8", "#F5C542", "#B8860B"] : ["#F3E3B0", "#D4A017", "#7A5A08"];
+  const stroke = tone === "light" ? "rgba(90,60,0,.55)" : "rgba(50,32,0,.7)";
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      fill="none"
+      aria-hidden="true"
+      style={fluid ? { width: "64%", height: "64%", display: "block" } : { width: size, height: size, display: "block" }}
+    >
+      <defs>
+        <linearGradient id={gid} x1="30%" y1="0%" x2="70%" y2="100%">
+          <stop offset="0%" stopColor={metal[0]} />
+          <stop offset="50%" stopColor={metal[1]} />
+          <stop offset="100%" stopColor={metal[2]} />
+        </linearGradient>
+      </defs>
+      <path
+        d="M5 22 L4 9 L10.5 14.5 L16 6.5 L21.5 14.5 L28 9 L27 22 Z"
+        fill={`url(#${gid})`}
+        stroke={stroke}
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <rect x="4.6" y="22" width="22.8" height="4.4" rx="1.6" fill={`url(#${gid})`} stroke={stroke} strokeWidth="1.2" />
+      <circle cx="4" cy="8" r="2.1" fill={metal[1]} stroke={stroke} strokeWidth="1" />
+      <circle cx="16" cy="5.6" r="2.1" fill={metal[1]} stroke={stroke} strokeWidth="1" />
+      <circle cx="28" cy="8" r="2.1" fill={metal[1]} stroke={stroke} strokeWidth="1" />
+      <circle cx="16" cy="18.2" r="1.9" fill={tone === "light" ? "#B8860B" : "#7A5A08"} opacity="0.85" />
+    </svg>
+  );
+}
 
 // ─── Board Operations ─────────────────────────────────────────────────────────
 function makeInitialBoard(): Board {
@@ -164,35 +200,102 @@ function maxDepth(
   return mx;
 }
 
+// True when `to` lies on a straight diagonal from `from` and every square
+// strictly between them is empty.
+function isClearDiagonal(b: Board, from: Sq, to: Sq): boolean {
+  const dr = Math.sign(to[0] - from[0]);
+  const dc = Math.sign(to[1] - from[1]);
+  if (dr === 0 || dc === 0) return false;
+  if (Math.abs(to[0] - from[0]) !== Math.abs(to[1] - from[1])) return false;
+  let r = from[0] + dr, c = from[1] + dc;
+  while (r !== to[0] || c !== to[1]) {
+    if (!inB(r, c) || b[r][c]) return false;
+    r += dr; c += dc;
+  }
+  return true;
+}
+
+// Rebuild the exact sequence of capture steps from the recorded list of victims
+// and the final destination. Each intermediate landing is chosen from the real
+// valid capture landings (getCaptures) so the king lines up with the next victim
+// instead of stopping right after the current one. The last step must land
+// exactly on `finalTo`, guaranteeing the animation matches the true move.
+function buildChainSteps(
+  board: Board, from: Sq, captured: Sq[], finalTo: Sq
+): Array<{ from: Sq; to: Sq; cap: Sq }> | null {
+  const steps: Array<{ from: Sq; to: Sq; cap: Sq }> = [];
+  const excl = new Set<string>();
+  let cur = from;
+  let b = cloneBoard(board);
+  let forbidden: [number, number] | undefined = undefined;
+
+  for (let i = 0; i < captured.length; i++) {
+    const target = captured[i];
+    const isLast = i === captured.length - 1;
+    // All valid landings for capturing `target` from the current square.
+    let opts: { to: Sq; cap: Sq }[] = getCaptures(b, cur[0], cur[1], excl, forbidden)
+      .filter((x: { to: Sq; cap: Sq }) => x.cap[0] === target[0] && x.cap[1] === target[1]);
+    if (isLast) {
+      opts = opts.filter((x: { to: Sq; cap: Sq }) => x.to[0] === finalTo[0] && x.to[1] === finalTo[1]);
+    }
+    if (opts.length === 0) return null;
+
+    let chosen: { to: Sq; cap: Sq } = opts[0];
+    if (!isLast) {
+      // Prefer a landing that already points at the next victim (cleaner reading).
+      const nextCap = captured[i + 1];
+      const aligned = opts.find((x: { to: Sq; cap: Sq }) => {
+        const lr = x.to[0] - nextCap[0], lc = x.to[1] - nextCap[1];
+        if (!(Math.abs(lr) === Math.abs(lc) && Math.abs(lr) > 0)) return false;
+        const odr = Math.sign(nextCap[0] - x.to[0]), odc = Math.sign(nextCap[1] - x.to[1]);
+        const br = nextCap[0] + odr, bc = nextCap[1] + odc;
+        return inB(br, bc) && !b[br][bc];
+      });
+      if (aligned) chosen = aligned;
+    }
+
+    steps.push({ from: cur, to: chosen.to, cap: target });
+
+    const nb = cloneBoard(b);
+    nb[chosen.to[0]][chosen.to[1]] = nb[cur[0]][cur[1]];
+    nb[cur[0]][cur[1]] = null;
+    nb[target[0]][target[1]] = null;
+    excl.add(sqKey(target[0], target[1]));
+    const piece = nb[chosen.to[0]][chosen.to[1]] as Piece | null;
+    const mdr = Math.sign(chosen.to[0] - cur[0]), mdc = Math.sign(chosen.to[1] - cur[1]);
+    forbidden = piece?.isDame ? [-mdr as -1 | 1, -mdc as -1 | 1] : undefined;
+    b = nb;
+    cur = chosen.to;
+  }
+  return steps;
+}
+
 // Reconstruct intermediate positions for chain capture animation
 function computeChainPath(board: Board, move: { from: Sq; to: Sq; captured: Sq[] }): Array<{ from: Sq; to: Sq; cap: Sq }> {
-  if (move.captured.length <= 1)
-    return move.captured.length === 1
-      ? [{ from: move.from, to: move.to, cap: move.captured[0] }]
-      : [];
+  if (move.captured.length === 0) return [];
+  if (move.captured.length === 1) return [{ from: move.from, to: move.to, cap: move.captured[0] }];
+  const built = buildChainSteps(board, move.from, move.captured, move.to);
+  if (built) return built;
+  // Last-resort fallback: single-step landings (should not normally happen).
   const steps: Array<{ from: Sq; to: Sq; cap: Sq }> = [];
   let cur: Sq = move.from;
   let curBoard = cloneBoard(board);
   for (let i = 0; i < move.captured.length; i++) {
     const cap = move.captured[i];
     const isLast = i === move.captured.length - 1;
-    const dr = Math.sign(cap[0] - cur[0]);
-    const dc = Math.sign(cap[1] - cur[1]);
+    const dr = Math.sign(cap[0] - cur[0]), dc = Math.sign(cap[1] - cur[1]);
     let landing: Sq;
     if (isLast) {
       landing = move.to;
     } else {
-      // Find first empty square past the captured piece in capture direction
       let tr = cap[0] + dr, tc = cap[1] + dc;
       while (inB(tr, tc) && curBoard[tr][tc] !== null) { tr += dr; tc += dc; }
       landing = inB(tr, tc) ? [tr, tc] : move.to;
     }
     steps.push({ from: cur, to: landing, cap });
-    // Update temp board (no promotion) for next step
     const nb = cloneBoard(curBoard);
     nb[landing[0]][landing[1]] = nb[cur[0]][cur[1]]; nb[cur[0]][cur[1]] = null; nb[cap[0]][cap[1]] = null;
-    curBoard = nb;
-    cur = landing;
+    curBoard = nb; cur = landing;
   }
   return steps;
 }
@@ -594,7 +697,7 @@ function PlayerCard({ color, name, balance, isMe, isActive, piecesLeft, damesLef
         border:`2px solid ${isActive ? "rgba(212,160,23,.6)" : isWhite ? "rgba(255,255,255,.2)" : "rgba(255,255,255,.1)"}`,
         boxShadow:"inset 0 2px 4px rgba(255,255,255,.3),inset 0 -2px 4px rgba(0,0,0,.35)",
         display:"flex", alignItems:"center", justifyContent:"center" }}>
-        {damesLeft > 0 && <span style={{ fontSize:16, filter:"drop-shadow(0 1px 2px rgba(0,0,0,.5))" }}>👑</span>}
+        {damesLeft > 0 && <CrownIcon size={18} tone={isWhite ? "light" : "dark"} />}
         {isActive && (
           <motion.span
             animate={{opacity:[.4,1,.4]}}
@@ -612,7 +715,7 @@ function PlayerCard({ color, name, balance, isMe, isActive, piecesLeft, damesLef
         <div style={{ display:"flex", alignItems:"center", gap:6 }}>
           <span className="gz-player-meta">{balance}</span>
           <span style={{ fontSize:10, color: isActive ? "#f2d38a" : "rgba(244,236,217,.4)", fontWeight:700 }}>
-            {piecesLeft} peças{damesLeft > 0 ? ` · ${damesLeft}👑` : ""}
+            {piecesLeft} peças{damesLeft > 0 ? ` · ${damesLeft} dama${damesLeft === 1 ? "" : "s"}` : ""}
           </span>
         </div>
       </div>
@@ -904,6 +1007,12 @@ export default function DamasGame() {
   const oppTimerRecvValRef = useRef<number>(30);
   const [botThinking, setBotThinking] = useState(false);
   const [rematchPhase, setRematchPhase] = useState<RematchPhase>("idle");
+  // ── Bot rematch simulation ──
+  // Mimics a human opponent: a short "a verificar", an "a aguardar resposta"
+  // then accept or decline. A bot that WON accepts up to 3 revanches; a bot
+  // that LOST accepts only 1. The counter resets whenever the outcome flips.
+  // O contador vive em sessionStorage (wm_bot_rematch) para sobreviver à
+  // navegação da revanche (a nova partida é um remount da página).
   const [kingsOnlyCount, setKingsOnlyCount] = useState(0);
   const kingsOnlyCountRef = useRef(0);
   const [isDraw, setIsDraw] = useState(false);
@@ -951,6 +1060,14 @@ export default function DamasGame() {
   // ── Bot: deduct bet once on mount — server-side ──────────────────────────────
   useEffect(() => {
     if (!isBot || !profile?.id || BET <= 0 || betDeductedRef.current) return;
+    // Idempotência: em revanche, a aposta já foi debitada pelo
+    // /api/games/bot-session antes da navegação — a flag evita cobrar duas vezes.
+    try {
+      if (sessionStorage.getItem(`wm_bet_deducted_damas_${gameId}`) === "1") {
+        betDeductedRef.current = true;
+        return;
+      }
+    } catch { /* noop */ }
     betDeductedRef.current = true;
     (async () => {
       try {
@@ -1100,7 +1217,31 @@ export default function DamasGame() {
       channelRef.current?.send({ type: "broadcast", event: "damas_timer_forfeit", payload: { player: myColor, lives: 0, gameOver: true } });
     } else {
       setLives(prev => ({ ...prev, [myColor]: remaining }));
-      // Pass the turn to the opponent on timer expiry
+      // The timed-out player still loses a life, but the system plays a random
+      // valid move for them so the game keeps progressing (same rule as Ludo).
+      const moves = aiGetAllMoves(boardRef.current, myColor);
+      if (moves.length > 0) {
+        const pick = moves[Math.floor(Math.random() * moves.length)];
+        const nb = applyBoardMove(boardRef.current, pick.from, pick.to, pick.captured);
+        boardRef.current = nb;
+        setBoard(nb);
+        setLastMove({ from: pick.from, to: pick.to });
+        seqRef.current += 1;
+        channelRef.current?.send({ type: "broadcast", event: "damas_move", payload: {
+          from: pick.from, to: pick.to, captured: pick.captured, nextTurn: oppColor, seq: seqRef.current,
+        }});
+        // A forced random move may capture the last opponent piece.
+        if (countPieces(nb, oppColor) === 0) {
+          setWinner(myColor);
+          winnerRef.current = myColor;
+          setWinReason("Todas as peças foram capturadas");
+          setSelected(null); setValidDests([]); setValidCapDests([]);
+          setChainPiece(null); setChainExcl(new Set()); setChainFrom(null); setAllCaptured([]); setChainForbiddenDir(null);
+          setTurn(oppColor);
+          setTimers({ w: 30, b: 30 });
+          return;
+        }
+      }
       const nextTurn = oppColor;
       setTurn(nextTurn);
       setTimers({ w: 30, b: 30 });
@@ -1124,6 +1265,21 @@ export default function DamasGame() {
       setTimers(prev => ({ ...prev, [oppColor]: 0 }));
     } else {
       setLives(prev => ({ ...prev, [oppColor]: remaining }));
+      // Safety: the bot loses a life but still plays a valid move, so the game
+      // never freezes waiting on a hung bot.
+      const moves = aiGetAllMoves(boardRef.current, oppColor);
+      if (moves.length > 0) {
+        const pick = moves[Math.floor(Math.random() * moves.length)];
+        const nb = applyBoardMove(boardRef.current, pick.from, pick.to, pick.captured);
+        boardRef.current = nb;
+        setBoard(nb);
+        setLastMove({ from: pick.from, to: pick.to });
+        if (countPieces(nb, myColor) === 0) {
+          setWinner(oppColor);
+          winnerRef.current = oppColor;
+          setWinReason("Todas as peças foram capturadas pelo bot");
+        }
+      }
       setTurn(myColor);
       setTimers({ w: 30, b: 30 });
       setSelected(null); setValidDests([]); setValidCapDests([]);
@@ -1681,12 +1837,56 @@ export default function DamasGame() {
     if (gameId === "local" || BET === 0) { resetGame(); return; }
     if (isBot) {
       if (!profile?.id) return;
+      // ── Simulate a human opponent accepting/declining a rematch ──
+      // Estado persistente por tab: sobrevive à navegação da revanche
+      // (nova partida = remount), mantendo o limite de aceitações do bot.
+      let st = { count: 0, lastWon: null as boolean | null };
       try {
-        const result = await serverBet(BET, "damas", "Aposta de revanche (Damas) vs bot");
-        if (!result.ok) { setRematchPhase("no_balance"); return; }
-        await refreshProfile();
-        resetGame();
-      } catch { setRematchPhase("no_balance"); }
+        const raw = sessionStorage.getItem("wm_bot_rematch");
+        if (raw) { const p = JSON.parse(raw); if (p && typeof p.count === "number") st = p; }
+      } catch { /* noop */ }
+      const botWon = winner === oppColor;
+      if (st.lastWon !== botWon) { st.count = 0; st.lastWon = botWon; }
+      const maxRematches = botWon ? 3 : 1;
+      const willAccept = st.count < maxRematches;
+
+      setRematchPhase("checking");
+      // Bot "checks" the request, then decides.
+      setTimeout(() => {
+        if (!willAccept) {
+          setRematchPhase("declined");
+          return;
+        }
+        setRematchPhase("waiting");
+        setTimeout(async () => {
+          try {
+            // Sessão de bot criada no SERVIDOR: débito atómico + partida
+            // registada (id "wmb_") para a vitória ser pagável no /games/win.
+            const session = await getSessionWithRefresh();
+            const token = session?.access_token;
+            if (!token) { setRematchPhase("no_balance"); return; }
+            const res = await fetch(`${API_BASE}/games/bot-session`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+              body: JSON.stringify({ gameType: "damas", betAmount: BET }),
+            });
+            const json = await res.json() as { ok?: boolean; gameId?: string; botName?: string; botBalance?: number; error?: string };
+            if (!res.ok || !json.ok || !json.gameId) {
+              setRematchPhase(json.error === "Saldo insuficiente" ? "no_balance" : "no_balance");
+              return;
+            }
+            st.count += 1;
+            try { sessionStorage.setItem("wm_bot_rematch", JSON.stringify(st)); } catch { /* noop */ }
+            try { sessionStorage.setItem(`wm_bet_deducted_damas_${json.gameId}`, "1"); } catch { /* noop */ }
+            try { sessionStorage.setItem(`wm_bot_session_${json.gameId}`, JSON.stringify({ bot: true, botBalance: json.botBalance ?? 200 })); } catch { /* noop */ }
+            await refreshProfile();
+            setRematchPhase("idle");
+            const myEnc  = encodeURIComponent(profile?.full_name ?? "Jogador");
+            const oppEnc = encodeURIComponent(json.botName ?? opponentName);
+            setLocation(`/damas-jogo?gameId=${json.gameId}&color=${myColor}&bet=${BET}&opp=${oppEnc}&myname=${myEnc}`);
+          } catch { setRematchPhase("no_balance"); }
+        }, 900 + Math.random() * 700);
+      }, 700 + Math.random() * 600);
       return;
     }
     if (!profile?.id) { setRematchPhase("no_balance"); return; }
@@ -1759,7 +1959,7 @@ export default function DamasGame() {
             <p className="gz-game-title">DAMAS</p>
             {kingsOnlyCount > 0
               ? <p className="gz-game-subtitle" style={{ color:"#f2d38a" }}>
-                  👑 SÓ DAMAS — {30 - kingsOnlyCount} JOGADAS
+                  SÓ DAMAS — {30 - kingsOnlyCount} JOGADAS
                 </p>
               : <p className="gz-game-subtitle">1 VS 1 · ONLINE</p>
             }
@@ -1857,7 +2057,15 @@ export default function DamasGame() {
                           transform: (isSel || isChain) ? "scale(1.1)" : "scale(1)",
                         }}>
                           {piece.isDame && (
-                            <span style={{ fontSize:"55%", lineHeight:1, filter:"drop-shadow(0 1px 2px rgba(0,0,0,0.5))" }}>👑</span>
+                            <div style={{
+                              position:"absolute", inset:0, borderRadius:"50%",
+                              display:"flex", alignItems:"center", justifyContent:"center",
+                              background: piece.color === "w"
+                                ? "radial-gradient(circle at 50% 42%, rgba(212,160,23,0.28), rgba(212,160,23,0) 70%)"
+                                : "radial-gradient(circle at 50% 42%, rgba(245,197,66,0.30), rgba(245,197,66,0) 70%)",
+                            }}>
+                              <CrownIcon fluid tone={piece.color === "w" ? "light" : "dark"} />
+                            </div>
                           )}
                         </div>
                       )}

@@ -5,6 +5,7 @@ import crypto from "crypto";
 const MIN_BET = 10;
 const MAX_BET = 5000;
 const VALID_GAMES = ["damas", "ludo", "xadrez"];
+const WIN_RATE = 0.90;
 
 function generateRoomCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -40,25 +41,19 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
     res.status(409).json({ error: "Já tens uma sala aberta. Cancela-a primeiro." }); return;
   }
 
-  const { data: profile, error: profileError } = await admin
-    .from("profiles").select("balance, is_blocked").eq("id", auth.userId).single();
+  // SECURITY: débito ATÓMICO via RPC — nunca perde créditos que aterram entre
+  // a leitura e a escrita (depósito/levantamento concorrente) e impede
+  // double-spend de duas criações de sala concorrentes.
+  const { data: balanceRow, error: adjustError } = await admin
+    .rpc("adjust_balance", { p_user_id: auth.userId, p_delta: -betAmount, p_min: 0 });
 
-  if (profileError || !profile) { res.status(500).json({ error: "Erro ao carregar perfil" }); return; }
-  if ((profile as { is_blocked?: boolean }).is_blocked) { res.status(403).json({ error: "Conta bloqueada" }); return; }
-
-  const currentBalance = parseFloat(String((profile as { balance: number }).balance ?? 0));
-  if (currentBalance < betAmount) { res.status(400).json({ error: "Saldo insuficiente" }); return; }
-
-  const newBalance = Math.round((currentBalance - betAmount) * 100) / 100;
-
-  // SECURITY: atomic guard — only deduct if balance is still sufficient
-  const { data: deducted, error: deductError } = await admin
-    .from("profiles").update({ balance: newBalance })
-    .eq("id", auth.userId).gte("balance", betAmount)
-    .select("balance").maybeSingle();
-
-  if (deductError || !deducted) {
-    res.status(400).json({ error: "Saldo insuficiente" }); return;
+  if (adjustError) {
+    console.error("[rooms/create] Erro ao debitar saldo:", adjustError);
+    res.status(500).json({ error: "Erro ao debitar saldo" }); return;
+  }
+  const newBalance = balanceRow === null || balanceRow === undefined ? null : Number(balanceRow);
+  if (newBalance === null) {
+    res.status(400).json({ error: "Saldo insuficiente", code: "INSUFFICIENT_BALANCE" }); return;
   }
 
   let code = generateRoomCode();
@@ -79,7 +74,8 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
     }).select("id").single();
 
   if (roomError || !room) {
-    await admin.from("profiles").update({ balance: currentBalance }).eq("id", auth.userId);
+    // Rollback atómico — nunca sobrescreve saldo concorrente
+    await admin.rpc("adjust_balance", { p_user_id: auth.userId, p_delta: betAmount, p_min: 0 });
     res.status(500).json({ error: "Erro ao criar sala. Tenta novamente." }); return;
   }
 
@@ -90,7 +86,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
     status: "approved", created_at: new Date().toISOString(),
   });
 
-  res.json({ ok: true, code, roomId: (room as { id: string }).id, newBalance: (deducted as { balance: number }).balance });
+  res.json({ ok: true, code, roomId: (room as { id: string }).id, newBalance });
 }
 
 // ─── /api/rooms/join ─────────────────────────────────────────────────────────
@@ -128,47 +124,73 @@ async function handleJoin(req: VercelRequest, res: VercelResponse) {
     res.status(400).json({ error: `Esta sala é de ${r.game_type}. Muda o jogo.` }); return;
   }
 
-  const betAmount = Number(r.bet_amount);
+  const betAmount = Math.abs(Number(r.bet_amount) || 0);
+  if (betAmount <= 0) { res.status(500).json({ error: "Sala com aposta inválida" }); return; }
 
-  const { data: profile, error: profileError } = await admin
-    .from("profiles").select("balance, is_blocked").eq("id", auth.userId).single();
+  // SECURITY: débito atómico do JOINER (RPC)
+  const { data: balanceRow, error: adjustError } = await admin
+    .rpc("adjust_balance", { p_user_id: auth.userId, p_delta: -betAmount, p_min: 0 });
 
-  if (profileError || !profile) { res.status(500).json({ error: "Erro ao carregar perfil" }); return; }
-  if ((profile as { is_blocked?: boolean }).is_blocked) { res.status(403).json({ error: "Conta bloqueada" }); return; }
+  if (adjustError) {
+    console.error("[rooms/join] Erro ao debitar saldo:", adjustError);
+    res.status(500).json({ error: "Erro ao debitar saldo" }); return;
+  }
+  const newBalance = balanceRow === null || balanceRow === undefined ? null : Number(balanceRow);
+  if (newBalance === null) {
+    res.status(400).json({ error: "Saldo insuficiente", code: "INSUFFICIENT_BALANCE" }); return;
+  }
 
-  const currentBalance = parseFloat(String((profile as { balance: number }).balance ?? 0));
-  if (currentBalance < betAmount) { res.status(400).json({ error: "Saldo insuficiente" }); return; }
-
-  const newBalance = Math.round((currentBalance - betAmount) * 100) / 100;
-
-  // SECURITY: Atomic balance deduction
-  const { data: deducted, error: deductError } = await admin
-    .from("profiles").update({ balance: newBalance })
-    .eq("id", auth.userId).gte("balance", betAmount)
-    .select("balance").maybeSingle();
-
-  if (deductError || !deducted) { res.status(400).json({ error: "Saldo insuficiente" }); return; }
-
-  // SECURITY: Atomic room status update — only succeeds if still "waiting"
+  // SECURITY: claim atómico da sala — só succeede se ainda estiver "waiting"
   const { data: updatedRoom, error: updateRoomErr } = await admin
     .from("game_rooms").update({ status: "matched", joiner_id: auth.userId })
     .eq("id", r.id).eq("status", "waiting")
     .select("id").maybeSingle();
 
   if (updateRoomErr || !updatedRoom) {
-    await admin.from("profiles").update({ balance: currentBalance }).eq("id", auth.userId);
+    // Rollback atómico do joiner
+    await admin.rpc("adjust_balance", { p_user_id: auth.userId, p_delta: betAmount, p_min: 0 });
     res.status(409).json({ error: "Sala já preenchida por outro jogador." }); return;
+  }
+
+  // CRÍTICO: criar a linha em `matches` AQUI — sem ela o win.ts nunca paga
+  // (player2_id vazio = "Partida sem adversário confirmado") e as duas apostas
+  // ficavam presas para sempre (buraco negro de saldo das salas privadas).
+  const gameId = `sala_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+  const bet = Math.round(betAmount * 100) / 100;
+
+  const { error: matchErr } = await admin.from("matches").insert({
+    id: gameId,
+    game_type: gameType,
+    player1_id: r.creator_id,
+    player2_id: auth.userId,
+    bet_amount: bet,
+    winner_payout: Math.floor(bet * 2 * WIN_RATE),
+    status: "active",
+    created_at: new Date().toISOString(),
+  });
+
+  if (matchErr) {
+    // Rollback completo: devolve o joiner e liberta a sala para nova entrada
+    await admin.rpc("adjust_balance", { p_user_id: auth.userId, p_delta: betAmount, p_min: 0 });
+    await admin.from("game_rooms")
+      .update({ status: "waiting", joiner_id: null })
+      .eq("id", r.id).eq("status", "matched").eq("joiner_id", auth.userId);
+    console.error("[rooms/join] Erro ao criar partida:", matchErr);
+    res.status(500).json({ error: "Erro ao preparar a partida. Tenta novamente." }); return;
   }
 
   await admin.from("transactions").insert({
     user_id: auth.userId, type: "bet",
-    amount: -Math.abs(betAmount),
+    amount: -bet,
     description: `Sala privada (${gameType}) — código ${code}`,
     status: "approved", created_at: new Date().toISOString(),
   });
 
-  const gameId = `sala_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-  res.json({ ok: true, gameId, betAmount, newBalance: (deducted as { balance: number }).balance });
+  // Cleanup: a sala cumpriu o seu propósito — liberta o criador para criar
+  // novas salas e evita que o efeito de recuperação volte a apanhar esta sala.
+  await admin.from("game_rooms").delete().eq("id", r.id).eq("status", "matched");
+
+  res.json({ ok: true, gameId, betAmount: bet, newBalance });
 }
 
 // ─── /api/rooms/cancel ───────────────────────────────────────────────────────
@@ -209,12 +231,27 @@ async function handleCancel(req: VercelRequest, res: VercelResponse) {
     res.status(409).json({ error: "Sala já foi preenchida — não é possível cancelar" }); return;
   }
 
-  const betAmount = Number(r.bet_amount);
-  const { data: profile } = await admin.from("profiles").select("balance").eq("id", auth.userId).single();
-  const currentBalance = parseFloat(String((profile as { balance: number } | null)?.balance ?? 0));
-  const newBalance = Math.round((currentBalance + betAmount) * 100) / 100;
+  const betAmount = Math.abs(Number(r.bet_amount) || 0);
 
-  await admin.from("profiles").update({ balance: newBalance }).eq("id", auth.userId);
+  // SECURITY: reembolso ATÓMICO via RPC — o bug "elimina mas não reembolsa"
+  // acontecia porque o reembolso reescrevia o saldo absoluto lido antes do
+  // delete (write-back obsoleto que perdia créditos concorrentes).
+  const { data: balanceRow, error: refundError } = await admin
+    .rpc("adjust_balance", { p_user_id: auth.userId, p_delta: betAmount, p_min: 0 });
+
+  if (refundError || balanceRow === null || balanceRow === undefined) {
+    console.error("[rooms/cancel] Erro ao reembolsar:", refundError);
+    // A sala já foi apagada — registra a dívida para reconciliação manual
+    await admin.from("transactions").insert({
+      user_id: auth.userId, type: "win", amount: 0,
+      description: `REEMBOLSO PENDENTE: sala cancelada (${r.game_type}) — ${betAmount} MT`,
+      status: "pending", created_at: new Date().toISOString(),
+    });
+    res.status(500).json({ error: "Sala cancelada mas o reembolso falhou — contacta o suporte." });
+    return;
+  }
+  const newBalance = Number(balanceRow);
+
   await admin.from("transactions").insert({
     user_id: auth.userId, type: "win", amount: betAmount,
     description: `Reembolso: sala cancelada (${r.game_type})`,
