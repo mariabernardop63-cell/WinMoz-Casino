@@ -100,29 +100,13 @@ function SectionHeader({
 }
 
 function KpiTile({
-  label, value, icon: Icon, accent, badge, badgeVariant = "purple", hint, onReset, decimals, prefix, compact,
+  label, value, icon: Icon, accent, badge, badgeVariant = "purple", hint, onReset, decimals, prefix,
 }: {
   label: string; value: number;
   icon: React.ElementType; accent?: string;
   badge?: string; badgeVariant?: "live" | "purple" | "warn" | "danger";
-  hint?: string; onReset?: () => void; decimals?: number; prefix?: string; compact?: boolean;
+  hint?: string; onReset?: () => void; decimals?: number; prefix?: string;
 }) {
-  if (compact) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-0.5 px-2 py-2 text-center" style={{ background: "var(--gz-bg-card-btn)" }}>
-        <span className="text-[9px] font-bold uppercase tracking-[0.05em] truncate w-full" style={{ color: "var(--gz-text-tertiary)" }}>
-          {label}
-        </span>
-        <RollingNumber
-          value={value}
-          decimals={decimals}
-          prefix={prefix}
-          className="text-[14px] font-black tracking-[-0.02em]"
-          style={{ color: "var(--gz-text-primary)" }}
-        />
-      </div>
-    );
-  }
   return (
     <div className="relative px-5 py-4 group" style={{ background: "var(--gz-bg-card-btn)" }}>
       <div className="flex items-center justify-between mb-3">
@@ -430,61 +414,43 @@ export default function Dashboard() {
         {/* ═══════════ MAIN COLUMN ═══════════ */}
         <div ref={scrollRef} className="flex-1 min-w-0 space-y-5">
 
-          {/* ── Unified KPI panel (collapses + sticks on scroll) ── */}
-          <motion.div
-            layout
-            className="lg:sticky z-30"
-            style={{ top: collapsed ? 8 : 0 }}
-            transition={{ layout: { duration: 0.32, ease: [0.4, 0, 0.2, 1] } }}
-          >
-            <motion.section
-              layout
-              className="gz-card overflow-hidden"
-              animate={{ boxShadow: collapsed ? "0 10px 30px rgba(0,0,0,.14)" : "0 0 0 rgba(0,0,0,0)" }}
-              transition={{ duration: 0.3 }}
+          {/* ── Unified KPI panel ── */}
+          <section className="gz-card overflow-hidden animate-float-up">
+            <SectionHeader
+              icon={Activity}
+              title="Resumo da Plataforma"
+              action={
+                <div className="flex items-center gap-2">
+                  {sLoad && (
+                    <span className="text-[11px] font-semibold" style={{ color: "var(--gz-text-muted)" }}>
+                      A carregar...
+                    </span>
+                  )}
+                  <LiveDot />
+                </div>
+              }
+            />
+            <div
+              className="grid grid-cols-2 md:grid-cols-3 gap-px"
+              style={{ background: "var(--gz-border-subtle)" }}
             >
-              <motion.div layout>
-                <SectionHeader
-                  icon={Activity}
-                  title="Resumo da Plataforma"
-                  action={
-                    <div className="flex items-center gap-2">
-                      {sLoad && (
-                        <span className="text-[11px] font-semibold" style={{ color: "var(--gz-text-muted)" }}>
-                          A carregar...
-                        </span>
-                      )}
-                      <LiveDot />
-                    </div>
-                  }
+              {kpis.map((k) => (
+                <KpiTile
+                  key={k.label}
+                  label={k.label}
+                  value={k.value}
+                  icon={k.icon}
+                  accent={k.accent}
+                  badge={k.badge}
+                  badgeVariant={k.badgeVariant}
+                  hint={k.hint}
+                  onReset={k.onReset}
+                  decimals={k.decimals}
+                  prefix={k.prefix}
                 />
-              </motion.div>
-              <motion.div
-                layout
-                className="grid grid-cols-3 lg:grid-cols-6 gap-px"
-                style={{ background: "var(--gz-border-subtle)" }}
-                transition={{ layout: { duration: 0.32, ease: [0.4, 0, 0.2, 1] } }}
-              >
-                {kpis.map((k) => (
-                  <motion.div layout key={k.label} className="min-w-0">
-                    <KpiTile
-                      label={k.label}
-                      value={k.value}
-                      icon={k.icon}
-                      accent={k.accent}
-                      badge={k.badge}
-                      badgeVariant={k.badgeVariant}
-                      hint={k.hint}
-                      onReset={k.onReset}
-                      decimals={k.decimals}
-                      prefix={k.prefix}
-                      compact={collapsed}
-                    />
-                  </motion.div>
-                ))}
-              </motion.div>
-            </motion.section>
-          </motion.div>
+              ))}
+            </div>
+          </section>
 
           {/* ── Area Chart — Estatística ── */}
           <section className="gz-card overflow-hidden animate-float-up" style={{ animationDelay: "80ms" }}>
