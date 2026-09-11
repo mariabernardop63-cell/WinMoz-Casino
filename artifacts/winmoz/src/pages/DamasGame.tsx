@@ -584,46 +584,39 @@ function PlayerCard({ color, name, balance, isMe, isActive, piecesLeft, damesLef
   isActive: boolean; piecesLeft: number; damesLeft: number; timeLeft: number; lives: number;
 }) {
   const isWhite = color === "w";
-  const accentColor = isWhite ? "#D4A35A" : "#5C7A2E";
   const pieceGrad = isWhite
     ? "radial-gradient(circle at 35% 30%,#F5F0E8,#C8C0A8,#A89880)"
     : "radial-gradient(circle at 35% 30%,#4A4040,#2A2020,#181010)";
   return (
-    <div style={{
-      display:"flex", alignItems:"center",
-      background:"#FFFFFF", borderRadius:14,
-      border:`2px solid ${isActive ? accentColor : "#E2E8F0"}`,
-      overflow:"hidden", height:60,
-      boxShadow: isActive ? `0 4px 20px ${accentColor}30,0 1px 4px rgba(0,0,0,0.06)` : "0 1px 6px rgba(0,0,0,0.07)",
-      transition:"border-color 0.3s,box-shadow 0.3s",
-    }}>
-      <div style={{ width:4, alignSelf:"stretch", flexShrink:0,
-        background: isActive ? `linear-gradient(180deg,${accentColor},${accentColor}88)` : "#E2E8F0",
-        transition:"background 0.3s" }}/>
-      <div style={{ width:36, height:36, borderRadius:10, flexShrink:0, margin:"0 8px",
-        background:pieceGrad, border:`2px solid ${isActive ? accentColor+"50" : "#E2E8F0"}`,
-        boxShadow:`inset 0 2px 4px rgba(255,255,255,0.3),inset 0 -2px 3px rgba(0,0,0,0.2)`,
+    <div className={`gz-playerpanel ${isActive ? "active" : ""}`}>
+      <div style={{ width:40, height:40, borderRadius:12, flexShrink:0,
+        background: pieceGrad,
+        border:`2px solid ${isActive ? "rgba(212,160,23,.6)" : isWhite ? "rgba(255,255,255,.2)" : "rgba(255,255,255,.1)"}`,
+        boxShadow:"inset 0 2px 4px rgba(255,255,255,.3),inset 0 -2px 4px rgba(0,0,0,.35)",
         display:"flex", alignItems:"center", justifyContent:"center" }}>
-        {damesLeft > 0 && <span style={{ fontSize:14 }}>👑</span>}
+        {damesLeft > 0 && <span style={{ fontSize:16, filter:"drop-shadow(0 1px 2px rgba(0,0,0,.5))" }}>👑</span>}
+        {isActive && (
+          <motion.span
+            animate={{opacity:[.4,1,.4]}}
+            transition={{duration:1.8,repeat:Infinity}}
+            style={{position:"absolute",width:40,height:40,borderRadius:12,border:"2px solid rgba(212,160,23,.5)"}}
+          />
+        )}
       </div>
       <div style={{ flex:1, minWidth:0 }}>
         <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:3 }}>
-          <span style={{ fontWeight:700, fontSize:13, color: isActive ? "#0F172A" : "#94A3B8",
-            overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:110 }}>{name}</span>
-          <span style={{ fontSize:9, fontWeight:700, letterSpacing:0.5, textTransform:"uppercase",
-            color: isMe ? "#FFFFFF" : "#64748B",
-            background: isMe ? accentColor : "#E2E8F0", borderRadius:4, padding:"2px 5px", flexShrink:0 }}>
-            {isMe?"Tu":"Rival"}
-          </span>
+          <span className={`gz-player-name ${isActive ? "" : "idle"}`}
+            style={{ overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:110 }}>{name}</span>
+          <span className={`gz-playerbadge ${isMe ? "me" : "rival"}`}>{isMe?"Tu":"Rival"}</span>
         </div>
-        <div style={{ display:"flex", alignItems:"center", gap:5 }}>
-          <span style={{ fontSize:10, color:"rgba(0,0,0,0.35)", fontWeight:600 }}>{balance}</span>
-          <span style={{ fontSize:10, color: isActive ? accentColor : "#94A3B8", fontWeight:700 }}>
-            {piecesLeft} peças{damesLeft > 0 ? ` (${damesLeft} 👑)` : ""}
+        <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+          <span className="gz-player-meta">{balance}</span>
+          <span style={{ fontSize:10, color: isActive ? "#f2d38a" : "rgba(244,236,217,.4)", fontWeight:700 }}>
+            {piecesLeft} peças{damesLeft > 0 ? ` · ${damesLeft}👑` : ""}
           </span>
         </div>
       </div>
-      <div style={{ padding:"0 10px 0 4px", display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+      <div style={{ padding:"0 12px 0 4px", display:"flex", flexDirection:"column", alignItems:"center", gap:5 }}>
         {isActive ? <TimerArc val={timeLeft}/> : <div style={{ width:28, height:28 }}/>}
         <div style={{ display:"flex", gap:3 }}>
           {Array.from({ length: 5 }).map((_, i) => {
@@ -631,9 +624,9 @@ function PlayerCard({ color, name, balance, isMe, isActive, piecesLeft, damesLef
             return (
               <div key={i} style={{
                 width: 8, height: 8, borderRadius: "50%",
-                background: alive ? "#EF4444" : "#CBD5E1",
-                border: alive ? "none" : "1px solid #94A3B8",
-                boxShadow: alive ? "0 0 4px rgba(239,68,68,0.6)" : "none",
+                background: alive ? "#EF4444" : "rgba(255,255,255,.12)",
+                border: alive ? "none" : "1px solid rgba(255,255,255,.12)",
+                boxShadow: alive ? "0 0 5px rgba(239,68,68,.7)" : "none",
                 transition: "all 0.3s ease",
               }}/>
             );
@@ -663,29 +656,27 @@ function RematchOverlay({ phase, requesterName, onAccept, onDecline, onClose }: 
   const m = msgs[phase];
   return (
     <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-      style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.82)", zIndex:200,
-        display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(10px)" }}>
+      style={{ position:"fixed", inset:0, zIndex:200,
+        display:"flex", alignItems:"center", justifyContent:"center" }}
+      className="gz-modal-backdrop">
       <motion.div initial={{ scale:0.85, y:20 }} animate={{ scale:1, y:0 }}
         transition={{ type:"spring", stiffness:280, damping:22 }}
-        style={{ width:"82%", maxWidth:300, background:"rgba(18,28,18,0.98)",
-          border:"1px solid rgba(255,255,255,0.1)", borderRadius:24, padding:"28px 22px 22px",
-          boxShadow:"0 24px 60px rgba(0,0,0,0.6)", textAlign:"center" }}>
+        style={{ width:"82%", maxWidth:300, borderRadius:24, padding:"28px 22px 22px",
+          textAlign:"center", background:"linear-gradient(180deg,#221c15,#14100b)",
+          border:"1px solid rgba(212,160,23,.22)",
+          boxShadow:"0 30px 80px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.06)" }}>
         <p style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:18,
-          color:"#E8F0FF", marginBottom:8 }}>{m.title}</p>
-        <p style={{ fontSize:12, color:"rgba(255,255,255,0.5)", marginBottom:20, lineHeight:1.5 }}>{m.body}</p>
+          color:"#f6e6bf", marginBottom:8 }}>{m.title}</p>
+        <p style={{ fontSize:12, color:"rgba(246,230,191,.5)", marginBottom:20, lineHeight:1.5 }}>{m.body}</p>
         {m.actions === "accept_decline" ? (
           <div style={{ display:"flex", gap:10 }}>
             <button onClick={onDecline} style={{ flex:1, padding:"12px 0", borderRadius:12,
               background:"rgba(239,68,68,0.12)", border:"1px solid rgba(239,68,68,0.3)",
-              color:"#EF4444", fontWeight:700, fontSize:13, cursor:"pointer" }}>Recusar</button>
-            <button onClick={onAccept} style={{ flex:1, padding:"12px 0", borderRadius:12,
-              background:"linear-gradient(135deg,#22C55E,#16A34A)", border:"none",
-              color:"#fff", fontWeight:700, fontSize:13, cursor:"pointer" }}>Aceitar</button>
+              color:"#fca5a5", fontWeight:700, fontSize:13, cursor:"pointer" }}>Recusar</button>
+            <button onClick={onAccept} className="gz-btn-primary">Aceitar</button>
           </div>
         ) : (
-          <button onClick={onClose} style={{ width:"100%", padding:"12px 0", borderRadius:12,
-            background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)",
-            color:"rgba(255,255,255,0.7)", fontWeight:700, fontSize:13, cursor:"pointer" }}>Fechar</button>
+          <button onClick={onClose} className="gz-btn-ghost" style={{ width:"100%" }}>Fechar</button>
         )}
       </motion.div>
     </motion.div>
@@ -733,58 +724,44 @@ function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQui
   isWinner: boolean; winnerName: string; loserName: string; betAmount: number;
   onReplay: () => void; onQuit: () => void;
 }) {
-  if (!isWinner) return (
+  if (!isWinner)   return (
     <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-      style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.82)",
-        backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      className="gz-modal-backdrop">
       <motion.div initial={{scale:0.6,opacity:0,y:40}} animate={{scale:1,opacity:1,y:0}}
         transition={{type:"spring",stiffness:220,damping:22}}
-        style={{background:"#fff",maxWidth:310,width:"88%",overflow:"hidden",
-          boxShadow:"0 24px 64px rgba(0,0,0,0.4)",border:"1px solid #e5e7eb"}}>
-        <div style={{background:"#fef2f2",padding:"28px 24px 22px",textAlign:"center",borderBottom:"1px solid #fecaca"}}>
-          <div style={{display:"flex",justifyContent:"center",marginBottom:14}}>
-            <div style={{width:64,height:64,background:"#fef2f2",border:"1px solid #fecaca",display:"flex",alignItems:"center",justifyContent:"center"}}>
-              <svg width={32} height={32} viewBox="0 0 32 32" fill="none">
-                <path d="M8 8 L24 24 M24 8 L8 24" stroke="#DC2626" strokeWidth="3" strokeLinecap="round"/>
-              </svg>
-            </div>
+        className="gz-modal-card">
+        <div className="gz-modal-head">
+          <div className="gz-modal-icon-badge">
+            <svg width={32} height={32} viewBox="0 0 32 32" fill="none">
+              <path d="M8 8 L24 24 M24 8 L8 24" stroke="#f87171" strokeWidth="3" strokeLinecap="round"/>
+            </svg>
           </div>
-          <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
-            color:"#9ca3af",marginBottom:6}}>DERROTA</p>
-          <p style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,
-            color:"#6b7280",lineHeight:1.2,marginBottom:4}}>Perdeste para</p>
-          <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#0a0a0a",lineHeight:1.1}}>{winnerName}</p>
+          <p className="gz-modal-label" style={{marginBottom:6}}>DERROTA</p>
+          <p style={{fontSize:13,color:"rgba(246,230,191,.6)",lineHeight:1.2,marginBottom:4}}>Perdeste para</p>
+          <p className="gz-modal-title">{winnerName}</p>
         </div>
-        <div style={{background:"#fff",padding:"20px 24px 22px"}}>
+        <div className="gz-modal-body">
           {betAmount > 0 && (
-            <div style={{background:"#fef2f2",border:"1px solid #fecaca",
-              padding:"12px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <div className="gz-stake-box loss">
               <div>
-                <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",color:"#9ca3af",marginBottom:4}}>PERDIDO</p>
-                <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:20,color:"#DC2626",lineHeight:1}}>
+                <p className="gz-stake-label">PERDIDO</p>
+                <p className="gz-stake-value loss">
                   -{betAmount.toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
-              <div style={{width:40,height:40,background:"#fef2f2",border:"1px solid #fecaca",
-                display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div className="gz-stake-icon loss">
                 <svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                  <path d="M3 17 L9 11 L13 15 L21 7" stroke="#DC2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M17 7 L21 7 L21 11" stroke="#DC2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M3 17 L9 11 L13 15 L21 7" stroke="#f87171" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M17 7 L21 7 L21 11" stroke="#f87171" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
             </div>
           )}
           <div style={{display:"flex",gap:10}}>
-            <button onClick={onReplay} style={{flex:1,background:"#0a0a0a",color:"#fff",
-              padding:"14px 0",border:"none",
-              fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",
-              display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <button onClick={onReplay} className="gz-btn-primary">
               <RotateCcw style={{width:13,height:13}}/>Revanche
             </button>
-            <button onClick={onQuit} style={{flex:1,background:"#f8fafc",
-              border:"1px solid #e5e7eb",color:"#374151",
-              padding:"14px 0",fontFamily:"'Syne',sans-serif",fontWeight:700,
-              fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <button onClick={onQuit} className="gz-btn-ghost">
               <LogOut style={{width:13,height:13}}/>Sair
             </button>
           </div>
@@ -795,16 +772,14 @@ function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQui
 
   return (
     <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
-      style={{position:"fixed",inset:0,zIndex:100,background:"rgba(0,0,0,0.82)",
-        backdropFilter:"blur(16px)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+      className="gz-modal-backdrop">
       <motion.div initial={{scale:0.6,opacity:0,y:40}} animate={{scale:1,opacity:1,y:0}}
         transition={{type:"spring",stiffness:220,damping:22}}
-        style={{background:"#fff",maxWidth:310,width:"88%",overflow:"hidden",
-          boxShadow:"0 24px 64px rgba(0,0,0,0.4)",border:"1px solid #e5e7eb"}}>
-        <div style={{background:"#f8fafc",padding:"28px 24px 22px",textAlign:"center",borderBottom:"1px solid #e5e7eb"}}>
+        className="gz-modal-card">
+        <div className="gz-modal-head">
           <motion.div animate={{y:[0,-4,0]}} transition={{duration:2,repeat:Infinity,ease:"easeInOut"}}
-            style={{display:"flex",justifyContent:"center",marginBottom:14}}>
-            <svg width={68} height={68} viewBox="0 0 100 100" fill="none">
+            className="gz-modal-icon-badge">
+            <svg width={40} height={40} viewBox="0 0 100 100" fill="none">
               <defs>
                 <linearGradient id="dwtg2" x1="25%" y1="0%" x2="75%" y2="100%">
                   <stop offset="0%" stopColor="#FFE566"/>
@@ -820,43 +795,34 @@ function WinScreen({ isWinner, winnerName, loserName, betAmount, onReplay, onQui
               <ellipse cx="38" cy="30" rx="7" ry="12" fill="rgba(255,255,255,0.2)" transform="rotate(-18 38 30)"/>
             </svg>
           </motion.div>
-          <p style={{fontSize:10,fontWeight:800,letterSpacing:3,textTransform:"uppercase",
-            color:"#9ca3af",marginBottom:6}}>VENCEDOR</p>
-          <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#0a0a0a",lineHeight:1.1}}>{winnerName}</p>
+          <p className="gz-modal-label" style={{marginBottom:6}}>VENCEDOR</p>
+          <p className="gz-modal-title">{winnerName}</p>
         </div>
-        <div style={{background:"#fff",padding:"20px 24px 22px"}}>
+        <div className="gz-modal-body">
           {betAmount > 0 && (
-            <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",padding:"14px 16px",
-              display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <div className="gz-stake-box win">
               <div>
-                <p style={{fontSize:10,fontWeight:700,letterSpacing:1.5,textTransform:"uppercase",color:"#9ca3af",marginBottom:4}}>GANHOS</p>
-                <p style={{fontFamily:"'Syne',sans-serif",fontWeight:900,fontSize:22,color:"#16a34a",lineHeight:1}}>
+                <p className="gz-stake-label">GANHOS</p>
+                <p className="gz-stake-value win">
                   +{Math.floor(betAmount * 2 * 0.90).toLocaleString("pt-MZ")}<span style={{fontSize:12}}> MT</span>
                 </p>
               </div>
-              <div style={{width:44,height:44,background:"#f0fdf4",border:"1px solid #bbf7d0",
-                display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div className="gz-stake-icon win">
                 <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="#16a34a" strokeWidth="1.5"/>
-                  <path d="M12 6v6l4 2" stroke="#16a34a" strokeWidth="1.8" strokeLinecap="round"/>
+                  <circle cx="12" cy="12" r="10" stroke="#6ee7a0" strokeWidth="1.5"/>
+                  <path d="M12 6v6l4 2" stroke="#6ee7a0" strokeWidth="1.8" strokeLinecap="round"/>
                 </svg>
               </div>
             </div>
           )}
-          <p style={{fontSize:12,color:"#9ca3af",textAlign:"center",marginBottom:16}}>
-            <span style={{color:"#374151",fontWeight:600}}>{loserName}</span> foi eliminado
+          <p style={{fontSize:12,color:"rgba(246,230,191,.5)",textAlign:"center",marginBottom:16}}>
+            <span style={{color:"#f6e6bf",fontWeight:600}}>{loserName}</span> foi eliminado
           </p>
           <div style={{display:"flex",gap:10}}>
-            <button onClick={onReplay} style={{flex:1,background:"#0a0a0a",color:"#fff",
-              padding:"14px 0",border:"none",
-              fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer",
-              display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <button onClick={onReplay} className="gz-btn-primary">
               <RotateCcw style={{width:13,height:13}}/>Jogar Novamente
             </button>
-            <button onClick={onQuit} style={{flex:1,background:"#f8fafc",
-              border:"1px solid #e5e7eb",color:"#374151",
-              padding:"14px 0",fontFamily:"'Syne',sans-serif",fontWeight:700,
-              fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+            <button onClick={onQuit} className="gz-btn-ghost">
               <LogOut style={{width:13,height:13}}/>Sair
             </button>
           </div>
@@ -1779,49 +1745,39 @@ export default function DamasGame() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="responsive-game-viewport" style={{ height:"100vh", width:"100%", overflow:"hidden",
-      background:"#fff",
+    <div className="responsive-game-viewport gz-game-viewport" style={{ height:"100vh", width:"100%", overflow:"hidden",
       display:"flex", justifyContent:"center" }}>
-      <div className="responsive-game-shell" style={{ width:"100%", maxWidth:430, height:"100vh", overflow:"hidden",
+      <div className="responsive-game-shell gz-game-shell" style={{ width:"100%", maxWidth:430, height:"100vh", overflow:"hidden",
         display:"flex", flexDirection:"column", position:"relative" }}>
 
         {/* Header */}
-        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between",
-          padding:"10px 14px 8px", borderBottom:"1px solid #e5e7eb",
-          background:"#fff", flexShrink:0 }}>
-          <button onClick={handleBack} style={{ width:34, height:34,
-            background:"none", border:"1px solid #e5e7eb",
-            display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
-            <ArrowLeft style={{ width:16, height:16, color:"#374151" }}/>
+        <div className="gz-game-header">
+          <button onClick={handleBack} className="gz-game-iconbtn" aria-label="Voltar">
+            <ArrowLeft style={{ width:17, height:17 }}/>
           </button>
-          <div style={{ textAlign:"center" }}>
-            <p style={{ fontFamily:"'Syne',sans-serif", fontWeight:900, fontSize:17,
-              color:"#0a0a0a", lineHeight:1, letterSpacing:5 }}>DAMAS</p>
+          <div style={{ textAlign:"center", flex:1, minWidth:0 }}>
+            <p className="gz-game-title">DAMAS</p>
             {kingsOnlyCount > 0
-              ? <p style={{ fontSize:9, color:"#b45309", marginTop:1, letterSpacing:1.5, fontWeight:700 }}>
+              ? <p className="gz-game-subtitle" style={{ color:"#f2d38a" }}>
                   👑 SÓ DAMAS — {30 - kingsOnlyCount} JOGADAS
                 </p>
-              : <p style={{ fontSize:9, color:"#9ca3af", marginTop:1, letterSpacing:2.5, fontWeight:700 }}>1 VS 1</p>
+              : <p className="gz-game-subtitle">1 VS 1 · ONLINE</p>
             }
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:6 }}>
             {!winner && gameId !== "local" && (
-              <button onClick={handleForfeit} style={{ width:34, height:34,
-                background:"#fef2f2", border:"1px solid #fecaca",
-                display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}>
-                <LogOut style={{ width:15, height:15, color:"#EF4444" }}/>
+              <button onClick={handleForfeit} className="gz-game-iconbtn danger" aria-label="Desistir">
+                <LogOut style={{ width:16, height:16 }}/>
               </button>
             )}
-            <div style={{ padding:"4px 10px", background:"#fefce8", border:"1px solid #fde68a" }}>
-              <span style={{ fontSize:10, color:"#92400e", fontWeight:700, fontFamily:"'Syne',sans-serif" }}>
-                {BET > 0 ? `${BET} MT` : "Demo"}
-              </span>
+            <div className="gz-game-chip">
+              {BET > 0 ? `${BET} MT` : "Demo"}
             </div>
           </div>
         </div>
 
         {/* Opponent panel */}
-        <div style={{ padding:"6px 10px 4px", flexShrink:0 }}>
+        <div className="gz-game-panelcol" style={{ padding:"8px 10px 4px", flexShrink:0 }}>
           <PlayerCard
             color={oppColor} name={opponentName} balance={opponentBal} isMe={false}
             isActive={turn === oppColor && !winner}
@@ -1831,16 +1787,10 @@ export default function DamasGame() {
         </div>
 
         {/* Board */}
-        <div style={{ flex:1, minHeight:0, padding:"4px 10px",
-          display:"flex", alignItems:"center", justifyContent:"center" }}>
-          <div style={{ width:"100%", maxHeight:"100%", aspectRatio:"1",
-            borderRadius:8, overflow:"hidden",
-            boxShadow:"0 8px 32px rgba(0,0,0,0.6), 0 0 0 3px #2A1A0A",
-            position:"relative" }}>
+        <div className="gz-game-body" style={{ padding:"4px 10px" }}>
+          <div className="gz-board-frame" style={{ width:"100%" }}>
+            <div className="gz-board-inner">
 
-            {/* Board grid */}
-            <div style={{ width:"100%", height:"100%", display:"grid",
-              gridTemplateColumns:"repeat(8,1fr)", gridTemplateRows:"repeat(8,1fr)" }}>
               {DR.map((boardRow, dRow) =>
                 DC.map((boardCol, dCol) => {
                   const light = isLight(boardRow, boardCol);
@@ -1920,17 +1870,20 @@ export default function DamasGame() {
         </div>
 
         {/* Turn indicator */}
-        <div style={{ padding:"2px 10px", flexShrink:0, textAlign:"center" }}>
-          <span style={{ fontSize:11, fontWeight:600,
-            color: myTurn ? "#b45309" : "#9ca3af" }}>
+        <div className="gz-game-panelcol" style={{ padding:"4px 10px 2px", flexShrink:0, display:"flex", justifyContent:"center" }}>
+          <div className={`gz-turn ${myTurn ? "mine" : ""}`}>
+            <span className="gz-turndot" style={{
+              background: myTurn ? "#f2d38a" : "rgba(244,236,217,.4)",
+              color: myTurn ? "#f2d38a" : "transparent",
+            }}/>
             {winner ? `Jogo terminado — ${winner === myColor ? "Venceste!" : "Perdeste"}` :
               chainPiece ? "Captura em cadeia! Continua a capturar." :
-              myTurn ? `${playerName.split(" ")[0]} — faz o teu movimento` : `A aguardar ${opponentName}…`}
-          </span>
+              myTurn ? `${playerName.split(" ")[0]} — faz o teu movimento` : `A aguardar ${opponentName}...`}
+          </div>
         </div>
 
         {/* My panel */}
-        <div style={{ padding:"4px 10px 3px", flexShrink:0 }}>
+        <div className="gz-game-panelcol" style={{ padding:"4px 10px 3px", flexShrink:0 }}>
           <PlayerCard
             color={myColor} name={playerName} balance={playerBal} isMe={true}
             isActive={myTurn && !winner}
@@ -1940,7 +1893,7 @@ export default function DamasGame() {
         </div>
 
         {/* Ad banner */}
-        <div style={{ padding:"0 10px 5px", flexShrink:0 }}>
+        <div style={{ padding:"4px 10px 5px", flexShrink:0 }}>
           <AdBanner compact />
         </div>
 
