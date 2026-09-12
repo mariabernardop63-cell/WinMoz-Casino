@@ -5,6 +5,7 @@ import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp, Bell, User } from 
 import BottomNav from "@/components/BottomNav";
 import HomeFooter from "@/components/HomeFooter";
 import AdBanner from "@/components/AdBanner";
+import WelcomeBonusModal from "@/components/WelcomeBonusModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSyntheticUser, generateWithdrawalAmount, getWithdrawalInterval, shouldBootWithdrawal, getLivePlayerCount, formatPlayerCount } from "@/lib/simulation";
 import BrandLogo from "@/components/BrandLogo";
@@ -1275,6 +1276,7 @@ const topGames = [
 export default function Home() {
   const [gamesReady, setGamesReady] = useState(false);
   const [tick, setTick] = useState(0);
+  const [showWelcomeBonus, setShowWelcomeBonus] = useState(false);
   const [, setLocation] = useLocation();
   const { user, profile } = useAuth();
   const isLoggedIn = !!user;
@@ -1292,6 +1294,29 @@ export default function Home() {
     const id = setInterval(() => setTick(t => t + 1), 20_000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    let pending = false;
+    try {
+      pending = sessionStorage.getItem("welcome_bonus_pending_home") === "true";
+    } catch {
+      return;
+    }
+    if (!pending) return;
+
+    const timer = setTimeout(() => {
+      try {
+        sessionStorage.removeItem("welcome_bonus_pending_home");
+      } catch {
+        // The modal state still prevents a duplicate display in this mount.
+      }
+      setShowWelcomeBonus(true);
+    }, 15_000);
+
+    return () => clearTimeout(timer);
+  }, [user?.id]);
 
   return (
     <div className="min-h-screen bg-[#F4F5F7] text-slate-900 w-full flex justify-center selection:bg-blue-100">
@@ -1588,6 +1613,10 @@ export default function Home() {
         <BottomNav />
 
       </div>
+      <WelcomeBonusModal
+        show={showWelcomeBonus}
+        onClose={() => setShowWelcomeBonus(false)}
+      />
     </div>
   );
 }

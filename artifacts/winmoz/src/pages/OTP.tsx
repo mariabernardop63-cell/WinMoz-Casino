@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import BrandLogo from "@/components/BrandLogo";
-import WelcomeBonusModal from "@/components/WelcomeBonusModal";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowLeft, ShieldCheck, Loader2, RefreshCw } from "lucide-react";
@@ -20,8 +19,6 @@ export default function OTP() {
   const [resending, setResending] = useState(false);
   const [error, setError] = useState("");
   const [resendSuccess, setResendSuccess] = useState(false);
-  const [showWelcomeBonus, setShowWelcomeBonus] = useState(false);
-  const welcomeBonusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const params = new URLSearchParams(window.location.search);
@@ -36,9 +33,6 @@ export default function OTP() {
 
   useEffect(() => {
     setTimeout(() => inputRefs.current[0]?.focus(), 300);
-    return () => {
-      if (welcomeBonusTimerRef.current) clearTimeout(welcomeBonusTimerRef.current);
-    };
   }, []);
 
   const fullCode = code.join("");
@@ -78,101 +72,73 @@ export default function OTP() {
     }
 
     if (otpType === "signup" && data.session?.user) {
+      let pending: Record<string, string> = {};
       try {
         const pendingRaw = sessionStorage.getItem("pendingReg");
-        const pending = pendingRaw ? JSON.parse(pendingRaw) : {};
-        if (pending.full_name || pending.phone || pending.invite_code_used) {
-          const profileUpdate: Record<string, unknown> = {};
-          if (pending.full_name) profileUpdate.full_name = pending.full_name;
-          if (pending.phone) profileUpdate.phone = pending.phone.replace(/\D/g, "");
-          if (pending.invite_code_used) profileUpdate.invite_code_used = pending.invite_code_used;
+        pending = pendingRaw ? JSON.parse(pendingRaw) : {};
+      } catch {
+        pending = {};
+      }
 
-          // PRIMARY: update profile directly via Supabase client.
-          const { error: updateErr } = await supabase
-            .from("profiles")
-            .update(profileUpdate)
-            .eq("id", data.session.user.id);
-
-          if (updateErr) {
-            // FALLBACK: if direct update fails, try the API
-            const ctrl = new AbortController();
-            const timer = setTimeout(() => ctrl.abort(), 8000);
-            try {
-              await fetch(`${API_BASE}/complete-registration`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${data.session.access_token}`,
-                },
-                signal: ctrl.signal,
-                body: JSON.stringify({
-                  full_name: pending.full_name,
-                  phone: pending.phone,
-                  invite_code_used: pending.invite_code_used,
-                }),
-              });
-            } finally {
-              clearTimeout(timer);
+      // Finish the profile, referral and welcome bonus in one idempotent
+      // server request. This avoids leaving the OTP screen waiting on a
+      // direct Supabase update before the user can enter Home.
+      let registrationSucceeded = false;
+      try {
+        for (let attempt = 0; attempt < 3 && !registrationSucceeded; attempt++) {
+          const registrationCtrl = new AbortController();
+          const registrationTimer = setTimeout(() => registrationCtrl.abort(), 8000);
+          try {
+            const registrationResponse = await fetch(`${API_BASE}/complete-registration`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${data.session.access_token}`,
+              },
+              signal: registrationCtrl.signal,
+              body: JSON.stringify({
+                full_name: pending.full_name,
+                phone: pending.phone,
+                invite_code_used: pending.invite_code_used,
+              }),
+            });
+            const registrationPayload = await registrationResponse.json().catch(() => ({})) as {
+              success?: boolean;
+              ok?: boolean;
+            };
+            if (!registrationResponse.ok || registrationPayload.success === false || registrationPayload.ok === false) {
+              throw new Error("registration completion failed");
             }
+            registrationSucceeded = true;
+          } catch (registrationError) {
+            if (attempt === 2) throw registrationError;
+            await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+          } finally {
+            clearTimeout(registrationTimer);
           }
-
-          sessionStorage.removeItem("pendingReg");
-        }
-
-        // Credit the welcome bonus through the authenticated server endpoint.
-        // The server performs an idempotent one-time claim, so retries cannot
-        // credit the same account twice.
-        let bonusRequestSucceeded = false;
-        try {
-          for (let attempt = 0; attempt < 3 && !bonusRequestSucceeded; attempt++) {
-            const bonusCtrl = new AbortController();
-            const bonusTimer = setTimeout(() => bonusCtrl.abort(), 8000);
-            try {
-              const bonusResponse = await fetch(`${API_BASE}/complete-registration`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${data.session.access_token}`,
-                },
-                signal: bonusCtrl.signal,
-                body: JSON.stringify({}),
-              });
-              const bonusPayload = await bonusResponse.json().catch(() => ({})) as {
-                success?: boolean;
-                ok?: boolean;
-              };
-              if (!bonusResponse.ok || bonusPayload.success === false || bonusPayload.ok === false) {
-                throw new Error("welcome bonus request failed");
-              }
-              bonusRequestSucceeded = true;
-            } catch (bonusError) {
-              if (attempt === 2) throw bonusError;
-              await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
-            } finally {
-              clearTimeout(bonusTimer);
-            }
-          }
-        } catch {
-          setVerifying(false);
-          setError("A conta foi confirmada, mas não foi possível creditar o bónus. Tenta novamente dentro de instantes.");
-          return;
-        }
-        if (!bonusRequestSucceeded) {
-          setVerifying(false);
-          setError("Não foi possível confirmar o crédito do bónus. Tenta novamente.");
-          return;
         }
       } catch {
         setVerifying(false);
-        setError("A conta foi confirmada, mas não foi possível concluir o crédito do bónus. Tenta novamente.");
+        setError("A conta foi confirmada, mas não foi possível concluir o crédito do bónus. Tenta novamente dentro de instantes.");
         return;
       }
+
+      if (!registrationSucceeded) {
+        setVerifying(false);
+        setError("Não foi possível concluir o registo. Tenta novamente.");
+        return;
+      }
+
+      try {
+        sessionStorage.removeItem("pendingReg");
+        sessionStorage.setItem("welcome_bonus_pending_home", "true");
+      } catch {
+        // The server has already completed the credit; storage only controls
+        // the one-time presentation of the welcome modal.
+      }
+
       setVerifying(false);
-      // Keep the confirmation screen visible for 15 seconds before showing
-      // the welcome modal, as requested.
-      welcomeBonusTimerRef.current = setTimeout(() => {
-        setShowWelcomeBonus(true);
-      }, 15_000);
+      setLocation("/");
     } else if (otpType === "recovery") {
       setVerifying(false);
       if (!data.session?.user) {
@@ -376,10 +342,6 @@ export default function OTP() {
         </motion.div>
       </div>
 
-      <WelcomeBonusModal
-        show={showWelcomeBonus}
-        onClose={() => { setShowWelcomeBonus(false); setLocation("/"); }}
-      />
     </div>
   );
 }
