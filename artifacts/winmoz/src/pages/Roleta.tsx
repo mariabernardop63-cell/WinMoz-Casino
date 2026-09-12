@@ -1,55 +1,85 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Star, Zap, AlertCircle, Lock } from "lucide-react";
+import { ChevronLeft, Star, Zap, AlertCircle, Lock, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSessionWithRefresh } from "@/lib/supabase";
 import { useLocation } from "wouter";
 
-// ─── Sectors ─────────────────────────────────────────────────────────────────
-// IMPORTANT: indices must match server-side logic:
-// 5 = "5 MT", 6 = "1 MT", 8 = "Boa Sorte"
 const SECTORS = [
-  { label: "100",   sub: "MT",    color: "#7C3AED", darkColor: "#5B21B6", prize: 100,  type: "mt"      },
-  { label: "200",   sub: "MT",    color: "#DC2626", darkColor: "#B91C1C", prize: 200,  type: "mt"      },
-  { label: "50",    sub: "MT",    color: "#6D28D9", darkColor: "#4C1D95", prize: 50,   type: "mt"      },
-  { label: "25",    sub: "MT",    color: "#EA580C", darkColor: "#C2410C", prize: 25,   type: "mt"      },
-  { label: "10",    sub: "MT",    color: "#7C3AED", darkColor: "#5B21B6", prize: 10,   type: "mt"      },
-  { label: "5",     sub: "MT",    color: "#2563EB", darkColor: "#1D4ED8", prize: 5,    type: "mt"      },
-  { label: "1",     sub: "MT",    color: "#6D28D9", darkColor: "#4C1D95", prize: 1,    type: "mt"      },
-  { label: "5.000", sub: "MT",    color: "#059669", darkColor: "#047857", prize: 5000, type: "jackpot" },
-  { label: "Boa",   sub: "Sorte", color: "#6B7280", darkColor: "#4B5563", prize: 0,    type: "luck"    },
+  { label: "100",   sub: "MT",    color: "#18181b", prize: 100,  type: "mt"      },
+  { label: "200",   sub: "MT",    color: "#27272a", prize: 200,  type: "mt"      },
+  { label: "50",    sub: "MT",    color: "#18181b", prize: 50,   type: "mt"      },
+  { label: "25",    sub: "MT",    color: "#27272a", prize: 25,   type: "mt"      },
+  { label: "10",    sub: "MT",    color: "#18181b", prize: 10,   type: "mt"      },
+  { label: "5",     sub: "MT",    color: "#27272a", prize: 5,    type: "mt"      },
+  { label: "1",     sub: "MT",    color: "#18181b", prize: 1,    type: "mt"      },
+  { label: "5.000", sub: "MT",    color: "#09090b", prize: 5000, type: "jackpot" },
+  { label: "Boa",   sub: "Sorte", color: "#3f3f46", prize: 0,    type: "luck"    },
 ];
 const N = SECTORS.length;
 const SLICE = 360 / N;
 
-// ─── Audio ───────────────────────────────────────────────────────────────────
-function playTick(ctx: AudioContext, vol = 0.15, freq = 900) {
+const PAID_SPIN_COST = 5;
+
+// ─── Audio (Web Audio API — no delay) ─────────────────────────────────────
+let sharedAudioCtx: AudioContext | null = null;
+function getAudioCtx(): AudioContext | null {
+  try {
+    if (!sharedAudioCtx) {
+      const AC = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AC) return null;
+      sharedAudioCtx = new AC();
+    }
+    if (sharedAudioCtx.state === "suspended") sharedAudioCtx.resume();
+    return sharedAudioCtx;
+  } catch { return null; }
+}
+
+function playTick(ctx: AudioContext, vol = 0.12) {
   try {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain); gain.connect(ctx.destination);
-    osc.type = "triangle"; osc.frequency.value = freq;
+    osc.type = "triangle"; osc.frequency.value = 1100;
     gain.gain.setValueAtTime(vol, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
-    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.025);
+    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.025);
   } catch { /* ignore */ }
 }
+
 function playWin(ctx: AudioContext) {
   try {
     [523, 659, 784, 1047].forEach((freq, i) => {
-      const osc = ctx.createOscillator(); const gain = ctx.createGain();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
       osc.connect(gain); gain.connect(ctx.destination);
       osc.type = "sine"; osc.frequency.value = freq;
-      const t = ctx.currentTime + i * 0.12;
+      const t = ctx.currentTime + i * 0.1;
       gain.gain.setValueAtTime(0, t);
-      gain.gain.linearRampToValueAtTime(0.18, t + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-      osc.start(t); osc.stop(t + 0.3);
+      gain.gain.linearRampToValueAtTime(0.15, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      osc.start(t); osc.stop(t + 0.24);
     });
   } catch { /* ignore */ }
 }
 
-// ─── Wheel SVG ───────────────────────────────────────────────────────────────
+function playLose(ctx: AudioContext) {
+  try {
+    [400, 350].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.type = "sine"; osc.frequency.value = freq;
+      const t = ctx.currentTime + i * 0.15;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.08, t + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      osc.start(t); osc.stop(t + 0.27);
+    });
+  } catch { /* ignore */ }
+}
+
+// ─── Wheel SVG ─────────────────────────────────────────────────────────────
 function WheelSVG() {
   const CX = 150, CY = 150, R = 138, INNER = 52;
   function sectorPath(i: number) {
@@ -70,161 +100,168 @@ function WheelSVG() {
     <svg viewBox="0 0 300 300" width="100%" height="100%" style={{ display: "block" }}>
       <defs>
         <radialGradient id="hubGrad" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#F5C842" />
-          <stop offset="60%" stopColor="#D4A017" />
-          <stop offset="100%" stopColor="#8B6914" />
+          <stop offset="0%" stopColor="#fafafa" />
+          <stop offset="100%" stopColor="#a1a1aa" />
         </radialGradient>
       </defs>
-      <circle cx={CX} cy={CY} r={R + 6} fill="none" stroke="#F5C842" strokeWidth={3} opacity={0.7} />
-      <circle cx={CX} cy={CY} r={R + 10} fill="none" stroke="#D4A017" strokeWidth={1.5} opacity={0.4} />
+      {/* Outer ring */}
+      <circle cx={CX} cy={CY} r={R + 6} fill="none" stroke="#e4e4e7" strokeWidth={3} opacity={0.6} />
+      <circle cx={CX} cy={CY} r={R + 10} fill="none" stroke="#d4d4d8" strokeWidth={1.5} opacity={0.3} />
+      {/* Sectors */}
       {SECTORS.map((s, i) => (
         <g key={i}>
-          <path d={sectorPath(i)} fill={s.color} stroke="rgba(0,0,0,0.3)" strokeWidth={1} />
-          <path d={sectorPath(i)} fill={s.darkColor} stroke="none" opacity={0.4}
-            style={{ transform: "scale(0.96)", transformOrigin: `${CX}px ${CY}px` }} />
+          <path d={sectorPath(i)} fill={s.color} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
         </g>
       ))}
+      {/* Dividers */}
       {SECTORS.map((_, i) => {
         const a = (i * SLICE - 90) * (Math.PI / 180);
         return <line key={i}
           x1={CX + INNER * Math.cos(a)} y1={CY + INNER * Math.sin(a)}
           x2={CX + R * Math.cos(a)} y2={CY + R * Math.sin(a)}
-          stroke="rgba(255,255,255,0.25)" strokeWidth={1.5} />;
+          stroke="rgba(255,255,255,0.12)" strokeWidth={1.5} />;
       })}
+      {/* Labels */}
       {SECTORS.map((s, i) => {
         const { x, y, angle } = textPos(i);
+        const isJackpot = s.type === "jackpot";
         return (
           <g key={i} transform={`rotate(${angle + 90} ${x} ${y})`}>
             <text x={x} y={y - (s.sub ? 5 : 1)} textAnchor="middle"
               fontSize={s.label.length > 4 ? 9 : s.label.length > 3 ? 10 : 12}
-              fontWeight="800" fill="white"
-              style={{ fontFamily: "'Syne',sans-serif", textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>
+              fontWeight="800" fill={isJackpot ? "#fbbf24" : "#fafafa"}
+              style={{ fontFamily: "'Syne',sans-serif" }}>
               {s.label}
             </text>
             {s.sub && (
               <text x={x} y={y + 8} textAnchor="middle" fontSize={7} fontWeight="600"
-                fill="rgba(255,255,255,0.75)" style={{ fontFamily: "sans-serif" }}>
+                fill={isJackpot ? "#fbbf24" : "rgba(255,255,255,0.5)"} style={{ fontFamily: "sans-serif" }}>
                 {s.sub}
               </text>
             )}
           </g>
         );
       })}
+      {/* Outer dots */}
       {Array.from({ length: N * 2 }).map((_, i) => {
         const a = (i * (360 / (N * 2))) * (Math.PI / 180);
         return <circle key={i} cx={CX + (R + 3) * Math.cos(a)} cy={CY + (R + 3) * Math.sin(a)}
-          r={2} fill="#FFD700" opacity={0.8} />;
+          r={2} fill="#a1a1aa" opacity={0.6} />;
       })}
+      {/* Hub */}
       <circle cx={CX} cy={CY} r={INNER - 4} fill="url(#hubGrad)" />
-      <circle cx={CX} cy={CY} r={INNER - 4} fill="none" stroke="#F5C842" strokeWidth={2} />
-      <circle cx={CX} cy={CY} r={INNER - 14} fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth={1} />
+      <circle cx={CX} cy={CY} r={INNER - 4} fill="none" stroke="#d4d4d8" strokeWidth={2} />
+      <circle cx={CX} cy={CY} r={INNER - 14} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
       <text x={CX} y={CY + 5} textAnchor="middle" fontSize={10} fontWeight="900"
-        fill="#2D1810" style={{ fontFamily: "'Syne',sans-serif" }}>SPIN</text>
+        fill="#18181b" style={{ fontFamily: "'Syne',sans-serif" }}>SPIN</text>
     </svg>
   );
 }
 
-// ─── Pointer ─────────────────────────────────────────────────────────────────
+// ─── Pointer ───────────────────────────────────────────────────────────────
 function Pointer() {
   return (
-    <div style={{ position: "absolute", top: -2, left: "50%", transform: "translateX(-50%)",
-      zIndex: 10, filter: "drop-shadow(0 2px 6px rgba(0,0,0,0.5))" }}>
-      <svg width={28} height={34} viewBox="0 0 28 34">
-        <polygon points="14,34 0,0 28,0" fill="#FF4500" />
-        <polygon points="14,34 0,0 28,0" fill="none" stroke="#FFD700" strokeWidth={2} />
-        <circle cx={14} cy={8} r={4} fill="#FFD700" />
+    <div style={{ position: "absolute", top: -4, left: "50%", transform: "translateX(-50%)",
+      zIndex: 10, filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.6))" }}>
+      <svg width={24} height={30} viewBox="0 0 24 30">
+        <polygon points="12,30 0,0 24,0" fill="#fafafa" />
+        <polygon points="12,30 0,0 24,0" fill="none" stroke="#a1a1aa" strokeWidth={1.5} />
       </svg>
     </div>
   );
 }
 
-// ─── Prize Card ───────────────────────────────────────────────────────────────
-function PrizeCard({ sector, isFreeSpin, onClose }: {
+// ─── Prize Modal ───────────────────────────────────────────────────────────
+function PrizeModal({ sector, isFreeSpin, onClose }: {
   sector: typeof SECTORS[0]; isFreeSpin: boolean; onClose: () => void
 }) {
   const isJackpot = sector.type === "jackpot";
   const isLuck = sector.type === "luck";
+  const isWin = !isLuck;
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex",
-        alignItems: "flex-end", justifyContent: "center",
-        background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)" }}
+        alignItems: "center", justifyContent: "center",
+        background: "rgba(0,0,0,0.6)", backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)", padding: 24 }}
       onClick={onClose}>
       <motion.div
-        initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
-        transition={{ type: "spring", stiffness: 300, damping: 28 }}
+        initial={{ scale: 0.88, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.92, opacity: 0, y: 10 }}
+        transition={{ type: "spring", stiffness: 340, damping: 26 }}
         onClick={e => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 430, borderRadius: "20px 20px 0 0",
-          overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)", borderBottom: "none",
-          boxShadow: `0 -12px 40px rgba(0,0,0,0.5), 0 0 40px ${sector.color}25` }}>
-        <div style={{ background: `linear-gradient(120deg,${sector.color} 0%,${sector.darkColor} 100%)`,
-          padding: "18px 22px 16px", display: "flex", alignItems: "center", gap: 14,
-          position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: 0, left: "-20%", width: "50%", height: "100%",
-            background: "linear-gradient(105deg,transparent,rgba(255,255,255,0.1),transparent)",
-            transform: "skewX(-15deg)", pointerEvents: "none" }} />
+        style={{ width: "100%", maxWidth: 360, borderRadius: 24,
+          overflow: "hidden", background: "#fff",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.15)" }}>
+        {/* Top */}
+        <div style={{ padding: "32px 28px 24px", textAlign: "center",
+          background: isWin ? "#09090b" : "#f4f4f5", position: "relative" }}>
+          <button onClick={onClose} style={{
+            position: "absolute", top: 14, right: 14, width: 28, height: 28,
+            borderRadius: 999, background: isWin ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
+            border: "none", display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer" }}>
+            <X style={{ width: 14, height: 14, color: isWin ? "rgba(255,255,255,0.5)" : "#71717a" }} />
+          </button>
+
           <motion.div
-            animate={isJackpot ? { rotate: [0, 10, -10, 5, -5, 0], scale: [1, 1.1, 1] }
-              : isLuck ? { opacity: [1, 0.55, 1] } : { y: [0, -2, 0] }}
-            transition={{ duration: isJackpot ? 0.6 : 1.8, repeat: Infinity, ease: "easeInOut" }}
-            style={{ width: 48, height: 48, borderRadius: 14, flexShrink: 0,
-              background: "rgba(0,0,0,0.22)", border: "1.5px solid rgba(255,255,255,0.2)",
+            animate={isJackpot ? { scale: [1, 1.1, 1] } : {}}
+            transition={{ duration: 0.6, repeat: Infinity }}
+            style={{ width: 56, height: 56, borderRadius: 18, margin: "0 auto 16px",
+              background: isWin ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)",
+              border: `1.5px solid ${isWin ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.06)"}`,
               display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {isLuck && (
+            {isWin ? (
+              <Star style={{ width: 28, height: 28, color: isJackpot ? "#fbbf24" : "#fafafa" }} fill={isJackpot ? "#fbbf24" : "none"} />
+            ) : (
               <svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9.5" stroke="rgba(255,255,255,0.65)" strokeWidth="1.5"/>
-                <path d="M12 7v5.5l3.5 2" stroke="rgba(255,255,255,0.9)" strokeWidth="1.8"
-                  strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
-            {!isJackpot && !isLuck && (
-              <svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9.5" fill="rgba(255,215,0,0.18)" stroke="#FFD700" strokeWidth="1.5"/>
-                <path d="M12 7.5v9M8.5 12h7" stroke="#FFD700" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            )}
-            {isJackpot && (
-              <svg width={26} height={26} viewBox="0 0 24 24" fill="none">
-                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6L12 2z"
-                  fill="rgba(255,215,0,0.4)" stroke="#FFD700" strokeWidth="1.4" strokeLinejoin="round"/>
+                <circle cx="12" cy="12" r="9.5" stroke="#a1a1aa" strokeWidth="1.5"/>
+                <path d="M12 7v5.5l3.5 2" stroke="#71717a" strokeWidth="1.8" strokeLinecap="round"/>
               </svg>
             )}
           </motion.div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: 3,
-              textTransform: "uppercase", color: "rgba(255,255,255,0.55)", marginBottom: 3 }}>
-              {isJackpot ? "JACKPOT" : isLuck ? "SEM PRÉMIO" : "GANHO"}
+
+          <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 3,
+            textTransform: "uppercase", color: isWin ? "rgba(255,255,255,0.4)" : "#a1a1aa",
+            marginBottom: 6 }}>
+            {isJackpot ? "JACKPOT" : isLuck ? "SEM PRÉMIO" : "GANHO"}
+          </p>
+          <p style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, lineHeight: 1.1,
+            fontSize: isJackpot ? 36 : isLuck ? 22 : 30,
+            color: isWin ? "#fff" : "#18181b", letterSpacing: -0.5 }}>
+            {isLuck ? "Boa Sorte!" : `${sector.label} MT`}
+          </p>
+          {isFreeSpin && isLuck && (
+            <p style={{ fontSize: 11, color: isWin ? "rgba(255,255,255,0.4)" : "#a1a1aa", marginTop: 8 }}>
+              Giro grátis usado — aposta para ganhar!
             </p>
-            <p style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, lineHeight: 1,
-              fontSize: isJackpot ? 26 : isLuck ? 20 : 24, color: "#fff", letterSpacing: -0.3 }}>
-              {isLuck ? "Boa Sorte!" : `${sector.label} ${sector.sub}`}
-            </p>
-            {isFreeSpin && isLuck && (
-              <p style={{ fontSize: 10, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
-                Giro grátis usado — aposta para ganhar!
-              </p>
-            )}
-          </div>
+          )}
         </div>
-        <div style={{ background: "rgba(8,10,18,0.97)", padding: "14px 18px 22px",
-          display: "flex", alignItems: "center", gap: 12 }}>
-          <p style={{ flex: 1, fontSize: 12, color: "rgba(255,255,255,0.42)", lineHeight: 1.5 }}>
+
+        {/* Bottom */}
+        <div style={{ padding: "18px 24px 24px", borderTop: "1px solid #f4f4f5" }}>
+          <p style={{ fontSize: 13, color: "#71717a", lineHeight: 1.6, marginBottom: 18, textAlign: "center" }}>
             {isLuck
               ? isFreeSpin
                 ? "O teu giro grátis acabou. Paga 5 MT para continuar a jogar!"
-                : "Desta vez não. Tenta de novo!"
+                : "Desta vez não saiu. Tenta de novo!"
               : isJackpot
               ? "Parabéns! Prémio máximo creditado na tua conta."
               : `+${sector.label} MT adicionados ao teu saldo.`}
           </p>
           <button onClick={onClose} style={{
-            height: 44, paddingLeft: 20, paddingRight: 20, borderRadius: 12, border: "none",
-            flexShrink: 0, cursor: "pointer",
-            background: isLuck ? "rgba(255,255,255,0.08)"
-              : `linear-gradient(135deg,${sector.color},${sector.darkColor})`,
-            color: "#fff", fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 13,
-            boxShadow: isLuck ? "none" : `0 4px 14px ${sector.color}50`,
-          }}>
+            width: "100%", height: 48, borderRadius: 14, border: "none", cursor: "pointer",
+            background: isWin ? "#09090b" : "#f4f4f5",
+            color: isWin ? "#fff" : "#18181b",
+            fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 14,
+            letterSpacing: "0.3px",
+            boxShadow: isWin ? "0 4px 16px rgba(0,0,0,0.2)" : "none",
+            transition: "transform 0.15s",
+          }}
+          onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = "scale(0.97)"; }}
+          onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}>
             {isLuck ? "Fechar" : "Continuar"}
           </button>
         </div>
@@ -233,26 +270,24 @@ function PrizeCard({ sector, isFreeSpin, onClose }: {
   );
 }
 
-// ─── Spinner icon ─────────────────────────────────────────────────────────────
+// ─── Spinner ───────────────────────────────────────────────────────────────
 function SpinnerIcon() {
   return (
-    <div style={{ width: 20, height: 20, borderRadius: "50%",
-      border: "2.5px solid rgba(255,255,255,0.25)", borderTopColor: "#fff",
-      animation: "spin 0.75s linear infinite" }} />
+    <div style={{ width: 18, height: 18, borderRadius: "50%",
+      border: "2.5px solid rgba(255,255,255,0.2)", borderTopColor: "#fff",
+      animation: "spin 0.7s linear infinite" }} />
   );
 }
 
-// ─── Main Roulette Component ──────────────────────────────────────────────────
-const PAID_SPIN_COST = 5;
-
+// ─── Main Component ────────────────────────────────────────────────────────
 export default function Roleta() {
   const [, setLocation] = useLocation();
   const { profile, refreshProfile } = useAuth();
 
   const [rotation, setRotation] = useState(0);
   const [spinDuration, setSpinDuration] = useState(5000);
-  const [loading, setLoading] = useState(false);     // API call in progress
-  const [animating, setAnimating] = useState(false); // wheel animation in progress
+  const [loading, setLoading] = useState(false);
+  const [animating, setAnimating] = useState(false);
   const [result, setResult] = useState<typeof SECTORS[0] | null>(null);
   const [wasFreeSpin, setWasFreeSpin] = useState(false);
   const [showResult, setShowResult] = useState(false);
@@ -261,7 +296,6 @@ export default function Roleta() {
   const [error, setError] = useState<string | null>(null);
   const [localBalance, setLocalBalance] = useState<number | null>(null);
 
-  const audioCtxRef = useRef<AudioContext | null>(null);
   const tickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rotationRef = useRef(0);
   const pendingBalanceRef = useRef<number | null>(null);
@@ -274,7 +308,6 @@ export default function Roleta() {
     if (!suppressBalanceSyncRef.current) setLocalBalance(profileBalance);
   }, [profile?.balance]);
 
-  // Check free spin status from server on mount (uses server Mozambique time)
   useEffect(() => {
     if (!profile?.id) return;
     void checkFreeSpinStatus();
@@ -298,57 +331,44 @@ export default function Roleta() {
     }
   }
 
-  function getAudioCtx(): AudioContext | null {
-    try {
-      if (!audioCtxRef.current) {
-        const AC = window.AudioContext || (window as any).webkitAudioContext;
-        if (!AC) return null;
-        audioCtxRef.current = new AC();
-      }
-      return audioCtxRef.current;
-    } catch {
-      return null;
-    }
-  }
-
   function stopTicking() {
     if (tickTimerRef.current) { clearTimeout(tickTimerRef.current); tickTimerRef.current = null; }
   }
 
-  // Animate wheel to a specific sector index, then call onComplete
-  const animateToSector = useCallback((targetIdx: number, onComplete: () => void) => {
+  const animateToSector = useCallback((targetIdx: number, isWin: boolean, onComplete: () => void) => {
     const ctx = getAudioCtx();
-    if (ctx && ctx.state === "suspended") { void ctx.resume(); }
 
     const currentAngleMod = ((rotationRef.current % 360) + 360) % 360;
     const rawTarget = ((360 - (targetIdx * SLICE + SLICE / 2)) % 360 + 360) % 360;
     const targetDeg = ((rawTarget - currentAngleMod) % 360 + 360) % 360;
     const totalSpins = 5 + Math.floor(Math.random() * 4);
     const totalRotation = rotationRef.current + totalSpins * 360 + targetDeg;
-    const duration = 4500 + Math.random() * 1200;
+    const duration = 4000 + Math.random() * 1000;
 
     setSpinDuration(duration);
     setRotation(totalRotation);
     rotationRef.current = totalRotation;
 
-    // Ticking audio (only if AudioContext is available)
+    // Ticking audio — starts immediately, no delay
     if (ctx) {
-      const ticksTotal = N * (totalSpins + 1);
+      const totalTicks = Math.floor(duration / 60);
       let tickCount = 0;
-      function scheduleTick() {
-        if (tickCount >= ticksTotal) { stopTicking(); return; }
-        const progress = tickCount / ticksTotal;
-        const interval = 50 + progress * progress * 350;
-        playTick(ctx!, Math.max(0.04, 0.18 - progress * 0.14), 800 + (1 - progress) * 400);
+      function scheduleNextTick() {
+        if (tickCount >= totalTicks) return;
+        const progress = tickCount / totalTicks;
+        const interval = 40 + progress * progress * 300;
+        playTick(ctx!, Math.max(0.03, 0.14 - progress * 0.11));
         tickCount++;
-        tickTimerRef.current = setTimeout(scheduleTick, interval);
+        tickTimerRef.current = setTimeout(scheduleNextTick, interval);
       }
-      scheduleTick();
+      scheduleNextTick();
     }
 
     setTimeout(() => {
       stopTicking();
-      if (ctx) playWin(ctx);
+      if (ctx) {
+        if (isWin) playWin(ctx); else playLose(ctx);
+      }
       onComplete();
     }, duration);
   }, []);
@@ -359,6 +379,10 @@ export default function Roleta() {
     if (loading || animating) return;
     if (!profile?.id) { setError("Precisas de estar autenticado para jogar."); return; }
 
+    // Resume audio context on user gesture (fixes iOS/Safari delay)
+    const ctx = getAudioCtx();
+    if (ctx?.state === "suspended") ctx.resume();
+
     setError(null);
     setShowResult(false);
     setResult(null);
@@ -366,91 +390,62 @@ export default function Roleta() {
 
     try {
       const session = await getSessionWithRefresh();
-      if (!session?.access_token) {
-        /* A sessão está morta — o getSessionWithRefresh já disparou
-           a conta permanece preservada para uma nova tentativa. */
-        setLoading(false);
-        return;
-      }
+      if (!session?.access_token) { setLoading(false); return; }
 
       const res = await fetch("/api/roleta/spin", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ isFree }),
       });
 
       let data: { sectorIndex?: number; prize?: number; newBalance?: number; error?: string };
-      try {
-        data = await res.json();
-      } catch {
-        setError("Resposta inválida do servidor. Tenta novamente.");
-        setLoading(false);
-        return;
+      try { data = await res.json(); } catch {
+        setError("Resposta inválida do servidor."); setLoading(false); return;
       }
 
-      if (!res.ok) {
-        setError(data.error ?? "Erro ao processar. Tenta novamente.");
-        setLoading(false);
-        return;
-      }
+      if (!res.ok) { setError(data.error ?? "Erro ao processar."); setLoading(false); return; }
 
       const sectorIndex = data.sectorIndex ?? 8;
       const newBalance = data.newBalance ?? 0;
+      const isWin = (data.prize ?? 0) > 0;
 
-      // Store pending balance — only applied when user dismisses the prize card
       pendingBalanceRef.current = newBalance;
       suppressBalanceSyncRef.current = true;
-
       if (isFree) setFreeSpinAvailable(false);
-
       setLoading(false);
       setAnimating(true);
 
-      try {
-        animateToSector(sectorIndex, () => {
-          setAnimating(false);
-          setWasFreeSpin(isFree);
-          setResult(SECTORS[sectorIndex]);
-          setShowResult(true);
-          // balance update deferred to onClose of PrizeCard
-        });
-      } catch {
-        // Animação falhou mas o spin foi processado — mostra resultado na mesma
+      animateToSector(sectorIndex, isWin, () => {
         setAnimating(false);
         setWasFreeSpin(isFree);
         setResult(SECTORS[sectorIndex]);
         setShowResult(true);
-      }
+      });
 
     } catch {
-      setError("Erro de rede. Verifica a tua ligação e tenta novamente.");
+      setError("Erro de rede. Verifica a tua ligação.");
       setLoading(false);
     }
   };
 
   const isBusy = loading || animating;
 
-  // Not logged in
   if (!profile && statusChecked) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-        background: "linear-gradient(180deg,#0D0620 0%,#1A0A35 50%,#0D0620 100%)", padding: 24 }}>
-        <div style={{ textAlign: "center", color: "#fff" }}>
-          <Lock style={{ width: 48, height: 48, color: "#A78BFA", margin: "0 auto 16px" }} />
-          <p style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 18, marginBottom: 8 }}>
+        background: "#fafafa", padding: 24 }}>
+        <div style={{ textAlign: "center" }}>
+          <Lock style={{ width: 44, height: 44, color: "#a1a1aa", margin: "0 auto 16px" }} />
+          <p style={{ fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 18, color: "#18181b", marginBottom: 8 }}>
             Precisa de conta
           </p>
-          <p style={{ color: "rgba(255,255,255,0.5)", marginBottom: 20 }}>
+          <p style={{ color: "#71717a", fontSize: 13, marginBottom: 20 }}>
             Faz login para jogar na Roleta da Sorte.
           </p>
           <button onClick={() => setLocation("/login")} style={{
-            background: "linear-gradient(135deg,#7C3AED,#5B21B6)", color: "#fff",
-            border: "none", borderRadius: 12, padding: "12px 28px",
-            fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 15, cursor: "pointer",
-          }}>Fazer Login</button>
+            background: "#09090b", color: "#fff", border: "none", borderRadius: 14,
+            padding: "13px 32px", fontFamily: "'Syne',sans-serif", fontWeight: 700, fontSize: 14,
+            cursor: "pointer" }}>Fazer Login</button>
         </div>
       </div>
     );
@@ -458,7 +453,7 @@ export default function Roleta() {
 
   return (
     <div style={{ minHeight: "100vh", width: "100%", display: "flex", justifyContent: "center",
-      background: "linear-gradient(180deg,#0D0620 0%,#1A0A35 50%,#0D0620 100%)" }}>
+      background: "#fafafa" }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       <div style={{ width: "100%", maxWidth: 430, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
 
@@ -467,18 +462,17 @@ export default function Roleta() {
           padding: "48px 20px 16px", flexShrink: 0 }}>
           <button onClick={() => window.history.back()} style={{
             width: 40, height: 40, borderRadius: "50%",
-            background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)",
+            background: "#fff", border: "1px solid #e4e4e7",
             display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-          }}>
-            <ChevronLeft style={{ width: 20, height: 20, color: "#fff" }} />
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+            <ChevronLeft style={{ width: 20, height: 20, color: "#18181b" }} />
           </button>
-          <p style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, fontSize: 18,
-            color: "#fff", letterSpacing: 4, textShadow: "0 0 24px rgba(124,58,237,0.8)" }}>
+          <p style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, fontSize: 16,
+            color: "#18181b", letterSpacing: 4 }}>
             ROLETA
           </p>
-          <div style={{ padding: "6px 12px", background: "rgba(255,215,0,0.12)",
-            border: "1px solid rgba(255,215,0,0.25)", borderRadius: 20 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#FFD700",
+          <div style={{ padding: "6px 14px", background: "#09090b", borderRadius: 20 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#fff",
               fontFamily: "'Syne',sans-serif" }}>
               {balance.toLocaleString("pt-MZ")} MT
             </span>
@@ -486,33 +480,28 @@ export default function Roleta() {
         </div>
 
         {/* Status badge */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
           {statusChecked && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 14px",
-              background: freeSpinAvailable ? "rgba(124,58,237,0.15)" : "rgba(255,215,0,0.10)",
-              border: `1px solid ${freeSpinAvailable ? "rgba(124,58,237,0.35)" : "rgba(255,215,0,0.25)"}`,
-              borderRadius: 99 }}>
-              <Zap style={{ width: 13, height: 13,
-                color: freeSpinAvailable ? "#A78BFA" : "#FFD700" }} />
-              <span style={{ fontSize: 11, fontWeight: 700,
-                color: freeSpinAvailable ? "#A78BFA" : "#FFD700" }}>
-                {freeSpinAvailable
-                  ? "1 giro grátis disponível hoje!"
-                  : `Apostar · 5 MT por giro`}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 16px",
+              background: freeSpinAvailable ? "#f4f4f5" : "#fff",
+              border: "1px solid #e4e4e7", borderRadius: 99 }}>
+              <Zap style={{ width: 13, height: 13, color: freeSpinAvailable ? "#18181b" : "#a1a1aa" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#18181b" }}>
+                {freeSpinAvailable ? "1 giro grátis disponível hoje!" : `Apostar · 5 MT por giro`}
               </span>
             </div>
           )}
         </div>
 
-        {/* Error banner */}
+        {/* Error */}
         <AnimatePresence>
           {error && (
             <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
               style={{ margin: "0 20px 8px", padding: "10px 14px", borderRadius: 12,
-                background: "rgba(220,38,38,0.12)", border: "1px solid rgba(220,38,38,0.35)",
+                background: "#fef2f2", border: "1px solid #fecaca",
                 display: "flex", alignItems: "center", gap: 8 }}>
-              <AlertCircle style={{ width: 16, height: 16, color: "#f87171", flexShrink: 0 }} />
-              <span style={{ fontSize: 12, color: "#f87171", lineHeight: 1.4 }}>{error}</span>
+              <AlertCircle style={{ width: 15, height: 15, color: "#dc2626", flexShrink: 0 }} />
+              <span style={{ fontSize: 12, color: "#dc2626", lineHeight: 1.4 }}>{error}</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -520,15 +509,16 @@ export default function Roleta() {
         {/* Wheel */}
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
           padding: "0 24px" }}>
-          <div style={{ width: "100%", maxWidth: 340, position: "relative" }}>
-            <div style={{ position: "absolute", inset: -20, borderRadius: "50%",
-              background: "radial-gradient(circle,rgba(124,58,237,0.3) 0%,transparent 70%)",
+          <div style={{ width: "100%", maxWidth: 320, position: "relative" }}>
+            <div style={{ position: "absolute", inset: -16, borderRadius: "50%",
+              background: "radial-gradient(circle,rgba(0,0,0,0.04) 0%,transparent 70%)",
               pointerEvents: "none" }} />
             <div style={{ position: "relative", width: "100%", paddingTop: "100%",
               borderRadius: "50%",
               boxShadow: animating
-                ? "0 0 40px rgba(124,58,237,0.6),0 0 80px rgba(124,58,237,0.3)"
-                : "0 0 20px rgba(0,0,0,0.5)",
+                ? "0 0 40px rgba(0,0,0,0.15), 0 8px 32px rgba(0,0,0,0.1)"
+                : "0 4px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)",
+              border: "3px solid #e4e4e7",
               transition: "box-shadow 0.5s" }}>
               <div style={{ position: "absolute", inset: 0 }}>
                 <Pointer />
@@ -546,39 +536,39 @@ export default function Roleta() {
           </div>
         </div>
 
-        {/* Prize legend */}
+        {/* Legend */}
         <div style={{ padding: "12px 20px", flexShrink: 0 }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
             {SECTORS.filter((_, i) => i < 6).map((s, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 6,
-                background: "rgba(255,255,255,0.05)", borderRadius: 8, padding: "5px 8px" }}>
-                <div style={{ width: 8, height: 8, borderRadius: "50%", background: s.color, flexShrink: 0 }} />
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.7)", fontWeight: 600 }}>
-                  {s.label}{s.sub ? ` ${s.sub}` : ""}
+                background: "#fff", borderRadius: 8, padding: "6px 10px",
+                border: "1px solid #f4f4f5" }}>
+                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#18181b", flexShrink: 0 }} />
+                <span style={{ fontSize: 10, color: "#71717a", fontWeight: 600 }}>
+                  {s.label} {s.sub}
                 </span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Spin buttons */}
-        <div style={{ padding: "8px 20px 36px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+        {/* Buttons */}
+        <div style={{ padding: "8px 20px 40px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
 
-          {/* Free spin button — only if available */}
           {statusChecked && freeSpinAvailable && (
             <motion.button
-              whileTap={{ scale: 0.96 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => startSpin(true)}
               disabled={isBusy}
               style={{
-                width: "100%", height: 56, borderRadius: 99, border: "none",
-                background: isBusy ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg,#7C3AED,#5B21B6)",
-                color: isBusy ? "rgba(255,255,255,0.3)" : "#fff",
-                fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 15,
+                width: "100%", height: 54, borderRadius: 16, border: "none",
+                background: isBusy ? "#f4f4f5" : "#09090b",
+                color: isBusy ? "#a1a1aa" : "#fff",
+                fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 14,
                 cursor: isBusy ? "not-allowed" : "pointer",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                boxShadow: isBusy ? "none" : "0 4px 24px rgba(124,58,237,0.45)",
-                transition: "all 0.3s",
+                boxShadow: isBusy ? "none" : "0 4px 16px rgba(0,0,0,0.15)",
+                transition: "all 0.2s",
               }}>
               {loading ? <><SpinnerIcon /> A processar…</> : animating ? <><SpinnerIcon /> A girar…</> : (
                 <><Zap style={{ width: 16, height: 16 }} /> Giro Grátis (1 por dia)</>
@@ -586,22 +576,19 @@ export default function Roleta() {
             </motion.button>
           )}
 
-          {/* Paid spin button */}
           <motion.button
-            whileTap={{ scale: 0.96 }}
+            whileTap={{ scale: 0.97 }}
             onClick={() => startSpin(false)}
             disabled={isBusy || balance < PAID_SPIN_COST}
             style={{
-              width: "100%", height: 60, borderRadius: 99, border: "none",
-              background: (isBusy || balance < PAID_SPIN_COST)
-                ? "rgba(255,255,255,0.06)"
-                : "linear-gradient(135deg,#B8860B,#D4A35A)",
-              color: (isBusy || balance < PAID_SPIN_COST) ? "rgba(255,255,255,0.3)" : "#fff",
-              fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16,
+              width: "100%", height: 58, borderRadius: 16, border: "none",
+              background: (isBusy || balance < PAID_SPIN_COST) ? "#f4f4f5" : "#18181b",
+              color: (isBusy || balance < PAID_SPIN_COST) ? "#a1a1aa" : "#fff",
+              fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 15,
               cursor: (isBusy || balance < PAID_SPIN_COST) ? "not-allowed" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              boxShadow: (isBusy || balance < PAID_SPIN_COST) ? "none" : "0 4px 24px rgba(212,163,90,0.45)",
-              transition: "all 0.3s",
+              boxShadow: (isBusy || balance < PAID_SPIN_COST) ? "none" : "0 6px 20px rgba(0,0,0,0.12)",
+              transition: "all 0.2s",
             }}>
             {loading ? <><SpinnerIcon /> A processar…</>
               : animating ? <><SpinnerIcon /> A girar…</>
@@ -609,20 +596,18 @@ export default function Roleta() {
               : <><Star style={{ width: 18, height: 18 }} /> Girar por {PAID_SPIN_COST} MT</>}
           </motion.button>
 
-          {/* Info line */}
           {statusChecked && !freeSpinAvailable && (
-            <p style={{ textAlign: "center", fontSize: 10, color: "rgba(255,255,255,0.25)",
-              marginTop: 2, lineHeight: 1.5 }}>
-              Giro grátis diário já utilizado. Volta amanhã para mais um!
+            <p style={{ textAlign: "center", fontSize: 10, color: "#a1a1aa", marginTop: 2, lineHeight: 1.5 }}>
+              Giro grátis diário já utilizado. Volta amanhã!
             </p>
           )}
         </div>
       </div>
 
-      {/* Prize overlay */}
+      {/* Result overlay */}
       <AnimatePresence>
         {showResult && result && (
-          <PrizeCard
+          <PrizeModal
             sector={result}
             isFreeSpin={wasFreeSpin}
             onClose={() => {
