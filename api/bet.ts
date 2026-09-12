@@ -70,21 +70,23 @@ async function handleRefund(req: VercelRequest, res: VercelResponse) {
 
   const admin = getSupabaseAdmin();
 
-  // Idempotência: mesmo refId → só credita uma vez (protege duplo-clique e
-  // corrida entre o botão cancelar e o temporizador de expiração).
-  if (refId && typeof refId === "string" && refId.length <= 80) {
-    const { data: existing } = await admin
-      .from("transactions")
-      .select("id")
-      .eq("user_id", auth.userId)
-      .eq("type", "win")
-      .eq("description", `Reembolso ${refId}`)
-      .limit(1);
+  // SECURITY: Always generate a server-side idempotency key if client omits refId.
+  // Prevents double-credit from double-click or network retry.
+  const idempotencyKey = refId && typeof refId === "string" && refId.length <= 80
+    ? refId
+    : `auto_${auth.userId}_${Math.round(amount)}_${Math.floor(Date.now() / 30_000)}`;
 
-    if (existing && existing.length > 0) {
-      res.json({ ok: true, alreadyRefunded: true });
-      return;
-    }
+  const { data: existing } = await admin
+    .from("transactions")
+    .select("id")
+    .eq("user_id", auth.userId)
+    .eq("type", "win")
+    .eq("description", `Reembolso ${idempotencyKey}`)
+    .limit(1);
+
+  if (existing && existing.length > 0) {
+    res.json({ ok: true, alreadyRefunded: true });
+    return;
   }
 
   const { data: balanceRow, error: adjustError } = await admin
@@ -102,9 +104,7 @@ async function handleRefund(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const txDesc = refId
-    ? `Reembolso ${refId}`
-    : `Reembolso ${(description || "").slice(0, 120)}`;
+  const txDesc = `Reembolso ${idempotencyKey}`;
 
   const { error: txError } = await admin.from("transactions").insert({
     user_id: auth.userId,

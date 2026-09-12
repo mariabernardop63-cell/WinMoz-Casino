@@ -68,19 +68,14 @@ async function handleSpin(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  const { data: profileData, error: profileError } = await supabaseAdmin
-    .from("profiles").select("balance").eq("id", userId).single();
-  if (profileError || !profileData) { res.status(500).json({ error: "Erro ao obter perfil" }); return; }
-  const currentBalance = Number(profileData.balance ?? 0);
+  // SECURITY: Atomic deduction via RPC — eliminates race condition
+  const { data: newBalRow, error: deductError } = await supabaseAdmin
+    .rpc("adjust_balance", { p_user_id: userId, p_delta: -PAID_SPIN_COST, p_min: 0 });
 
-  if (currentBalance < PAID_SPIN_COST) {
+  if (deductError || newBalRow === null || newBalRow === undefined) {
     res.status(400).json({ error: "Saldo insuficiente para apostar." }); return;
   }
-
-  const balanceAfterBet = Math.round((currentBalance - PAID_SPIN_COST) * 100) / 100;
-  const { error: deductError } = await supabaseAdmin
-    .from("profiles").update({ balance: balanceAfterBet }).eq("id", userId);
-  if (deductError) { res.status(500).json({ error: "Erro ao processar aposta" }); return; }
+  const balanceAfterBet = Number(newBalRow);
 
   await supabaseAdmin.from("transactions").insert({
     user_id: userId, type: "bet", amount: -PAID_SPIN_COST,
@@ -112,13 +107,18 @@ async function handleSpin(req: VercelRequest, res: VercelResponse) {
 
   let finalBalance = balanceAfterBet;
   if (prize > 0) {
-    finalBalance = Math.round((balanceAfterBet + prize) * 100) / 100;
-    await supabaseAdmin.from("profiles").update({ balance: finalBalance }).eq("id", userId);
-    await supabaseAdmin.from("transactions").insert({
-      user_id: userId, type: "win", amount: prize,
-      description: `Prémio Roleta da Sorte (+${prize} MT)`,
-      status: "approved", created_at: new Date().toISOString(),
-    });
+    // SECURITY: Atomic prize credit via RPC — eliminates race condition
+    const { data: prizeBalRow, error: prizeErr } = await supabaseAdmin
+      .rpc("adjust_balance", { p_user_id: userId, p_delta: prize, p_min: 0 });
+
+    if (!prizeErr && prizeBalRow !== null && prizeBalRow !== undefined) {
+      finalBalance = Number(prizeBalRow);
+      await supabaseAdmin.from("transactions").insert({
+        user_id: userId, type: "win", amount: prize,
+        description: `Prémio Roleta da Sorte (+${prize} MT)`,
+        status: "approved", created_at: new Date().toISOString(),
+      });
+    }
   }
 
   res.json({ sectorIndex, prize, newBalance: finalBalance });
