@@ -6,7 +6,7 @@ import { authenticateUser } from "../_lib/auth";
    Secrets do Vercel). Nunca é exposta ao browser — o frontend chama apenas
    este endpoint autenticado. Groq mantido como fallback de resiliência. */
 const BAI_API_URL  = "https://api.b.ai/v1/chat/completions";
-const BAI_MODEL    = "b-ai/mimo-v2.5";
+const BAI_MODEL    = "mimo-v2.5";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL   = "llama-3.3-70b-versatile";

@@ -10,7 +10,7 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
    ───────────────────────────────────────────────────────────────────────── */
 
 const BAI_API_URL = "https://api.b.ai/v1/chat/completions";
-const BAI_MODEL   = "b-ai/mimo-v2.5";
+const BAI_MODEL   = "mimo-v2.5";
 
 const rateMap = new Map<string, number[]>();
 

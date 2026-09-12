@@ -84,8 +84,6 @@ export default function OTP() {
           if (pending.invite_code_used) profileUpdate.invite_code_used = pending.invite_code_used;
 
           // PRIMARY: update profile directly via Supabase client.
-          // This triggers the fn_auto_link_referral DB trigger server-side,
-          // which reliably creates the referral entry without any API call.
           const { error: updateErr } = await supabase
             .from("profiles")
             .update(profileUpdate)
@@ -116,6 +114,22 @@ export default function OTP() {
 
           sessionStorage.removeItem("pendingReg");
         }
+
+        // ALWAYS credit welcome bonus via the API (regardless of profile update path)
+        try {
+          const bonusCtrl = new AbortController();
+          const bonusTimer = setTimeout(() => bonusCtrl.abort(), 8000);
+          await fetch(`${API_BASE}/complete-registration`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${data.session.access_token}`,
+            },
+            signal: bonusCtrl.signal,
+            body: JSON.stringify({}),
+          });
+          clearTimeout(bonusTimer);
+        } catch { /* best-effort */ }
       } catch { /* non-critical — profile update is best-effort */ }
       setVerifying(false);
       setShowWelcomeBonus(true);
