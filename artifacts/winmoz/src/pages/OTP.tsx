@@ -21,6 +21,7 @@ export default function OTP() {
   const [error, setError] = useState("");
   const [resendSuccess, setResendSuccess] = useState(false);
   const [showWelcomeBonus, setShowWelcomeBonus] = useState(false);
+  const welcomeBonusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const params = new URLSearchParams(window.location.search);
@@ -35,6 +36,9 @@ export default function OTP() {
 
   useEffect(() => {
     setTimeout(() => inputRefs.current[0]?.focus(), 300);
+    return () => {
+      if (welcomeBonusTimerRef.current) clearTimeout(welcomeBonusTimerRef.current);
+    };
   }, []);
 
   const fullCode = code.join("");
@@ -115,24 +119,60 @@ export default function OTP() {
           sessionStorage.removeItem("pendingReg");
         }
 
-        // ALWAYS credit welcome bonus via the API (regardless of profile update path)
+        // Credit the welcome bonus through the authenticated server endpoint.
+        // The server performs an idempotent one-time claim, so retries cannot
+        // credit the same account twice.
+        let bonusRequestSucceeded = false;
         try {
-          const bonusCtrl = new AbortController();
-          const bonusTimer = setTimeout(() => bonusCtrl.abort(), 8000);
-          await fetch(`${API_BASE}/complete-registration`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${data.session.access_token}`,
-            },
-            signal: bonusCtrl.signal,
-            body: JSON.stringify({}),
-          });
-          clearTimeout(bonusTimer);
-        } catch { /* best-effort */ }
-      } catch { /* non-critical — profile update is best-effort */ }
+          for (let attempt = 0; attempt < 3 && !bonusRequestSucceeded; attempt++) {
+            const bonusCtrl = new AbortController();
+            const bonusTimer = setTimeout(() => bonusCtrl.abort(), 8000);
+            try {
+              const bonusResponse = await fetch(`${API_BASE}/complete-registration`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${data.session.access_token}`,
+                },
+                signal: bonusCtrl.signal,
+                body: JSON.stringify({}),
+              });
+              const bonusPayload = await bonusResponse.json().catch(() => ({})) as {
+                success?: boolean;
+                ok?: boolean;
+              };
+              if (!bonusResponse.ok || bonusPayload.success === false || bonusPayload.ok === false) {
+                throw new Error("welcome bonus request failed");
+              }
+              bonusRequestSucceeded = true;
+            } catch (bonusError) {
+              if (attempt === 2) throw bonusError;
+              await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+            } finally {
+              clearTimeout(bonusTimer);
+            }
+          }
+        } catch {
+          setVerifying(false);
+          setError("A conta foi confirmada, mas não foi possível creditar o bónus. Tenta novamente dentro de instantes.");
+          return;
+        }
+        if (!bonusRequestSucceeded) {
+          setVerifying(false);
+          setError("Não foi possível confirmar o crédito do bónus. Tenta novamente.");
+          return;
+        }
+      } catch {
+        setVerifying(false);
+        setError("A conta foi confirmada, mas não foi possível concluir o crédito do bónus. Tenta novamente.");
+        return;
+      }
       setVerifying(false);
-      setShowWelcomeBonus(true);
+      // Keep the confirmation screen visible for 15 seconds before showing
+      // the welcome modal, as requested.
+      welcomeBonusTimerRef.current = setTimeout(() => {
+        setShowWelcomeBonus(true);
+      }, 15_000);
     } else if (otpType === "recovery") {
       setVerifying(false);
       if (!data.session?.user) {

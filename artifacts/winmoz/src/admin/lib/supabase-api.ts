@@ -680,7 +680,7 @@ export function getListBetsQueryKey() { return ["bets"]; }
 export interface AdminTransaction {
   id: string;
   playerName: string;
-  type: "bet" | "deposit" | "withdrawal" | "win";
+  type: "bet" | "deposit" | "withdrawal" | "win" | "bonus";
   amount: number;
   payout: number | null;
   status: "active" | "settled" | "cancelled" | "pending" | "approved" | "rejected";

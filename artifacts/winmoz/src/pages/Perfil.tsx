@@ -53,7 +53,7 @@ interface Tx {
 function mapTxType(dbType: string): string {
   const m: Record<string, string> = {
     deposit: "Depósito", withdrawal: "Levamento", bet: "Aposta",
-    win: "Vitória", recharge: "Recarga", referral_bonus: "Bónus",
+    win: "Vitória", recharge: "Recarga", bonus: "Bónus", referral_bonus: "Bónus",
     manual_deposit: "Depósito", manual_bet: "Aposta",
   };
   return m[dbType] || "Transação";
@@ -69,7 +69,7 @@ function mapTxIcon(dbType: string): { icon: TxIcon; color: string } {
   if (dbType === "recharge") return { icon: RefreshCw, color: "#00D4B4" };
   if (dbType === "win") return { icon: Gamepad2, color: "#f59e0b" };
   if (dbType === "bet" || dbType === "manual_bet") return { icon: Gamepad2, color: "#a78bfa" };
-  if (dbType === "referral_bonus") return { icon: ArrowDownLeft, color: "#22c55e" };
+  if (dbType === "bonus" || dbType === "referral_bonus") return { icon: ArrowDownLeft, color: "#22c55e" };
   return { icon: CreditCard, color: "#94a3b8" };
 }
 

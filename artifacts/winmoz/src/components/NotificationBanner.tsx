@@ -26,16 +26,14 @@ function CountdownButton({ onDismiss }: { onDismiss: () => void }) {
         marginTop: 16,
         width: "100%",
         padding: "12px 20px",
-        borderRadius: 12,
-        border: "none",
+        borderRadius: 0,
+        border: "1px solid #000000",
         cursor: ready ? "pointer" : "not-allowed",
         fontSize: 13,
         fontWeight: 700,
         fontFamily: "'Inter', 'Syne', sans-serif",
-        color: ready ? "#fff" : "rgba(255,255,255,0.5)",
-        background: ready
-          ? "linear-gradient(135deg, #1d4ed8, #1e40af)"
-          : "rgba(0,0,0,0.06)",
+        color: ready ? "#fff" : "#737373",
+        background: ready ? "#000000" : "#f5f5f5",
         transition: "all 0.3s ease",
         letterSpacing: "0.3px",
         display: "flex",
@@ -150,6 +148,9 @@ export default function NotificationBanner() {
           >
             <motion.div
               key="card"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="notification-modal-title"
               initial={{ opacity: 0, scale: 0.92, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -157,11 +158,11 @@ export default function NotificationBanner() {
               style={{
                 width: isAnnouncement ? "min(92vw, 420px)" : "min(88vw, 380px)",
                 pointerEvents: "all",
-                borderRadius: 20,
+                borderRadius: 0,
                 overflow: "hidden",
                 background: "#ffffff",
-                boxShadow: "0 25px 60px rgba(0,0,0,0.18), 0 8px 24px rgba(0,0,0,0.08)",
-                border: "1px solid rgba(0,0,0,0.06)",
+                boxShadow: "0 24px 64px rgba(0,0,0,0.24)",
+                border: "1px solid #111111",
               }}
             >
               {/* Close button */}
@@ -173,9 +174,9 @@ export default function NotificationBanner() {
                   right: 12,
                   width: 28,
                   height: 28,
-                  borderRadius: 999,
-                  background: "rgba(0,0,0,0.05)",
-                  border: "none",
+                  borderRadius: 0,
+                  background: "#000000",
+                  border: "1px solid #ffffff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -183,7 +184,7 @@ export default function NotificationBanner() {
                   zIndex: 10,
                 }}
               >
-                <X style={{ width: 14, height: 14, color: "#64748b" }} />
+                <X style={{ width: 14, height: 14, color: "#ffffff" }} />
               </button>
 
               {isAnnouncement ? (
@@ -191,7 +192,7 @@ export default function NotificationBanner() {
                 <div>
                   {/* Header bar */}
                   <div style={{
-                    background: "linear-gradient(135deg, #1d4ed8, #1e40af)",
+                    background: "#000000",
                     padding: "14px 18px",
                     display: "flex",
                     alignItems: "center",
@@ -200,16 +201,16 @@ export default function NotificationBanner() {
                     <div style={{
                       width: 32,
                       height: 32,
-                      borderRadius: 10,
-                      background: "rgba(255,255,255,0.15)",
+                      borderRadius: 0,
+                      background: "#ffffff",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                     }}>
-                      <Megaphone style={{ width: 16, height: 16, color: "#fff" }} />
+                      <Megaphone style={{ width: 16, height: 16, color: "#000000" }} />
                     </div>
                     <div>
-                      <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Anúncio</p>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: "#d4d4d4", textTransform: "uppercase", letterSpacing: "0.1em" }}>Anúncio</p>
                       <p style={{ fontSize: 13, fontWeight: 800, color: "#fff", fontFamily: "'Syne', sans-serif" }}>Comunicado Oficial</p>
                     </div>
                   </div>
@@ -220,7 +221,7 @@ export default function NotificationBanner() {
                       <img
                         src={current.imageUrl}
                         alt=""
-                        style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }}
+                        style={{ width: "100%", height: 160, objectFit: "cover", display: "block", filter: "grayscale(1)" }}
                         onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                       />
                       <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 40, background: "linear-gradient(to top, #fff, transparent)" }} />
@@ -229,7 +230,7 @@ export default function NotificationBanner() {
 
                   {/* Content */}
                   <div style={{ padding: "18px 20px 20px" }}>
-                    <p style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", lineHeight: 1.35, marginBottom: 8, fontFamily: "'Syne', sans-serif" }}>
+                     <p id="notification-modal-title" style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", lineHeight: 1.35, marginBottom: 8, fontFamily: "'Syne', sans-serif" }}>
                       {current.title}
                     </p>
                     {current.subtitle && (
@@ -243,9 +244,9 @@ export default function NotificationBanner() {
                         style={{
                           width: "100%",
                           padding: "11px 16px",
-                          borderRadius: 12,
-                          border: "none",
-                          background: "linear-gradient(135deg, #1d4ed8, #1e40af)",
+                          borderRadius: 0,
+                          border: "1px solid #000000",
+                          background: "#000000",
                           color: "#fff",
                           fontSize: 13,
                           fontWeight: 700,
@@ -255,7 +256,6 @@ export default function NotificationBanner() {
                           justifyContent: "center",
                           gap: 6,
                           fontFamily: "'Inter', 'Syne', sans-serif",
-                          boxShadow: "0 4px 12px rgba(29,78,216,0.3)",
                         }}
                       >
                         {current.actionButtonLabel}
@@ -270,7 +270,7 @@ export default function NotificationBanner() {
                 <div>
                   {/* Header bar */}
                   <div style={{
-                    background: "linear-gradient(135deg, #1d4ed8, #1e40af)",
+                    background: "#000000",
                     padding: "14px 18px",
                     display: "flex",
                     alignItems: "center",
@@ -279,23 +279,23 @@ export default function NotificationBanner() {
                     <div style={{
                       width: 32,
                       height: 32,
-                      borderRadius: 10,
-                      background: "rgba(255,255,255,0.15)",
+                      borderRadius: 0,
+                      background: "#ffffff",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                     }}>
-                      <Bell style={{ width: 16, height: 16, color: "#fff" }} />
+                      <Bell style={{ width: 16, height: 16, color: "#000000" }} />
                     </div>
                     <div>
-                      <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Notificação</p>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: "#d4d4d4", textTransform: "uppercase", letterSpacing: "0.1em" }}>Notificação</p>
                       <p style={{ fontSize: 13, fontWeight: 800, color: "#fff", fontFamily: "'Syne', sans-serif" }}>{brandName}</p>
                     </div>
                   </div>
 
                   {/* Content */}
                   <div style={{ padding: "20px 20px 20px" }}>
-                    <p style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", lineHeight: 1.35, marginBottom: 8, fontFamily: "'Syne', sans-serif" }}>
+                     <p id="notification-modal-title" style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", lineHeight: 1.35, marginBottom: 8, fontFamily: "'Syne', sans-serif" }}>
                       {current.title}
                     </p>
                     {current.subtitle && (
@@ -311,10 +311,10 @@ export default function NotificationBanner() {
                         style={{
                           width: "100%",
                           padding: "11px 16px",
-                          borderRadius: 12,
-                          border: "1px solid rgba(29,78,216,0.2)",
-                          background: "rgba(29,78,216,0.06)",
-                          color: "#1d4ed8",
+                          borderRadius: 0,
+                          border: "1px solid #000000",
+                          background: "#ffffff",
+                          color: "#000000",
                           fontSize: 13,
                           fontWeight: 700,
                           cursor: "pointer",
@@ -333,12 +333,12 @@ export default function NotificationBanner() {
                     <CountdownButton onDismiss={dismiss} />
 
                     {/* Progress bar */}
-                    <div style={{ marginTop: 12, height: 3, borderRadius: 3, background: "rgba(0,0,0,0.04)", overflow: "hidden" }}>
+                    <div style={{ marginTop: 12, height: 3, background: "#e5e5e5", overflow: "hidden" }}>
                       <motion.div
                         initial={{ width: "100%" }}
                         animate={{ width: "0%" }}
                         transition={{ duration: 8, ease: "linear" }}
-                        style={{ height: "100%", background: "linear-gradient(to right, #1d4ed8, #3b82f6)", borderRadius: 3 }}
+                        style={{ height: "100%", background: "#000000" }}
                       />
                     </div>
                   </div>

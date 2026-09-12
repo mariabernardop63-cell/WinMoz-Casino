@@ -87,7 +87,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           })
           .eq("id", resolvedUserId);
 
-        await admin.from("transactions").insert({
+        let { error: transactionError } = await admin.from("transactions").insert({
           user_id: resolvedUserId,
           type: "bonus",
           amount: WELCOME_BONUS,
@@ -95,6 +95,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           status: "approved",
           created_at: new Date().toISOString(),
         });
+        if (transactionError) {
+          const fallback = await admin.from("transactions").insert({
+            user_id: resolvedUserId,
+            type: "deposit",
+            amount: WELCOME_BONUS,
+            description: "Bónus de boas-vindas — 10 MT",
+            status: "approved",
+            created_at: new Date().toISOString(),
+          });
+          transactionError = fallback.error;
+        }
+        if (transactionError) {
+          await admin.rpc("adjust_balance", { p_user_id: resolvedUserId, p_delta: -WELCOME_BONUS, p_min: 0 });
+          await admin.from("profiles").update({ welcome_bonus_claimed: false, bonus_balance: 0 }).eq("id", resolvedUserId);
+          throw new Error(`welcome bonus transaction error: ${transactionError.message}`);
+        }
       } else {
         console.error("[complete-registration] welcome bonus error:", bonusErr);
       }

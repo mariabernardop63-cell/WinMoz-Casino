@@ -173,6 +173,90 @@ async function withUserLock<T>(userId: string, fn: () => Promise<T>): Promise<T>
   }
 }
 
+/**
+ * Claims and credits the welcome bonus exactly once.
+ *
+ * The conditional update is the idempotency gate. Balance and transaction
+ * writes are checked explicitly; if any step fails, the balance and claim flag
+ * are rolled back so the client never receives a success response without a
+ * real credit.
+ */
+async function claimWelcomeBonus(admin: any, userId: string): Promise<boolean> {
+  const WELCOME_BONUS = 10;
+  const { data: profile, error: profileError } = await admin
+    .from("profiles")
+    .select("welcome_bonus_claimed")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (profileError) throw new Error(`Não foi possível verificar o bónus: ${profileError.message}`);
+  if (!profile) throw new Error("Perfil do utilizador não encontrado");
+  if (profile.welcome_bonus_claimed) return false;
+
+  const { data: claimed, error: claimError } = await admin
+    .from("profiles")
+    .update({ welcome_bonus_claimed: true })
+    .eq("id", userId)
+    .eq("welcome_bonus_claimed", false)
+    .select("id")
+    .maybeSingle();
+
+  if (claimError) throw new Error(`Não foi possível reservar o bónus: ${claimError.message}`);
+  if (!claimed) return false;
+
+  const rollbackClaim = async () => {
+    await admin.from("profiles").update({ welcome_bonus_claimed: false }).eq("id", userId);
+  };
+
+  const { error: balanceError } = await admin.rpc("adjust_balance", {
+    p_user_id: userId,
+    p_delta: WELCOME_BONUS,
+    p_min: 0,
+  });
+  if (balanceError) {
+    await rollbackClaim();
+    throw new Error(`Não foi possível creditar o bónus: ${balanceError.message}`);
+  }
+
+  const { error: bonusBalanceError } = await admin
+    .from("profiles")
+    .update({ bonus_balance: WELCOME_BONUS })
+    .eq("id", userId);
+  if (bonusBalanceError) {
+    await admin.rpc("adjust_balance", { p_user_id: userId, p_delta: -WELCOME_BONUS, p_min: 0 });
+    await rollbackClaim();
+    throw new Error(`Não foi possível guardar o bónus: ${bonusBalanceError.message}`);
+  }
+
+  const transaction = {
+    user_id: userId,
+    type: "bonus",
+    amount: WELCOME_BONUS,
+    description: "Bónus de boas-vindas — 10 MT",
+    status: "approved",
+    created_at: new Date().toISOString(),
+  };
+  let { error: transactionError } = await admin.from("transactions").insert(transaction);
+
+  // Older installations may not yet allow the "bonus" transaction type.
+  // Keep the audit trail in the existing deposit type instead of losing it.
+  if (transactionError) {
+    const fallback = await admin.from("transactions").insert({
+      ...transaction,
+      type: "deposit",
+    });
+    transactionError = fallback.error;
+  }
+
+  if (transactionError) {
+    await admin.rpc("adjust_balance", { p_user_id: userId, p_delta: -WELCOME_BONUS, p_min: 0 });
+    await rollbackClaim();
+    throw new Error(`Não foi possível registar o bónus: ${transactionError.message}`);
+  }
+
+  return true;
+}
+
 router.use(healthRouter);
 router.use(debitoRouter);
 
@@ -269,7 +353,10 @@ router.post("/complete-registration", async (req, res) => {
       console.error("[complete-registration] profile update error:", profileErr.message);
     }
 
-    /* ── 3. Record referral if an invite code was used ── */
+    /* ── 3. Welcome bonus (10 MT — one-time, idempotent) ── */
+    const bonusCredited = await withUserLock(user_id, () => claimWelcomeBonus(admin, user_id));
+
+    /* ── 4. Record referral if an invite code was used ── */
     if (invite_code_used && invite_code_used.trim().length >= 4) {
       const code = invite_code_used.toUpperCase().trim();
 
@@ -317,7 +404,7 @@ router.post("/complete-registration", async (req, res) => {
       }
     }
 
-    res.json({ success: true, user_id, my_invite_code: myCode });
+    res.json({ success: true, user_id, my_invite_code: myCode, bonusCredited });
   } catch (err) {
     console.error("[complete-registration] unexpected error:", err);
     res.status(500).json({ error: "Internal server error" });

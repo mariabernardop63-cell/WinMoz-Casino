@@ -27,7 +27,7 @@ interface Tx {
 function mapType(dbType: string): string {
   const m: Record<string, string> = {
     deposit: "Depósito", withdrawal: "Levamento", bet: "Aposta",
-    win: "Aposta", recharge: "Recarga", referral_bonus: "Bónus",
+    win: "Aposta", recharge: "Recarga", bonus: "Bónus", referral_bonus: "Bónus",
   };
   return m[dbType] || "Transação";
 }
@@ -44,6 +44,7 @@ function mapStatus(s: string): Tx["state"] {
 
 function getIcon(type: string) {
   if (type === "Depósito") return { Icon: ArrowDownLeft, color: "#22c55e" };
+  if (type === "Bónus") return { Icon: ArrowDownLeft, color: "#111111" };
   if (type === "Levamento") return { Icon: ArrowUpRight, color: "#ef4444" };
   if (type === "Recarga") return { Icon: RefreshCw, color: CYAN };
   if (type === "Aposta") return { Icon: Gamepad2, color: "#a78bfa" };

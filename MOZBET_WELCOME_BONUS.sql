@@ -36,3 +36,23 @@ BEGIN
   RETURN new_bal;
 END;
 $$;
+
+-- 5. Permitir que o lançamento do bónus seja guardado no histórico.
+-- Instalações antigas podem ainda ter o constraint sem o tipo 'bonus'.
+ALTER TABLE public.transactions
+  DROP CONSTRAINT IF EXISTS transactions_type_check;
+
+ALTER TABLE public.transactions
+  ADD CONSTRAINT transactions_type_check
+  CHECK (type IN (
+    'deposit',
+    'withdrawal',
+    'recharge',
+    'bet',
+    'win',
+    'manual_deposit',
+    'manual_bet',
+    'referral_bonus',
+    'affiliate_bonus',
+    'bonus'
+  ));
