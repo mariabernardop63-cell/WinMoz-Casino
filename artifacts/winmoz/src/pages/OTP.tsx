@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import BrandLogo from "@/components/BrandLogo";
+import WelcomeBonusModal from "@/components/WelcomeBonusModal";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { ArrowLeft, ShieldCheck, Loader2, RefreshCw } from "lucide-react";
@@ -19,6 +20,7 @@ export default function OTP() {
   const [resending, setResending] = useState(false);
   const [error, setError] = useState("");
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [showWelcomeBonus, setShowWelcomeBonus] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   const params = new URLSearchParams(window.location.search);
@@ -116,7 +118,7 @@ export default function OTP() {
         }
       } catch { /* non-critical — profile update is best-effort */ }
       setVerifying(false);
-      setLocation("/");
+      setShowWelcomeBonus(true);
     } else if (otpType === "recovery") {
       setVerifying(false);
       if (!data.session?.user) {
@@ -319,6 +321,11 @@ export default function OTP() {
           </p>
         </motion.div>
       </div>
+
+      <WelcomeBonusModal
+        show={showWelcomeBonus}
+        onClose={() => { setShowWelcomeBonus(false); setLocation("/"); }}
+      />
     </div>
   );
 }

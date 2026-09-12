@@ -11,6 +11,7 @@
     { "source": "/api/games/:action", "destination": "/api/games?_action=:action" },
     { "source": "/api/bet/:action", "destination": "/api/bet?_action=:action" },
     { "source": "/api/record-bet-reward", "destination": "/api/games?_action=record-bet-reward" },
+    { "source": "/api/chat-bots", "destination": "/api/chat-bots" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

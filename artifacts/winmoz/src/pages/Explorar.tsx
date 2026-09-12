@@ -252,8 +252,6 @@ function SalaTab() {
   async function deductBalance(amount: number, desc: string): Promise<{ ok: boolean; error?: string }> {
     if (!user?.id) return { ok: false, error: "Não autenticado" };
     try {
-      /* SECURITY: balance mutations go through the server-side API with atomic
-         guards — the browser must never write to profiles.balance directly */
       const session = await getSessionWithRefresh();
       const token = session?.access_token;
       if (!token) return { ok: false, error: "Sessão expirada" };
@@ -262,10 +260,28 @@ function SalaTab() {
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
         body: JSON.stringify({ amount, description: desc }),
       });
-      const data = await res.json() as { ok?: boolean; error?: string };
+      const data = await res.json() as { ok?: boolean; error?: string; newBalance?: number };
       if (!res.ok || !data.ok) return { ok: false, error: data.error ?? "Erro ao debitar saldo" };
       refreshProfile();
       return { ok: true };
+    } catch { return { ok: false, error: "Erro de ligação" }; }
+  }
+
+  async function createRoomViaAPI(amount: number, gameType: string): Promise<{ ok: boolean; code?: string; roomId?: string; error?: string }> {
+    if (!user?.id) return { ok: false, error: "Não autenticado" };
+    try {
+      const session = await getSessionWithRefresh();
+      const token = session?.access_token;
+      if (!token) return { ok: false, error: "Sessão expirada" };
+      const res = await fetch("/api/rooms/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ betAmount: amount, gameType }),
+      });
+      const data = await res.json() as { ok?: boolean; code?: string; roomId?: string; error?: string };
+      if (!res.ok || !data.ok) return { ok: false, error: data.error ?? "Erro ao criar sala" };
+      refreshProfile();
+      return { ok: true, code: data.code, roomId: data.roomId };
     } catch { return { ok: false, error: "Erro de ligação" }; }
   }
 
@@ -562,14 +578,14 @@ function SalaTab() {
             if (!selectedBet || !selectedGame) return;
             setError(""); setLoading(true);
             try {
-              const result = await deductBalance(selectedBet, `Criação de sala – ${selectedGame.name}`);
-              if (!result.ok) {
-                setError(result.error === "Saldo insuficiente"
+              const result = await createRoomViaAPI(selectedBet, selectedGame.id);
+              if (!result.ok || !result.code) {
+                setError(result.error === "Saldo insuficiente" || result.error?.includes("insuficiente")
                   ? "Saldo insuficiente. Por favor recarregue a sua conta."
-                  : "Não foi possível criar a sala. Tenta novamente.");
+                  : result.error || "Não foi possível criar a sala. Tenta novamente.");
                 setLoading(false); return;
               }
-              const code = genRoomCode();
+              const code = result.code;
               const rec: RoomRecord = { code, gameId: selectedGame.id, gameName: selectedGame.name, betAmount: selectedBet, createdAt: Date.now(), status: "waiting" };
               const updated = [rec, ...loadRooms()];
               saveRooms(updated); setMyRooms(updated);
@@ -662,14 +678,28 @@ function SalaTab() {
         <button disabled={loading}
           onClick={async () => {
             setError(""); setLoading(true);
-            const result = await deductBalance(activeBet, `Entrada em sala ${activeCode}`);
-            if (!result.ok) {
-              setError(result.error === "Saldo insuficiente"
-                ? "Saldo insuficiente. Por favor recarregue a sua conta."
-                : "Não foi possível entrar na sala. Tenta novamente.");
-              setLoading(false); return;
+            try {
+              const session = await getSessionWithRefresh();
+              const token = session?.access_token;
+              if (!token) { setError("Sessão expirada. Faz login novamente."); setLoading(false); return; }
+              const res = await fetch("/api/rooms/join", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ code: activeCode, gameType: activeGameId }),
+              });
+              const data = await res.json() as { ok?: boolean; gameId?: string; error?: string };
+              if (!res.ok || !data.ok) {
+                setError(data.error === "Saldo insuficiente" || data.error?.includes("insuficiente")
+                  ? "Saldo insuficiente. Por favor recarregue a sua conta."
+                  : data.error || "Não foi possível entrar na sala. Tenta novamente.");
+                setLoading(false); return;
+              }
+              refreshProfile();
+              setLoading(false); setWaitRemaining(300); setWaitFound(false); setRoomRole("joiner"); setView("room-waiting");
+            } catch {
+              setError("Erro de ligação. Tenta novamente.");
+              setLoading(false);
             }
-            setLoading(false); setWaitRemaining(300); setWaitFound(false); setRoomRole("joiner"); setView("room-waiting");
           }}
           className="w-full py-4 rounded-xl font-syne font-bold text-sm flex items-center justify-center gap-2 text-white"
           style={{ background: loading ? "#7c3aed99" : "linear-gradient(135deg,#7c3aed,#6d28d9)", cursor: loading ? "not-allowed" : "pointer" }}>

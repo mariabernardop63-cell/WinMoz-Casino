@@ -26,6 +26,21 @@ args = "Start application"
 task = "workflow.run"
 args = "API Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "DeepSeek Harness"
+
+[[workflows.workflow]]
+name = "DeepSeek Harness"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash /home/runner/workspace/tools/start-dsh.sh"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"

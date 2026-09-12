@@ -1,17 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Bell, Megaphone, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGetUserNotifications, useMarkNotificationRead, UserNotification } from "@/admin/lib/supabase-api";
 import { useLocation } from "wouter";
 import { BrandMark } from "@/components/BrandLogo";
-
-function LogoBars() {
-  return <BrandMark size={18} variant="light" />;
-}
+import { useBrand } from "@/lib/brand-context";
 
 function CountdownButton({ onDismiss }: { onDismiss: () => void }) {
-  const [secondsLeft, setSecondsLeft] = useState(10);
+  const [secondsLeft, setSecondsLeft] = useState(8);
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
@@ -26,34 +23,35 @@ function CountdownButton({ onDismiss }: { onDismiss: () => void }) {
       onClick={ready ? onDismiss : undefined}
       disabled={!ready}
       style={{
-        marginTop: 20,
+        marginTop: 16,
         width: "100%",
-        padding: "11px 20px",
-        borderRadius: 14,
+        padding: "12px 20px",
+        borderRadius: 12,
         border: "none",
         cursor: ready ? "pointer" : "not-allowed",
-        fontSize: 13.5,
+        fontSize: 13,
         fontWeight: 700,
-        fontFamily: "inherit",
-        color: ready ? "#fff" : "rgba(255,255,255,0.45)",
+        fontFamily: "'Inter', 'Syne', sans-serif",
+        color: ready ? "#fff" : "rgba(255,255,255,0.5)",
         background: ready
-          ? "linear-gradient(135deg, #6C5CE7, #4f46e5)"
-          : "rgba(255,255,255,0.1)",
+          ? "linear-gradient(135deg, #1d4ed8, #1e40af)"
+          : "rgba(0,0,0,0.06)",
         transition: "all 0.3s ease",
-        letterSpacing: "0.2px",
+        letterSpacing: "0.3px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         gap: 8,
       }}
     >
-      {ready ? "Já li" : `Já li  (${secondsLeft}s)`}
+      {ready ? "Fechar" : `Fechar (${secondsLeft}s)`}
     </button>
   );
 }
 
 export default function NotificationBanner() {
   const { user, profile } = useAuth();
+  const { brandName } = useBrand();
   const [, setLocation] = useLocation();
   const { data: notifications = [] } = useGetUserNotifications(user?.id ?? null, profile?.created_at ?? null);
   const markRead = useMarkNotificationRead();
@@ -75,7 +73,7 @@ export default function NotificationBanner() {
 
     const fresh = unread.filter(n => {
       const age = Date.now() - new Date(n.createdAt).getTime();
-      return age < 10 * 60 * 1000; // only show notifications from last 10 minutes
+      return age < 10 * 60 * 1000;
     });
 
     if (fresh.length === 0) return;
@@ -130,12 +128,14 @@ export default function NotificationBanner() {
             style={{
               position: "fixed",
               inset: 0,
-              background: "rgba(0,0,0,0.55)",
+              background: "rgba(15,23,42,0.45)",
+              backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
               zIndex: 9998,
             }}
           />
 
-          {/* Centering wrapper — handles position; motion.div handles animation */}
+          {/* Centering wrapper */}
           <div
             style={{
               position: "fixed",
@@ -145,58 +145,121 @@ export default function NotificationBanner() {
               justifyContent: "center",
               zIndex: 9999,
               pointerEvents: "none",
+              padding: "20px",
             }}
           >
             <motion.div
               key="card"
-              initial={{ opacity: 0, scale: 0.88, y: 24 }}
+              initial={{ opacity: 0, scale: 0.92, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 16 }}
-              transition={{ type: "spring", stiffness: 340, damping: 26 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ type: "spring", stiffness: 360, damping: 28 }}
               style={{
-                width: isAnnouncement ? "min(92vw, 440px)" : "min(88vw, 380px)",
+                width: isAnnouncement ? "min(92vw, 420px)" : "min(88vw, 380px)",
                 pointerEvents: "all",
-                borderRadius: 22,
+                borderRadius: 20,
                 overflow: "hidden",
-                background: "linear-gradient(160deg, #1a0840 0%, #2d1065 50%, #1e0a3c 100%)",
-                boxShadow: "0 24px 64px rgba(108,92,231,0.45), 0 4px 20px rgba(0,0,0,0.4)",
+                background: "#ffffff",
+                boxShadow: "0 25px 60px rgba(0,0,0,0.18), 0 8px 24px rgba(0,0,0,0.08)",
+                border: "1px solid rgba(0,0,0,0.06)",
               }}
             >
+              {/* Close button */}
+              <button
+                onClick={dismiss}
+                style={{
+                  position: "absolute",
+                  top: 12,
+                  right: 12,
+                  width: 28,
+                  height: 28,
+                  borderRadius: 999,
+                  background: "rgba(0,0,0,0.05)",
+                  border: "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  zIndex: 10,
+                }}
+              >
+                <X style={{ width: 14, height: 14, color: "#64748b" }} />
+              </button>
+
               {isAnnouncement ? (
-                /* ── Announcement layout: image left + content right ── */
-                <div style={{ display: "flex", minHeight: 140 }}>
-                  {/* Left: image */}
+                /* ── Announcement layout ── */
+                <div>
+                  {/* Header bar */}
+                  <div style={{
+                    background: "linear-gradient(135deg, #1d4ed8, #1e40af)",
+                    padding: "14px 18px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                  }}>
+                    <div style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 10,
+                      background: "rgba(255,255,255,0.15)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}>
+                      <Megaphone style={{ width: 16, height: 16, color: "#fff" }} />
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Anúncio</p>
+                      <p style={{ fontSize: 13, fontWeight: 800, color: "#fff", fontFamily: "'Syne', sans-serif" }}>Comunicado Oficial</p>
+                    </div>
+                  </div>
+
+                  {/* Image */}
                   {current.imageUrl && (
-                    <div style={{ width: 130, flexShrink: 0, position: "relative", overflow: "hidden" }}>
+                    <div style={{ width: "100%", maxHeight: 160, overflow: "hidden", position: "relative" }}>
                       <img
                         src={current.imageUrl}
                         alt=""
-                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        style={{ width: "100%", height: 160, objectFit: "cover", display: "block" }}
                         onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                       />
-                      <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, transparent 60%, rgba(30,8,60,0.6))" }} />
+                      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 40, background: "linear-gradient(to top, #fff, transparent)" }} />
                     </div>
                   )}
-                  {/* Right: content */}
-                  <div style={{ flex: 1, padding: current.imageUrl ? "20px 20px 20px 18px" : "22px 22px 20px 22px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                      <LogoBars />
-                      <span style={{ fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.12em" }}>Anúncio</span>
-                    </div>
-                    <p style={{ fontSize: 15, fontWeight: 800, color: "#fff", lineHeight: 1.3, marginBottom: 4, fontFamily: "'Syne', sans-serif" }}>
+
+                  {/* Content */}
+                  <div style={{ padding: "18px 20px 20px" }}>
+                    <p style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", lineHeight: 1.35, marginBottom: 8, fontFamily: "'Syne', sans-serif" }}>
                       {current.title}
                     </p>
                     {current.subtitle && (
-                      <p style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", lineHeight: 1.5, marginBottom: 10 }}>
+                      <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.6, marginBottom: 14 }}>
                         {current.subtitle}
                       </p>
                     )}
                     {current.actionButtonLabel && (
                       <button
                         onClick={handleAction}
-                        style={{ padding: "7px 14px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #6C5CE7, #4f46e5)", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                        style={{
+                          width: "100%",
+                          padding: "11px 16px",
+                          borderRadius: 12,
+                          border: "none",
+                          background: "linear-gradient(135deg, #1d4ed8, #1e40af)",
+                          color: "#fff",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                          fontFamily: "'Inter', 'Syne', sans-serif",
+                          boxShadow: "0 4px 12px rgba(29,78,216,0.3)",
+                        }}
+                      >
                         {current.actionButtonLabel}
-                        <ExternalLink style={{ width: 11, height: 11 }} />
+                        <ExternalLink style={{ width: 13, height: 13 }} />
                       </button>
                     )}
                     <CountdownButton onDismiss={dismiss} />
@@ -204,44 +267,80 @@ export default function NotificationBanner() {
                 </div>
               ) : (
                 /* ── Regular notification layout ── */
-                <div style={{ padding: "22px 22px 22px 22px" }}>
-                  {/* Logo bars top-left */}
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
-                    <LogoBars />
-                    <span style={{ fontSize: 9.5, fontWeight: 700, color: "rgba(255,255,255,0.45)", textTransform: "uppercase", letterSpacing: "0.12em" }}>Notificação</span>
+                <div>
+                  {/* Header bar */}
+                  <div style={{
+                    background: "linear-gradient(135deg, #1d4ed8, #1e40af)",
+                    padding: "14px 18px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                  }}>
+                    <div style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 10,
+                      background: "rgba(255,255,255,0.15)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}>
+                      <Bell style={{ width: 16, height: 16, color: "#fff" }} />
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Notificação</p>
+                      <p style={{ fontSize: 13, fontWeight: 800, color: "#fff", fontFamily: "'Syne', sans-serif" }}>{brandName}</p>
+                    </div>
                   </div>
 
-                  {/* Title + subtitle */}
-                  <p style={{ fontSize: 17, fontWeight: 800, color: "#fff", lineHeight: 1.35, marginBottom: 6, fontFamily: "'Syne', sans-serif" }}>
-                    {current.title}
-                  </p>
-                  {current.subtitle && (
-                    <p style={{ fontSize: 13, color: "rgba(255,255,255,0.72)", lineHeight: 1.6 }}>
-                      {current.subtitle}
+                  {/* Content */}
+                  <div style={{ padding: "20px 20px 20px" }}>
+                    <p style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", lineHeight: 1.35, marginBottom: 8, fontFamily: "'Syne', sans-serif" }}>
+                      {current.title}
                     </p>
-                  )}
+                    {current.subtitle && (
+                      <p style={{ fontSize: 13, color: "#475569", lineHeight: 1.65, marginBottom: 14 }}>
+                        {current.subtitle}
+                      </p>
+                    )}
 
-                  {/* Action button */}
-                  {current.actionButtonLabel && (
-                    <button
-                      onClick={handleAction}
-                      style={{ marginTop: 14, padding: "9px 16px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 12.5, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: "inherit" }}>
-                      {current.actionButtonLabel}
-                      <ExternalLink style={{ width: 12, height: 12 }} />
-                    </button>
-                  )}
+                    {/* Action button */}
+                    {current.actionButtonLabel && (
+                      <button
+                        onClick={handleAction}
+                        style={{
+                          width: "100%",
+                          padding: "11px 16px",
+                          borderRadius: 12,
+                          border: "1px solid rgba(29,78,216,0.2)",
+                          background: "rgba(29,78,216,0.06)",
+                          color: "#1d4ed8",
+                          fontSize: 13,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 6,
+                          fontFamily: "'Inter', 'Syne', sans-serif",
+                        }}
+                      >
+                        {current.actionButtonLabel}
+                        <ExternalLink style={{ width: 13, height: 13 }} />
+                      </button>
+                    )}
 
-                  {/* Countdown dismiss button */}
-                  <CountdownButton onDismiss={dismiss} />
+                    <CountdownButton onDismiss={dismiss} />
 
-                  {/* Progress bar */}
-                  <div style={{ marginTop: 14, height: 2, borderRadius: 2, background: "rgba(255,255,255,0.1)", overflow: "hidden" }}>
-                    <motion.div
-                      initial={{ width: "100%" }}
-                      animate={{ width: "0%" }}
-                      transition={{ duration: 10, ease: "linear" }}
-                      style={{ height: "100%", background: "linear-gradient(to right, #a78bfa, #6C5CE7)", borderRadius: 2 }}
-                    />
+                    {/* Progress bar */}
+                    <div style={{ marginTop: 12, height: 3, borderRadius: 3, background: "rgba(0,0,0,0.04)", overflow: "hidden" }}>
+                      <motion.div
+                        initial={{ width: "100%" }}
+                        animate={{ width: "0%" }}
+                        transition={{ duration: 8, ease: "linear" }}
+                        style={{ height: "100%", background: "linear-gradient(to right, #1d4ed8, #3b82f6)", borderRadius: 3 }}
+                      />
+                    </div>
                   </div>
                 </div>
               )}

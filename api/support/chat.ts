@@ -1,12 +1,12 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { authenticateUser } from "../_lib/auth";
 
-/* ── Provider: b.ia (OpenAI-compatible) · model: GLM 5.3 Flash ────────────────
+/* ── Provider: b.ia (OpenAI-compatible) · model: mimo v2.5 ───────────────────
    SECURITY: a chave vive APENAS no ambiente do servidor (BAI_API_KEY nas
    Secrets do Vercel). Nunca é exposta ao browser — o frontend chama apenas
    este endpoint autenticado. Groq mantido como fallback de resiliência. */
-const BAI_API_URL  = process.env["BAI_API_URL"]  || "https://api.b.ai/v1/chat/completions";
-const BAI_MODEL    = process.env["BAI_MODEL"]    || "glm-5.3-flash";
+const BAI_API_URL  = "https://api.b.ai/v1/chat/completions";
+const BAI_MODEL    = "b-ai/mimo-v2.5";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL   = "llama-3.3-70b-versatile";

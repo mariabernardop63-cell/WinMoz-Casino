@@ -35,11 +35,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Blocked status
   const { data: blockedRow } = await admin
     .from("profiles")
-    .select("is_blocked, full_name")
+    .select("is_blocked, full_name, bonus_balance, balance")
     .eq("id", auth.userId)
     .single();
 
-  const p = blockedRow as { is_blocked?: boolean; full_name?: string } | null;
+  const p = blockedRow as { is_blocked?: boolean; full_name?: string; bonus_balance?: number; balance?: number } | null;
   if (!p) {
     res.status(500).json({ error: "Erro ao carregar perfil" });
     return;
@@ -47,6 +47,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (p.is_blocked) {
     res.status(403).json({ error: "Conta bloqueada" });
     return;
+  }
+
+  // ── WELCOME BONUS CHECK ──────────────────────────────────────────────────
+  // If the user has bonus_balance > 0, they must have placed at least one bet
+  // before they can withdraw. This prevents bonus abuse.
+  const bonusBalance = Number(p.bonus_balance ?? 0);
+  if (bonusBalance > 0) {
+    const { count: betCount } = await admin
+      .from("transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", auth.userId)
+      .eq("type", "bet")
+      .limit(1);
+
+    if ((betCount ?? 0) === 0) {
+      res.status(400).json({
+        error: "Bónus de boas-vindas bloqueado para levantamento",
+        code: "BONUS_LOCKED",
+        message: "Para levantar o teu bónus de boas-vindas de 10 MT, precisas fazer pelo menos uma aposta. Faz uma aposta e depois podes levantar normalmente!",
+      });
+      return;
+    }
+
+    // User has placed a bet — unlock the bonus for withdrawal
+    await admin
+      .from("profiles")
+      .update({ bonus_balance: 0 })
+      .eq("id", auth.userId);
   }
 
   // SECURITY (auditoria v2): dedução ATÓMICA via RPC — o saldo é decrementado

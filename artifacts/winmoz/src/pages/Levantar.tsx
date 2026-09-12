@@ -76,6 +76,7 @@ export default function Levantar() {
   const [amountStr, setAmountStr] = useState("");
   const [processingConfirm, setProcessingConfirm] = useState(false);
   const [withdrawalId, setWithdrawalId] = useState<string | null>(null);
+  const [bonusLockedMsg, setBonusLockedMsg] = useState<string | null>(null);
   const [txId] = useState(() => "TX" + Date.now().toString(36).toUpperCase());
   const [txDate] = useState(() => new Date().toLocaleString("pt-PT"));
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -198,6 +199,14 @@ export default function Levantar() {
             if (json.success && json.withdrawalId) {
               withdrawalId = json.withdrawalId;
               apiSuccess = true;
+            }
+          } else {
+            const errJson = await res.json().catch(() => ({})) as { code?: string; message?: string; error?: string };
+            if (errJson.code === "BONUS_LOCKED") {
+              setProcessingConfirm(false);
+              setBonusLockedMsg(errJson.message || "Faz uma aposta para desbloquear o teu bónus.");
+              setScreen("rejected");
+              return;
             }
           }
         }
@@ -647,15 +656,15 @@ export default function Levantar() {
           </p>
         </motion.div>
 
-        <div className="flex items-start gap-3 p-3.5 mb-6" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
-          <AlertTriangle style={{ width: 14, height: 14, color: "#d97706", flexShrink: 0, marginTop: 2 }} />
-          <p style={{ fontSize: 12, color: "#92400e", lineHeight: 1.5 }}>
-            O teu pedido de levantamento foi recusado pelo administrador. O valor foi devolvido ao teu saldo.
+        <div className="flex items-start gap-3 p-3.5 mb-6" style={{ background: bonusLockedMsg ? "#eff6ff" : "#fffbeb", border: bonusLockedMsg ? "1px solid #bfdbfe" : "1px solid #fde68a" }}>
+          <AlertTriangle style={{ width: 14, height: 14, color: bonusLockedMsg ? "#2563eb" : "#d97706", flexShrink: 0, marginTop: 2 }} />
+          <p style={{ fontSize: 12, color: bonusLockedMsg ? "#1e40af" : "#92400e", lineHeight: 1.5 }}>
+            {bonusLockedMsg || "O teu pedido de levantamento foi recusado pelo administrador. O valor foi devolvido ao teu saldo."}
           </p>
         </div>
 
         <div className="flex flex-col gap-3">
-          <button onClick={() => { setAmountStr(""); setScreen("amount"); }}
+          <button onClick={() => { setAmountStr(""); setBonusLockedMsg(null); setScreen("amount"); }}
             className="w-full h-14 font-syne font-bold text-sm text-white transition-all"
             style={{ background: "#0a0a0a", borderRadius: 0, border: "none", letterSpacing: "0.3px" }}>
             Tentar Novamente

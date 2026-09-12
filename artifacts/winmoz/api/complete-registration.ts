@@ -14,10 +14,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     invite_code_used?: string | null;
   };
 
-  if (!user_id) {
-    return res.status(400).json({ error: "user_id is required" });
-  }
-
   const supabaseUrl =
     process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? "";
   const serviceKey =
@@ -34,9 +30,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // Resolve user_id from body or auth token
+  let resolvedUserId = user_id;
+  if (!resolvedUserId) {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const { data: { user }, error } = await admin.auth.getUser(token);
+      if (user?.id) resolvedUserId = user.id;
+    }
+  }
+
+  if (!resolvedUserId) {
+    return res.status(400).json({ error: "user_id is required" });
+  }
+
   try {
     /* ── 1. Upsert profile ───────────────────────────────────────────── */
-    const profileData: Record<string, unknown> = { id: user_id };
+    const profileData: Record<string, unknown> = { id: resolvedUserId };
     if (email)     profileData.email     = email;
     if (full_name) profileData.full_name = full_name;
     if (phone)     profileData.phone     = phone.replace(/\D/g, "");
@@ -51,7 +62,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       console.error("[complete-registration] upsert error:", upsertErr);
     }
 
-    /* ── 2. Link referral if invite code provided ────────────────────── */
+    /* ── 2. Welcome bonus (10 MT — one-time) ─────────────────────────── */
+    const { data: profileRow } = await admin
+      .from("profiles")
+      .select("welcome_bonus_claimed, balance")
+      .eq("id", resolvedUserId)
+      .maybeSingle();
+
+    const p = profileRow as { welcome_bonus_claimed?: boolean; balance?: number } | null;
+    if (p && !p.welcome_bonus_claimed) {
+      const WELCOME_BONUS = 10;
+      const { error: bonusErr } = await admin.rpc("adjust_balance", {
+        p_user_id: resolvedUserId,
+        p_delta: WELCOME_BONUS,
+        p_min: 0,
+      });
+
+      if (!bonusErr) {
+        await admin
+          .from("profiles")
+          .update({
+            welcome_bonus_claimed: true,
+            bonus_balance: WELCOME_BONUS,
+          })
+          .eq("id", resolvedUserId);
+
+        await admin.from("transactions").insert({
+          user_id: resolvedUserId,
+          type: "bonus",
+          amount: WELCOME_BONUS,
+          description: "Bónus de boas-vindas — 10 MT",
+          status: "approved",
+          created_at: new Date().toISOString(),
+        });
+      } else {
+        console.error("[complete-registration] welcome bonus error:", bonusErr);
+      }
+    }
+
+    /* ── 3. Link referral if invite code provided ────────────────────── */
     if (invite_code_used) {
       const code = invite_code_used.toUpperCase().trim();
 
@@ -59,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const { data: existingRef } = await admin
         .from("referrals")
         .select("id")
-        .eq("referred_id", user_id)
+        .eq("referred_id", resolvedUserId)
         .maybeSingle();
 
       if (!existingRef) {
@@ -74,7 +123,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           .from("profiles")
           .select("id")
           .eq("my_invite_code", code)
-          .neq("id", user_id)
+          .neq("id", resolvedUserId)
           .maybeSingle();
 
         if (byGeneral?.id) {
@@ -85,7 +134,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .from("profiles")
             .select("id")
             .eq("affiliate_invite_code", code)
-            .neq("id", user_id)
+            .neq("id", resolvedUserId)
             .maybeSingle();
 
           if (byAffiliate?.id) {
@@ -97,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (referrerId) {
           const { error: refErr } = await admin.from("referrals").insert({
             referrer_id: referrerId,
-            referred_id: user_id,
+            referred_id: resolvedUserId,
             referral_type: referralType,
           });
 

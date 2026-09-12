@@ -28,13 +28,82 @@ type Msg = {
   userId?: string;
 };
 
+/* ── Chat Bots ──────────────────────────────────────────────────────────── */
+
+interface ChatBot {
+  id: string;
+  name: string;
+  initials: string;
+  avatarBg: string;
+}
+
+const CHAT_BOTS: ChatBot[] = [
+  { id: "bot_carlos", name: "Carlos Matsinhe", initials: "CM", avatarBg: "linear-gradient(135deg, #10b981, #065f46)" },
+  { id: "bot_fatima", name: "Fátima Guambe", initials: "FG", avatarBg: "linear-gradient(135deg, #ec4899, #9d174d)" },
+  { id: "bot_joao", name: "João Macamo", initials: "JM", avatarBg: "linear-gradient(135deg, #3b82f6, #1d4ed8)" },
+  { id: "bot_ana", name: "Ana Sitoe", initials: "AS", avatarBg: "linear-gradient(135deg, #f59e0b, #b45309)" },
+  { id: "bot_pedro", name: "Pedro Cossa", initials: "PC", avatarBg: "linear-gradient(135deg, #8b5cf6, #4c1d95)" },
+  { id: "bot_maria", name: "Maria Nhantumbo", initials: "MN", avatarBg: "linear-gradient(135deg, #ef4444, #b91c1c)" },
+  { id: "bot_ricardo", name: "Ricardo Mavie", initials: "RM", avatarBg: "linear-gradient(135deg, #06b6d4, #0e7490)" },
+  { id: "bot_sofia", name: "Sofia Munguambe", initials: "SM", avatarBg: "linear-gradient(135deg, #d946ef, #a21caf)" },
+];
+
+/* Conversational threads — realistic Mozambican chat messages */
+const BOT_CONVERSATIONS: string[][] = [
+  ["Kmk malta, alguém para jogar comigo? 😄", "Bora lá, eu tou disponível!", "Qual jogo queres? Damas ou Ludo?"],
+  ["Alguém já ganhou hoje? Eu perdi 200MT 😅", "Paciência mano, amanhã recuperas!", "É verdade, o importante é não desistir"],
+  ["Boa noite pessoal! Quem está online?", "Eu estou aqui! A jogar Damas 😊", "Também estou! Boa noite a todos"],
+  ["Qual é a sena people, alguém animado para jogar?", "Eu tou sempre pronto para um desafio!", "Bora marcar uma partida então"],
+  ["Acabei de ganhar 500MT na roleta! 🔥", "Parabéns mano! Sorte grande!", "Manda aí uma parte do dinheiro 😂"],
+  ["Pessoal, recomendo o jogo de Damas, é muito bom", "Concordo! Já joguei ontem e ganhei", "Damas é o melhor jogo mesmo"],
+  ["Alguém quer jogar Ludo? 50MT?", "Eu aceito! Manda o código da sala", "Vamos lá, adoro Ludo!"],
+  ["Ei malta, como é que se cria sala privada?", "Vai no separador Sala e clica em Criar Sala", "É fácil mano, depois partilha o código"],
+  ["Quem vai jogar hoje à noite?", "Eu vou! Às 21h estou disponível", "Conta comigo também!"],
+  ["Ganhei 3 partidas seguidas! 🏆", "Isso aí! És o campeão!", "Parabéns! Ensina-me a jogar melhor"],
+  ["Boa tarde pessoal! Tudo bem?", "Tudo bom e tu? Vamos jogar?", "Boa tarde! Tou a ver o jogo ao vivo"],
+  ["Quem é bom em Xadrez aqui?", "Eu jogo há anos! Aceitas um desafio?", "Xadrez é para os fortes 💪"],
+  ["Malta, cuidado com os bots, eles são espertos 😂", "É verdade! Perdi contra um ontem", "Os bots estão cada vez melhores"],
+  ["Alguém sabe quando é o próximo torneio?", "Acho que é no fim-de-semana, vê no separador Novidades", "Espero que sim, tou preparado!"],
+  ["Km tá a correr o jogo? Alguém recomenda?", "Damas MZ é o melhor na minha opinião", "Ludo Cash também é fixe!"],
+];
+
+/* Random non-reply: sometimes a bot doesn't respond */
+const SHOULD_SKIP_CHANCE = 0.25;
+
+/* ── End Bots ──────────────────────────────────────────────────────────── */
+
 function loadStoredMessages(): Msg[] {
   try {
     const raw = sessionStorage.getItem(MESSAGES_KEY);
-    if (!raw) return [];
+    if (!raw) return seedBotMessages();
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.slice(-200) : [];
-  } catch { return []; }
+    return Array.isArray(parsed) ? parsed.slice(-200) : seedBotMessages();
+  } catch { return seedBotMessages(); }
+}
+
+function seedBotMessages(): Msg[] {
+  const now = Date.now();
+  const msgs: Msg[] = [];
+  const seedBots = [
+    { bot: CHAT_BOTS[0], text: "Kmk malta! Alguém para jogar Damas? 😄", offset: -180_000 },
+    { bot: CHAT_BOTS[1], text: "Boa noite pessoal! Tudo bem?", offset: -150_000 },
+    { bot: CHAT_BOTS[2], text: "Eu tou disponível! Bora jogar 🎮", offset: -120_000 },
+    { bot: CHAT_BOTS[3], text: "Acabei de ganhar 200MT na roleta 🔥", offset: -90_000 },
+    { bot: CHAT_BOTS[4], text: "Parabéns! Sorte boa!", offset: -60_000 },
+    { bot: CHAT_BOTS[5], text: "Qual é a sena people, alguém animado?", offset: -30_000 },
+  ];
+
+  for (const s of seedBots) {
+    msgs.push({
+      id: `seed_${s.bot.id}_${now + s.offset}`,
+      user: s.bot.name,
+      initials: s.bot.initials,
+      avatarBg: s.bot.avatarBg,
+      text: s.text,
+      time: new Date(now + s.offset).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" }),
+    });
+  }
+  return msgs;
 }
 
 function storeMessages(msgs: Msg[]) {
@@ -73,7 +142,11 @@ const AVATAR_PALETTES = [
 
 export default function GrupoChat() {
   const [, setLocation] = useLocation();
-  const [messages, setMessages] = useState<Msg[]>(loadStoredMessages);
+  const [messages, setMessages] = useState<Msg[]>(() => {
+    const msgs = loadStoredMessages();
+    if (msgs.length > 0) storeMessages(msgs);
+    return msgs;
+  });
   const [text, setText] = useState("");
   const [showInfo, setShowInfo] = useState(false);
   const [onlineCount, setOnlineCount] = useState(39);
@@ -90,6 +163,74 @@ export default function GrupoChat() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // ── Bot chat engine (AI-powered via b.ia mimo v2.5) ─────────────────────
+  const botStateRef = useRef({
+    nextBotTime: Date.now() + 20_000 + Math.random() * 40_000,
+    recentBotMessages: [] as string[],
+    fetching: false,
+  });
+
+  useEffect(() => {
+    const BOT_CHECK_INTERVAL = 8_000;
+
+    const fetchBotMessage = async () => {
+      if (botStateRef.current.fetching) return;
+      botStateRef.current.fetching = true;
+
+      try {
+        // Send recent bot messages as context to avoid repetition
+        const context = botStateRef.current.recentBotMessages.slice(-6).join("\n");
+        const res = await fetch(`/api/chat-bots?context=${encodeURIComponent(context)}`);
+        if (!res.ok) throw new Error("Bot API error");
+
+        const data = await res.json() as { name: string; initials: string; avatarBg: string; message: string };
+
+        const botMsg: Msg = {
+          id: `bot_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          user: data.name,
+          initials: data.initials,
+          avatarBg: data.avatarBg,
+          text: data.message,
+          time: nowTime(),
+        };
+
+        setMessages(prev => {
+          const next = [...prev, botMsg];
+          storeMessages(next);
+          return next;
+        });
+
+        // Track recent messages to avoid repetition
+        botStateRef.current.recentBotMessages.push(data.message);
+        if (botStateRef.current.recentBotMessages.length > 10) {
+          botStateRef.current.recentBotMessages.shift();
+        }
+      } catch {
+        // Silently fail — next interval will retry
+      } finally {
+        botStateRef.current.fetching = false;
+      }
+    };
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      if (now < botStateRef.current.nextBotTime) return;
+
+      // 30% chance to skip (not always respond)
+      if (Math.random() < 0.3) {
+        botStateRef.current.nextBotTime = now + 25_000 + Math.random() * 50_000;
+        return;
+      }
+
+      fetchBotMessage();
+
+      // Next message: 25-90s (realistic human delay)
+      botStateRef.current.nextBotTime = now + 25_000 + Math.random() * 65_000;
+    }, BOT_CHECK_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, []);
 
   // Supabase Realtime channel
   useEffect(() => {
