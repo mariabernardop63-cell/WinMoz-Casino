@@ -696,7 +696,7 @@ async function handleMatchmakingQueue(req: VercelRequest, res: VercelResponse) {
         .limit(100),
       admin
         .from("matches")
-        .select("player1_id, player2_id, status, winner_id, completed_at, paid_out")
+        .select("player1_id, player2_id, status, winner_id, completed_at")
         .limit(500),
     ]);
 
@@ -711,8 +711,7 @@ async function handleMatchmakingQueue(req: VercelRequest, res: VercelResponse) {
       const status = String(match.status ?? "").toLowerCase();
       const terminal = ["finished", "cancelled", "completed", "ended", "resolved"].includes(status)
         || Boolean(match.completed_at)
-        || Boolean(match.winner_id)
-        || match.paid_out === true;
+        || Boolean(match.winner_id);
       const hasOpponent = Boolean(match.player2_id);
       if (!terminal && (hasOpponent || ["active", "live", "in_progress"].includes(status))) {
         if (match.player1_id) inActiveMatch.add(String(match.player1_id));
@@ -803,7 +802,7 @@ async function handleMatches(req: VercelRequest, res: VercelResponse) {
     const admin = getSupabaseAdmin();
     const { data: rows, error } = await admin
       .from("matches")
-      .select("id, game_type, player1_id, player2_id, player1_name, bet_amount, status, winner_id, created_at, completed_at, paid_out")
+      .select("id, game_type, player1_id, player2_id, player1_name, bet_amount, status, winner_id, created_at, completed_at")
       .order("created_at", { ascending: false })
       .limit(500);
 
@@ -825,8 +824,7 @@ async function handleMatches(req: VercelRequest, res: VercelResponse) {
       const rawStatus = String(m.status ?? "").toLowerCase();
       const isFinished = ["finished", "cancelled", "completed", "ended", "resolved"].includes(rawStatus)
         || Boolean(m.completed_at)
-        || Boolean(m.winner_id)
-        || m.paid_out === true;
+        || Boolean(m.winner_id);
       const status = isFinished
         ? (rawStatus === "cancelled" ? "cancelled" : "finished")
         : (m.player2_id || isBot ? "active" : "pending");

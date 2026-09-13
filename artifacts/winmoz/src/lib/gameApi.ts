@@ -85,9 +85,10 @@ export async function serverBet(
   amount: number,
   gameType: "damas" | "ludo" | "xadrez",
   description?: string,
-  gameId?: string
+  gameId?: string,
+  color?: string
 ): Promise<BetResult> {
-  const result = await postWithAuthRetry("/api/games/bet", { amount, gameType, description, gameId });
+  const result = await postWithAuthRetry("/api/games/bet", { amount, gameType, description, gameId, color });
   if (!result) return { ok: false, newBalance: 0, error: "Não autenticado" };
   const { res, data } = result;
   if (!res.ok || !data.ok) {

@@ -303,11 +303,8 @@ function SalaTab() {
 
   /* Registo server-side da partida (idempotente) — fecha o "buraco negro" de
      payout das salas: sem linha em `matches` o vencedor nunca recebia. */
-  function registerSalaMatch(gameRoom: string, bet: number) {
-    if (!user?.id || !gameRoom || bet <= 0) return;
-    const [idA, idB] = gameRoom.split("_");
-    if (!idA || !idB) return;
-    const opponentId = idA === user.id ? idB : idA;
+  function registerSalaMatch(gameId: string, bet: number, opponentId: string, color: string) {
+    if (!user?.id || !gameId || bet <= 0 || !opponentId) return;
     if (opponentId === user.id) return;
     const tokenPromise = getSessionWithRefresh();
     tokenPromise.then(async (session) => {
@@ -317,13 +314,13 @@ function SalaTab() {
         await fetch("/api/games/match", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-          body: JSON.stringify({ gameId: gameRoom, gameType: activeGameId, betAmount: bet, opponentId }),
+          body: JSON.stringify({ gameId, gameType: activeGameId, betAmount: bet, opponentId, color }),
         });
       } catch { /* best-effort — o adversário também tenta */ }
     }).catch(() => {});
   }
 
-  function navigateToGame(gameId: string, color: string, oppName: string, bet: number, gameRoom: string) {
+  function navigateToGame(gameTypeId: string, color: string, oppName: string, bet: number, opponentId: string, gameRoom: string) {
     const myEnc = encodeURIComponent(profile?.full_name ?? "Jogador");
     const oppEnc = encodeURIComponent(oppName);
     /* Prevent game pages from double-deducting the bet that was already charged here */
@@ -331,10 +328,10 @@ function SalaTab() {
     try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameRoom}`, "1"); } catch {}
     try { sessionStorage.setItem(`wm_bet_deducted_chess_${gameRoom}`, "1"); } catch {}
     /* Registo server-side da partida (idempotente; ambos os lados tentam) */
-    registerSalaMatch(gameRoom, bet);
+    registerSalaMatch(gameRoom, bet, opponentId, color);
     let dest = "/explorar";
-    if (gameId === "ludo") dest = `/ludo-jogo?gameId=${gameRoom}&color=${color}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
-    else if (gameId === "xadrez") dest = `/xadrez-jogo?gameId=${gameRoom}&color=${color === "blue" ? "white" : "black"}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+    if (gameTypeId === "ludo" || gameTypeId === "ludo-classic") dest = `/ludo-jogo?gameId=${gameRoom}&color=${color}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+    else if (gameTypeId === "xadrez") dest = `/xadrez-jogo?gameId=${gameRoom}&color=${color === "blue" ? "white" : "black"}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
     else dest = `/damas-jogo?gameId=${gameRoom}&color=${color === "blue" ? "w" : "b"}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
     setLocation(dest);
   }
@@ -353,10 +350,12 @@ function SalaTab() {
       matchedRef.current = true;
       const myColor = payload.blue === user.id ? "blue" : "green";
       const oppName = myColor === "green" ? (payload.blueName ?? "Adversário") : (payload.greenName ?? "Adversário");
+      const oppId = payload.blue === user.id ? payload.green : payload.blue;
+      const gameRoom = (payload.gameId as string) || crypto.randomUUID();
       const updated = loadRooms().map(r => r.code === activeCode ? { ...r, status: "matched" as const } : r);
       saveRooms(updated); setMyRooms(updated);
       setWaitFound(true);
-      setTimeout(() => { navigateToGame(activeGameId, myColor, oppName, activeBet, `${payload.blue}_${payload.green}`); supabase.removeChannel(channel); }, 1500);
+      setTimeout(() => { navigateToGame(activeGameId, myColor, oppName, activeBet, oppId, gameRoom); supabase.removeChannel(channel); }, 1500);
     });
 
     const tryMatch = () => {
@@ -367,11 +366,13 @@ function SalaTab() {
       matchedRef.current = true;
       const oppId = ids[1];
       const oppName = ((state[oppId] as any)?.[0] as any)?.displayName ?? "Adversário";
-      channel.send({ type: "broadcast", event: "room_match", payload: { blue: user.id, green: oppId, blueName: profile?.full_name ?? "Jogador", greenName: oppName } });
+      // `matches.id` é uuid na base de dados — um id textual era rejeitado.
+      const gameRoom = crypto.randomUUID();
+      channel.send({ type: "broadcast", event: "room_match", payload: { gameId: gameRoom, blue: user.id, green: oppId, blueName: profile?.full_name ?? "Jogador", greenName: oppName } });
       const updated = loadRooms().map(r => r.code === activeCode ? { ...r, status: "matched" as const } : r);
       saveRooms(updated); setMyRooms(updated);
       setWaitFound(true);
-      setTimeout(() => { navigateToGame(activeGameId, "blue", oppName, activeBet, `${user.id}_${oppId}`); supabase.removeChannel(channel); }, 1500);
+      setTimeout(() => { navigateToGame(activeGameId, "blue", oppName, activeBet, oppId, gameRoom); supabase.removeChannel(channel); }, 1500);
     };
 
     channel.on("presence", { event: "sync" }, tryMatch);

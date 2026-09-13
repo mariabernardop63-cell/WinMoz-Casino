@@ -162,7 +162,9 @@ async function handleJoin(req: VercelRequest, res: VercelResponse) {
   // CRÍTICO: criar a linha em `matches` AQUI — sem ela o win.ts nunca paga
   // (player2_id vazio = "Partida sem adversário confirmado") e as duas apostas
   // ficavam presas para sempre (buraco negro de saldo das salas privadas).
-  const gameId = `sala_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
+  // `matches.id` é uuid na base de dados — um id textual ("sala_...") era
+  // rejeitado e a partida nunca era criada.
+  const gameId = crypto.randomUUID();
   const bet = Math.round(betAmount * 100) / 100;
 
   const { error: matchErr } = await admin.from("matches").insert({

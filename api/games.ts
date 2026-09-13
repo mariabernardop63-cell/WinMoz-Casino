@@ -60,6 +60,15 @@ async function handleBet(req: VercelRequest, res: VercelResponse) {
 
   const validGameId = gameId && GAME_ID_RE.test(gameId) ? gameId : null;
 
+  // Cor declarada pelo cliente decide o slot no match (player1 = blue/white/w,
+  // player2 = green/black/b). É a fonte de verdade para o mapeamento de cor
+  // do servidor — evita que o segundo jogador a chegar fique com a cor errada
+  // e que o servidor rejeite a sua vez (dado "preso" / rolagem infinita).
+  const declaredColor = (req.body as { color?: string } | undefined)?.color;
+  const wantsSecondSlot =
+    declaredColor === "green" || declaredColor === "black" || declaredColor === "b";
+  const mySlot: "player1_id" | "player2_id" = wantsSecondSlot ? "player2_id" : "player1_id";
+
   // ── SECURITY: IDEMPOTÊNCIA POR PARTIDA ─────────────────────────────────────
   // A flag sessionStorage wm_bet_deducted_* vive por TAB — ao reabrir o jogo
   // num novo separador a flag perde-se e o cliente volta a chamar /bet,
@@ -68,19 +77,19 @@ async function handleBet(req: VercelRequest, res: VercelResponse) {
   if (validGameId) {
     const { data: existing } = await admin
       .from("matches")
-      .select("id, player1_id, player2_id, status, paid_out, bet_amount")
+      .select("id, player1_id, player2_id, status, bet_amount")
       .eq("id", validGameId)
       .maybeSingle();
 
     if (existing) {
       const e = existing as {
-        player1_id: string; player2_id: string | null;
-        status: string; paid_out: boolean; bet_amount: number;
+        player1_id: string | null; player2_id: string | null;
+        status: string; bet_amount: number;
       };
       const isParticipant = e.player1_id === auth.userId || e.player2_id === auth.userId;
 
       if (isParticipant) {
-        if (e.status === "active" && !e.paid_out) {
+        if (e.status === "active") {
           // Já pagou esta partida — idempotente
           const { data: bal } = await admin.from("profiles").select("balance")
             .eq("id", auth.userId).maybeSingle();
@@ -93,17 +102,17 @@ async function handleBet(req: VercelRequest, res: VercelResponse) {
       }
 
       // Não é participante:
-      if (e.status !== "active" || e.paid_out) {
+      if (e.status !== "active") {
         res.status(409).json({ error: "Partida já terminada" });
         return;
       }
-      if (e.player2_id) {
+      if (e[mySlot]) {
         res.status(409).json({ error: "Partida já completa" });
         return;
       }
 
-      // Slot de player2 livre (matchmaking público): cobra e reclama o slot
-      // atomicamente. Fecha o buraco negro em que a aposta do 2.º jogador era
+      // Slot próprio livre (matchmaking público): cobra e reclama o slot
+      // atomicamente. Fecha o buraco negro em que a aposta do 2.o jogador era
       // cobrada mas a partida ficava sem player2 e o vencedor nunca recebia.
       const { data: balanceRow, error: adjustError } = await admin
         .rpc("adjust_balance", { p_user_id: auth.userId, p_delta: -amount, p_min: 0 });
@@ -121,10 +130,10 @@ async function handleBet(req: VercelRequest, res: VercelResponse) {
 
       const { data: claimed, error: claimErr } = await admin
         .from("matches")
-        .update({ player2_id: auth.userId })
+        .update({ [mySlot]: auth.userId })
         .eq("id", validGameId)
         .eq("status", "active")
-        .is("player2_id", null)
+        .is(mySlot, null)
         .select("id").maybeSingle();
 
       if (claimErr || !claimed) {
@@ -180,17 +189,47 @@ async function handleBet(req: VercelRequest, res: VercelResponse) {
   }
 
   if (validGameId) {
-    const { error: insertErr } = await admin.from("matches").insert({
-      id: validGameId,
-      game_type: gameType,
-      player1_id: auth.userId,
-      player1_name: (description || "").slice(0, 120) || null,
-      bet_amount: amount,
-      winner_payout: Math.floor(amount * 2 * WIN_RATE),
-      status: "active",
-      created_at: new Date().toISOString(),
-    });
-    if (insertErr) console.error("[games/bet] Erro ao criar partida:", insertErr);
+    // Cor autoritativa do cliente (blue|white|w => player1; green|black|b => player2).
+    // Sem isto, o segundo jogador a chegar podia ocupar player1 e o cliente
+    // manter outra cor — o servidor passava a rejeitar a vez (423) e o dado
+    // ficava "preso" (o sintoma de rolar infinitamente na mesma pessoa).
+    // Tenta ocupar primeiro o slot já aberto pelo adversário (matchmaking
+    // público): cada jogador reivindica apenas o seu slot, nunca o do outro.
+    const { data: claimedSlot } = await admin
+      .from("matches")
+      .update({ [mySlot]: auth.userId })
+      .eq("id", validGameId)
+      .eq("status", "active")
+      .is(mySlot, null)
+      .select("id")
+      .maybeSingle();
+
+    if (!claimedSlot) {
+      // Ainda não existe linha (ou o slot já estava ocupado): cria a partida
+      // com o meu slot. O adversário reivindicará o slot oposto.
+      const insertRow: Record<string, unknown> = {
+        id: validGameId,
+        game_type: gameType,
+        bet_amount: amount,
+        winner_payout: Math.floor(amount * 2 * WIN_RATE),
+        status: "active",
+        created_at: new Date().toISOString(),
+      };
+      insertRow[mySlot] = auth.userId;
+      insertRow[mySlot === "player1_id" ? "player1_name" : "player2_name"] =
+        (description || "").slice(0, 120) || null;
+
+      const { error: insertErr } = await admin.from("matches").insert(insertRow);
+      // Corrida: o adversário criou a linha ao mesmo tempo → reivindica o slot.
+      if (insertErr) {
+        await admin
+          .from("matches")
+          .update({ [mySlot]: auth.userId })
+          .eq("id", validGameId)
+          .eq("status", "active")
+          .is(mySlot, null);
+      }
+    }
   }
 
   res.json({ ok: true, newBalance });
@@ -223,7 +262,7 @@ async function handleWin(req: VercelRequest, res: VercelResponse) {
   // 1) Ler a partida para decidir o caminho (2 jogadores vs bot)
   const { data: matchRow } = await admin
     .from("matches")
-    .select("id, status, paid_out, player1_id, player2_id, bet_amount, created_at")
+    .select("id, status, player1_id, player2_id, bet_amount, created_at, game_channel")
     .eq("id", gameId)
     .maybeSingle();
 
@@ -232,16 +271,17 @@ async function handleWin(req: VercelRequest, res: VercelResponse) {
     return;
   }
   const m0 = matchRow as {
-    status: string; paid_out: boolean;
+    status: string;
     player1_id: string; player2_id: string | null;
     bet_amount: number; created_at: string;
+    game_channel: string | null;
   };
 
   if (m0.player1_id !== auth.userId && m0.player2_id !== auth.userId) {
     res.status(403).json({ error: "Não és participante desta partida" });
     return;
   }
-  if (m0.status === "finished" || m0.paid_out) {
+  if (m0.status === "finished") {
     res.status(409).json({ error: "Partida já terminada" });
     return;
   }
@@ -250,7 +290,9 @@ async function handleWin(req: VercelRequest, res: VercelResponse) {
 
   // 2) Guardas para partidas de bot
   if (isBotMatch) {
-    if (!gameId.startsWith(BOT_ID_PREFIX)) {
+    // Marca de bot em `game_channel` (ids antigos "wmb_" continuam aceites).
+    const isBotTagged = m0.game_channel === BOT_ID_PREFIX || gameId.startsWith(BOT_ID_PREFIX);
+    if (!isBotTagged) {
       // Ids "solo" sem marca de bot continuam bloqueados (anti money-printing)
       res.status(400).json({ error: "Partida sem adversário confirmado" });
       return;
@@ -260,24 +302,33 @@ async function handleWin(req: VercelRequest, res: VercelResponse) {
       res.status(400).json({ error: "A partida ainda não pode ser fechada" });
       return;
     }
+    // O limite diário de vitórias contra bots é derivado das transacções de
+    // "win" do próprio utilizador (as partidas de bot têm id "wmb_"), em vez
+    // de depender da coluna `paid_out`. Assim a protecção anti money-printing
+    // continua válida mesmo que a migração `paid_out` ainda não tenha sido
+    // aplicada na base de dados (era esta dependência que bloqueava o payout
+    // com "column matches.paid_out does not exist").
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-    const { count: paidToday } = await admin
+    const { data: botWinsToday } = await admin
       .from("matches")
-      .select("id", { count: "exact", head: true })
+      .select("id")
       .eq("player1_id", auth.userId)
       .is("player2_id", null)
-      .eq("paid_out", true)
+      .eq("status", "finished")
       .gte("completed_at", startOfDay.toISOString());
 
-    if ((paidToday ?? 0) >= BOT_DAILY_WIN_CAP) {
+    if ((botWinsToday?.length ?? 0) >= BOT_DAILY_WIN_CAP) {
       res.status(429).json({ error: "Limite diário de vitórias contra bots atingido" });
       return;
     }
   }
 
   // 3) Claim atómico do payout — único por partida
-  const { data: updated, error: updateMatchErr } = await admin
+  // O guard `paid_out = false` fecha a corrida entre dois pedidos de payout.
+  // Se a coluna ainda não existir na base de dados (migração por aplicar),
+  // cai-se para o guard de `status != finished`, mantendo a idempotência.
+  const winClaim = admin
     .from("matches")
     .update({
       winner_id: auth.userId,
@@ -292,6 +343,24 @@ async function handleWin(req: VercelRequest, res: VercelResponse) {
     .select("id, bet_amount, player1_id, player2_id, game_type")
     .maybeSingle();
 
+  let { data: updated, error: updateMatchErr } = await winClaim;
+
+  // Fallback sem `paid_out` (coluna ausente) — preserva o guard de status.
+  if (updateMatchErr && /paid_out/i.test(updateMatchErr.message ?? "")) {
+    ({ data: updated, error: updateMatchErr } = await admin
+      .from("matches")
+      .update({
+        winner_id: auth.userId,
+        status: "finished",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", gameId)
+      .neq("status", "finished")
+      .or(`player1_id.eq.${auth.userId},player2_id.eq.${auth.userId}`)
+      .select("id, bet_amount, player1_id, player2_id, game_type")
+      .maybeSingle());
+  }
+
   if (updateMatchErr) {
     console.error("[games/win] Erro ao actualizar partida:", updateMatchErr);
     res.status(500).json({ error: "Erro ao processar vitória" });
@@ -302,7 +371,7 @@ async function handleWin(req: VercelRequest, res: VercelResponse) {
     // Perdeu a corrida atómica — reconcilia o estado para a mensagem certa
     const { data: match } = await admin
       .from("matches")
-      .select("status, winner_id, player1_id, player2_id, paid_out")
+      .select("status, winner_id, player1_id, player2_id")
       .eq("id", gameId)
       .maybeSingle();
 
@@ -310,8 +379,8 @@ async function handleWin(req: VercelRequest, res: VercelResponse) {
       res.status(404).json({ error: "Partida não encontrada" });
       return;
     }
-    const row = match as { status: string; paid_out: boolean; player2_id: string | null };
-    if (row.status === "finished" || row.paid_out) {
+    const row = match as { status: string; player2_id: string | null };
+    if (row.status === "finished") {
       res.status(409).json({ error: "Partida já terminada" });
       return;
     }
@@ -391,13 +460,13 @@ async function handleForfeit(req: VercelRequest, res: VercelResponse) {
   const admin = getSupabaseAdmin();
   const { data: match } = await admin
     .from("matches")
-    .select("id, status, paid_out, player1_id, player2_id, bet_amount")
+    .select("id, status, player1_id, player2_id, bet_amount")
     .eq("id", gameId)
     .maybeSingle();
   if (!match) { res.status(404).json({ error: "Partida não encontrada" }); return; }
 
   const m = match as {
-    id: string; status: string; paid_out: boolean;
+    id: string; status: string;
     player1_id: string; player2_id: string | null; bet_amount: number;
   };
   if (m.player1_id !== auth.userId && m.player2_id !== auth.userId) {
@@ -410,7 +479,9 @@ async function handleForfeit(req: VercelRequest, res: VercelResponse) {
 
   // The quitter settles the match server-side. This does not depend on the
   // realtime forfeit packet reaching the other browser.
-  const { data: updated, error: updateError } = await admin
+  // `paid_out` fecha a corrida entre desistência e vitória; se a coluna ainda
+  // não existir (migração por aplicar), cai-se para o guard de status.
+  let { data: updated, error: updateError } = await admin
     .from("matches")
     .update({
       winner_id: winnerId,
@@ -424,15 +495,29 @@ async function handleForfeit(req: VercelRequest, res: VercelResponse) {
     .select("id, bet_amount")
     .maybeSingle();
 
+  if (updateError && /paid_out/i.test(updateError.message ?? "")) {
+    ({ data: updated, error: updateError } = await admin
+      .from("matches")
+      .update({
+        winner_id: winnerId,
+        status: "finished",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", gameId)
+      .neq("status", "finished")
+      .select("id, bet_amount")
+      .maybeSingle());
+  }
+
   if (updateError) {
     console.error("[games/forfeit] Erro ao fechar partida:", updateError);
     res.status(500).json({ error: "Erro ao registar desistência" }); return;
   }
   if (!updated) {
     const { data: current } = await admin
-      .from("matches").select("status, winner_id, paid_out")
+      .from("matches").select("status, winner_id")
       .eq("id", gameId).maybeSingle();
-    if (current && (current as any).winner_id === winnerId && (current as any).paid_out) {
+    if (current && (current as any).winner_id === winnerId && (current as any).status === "finished") {
       res.json({ ok: true, winnerId, alreadySettled: true });
       return;
     }
@@ -480,8 +565,8 @@ async function handleMatch(req: VercelRequest, res: VercelResponse) {
   const auth = await authenticateUser(req);
   if (!auth) { res.status(401).json({ error: "Não autenticado" }); return; }
 
-  const { gameId, gameType, betAmount, opponentId } = (req.body ?? {}) as {
-    gameId?: string; gameType?: string; betAmount?: number; opponentId?: string;
+  const { gameId, gameType, betAmount, opponentId, color } = (req.body ?? {}) as {
+    gameId?: string; gameType?: string; betAmount?: number; opponentId?: string; color?: string;
   };
 
   if (!gameId || !GAME_ID_RE.test(gameId)) { res.status(400).json({ error: "ID de jogo inválido" }); return; }
@@ -498,12 +583,12 @@ async function handleMatch(req: VercelRequest, res: VercelResponse) {
   // Idempotência — partida já registada
   const { data: existing } = await admin
     .from("matches")
-    .select("id, player1_id, player2_id, status, paid_out")
+    .select("id, player1_id, player2_id, status")
     .eq("id", gameId)
     .maybeSingle();
 
   if (existing) {
-    const e = existing as { player1_id: string; player2_id: string | null; status: string; paid_out: boolean };
+    const e = existing as { player1_id: string; player2_id: string | null; status: string };
     const isParticipant = e.player1_id === auth.userId || e.player2_id === auth.userId;
     if (!isParticipant) { res.status(403).json({ error: "Não és participante desta partida" }); return; }
     res.json({ ok: true, alreadyRegistered: true });
@@ -535,11 +620,17 @@ async function handleMatch(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // Slots coerentes com a cor declarada pelo cliente (player1 = blue/white/w,
+  // player2 = green/black/b). O adversário ocupa o slot oposto.
+  const wantsSecondSlot = color === "green" || color === "black" || color === "b";
+  const p1 = wantsSecondSlot ? opponentId : auth.userId;
+  const p2 = wantsSecondSlot ? auth.userId : opponentId;
+
   const { error: insertErr } = await admin.from("matches").insert({
     id: gameId,
     game_type: gameType,
-    player1_id: opponentId,
-    player2_id: auth.userId,
+    player1_id: p1,
+    player2_id: p2,
     bet_amount: betAmount,
     winner_payout: Math.floor(betAmount * 2 * WIN_RATE),
     status: "active",
@@ -603,7 +694,10 @@ async function handleBotSession(req: VercelRequest, res: VercelResponse) {
 
   let botName = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
   const botBalance = Math.floor(Math.random() * 400) + 100;
-  const gameId = `wmb_${crypto.randomBytes(9).toString("hex")}`;
+  // `matches.id` é uuid na base de dados; um id textual "wmb_" era rejeitado e
+  // a partida contra o bot nunca era criada (a aposta ficava presa e o prémio
+  // nunca era pago). Mantemos a marca de bot em `game_channel`.
+  const gameId = crypto.randomUUID();
 
   const { error: matchErr } = await admin.from("matches").insert({
     id: gameId,
@@ -611,6 +705,7 @@ async function handleBotSession(req: VercelRequest, res: VercelResponse) {
     player1_id: auth.userId,
     player2_id: null, // bot — resolvido pelo win.ts com guards próprios
     player1_name: `Aposta (${gameType}) vs ${botName}`,
+    game_channel: BOT_ID_PREFIX, // marca anti money-printing
     bet_amount: betAmount,
     winner_payout: Math.floor(betAmount * 2 * WIN_RATE),
     status: "active",
@@ -685,12 +780,18 @@ async function handleLudoDice(req: VercelRequest, res: VercelResponse) {
 
   const admin = getSupabaseAdmin();
 
-  if (gameId !== "local" && !gameId.startsWith("bot_") && !gameId.startsWith("wm")) {
+  // Partidas de bot/solo (gameId "local"/"bot_"/"wmb_") não têm linha em
+  // `matches` — o dado é gerado sem enforcement de turno. As restantes passam
+  // pela verificação autoritativa abaixo.
+  const isSoloGame =
+    gameId === "local" || gameId.startsWith("bot_") || gameId.startsWith(BOT_ID_PREFIX);
+
+  if (!isSoloGame) {
     const { data: match, error: matchErr } = await admin
       .from("matches")
       .select("player1_id, player2_id, status, current_turn, turn_updated_at")
       .eq("id", gameId)
-      .single();
+      .maybeSingle();
 
     if (matchErr || !match) {
       res.status(404).json({ error: "Partida não encontrada" });
@@ -712,6 +813,21 @@ async function handleLudoDice(req: VercelRequest, res: VercelResponse) {
     }
     if (m.status === "finished") {
       res.status(409).json({ error: "Partida já terminada" });
+      return;
+    }
+
+    // Partida contra bot (sem player2 humano): não há passagem de vez real,
+    // por isso não se aplica enforcement de turno.
+    if (m.player2_id === null) {
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        value: generateSecureDice(
+          Boolean(allInBase),
+          Number(stuckTurns) || 0,
+          Number(consecutiveSixes) || 0
+        ),
+        timestamp: Date.now(),
+      });
       return;
     }
 

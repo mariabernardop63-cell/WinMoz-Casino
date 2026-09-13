@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { createClient } from "@supabase/supabase-js";
-import { randomInt } from "crypto";
+import { randomInt, randomUUID } from "crypto";
 import healthRouter from "./health";
 import debitoRouter from "./debito";
 import ws from "ws";
@@ -1929,7 +1929,7 @@ router.get("/admin/matches", async (req, res) => {
 
     const { data: rows, error } = await gate.supabaseAdmin
       .from("matches")
-      .select("id, game_type, player1_id, player2_id, player1_name, bet_amount, status, winner_id, created_at, completed_at, paid_out")
+      .select("id, game_type, player1_id, player2_id, player1_name, bet_amount, status, winner_id, created_at, completed_at")
       .order("created_at", { ascending: false })
       .limit(500);
     if (error) { res.status(500).json({ error: error.message }); return; }
@@ -1950,8 +1950,7 @@ router.get("/admin/matches", async (req, res) => {
       const rawStatus = String(m.status ?? "").toLowerCase();
       const isFinished = ["finished", "cancelled", "completed", "ended", "resolved"].includes(rawStatus)
         || Boolean(m.completed_at)
-        || Boolean(m.winner_id)
-        || m.paid_out === true;
+        || Boolean(m.winner_id);
       const status = isFinished
         ? (rawStatus === "cancelled" ? "cancelled" : "finished")
         : (m.player2_id || isBot ? "active" : "pending");
@@ -2009,7 +2008,7 @@ router.get("/admin/queue", async (req, res) => {
         .limit(100),
       gate.supabaseAdmin
         .from("matches")
-        .select("player1_id, player2_id, status, winner_id, completed_at, paid_out")
+        .select("player1_id, player2_id, status, winner_id, completed_at")
         .limit(500),
     ]);
     if (queueError) { res.status(500).json({ error: queueError.message }); return; }
@@ -2019,8 +2018,7 @@ router.get("/admin/queue", async (req, res) => {
       const rawStatus = String(match.status ?? "").toLowerCase();
       const terminal = ["finished", "cancelled", "completed", "ended", "resolved"].includes(rawStatus)
         || Boolean(match.completed_at)
-        || Boolean(match.winner_id)
-        || match.paid_out === true;
+        || Boolean(match.winner_id);
       const hasOpponent = Boolean(match.player2_id);
       if (!terminal && (hasOpponent || ["active", "live", "in_progress"].includes(rawStatus))) {
         if (match.player1_id) inActiveMatch.add(String(match.player1_id));
@@ -2189,8 +2187,8 @@ router.post("/games/bet", async (req, res) => {
     if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
     const { supabaseAdmin, userId } = gate;
 
-    const { amount, gameType, gameId, description } = req.body as {
-      amount?: number; gameType?: string; gameId?: string; description?: string;
+    const { amount, gameType, gameId, description, color } = req.body as {
+      amount?: number; gameType?: string; gameId?: string; description?: string; color?: string;
     };
 
     if (!amount || typeof amount !== "number" || amount < 1 || amount > 100000) {
@@ -2202,6 +2200,40 @@ router.post("/games/bet", async (req, res) => {
     const isLocalOrBotGame = gameId === "local" || gameId?.startsWith("bot_") || gameId?.startsWith("wm");
     if (gameId && !isLocalOrBotGame && !GAME_ID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
+    }
+
+    const wantsSecondSlot = color === "green" || color === "black" || color === "b";
+    const mySlot: "player1_id" | "player2_id" = wantsSecondSlot ? "player2_id" : "player1_id";
+
+    /* Idempotência por partida: se a partida já existe e o chamador já é
+       participante, a aposta já foi escrowada — não cobrar duas vezes
+       (reabrir o jogo num novo separador perde a flag de sessionStorage). */
+    if (gameId && !isLocalOrBotGame) {
+      const { data: existing } = await supabaseAdmin
+        .from("matches")
+        .select("id, player1_id, player2_id, status, bet_amount")
+        .eq("id", gameId)
+        .maybeSingle();
+      if (existing) {
+        const e = existing as {
+          player1_id: string | null; player2_id: string | null;
+          status: string; bet_amount: number;
+        };
+        const isParticipant = e.player1_id === userId || e.player2_id === userId;
+        if (isParticipant) {
+          if (e.status === "active") {
+            const { data: bal } = await supabaseAdmin.from("profiles").select("balance")
+              .eq("id", userId).maybeSingle();
+            res.json({ ok: true, newBalance: Number((bal as any)?.balance ?? 0), alreadyPaid: true });
+            return;
+          }
+          res.status(409).json({ error: "Partida já terminada" });
+          return;
+        }
+        if (e.status !== "active") { res.status(409).json({ error: "Partida já terminada" }); return; }
+        // O slot do próprio (pela cor declarada) tem de estar livre.
+        if (e[mySlot]) { res.status(409).json({ error: "Partida já completa" }); return; }
+      }
     }
 
     const { data: profile, error: profileError } = await supabaseAdmin
@@ -2236,23 +2268,209 @@ router.post("/games/bet", async (req, res) => {
     const updated = { balance: deductResult };
 
     if (gameId && GAME_ID_RE.test(gameId)) {
-      await supabaseAdmin
+      const wantsSecondSlot = color === "green" || color === "black" || color === "b";
+      const { data: existingMatch } = await supabaseAdmin
         .from("matches")
-        .upsert({
+        .select("id, player1_id, player2_id, status")
+        .eq("id", gameId)
+        .maybeSingle();
+
+      if (!existingMatch) {
+        // A cor declarada pelo cliente decide o slot: quem joga de "green/black"
+        // ocupa player2; os restantes ocupam player1. Sem isto, o segundo
+        // jogador a chegar podia ocupar player1 e o servidor rejeitava a sua
+        // vez (423) — dado "preso" a rolar para sempre.
+        const insertRow: Record<string, unknown> = {
           id: gameId,
           game_type: gameType,
-          player1_id: userId,
           bet_amount: amount,
           winner_payout: Math.floor(amount * 2 * 0.9),
           status: "active",
+          current_turn: "blue",
+          turn_updated_at: new Date().toISOString(),
           created_at: new Date().toISOString(),
-        }, { onConflict: "id" })
-        .eq("player1_id", userId);
+        };
+        if (wantsSecondSlot) insertRow.player2_id = userId;
+        else insertRow.player1_id = userId;
+
+        const { error: insErr } = await supabaseAdmin.from("matches").insert(insertRow);
+        // Corrida: o adversário criou a linha ao mesmo tempo → ocupa o slot livre.
+        if (insErr) {
+          const slot = wantsSecondSlot ? "player2_id" : "player1_id";
+          await supabaseAdmin
+            .from("matches")
+            .update({ [slot]: userId })
+            .eq("id", gameId)
+            .eq("status", "active")
+            .is(slot, null);
+        }
+      } else {
+        const em = existingMatch as {
+          player1_id: string | null; player2_id: string | null; status: string;
+        };
+        // Reclama o slot oposto ao do adversário, atomicamente.
+        if (em.status === "active" && em.player1_id !== userId && em.player2_id !== userId) {
+          const slot = wantsSecondSlot ? "player2_id" : "player1_id";
+          if (!em[slot as "player1_id" | "player2_id"]) {
+            await supabaseAdmin
+              .from("matches")
+              .update({ [slot]: userId })
+              .eq("id", gameId)
+              .eq("status", "active")
+              .is(slot, null);
+          }
+        }
+      }
     }
 
     res.json({ ok: true, newBalance: (updated as any).balance });
   } catch (err) {
     req.log.error({ err }, "games/bet error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Games: cria sessão contra bot (port of Vercel api/games/bot-session) ──
+   O frontend chama /api/games/bot-session ao encontrar um bot. Sem esta rota
+   o pedido devolvia 404 e o ecrã "matched" voltava ao ecrã de apostar. */
+const BOT_NAMES = [
+  "Miguel Pro", "SuraBot", "Kácia", "Xitique", "Dama Mestre",
+  "Rafa Joga", "Tio Zeca", "Prof Komba", "Lady Pawns", "Rei da Rua",
+];
+const BOT_ID_PREFIX = "wmb_";
+
+router.post("/games/bot-session", async (req, res) => {
+  try {
+    const gate = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+    const { supabaseAdmin, userId } = gate;
+
+    const { gameType, betAmount } = req.body as { gameType?: string; betAmount?: number };
+    if (!gameType || !["damas", "xadrez"].includes(gameType)) {
+      res.status(400).json({ error: "Tipo de jogo inválido" }); return;
+    }
+    if (!betAmount || typeof betAmount !== "number" || betAmount < 10 || betAmount > 5000) {
+      res.status(400).json({ error: "Montante de aposta inválido" }); return;
+    }
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles").select("balance, is_blocked").eq("id", userId).single();
+    if (profileError || !profile) { res.status(500).json({ error: "Erro ao carregar perfil" }); return; }
+    if ((profile as any).is_blocked) { res.status(403).json({ error: "Conta bloqueada" }); return; }
+
+    const newBalance = await withUserLock(userId, async () => {
+      const { data: updated, error: updateError } = await supabaseAdmin
+        .from("profiles")
+        .update({ balance: Math.round((Number((profile as any).balance ?? 0) - betAmount) * 100) / 100 })
+        .eq("id", userId)
+        .gte("balance", betAmount)
+        .select("balance")
+        .maybeSingle();
+      if (updateError || !updated) return null;
+      return Number((updated as any).balance);
+    });
+    if (newBalance === null) {
+      res.status(400).json({ error: "Saldo insuficiente", code: "INSUFFICIENT_BALANCE" }); return;
+    }
+
+    const botName = BOT_NAMES[randomInt(BOT_NAMES.length)];
+    const botBalance = randomInt(100, 500);
+    const gameId = randomUUID();
+
+    const { error: matchErr } = await supabaseAdmin.from("matches").insert({
+      id: gameId,
+      game_type: gameType,
+      player1_id: userId,
+      player2_id: null,
+      player1_name: `Aposta (${gameType}) vs ${botName}`,
+      game_channel: BOT_ID_PREFIX,
+      bet_amount: betAmount,
+      winner_payout: Math.floor(betAmount * 2 * 0.9),
+      status: "active",
+      created_at: new Date().toISOString(),
+    });
+    if (matchErr) {
+      // Rollback do débito — sem partida a aposta não pode ficar presa.
+      await supabaseAdmin.from("profiles")
+        .update({ balance: Math.round((newBalance + betAmount) * 100) / 100 })
+        .eq("id", userId);
+      req.log.error({ matchErr }, "games/bot-session insert failed");
+      res.status(500).json({ error: "Erro ao criar sessão de jogo" }); return;
+    }
+
+    await supabaseAdmin.from("transactions").insert({
+      user_id: userId,
+      type: "bet",
+      amount: -Math.abs(betAmount),
+      description: `Aposta (${gameType}) vs ${botName}`,
+      status: "approved",
+      created_at: new Date().toISOString(),
+    });
+
+    res.json({ ok: true, gameId, botName, botBalance, newBalance });
+  } catch (err) {
+    req.log.error({ err }, "games/bot-session error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Games: registo idempotente de partida de sala (port of Vercel api/games/match) ── */
+router.post("/games/match", async (req, res) => {
+  try {
+    const gate = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+    const { supabaseAdmin, userId } = gate;
+
+    const { gameId, gameType, betAmount, opponentId, color } = req.body as {
+      gameId?: string; gameType?: string; betAmount?: number; opponentId?: string; color?: string;
+    };
+    if (!gameId || !GAME_ID_RE.test(gameId)) { res.status(400).json({ error: "ID de jogo inválido" }); return; }
+    if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
+      res.status(400).json({ error: "Tipo de jogo inválido" }); return;
+    }
+    if (!betAmount || typeof betAmount !== "number" || betAmount < 10 || betAmount > 5000) {
+      res.status(400).json({ error: "Montante de aposta inválido" }); return;
+    }
+    if (!opponentId || !UUID_RE.test(opponentId) || opponentId === userId) {
+      res.status(400).json({ error: "Adversário inválido" }); return;
+    }
+
+    const { data: existing } = await supabaseAdmin
+      .from("matches").select("id, player1_id, player2_id").eq("id", gameId).maybeSingle();
+    if (existing) {
+      const e = existing as { player1_id: string | null; player2_id: string | null };
+      if (e.player1_id !== userId && e.player2_id !== userId) {
+        res.status(403).json({ error: "Não és participante desta partida" }); return;
+      }
+      res.json({ ok: true, alreadyRegistered: true }); return;
+    }
+
+    const wantsSecondSlot = color === "green" || color === "black" || color === "b";
+    const p1 = wantsSecondSlot ? opponentId : userId;
+    const p2 = wantsSecondSlot ? userId : opponentId;
+
+    const { error: insertErr } = await supabaseAdmin.from("matches").insert({
+      id: gameId,
+      game_type: gameType,
+      player1_id: p1,
+      player2_id: p2,
+      bet_amount: betAmount,
+      winner_payout: Math.floor(betAmount * 2 * 0.9),
+      status: "active",
+      created_at: new Date().toISOString(),
+    });
+    if (insertErr) {
+      const code = (insertErr as { code?: string }).code ?? "";
+      if (code === "23505" || /duplicate|unique/i.test(String(insertErr.message ?? ""))) {
+        res.json({ ok: true, alreadyRegistered: true }); return;
+      }
+      req.log.error({ insertErr }, "games/match insert failed");
+      res.status(500).json({ error: "Erro ao registar partida" }); return;
+    }
+
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error({ err }, "games/match error");
     res.status(500).json({ error: "Erro interno" });
   }
 });

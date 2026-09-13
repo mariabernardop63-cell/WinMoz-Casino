@@ -1225,7 +1225,7 @@ export default function ChessGame(){
     betDeductedRef.current=true;
     (async()=>{
       try{
-        const result = await serverBet(BET, "xadrez", `Aposta (Xadrez) vs ${opponentName}`, gameId);
+        const result = await serverBet(BET, "xadrez", `Aposta (Xadrez) vs ${opponentName}`, gameId, myColor);
         if(!result.ok){ betDeductedRef.current=false; return; }
         getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
         try{sessionStorage.setItem(`wm_bet_deducted_chess_${gameId}`,"1");}catch{}
@@ -1469,6 +1469,12 @@ export default function ChessGame(){
       setWinner(myColor);
       setWinReason(`${opponentName} desistiu da partida!`);
       setStatus("checkmate");
+      // O desistente fecha a partida no servidor, mas se se desligou o pedido
+      // pode não ter chegado. Como vencedor, reclamamos a liquidação —
+      // serverWin é idempotente (não credita duas vezes).
+      if(gameId!=="local"&&!isBot&&BET>0){
+        void serverWin(gameId,"xadrez",BET).then(()=>refreshProfile()).catch(()=>{});
+      }
     });
 
     ch.on("broadcast",{event:"chess_resync_req"},()=>{
@@ -1533,7 +1539,7 @@ export default function ChessGame(){
         if(BET>0&&!betDeductedRef.current){
           betDeductedRef.current=true;
           try{
-            const result = await serverBet(BET, "xadrez", "Aposta de jogo (Xadrez)", gameId);
+            const result = await serverBet(BET, "xadrez", "Aposta de jogo (Xadrez)", gameId, myColor);
             if(!result.ok){ betDeductedRef.current=false; }
             else { await refreshProfile(); }
           }catch{betDeductedRef.current=false;}

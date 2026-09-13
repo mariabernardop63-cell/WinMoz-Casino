@@ -1605,7 +1605,7 @@ export default function LudoGame() {
             captureAnimRef.current = true;
             playCaptureSound();
             const capturerName=mover.player===myColor?playerName.split(" ")[0]:opponentName;
-            setMsg(`${capturerName} capturou uma peça! +1 jogada`);
+            setMsg(`${capturerName} capturou uma peça!`);
           }
           let pos=p.pos;
           // Safety: always clear captureAnimRef after at most 900ms so it never blocks dice rolls
@@ -1720,7 +1720,7 @@ export default function LudoGame() {
     // while the other device remained on the old phase.
     const extraTurn = originalDice===6 || enteredHome;
     if(extraTurn){
-      const reason = originalDice===6?"tirou 6":captured?"capturou uma peça":"chegou ao centro!";
+      const reason = originalDice===6?"tirou 6":"chegou ao centro!";
       const plName=currentTurn===myColor?playerName.split(" ")[0]:opponentName;
       setMsg(`${plName} ${reason} — joga de novo!`);
       setMovable([]);
@@ -1979,7 +1979,6 @@ export default function LudoGame() {
       phaseRef.current!=="roll" ||
       turnRef.current!==myColor ||
       winnerRef.current ||
-      captureAnimRef.current ||
       rollBusyRef.current
     ) return;
     // One request at a time, matching the working turn/dice flow from
@@ -2285,6 +2284,13 @@ export default function LudoGame() {
       setWinner(myColor);
       setPhase("done");
       setMsg(`${opponentName} desistiu! Tu venceste!`);
+      // O desistente é quem fecha a partida no servidor, mas se ele se
+      // desligou/perdeu a rede o pedido nunca chegou. Como vencedor,
+      // reclamamos a liquidação (serverWin é idempotente: se já foi paga
+      // devolve 409 "terminada" sem creditar duas vezes).
+      if(gameId!=="local"&&!isBot&&BET_AMOUNT>0){
+        void serverWin(gameId,"ludo",BET_AMOUNT).then(()=>refreshProfile()).catch(()=>{});
+      }
     });
 
     channel.on("broadcast",{ event:"ludo_resync_req" },()=>{
@@ -2440,7 +2446,7 @@ export default function LudoGame() {
         if(BET_AMOUNT > 0 && !betDeductedRef.current){
           betDeductedRef.current = true;
           try {
-            const result = await serverBet(BET_AMOUNT, "ludo", "Aposta de jogo (Ludo)", gameId);
+            const result = await serverBet(BET_AMOUNT, "ludo", "Aposta de jogo (Ludo)", gameId, myColor);
             if(!result.ok){ betDeductedRef.current = false; }
             else {
               try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`, "1"); } catch { /* ignore */ }

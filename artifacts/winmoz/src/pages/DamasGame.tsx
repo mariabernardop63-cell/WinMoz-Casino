@@ -1071,7 +1071,7 @@ export default function DamasGame() {
     betDeductedRef.current = true;
     (async () => {
       try {
-        const result = await serverBet(BET, "damas", `Aposta (Damas) vs ${opponentName}`, gameId);
+        const result = await serverBet(BET, "damas", `Aposta (Damas) vs ${opponentName}`, gameId, myColor);
         if (!result.ok) { betDeductedRef.current = false; return; }
         getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
         try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch {}
@@ -1517,6 +1517,12 @@ export default function DamasGame() {
       if (winnerRef.current) return;
       setWinner(myColor);
       setWinReason(`${opponentName} desistiu da partida!`);
+      // O desistente fecha a partida no servidor, mas se se desligou o pedido
+      // pode não ter chegado. Como vencedor, reclamamos a liquidação —
+      // serverWin é idempotente (não credita duas vezes).
+      if (gameId !== "local" && !isBot && BET > 0) {
+        void serverWin(gameId, "damas", BET).then(() => refreshProfile()).catch(() => {});
+      }
     });
 
     ch.on("broadcast", { event: "damas_kings_draw" }, () => {
@@ -1611,7 +1617,7 @@ export default function DamasGame() {
         if(BET > 0 && !betDeductedRef.current){
           betDeductedRef.current = true;
           try{
-            const result = await serverBet(BET, "damas", "Aposta de jogo (Damas)", gameId);
+            const result = await serverBet(BET, "damas", "Aposta de jogo (Damas)", gameId, myColor);
             if(!result.ok){ betDeductedRef.current = false; }
             else {
               try { sessionStorage.setItem(`wm_bet_deducted_damas_${gameId}`, "1"); } catch { /* ignore */ }
