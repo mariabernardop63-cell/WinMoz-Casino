@@ -73,6 +73,35 @@ function _throttledPlay(kind: string, buf: AudioBuffer | null, minGapMs: number,
 
 function playRollSound()    { _throttledPlay("roll",   _rollBuffer,    400); }
 function playCaptureSound() { _throttledPlay("capture", _captureBuffer, 700); }
+
+// O primeiro clique pode acontecer antes do ficheiro MP3 terminar de
+// descodificar. Não atrasamos o som até ao fetch acabar: emitimos um som
+// curto imediatamente e usamos o MP3 nos lançamentos seguintes.
+function playDiceFallbackSound() {
+  try {
+    const ctx = _getCtx();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = "square";
+    osc.frequency.setValueAtTime(180, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(90, ctx.currentTime + 0.07);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    osc.start(); osc.stop(ctx.currentTime + 0.09);
+  } catch {}
+}
+
+function playDiceSoundImmediately() {
+  if (_rollBuffer) playRollSound();
+  else {
+    const now = Date.now();
+    if (now - (_lastPlayAt["roll"] ?? 0) < 400) return;
+    _lastPlayAt["roll"] = now;
+    playDiceFallbackSound();
+  }
+}
 function playVictoryChime() {
   /* 1x apenas — chames concorrentes (handleMoveComplete + state sync) não repetem */
   const now = Date.now();
@@ -1447,6 +1476,9 @@ export default function LudoGame() {
   // carries the intent through the asynchronous dice animation so a roll
   // with several legal pieces is selected automatically.
   const autoMoveAfterRollRef = useRef(false);
+  // Depois de expirar, a mesma vez pode passar por roll → select. O ref
+  // impede que o efeito do timer seja recriado e desconte vidas duas vezes.
+  const timerExpiredTurnRef = useRef<Player|null>(null);
   // Persiste em sessionStorage para não re-debitar se o utilizador fizer back e retomar
   const betDeductedRef = useRef(
     gameId !== "local"
@@ -1596,14 +1628,14 @@ export default function LudoGame() {
   // o turno do servidor é a verdade: adoptamos o turno indicado para o
   // estado local nunca divergir (era a causa do dado "bugado" na vez do
   // adversário).
-  const serverHandoff=useCallback(async(keepTurn:boolean):Promise<void>=>{
-    if(isBot||gameId==="local") return;
+  const serverHandoff=useCallback(async(keepTurn:boolean):Promise<boolean>=>{
+    if(isBot||gameId==="local") return true;
     let result = await passLudoTurn(gameId, keepTurn);
     if(!result.ok && !result.serverTurn){
       // Falha de rede/timeout — uma segunda tentativa
       result = await passLudoTurn(gameId, keepTurn);
     }
-    if(result.ok) return;
+    if(result.ok) return true;
     const st = result.serverTurn;
     if(st==="blue"||st==="green"){
       if(turnRef.current!==st){
@@ -1614,7 +1646,12 @@ export default function LudoGame() {
         if(st==="blue")setDiceBlue(null);else setDiceGreen(null);
         setMsg(st===myColor?myTurnMsg:oppTurnMsg);
       }
+      return false;
     }
+    // Se a resposta foi perdida por uma falha de rede, não bloqueamos a
+    // partida indefinidamente. O próximo lançamento volta a ser validado pelo
+    // servidor e, se necessário, o seu turno autoritativo será adoptado.
+    return true;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[isBot,gameId,myColor,playerName,opponentName]);
 
@@ -1647,26 +1684,24 @@ export default function LudoGame() {
     // discard delayed/duplicated packets that would revert the turn. The version
     // is raised above anything this device has ever SENT or RECEIVED, so the
     // counter converges across both devices.
-    const broadcastSync=(syncTurn:Player,syncPhase:Phase,delay:number,syncWinner?:Player)=>{
+    const broadcastSync=(syncTurn:Player,syncPhase:Phase,syncWinner?:Player)=>{
       if(isBot||currentTurn!==myColor||!channelRef.current) return;
       stateVersionRef.current = Math.max(stateVersionRef.current,lastSyncVersionRef.current)+1;
       const version = stateVersionRef.current;
-      setTimeout(()=>{
-        channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
-           pieces:authPieces, turn:syncTurn, phase:syncPhase,
-          diceBlue:null, diceGreen:null,
-          version,
-          stuckTurns:stuckTurnsRef.current,
-          lives:livesRef.current,
-          ...(syncWinner?{winner:syncWinner}:{}),
-        }});
-      },delay);
+      channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
+        pieces:authPieces, turn:syncTurn, phase:syncPhase,
+        diceBlue:null, diceGreen:null,
+        version,
+        stuckTurns:stuckTurnsRef.current,
+        lives:livesRef.current,
+        ...(syncWinner?{winner:syncWinner}:{}),
+      }});
     };
 
     if(finishedCount(updatedPs,currentTurn)===4){
       setWinner(currentTurn); setPhase("done");
       if(currentTurn===myColor) playWinFanfare();
-      broadcastSync(currentTurn,"done",100,currentTurn);
+      broadcastSync(currentTurn,"done",currentTurn);
       return;
     }
     const enteredHome = mover.pos>=56 && prevPos<56;
@@ -1677,12 +1712,19 @@ export default function LudoGame() {
       const plName=currentTurn===myColor?playerName.split(" ")[0]:opponentName;
       setMsg(`${plName} ${reason} — joga de novo!`);
       setMovable([]);
-      // Keep consecutiveSixes for this extra turn (don't reset, it accumulates)
-      setTimeout(()=>{setPhase("roll");if(currentTurn==="blue")setDiceBlue(null);else setDiceGreen(null);},400);
-      broadcastSync(currentTurn,"roll",500);
-      if(!isBot&&currentTurn===myColor&&gameId!=="local"){
-        void serverHandoff(true);
-      }
+      // Keep consecutiveSixes for this extra turn (don't reset, it accumulates).
+      // The next roll is exposed only after the server confirms the extra turn;
+      // otherwise the opponent can see a new phase while the API still owns
+      // the previous one.
+      const extraHandoff = (!isBot&&currentTurn===myColor&&gameId!=="local")
+        ? serverHandoff(true)
+        : Promise.resolve(true);
+      setTimeout(async()=>{
+        if (!(await extraHandoff) || winnerRef.current) return;
+        setPhase("roll");
+        if(currentTurn==="blue")setDiceBlue(null);else setDiceGreen(null);
+        broadcastSync(currentTurn,"roll");
+      },400);
     } else {
       const next=other(currentTurn);
       const justMoved = prevPos !== mover.pos;
@@ -1695,15 +1737,16 @@ export default function LudoGame() {
       // hand-off below, but the server value is authoritative: any further
       // roll request from this device is rejected with 423 until it's
       // genuinely this player's turn again.
-      if(!isBot&&currentTurn===myColor&&gameId!=="local"){
-        void serverHandoff(false);
-      }
-      setTimeout(()=>{
+      const nextHandoff = (!isBot&&currentTurn===myColor&&gameId!=="local")
+        ? serverHandoff(false)
+        : Promise.resolve(true);
+      setTimeout(async()=>{
+        if (!(await nextHandoff) || winnerRef.current) return;
         setTurn(next); setPhase("roll");
         if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
         setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
+        broadcastSync(next,"roll");
       },500);
-      broadcastSync(next,"roll",600);
     }
   }
 
@@ -1818,6 +1861,7 @@ export default function LudoGame() {
           ?`${plName} — 6 mas sem movimento!`
           :`${plName} — ${val} sem jogadas.`);
         consecutiveSixesRef.current=0;
+        autoMoveAfterRollRef.current = false;
         // No piece moved, so the player who owns this turn must publish the
         // hand-off. Without this event the other device could keep an old
         // turn/phase and reject the next player's roll forever.
@@ -1827,30 +1871,35 @@ export default function LudoGame() {
           rollBusyRef.current = true;
           phaseRef.current = "moving";
           setPhase("moving");
-          if(!isBot&&gameId!=="local"){
-            void serverHandoff(false);
-          }
+          const noMoveHandoff = (!isBot&&gameId!=="local")
+            ? serverHandoff(false)
+            : Promise.resolve(true);
+          setTimeout(async()=>{
+            if (!(await noMoveHandoff) || winnerRef.current) return;
+            const next=other(pl);
+            setTurn(next); setPhase("roll");
+            if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
+            setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
+            if (pl===myColor && !isBot) {
+              stateVersionRef.current = Math.max(stateVersionRef.current,lastSyncVersionRef.current)+1;
+              const version = stateVersionRef.current;
+              channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
+                pieces:piecesRef.current, turn:next, phase:"roll",
+                diceBlue:null, diceGreen:null,
+                version,
+                stuckTurns:stuckTurnsRef.current,
+                lives:livesRef.current,
+              }});
+            }
+            if(pl===myColor) rollBusyRef.current = false;
+          },1300);
+        } else {
+          // The opponent owns the authoritative hand-off. Its state sync will
+          // move this client to the next roll phase.
         }
-        setTimeout(()=>{
-          const next=other(pl);
-          setTurn(next); setPhase("roll");
-          if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
-          setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
-          if (pl===myColor && !isBot) {
-            stateVersionRef.current = Math.max(stateVersionRef.current,lastSyncVersionRef.current)+1;
-            const version = stateVersionRef.current;
-            channelRef.current?.send({type:"broadcast",event:"ludo_state_sync",payload:{
-              pieces:piecesRef.current, turn:next, phase:"roll",
-              diceBlue:null, diceGreen:null,
-              version,
-              stuckTurns:stuckTurnsRef.current,
-              lives:livesRef.current,
-            }});
-          }
-          if(pl===myColor) rollBusyRef.current = false;
-        },1300);
       } else if(mv.length===1){
         setMsg(`${plName} tirou ${val}!`);
+        autoMoveAfterRollRef.current = false;
         if(pl===myColor){
           // Auto-move: broadcast piece_selected so opponent can animate
           channelRef.current?.send({type:"broadcast",event:"piece_selected",
@@ -1903,7 +1952,7 @@ export default function LudoGame() {
     // One request at a time, matching the working turn/dice flow from
     // 400fe82. The lock is released when the visual roll resolves.
     rollBusyRef.current = true;
-    playRollSound();
+    playDiceSoundImmediately();
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
     const allInBase = myPieces.every(p=>p.pos===-1);
@@ -1950,6 +1999,15 @@ export default function LudoGame() {
       (myColor==="blue"?setRollingB:setRollingG)(false);
       rollBusyRef.current = false;
       setMsg(rollError || "Não foi possível rolar o dado. Tenta novamente.");
+      // A timeout is a complete turn action. A transient API/network failure
+      // must not leave the timed-out player permanently without a move.
+      if (autoMoveAfterRollRef.current && phaseRef.current === "roll" && turnRef.current === myColor) {
+        setTimeout(() => {
+          if (phaseRef.current === "roll" && turnRef.current === myColor && !winnerRef.current) {
+            void doRoll();
+          }
+        }, 750);
+      }
       return;
     }
 
@@ -2096,15 +2154,24 @@ export default function LudoGame() {
       // Security: validate dice value is in expected range
       const val = payload.value as number;
       if(typeof val !== "number" || val < 1 || val > 6 || !Number.isInteger(val)) return;
+      const remotePlayer = payload.player as Player;
+      // A delayed dice packet must never create a phantom turn. Ask for the
+      // authoritative snapshot instead; accepting it here was the source of
+      // ghost rolls and of the other player's die becoming disabled.
+      if (remotePlayer !== turnRef.current) {
+        channel.send({type:"broadcast",event:"ludo_resync_req",payload:{}}).catch(()=>{});
+        return;
+      }
       // Game has definitively started — credit referral reward now (opponent's first move)
       if(BET_AMOUNT > 0 && !rewardFiredRef.current){
         rewardFiredRef.current=true;
         getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
       }
       lastActivityAtRef.current = Date.now();
-      // O oponente ouve o mesmo som de dado que eu ouço quando jogo
-      playRollSound();
-      applyRoll(payload.player as Player, val);
+      // O oponente ouve o mesmo som imediatamente, mesmo se o MP3 ainda
+      // estiver a descodificar nesta aba.
+      playDiceSoundImmediately();
+      applyRoll(remotePlayer, val);
     });
 
     channel.on("broadcast",{ event:"piece_selected" },({ payload })=>{
@@ -2123,6 +2190,10 @@ export default function LudoGame() {
       if(typeof diceVal !== "number" || diceVal < 1 || diceVal > 6 || !Number.isInteger(diceVal)) return;
       const expectedPrefix = payload.player === "blue" ? "B" : "G";
       if(pieceId[0] !== expectedPrefix) return;
+      if ((payload.player as Player) !== turnRef.current) {
+        channel.send({type:"broadcast",event:"ludo_resync_req",payload:{}}).catch(()=>{});
+        return;
+      }
       lastActivityAtRef.current = Date.now();
       // Use doOpponentMove (animation only) — final state comes via ludo_state_sync
       doOpponentMove(
@@ -2458,6 +2529,13 @@ export default function LudoGame() {
       try { sessionStorage.removeItem(turnTimerKey); } catch { /* ignore */ }
       return;
     }
+    // A timeout may transition through several phases while keeping the same
+    // turn. Do not create a second expiry callback for that same turn.
+    if (timerExpiredTurnRef.current === turn) {
+      setTimeLeft(0);
+      return;
+    }
+    if (timerExpiredTurnRef.current !== turn) timerExpiredTurnRef.current = null;
     // Novo turno real? → começa agora. Mudança de fase (roll↔select) ou
     // retoma (back + voltar)? → o timer CONTINUA do início original.
     const isNewTurn = prevTimerTurnRef.current !== turn;
@@ -2483,6 +2561,7 @@ export default function LudoGame() {
     const fireExpiry = () => {
       if (firedExpiry) return;
       firedExpiry = true;
+      timerExpiredTurnRef.current = turn;
       setTimeout(() => autoPlayRef.current?.(), 0);
     };
 
@@ -2528,6 +2607,7 @@ export default function LudoGame() {
     setStuckTurns({blue:0,green:0}); stuckTurnsRef.current={blue:0,green:0};
     consecutiveSixesRef.current=0;
     autoMoveAfterRollRef.current = false;
+    timerExpiredTurnRef.current = null;
     rollBusyRef.current = false;
     moveBusyRef.current = false;
     lastEventSeqRef.current = {};

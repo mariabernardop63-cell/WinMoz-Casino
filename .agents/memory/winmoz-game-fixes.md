@@ -47,6 +47,9 @@ description: Key decisions and patterns from major bug-fix session — payout, r
 - Ludo roll locks must last until the server response and phase transition, not a fixed short delay.
 - **Why:** A slow roll request can outlive a fixed unlock timer and let rapid clicks create concurrent rolls or duplicate turn events.
 - **How to apply:** Lock before the request, release on error/stale response or authoritative state transition, and reject duplicate remote roll broadcasts while the current roll is being resolved.
+- Timer expiry must be idempotent across phase changes within the same turn.
+- **Why:** The timeout changes roll → moving/select, which recreates timer effects; without a per-turn expiry marker it can deduct multiple lives or start multiple automatic rolls.
+- **How to apply:** Mark the current player/turn when expiry fires and clear that marker only when the turn changes or the game resets.
 - Avoid adding client-side epochs or snapshot sequence gates to the working Ludo dice flow without a full two-client test.
 - **Why:** A local client can still be on the previous phase when a valid opponent roll arrives; strict epoch/turn filters then reject the event and make one player's die appear permanently disabled.
 - **How to apply:** Keep the reference event flow for dice, selection, and state sync; use only a short local request lock to prevent duplicate clicks, and validate any stronger authority at the server boundary.
