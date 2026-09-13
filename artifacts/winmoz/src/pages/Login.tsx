@@ -163,6 +163,10 @@ export default function Login() {
             </div>
           )}
 
+          <form
+            onSubmit={e => { e.preventDefault(); void handleSubmit(); }}
+            noValidate
+          >
           <div className="mb-4">
             <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "#374151", marginBottom: 7 }}>
               Endereço de Email
@@ -170,6 +174,7 @@ export default function Login() {
             <input
               type="email"
               placeholder="exemplo@email.com"
+              autoComplete="email"
               value={email}
               onChange={e => { setEmail(e.target.value); clearErr("email"); }}
               onFocus={() => setFocused("email")}
@@ -188,11 +193,11 @@ export default function Login() {
               <input
                 type={showPassword ? "text" : "password"}
                 placeholder="A sua palavra-passe"
+                autoComplete="current-password"
                 value={password}
                 onChange={e => { setPassword(e.target.value); clearErr("password"); }}
                 onFocus={() => setFocused("password")}
                 onBlur={() => setFocused(null)}
-                onKeyDown={e => e.key === "Enter" && handleSubmit()}
                 style={{ ...inputStyle("password"), paddingRight: 48 }}
                 disabled={loading}
               />
@@ -206,14 +211,14 @@ export default function Login() {
 
           <div className="flex justify-end mb-6">
             <Link href="/esqueceu-senha">
-              <button className="text-[12.5px] font-semibold text-[#111] hover:underline">
+              <button type="button" className="text-[12.5px] font-semibold text-[#111] hover:underline">
                 Esqueceu a palavra-passe?
               </button>
             </Link>
           </div>
 
           <button
-            onClick={handleSubmit}
+            type="submit"
             disabled={loading}
             style={{
               width: "100%", padding: "15px", background: loading ? "#555" : "#000", color: "#fff",
@@ -229,6 +234,7 @@ export default function Login() {
             ) : "Iniciar Sessão"}
           </button>
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </form>
 
           <div className="flex items-center gap-3 my-6">
             <div className="flex-1 h-px bg-slate-200" />

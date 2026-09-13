@@ -35,8 +35,10 @@ async function postWithAuthRetry(
     if (recovered) {
       const fresh = await getToken();
       if (fresh) res = await doFetch(fresh);
+      // Só um 401 depois de um refresh confirmado prova que o servidor
+      // rejeitou uma sessão nova. Um refresh que falhou por rede não é logout.
+      if (res.status === 401) forceSessionLogout("api_unauthorized");
     }
-    if (res.status === 401) forceSessionLogout("api_unauthorized");
   }
   let data: Record<string, unknown> = {};
   try { data = await res.json() as Record<string, unknown>; } catch { /* body vazio */ }

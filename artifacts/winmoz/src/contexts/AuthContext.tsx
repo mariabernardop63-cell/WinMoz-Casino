@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import {
-  forceSessionLogout, isSessionExpiredError, isHardAuthError,
-  ensureFreshSession, terminateSession, clearLocalAuthStorage,
+  isSessionExpiredError, isHardAuthError, ensureFreshSession,
+  terminateSession, clearLocalAuthStorage,
   inLoginGrace, cancelLoginGrace, supabase,
 } from "@/lib/supabase";
 import { API_BASE } from "@/lib/apiBase";
@@ -94,8 +94,9 @@ async function fetchProfile(userId: string, attempt = 0): Promise<UserProfile | 
         await new Promise(r => setTimeout(r, 300 * Math.pow(2, attempt)));
         return fetchProfile(userId, attempt + 1);
       }
-      // Só encerra a sessão quando o refresh já não consegue produzir token.
-      forceSessionLogout("profile_fetch_failed");
+      // ensureFreshSession já decide se o refresh token morreu. Não terminar
+      // a sessão aqui: um 401 transitório durante uma troca de token/rede
+      // nunca deve expulsar o utilizador.
       return null;
     }
     if (error || !data) {
@@ -184,11 +185,11 @@ async function ensureProfileExists(
 export function AuthProvider({ children }: { children: ReactNode }) {
   const cachedProfile = loadCachedProfile();
 
-  const [user, setUser] = useState<{ id: string; email: string } | null>(
-    cachedProfile ? { id: cachedProfile.id, email: cachedProfile.email ?? "" } : null
-  );
+  // O perfil em cache é apenas um apoio para a UI. A identidade só fica
+  // autenticada depois de o Supabase confirmar a sessão guardada.
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(cachedProfile ?? null);
-  const [loading, setLoading] = useState(!cachedProfile);
+  const [loading, setLoading] = useState(true);
   const [sessionReady, setSessionReady] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
 
@@ -198,7 +199,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // true quando esta tab chegou a ter um utilizador autenticado — só nesse
   // caso o fim de sessão deve encaminhar para /login.
-  const hadAuthenticatedStateRef = useRef(Boolean(cachedProfile));
+  const hadAuthenticatedStateRef = useRef(false);
 
   const saveAndSet = (p: UserProfile, { persist = true } = {}) => {
     if (p.is_blocked) {
@@ -395,7 +396,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Sem sessão em storage: visitante anónimo legítimo OU uma
           //falha ao ler o storage. Só encerra a conta se houve conta
           // activa nesta tab; caso contrário é apenas um visitante.
-          if (!cancelled && hadAuthenticatedStateRef.current) invalidateSession();
+          if (!cancelled && hadAuthenticatedStateRef.current) {
+            invalidateSession();
+          } else if (!cancelled) {
+            // Nunca renderizar dados do perfil anterior sem uma sessão
+            // confirmada, sobretudo quando outra conta usa o mesmo browser.
+            clearCachedProfile();
+            setUser(null);
+            setProfile(null);
+          }
           if (!cancelled) { setLoading(false); setSessionReady(true); }
           return;
         }
@@ -473,11 +482,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!cancelled) { setLoading(false); setSessionReady(true); }
     }, 8000);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (cancelled) return;
-
-        if (event === "SIGNED_IN" && session?.user) {
+    const handleSignedIn = async (session: NonNullable<Parameters<Parameters<typeof supabase.auth.onAuthStateChange>[0]>[1]>) => {
+      if (!session?.user || cancelled) return;
+      {
           const { id, email = "" } = session.user;
           if (signedInHandledRef.current && activeUidRef.current === id) {
             /* Já tratámos este login — mas se o perfil ainda não chegou
@@ -529,7 +536,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             startHeartbeat(id);
             startRealtimeProfile(id, email);
           }
+      }
+    };
 
+    // Do not await Supabase calls from inside onAuthStateChange. Supabase
+    // serializes auth operations with a lock; awaiting profile queries here
+    // can deadlock a login/refresh and make the UI fall back to the home page.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (cancelled) return;
+
+        if (event === "SIGNED_IN" && session?.user) {
+          setTimeout(() => { void handleSignedIn(session); }, 0);
         } else if (event === "SIGNED_OUT") {
           /* Ignorar SIGNED_OUT durante a graça de login: é tipicamente um
              refresh antigo (da sessão anterior) a falhar e a apagar a
@@ -552,15 +570,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else if (event === "TOKEN_REFRESHED" && session?.user) {
           const { id, email = "" } = session.user;
           if (!cancelled) setUser(prev => (prev?.id === id ? prev : { id, email }));
-          const data = await fetchProfile(id);
-          if (!cancelled && activeUidRef.current === id && data) {
-            saveAndSet({ ...data, email });
-          }
+          setTimeout(() => {
+            void fetchProfile(id).then(data => {
+              if (!cancelled && activeUidRef.current === id && data) {
+                saveAndSet({ ...data, email });
+              }
+            });
+          }, 0);
 
         } else if (event === "USER_UPDATED" && session?.user) {
           const { id, email = "" } = session.user;
-          const data = await fetchProfile(id);
-          if (!cancelled && data) saveAndSet({ ...data, email });
+          setTimeout(() => {
+            void fetchProfile(id).then(data => {
+              if (!cancelled && activeUidRef.current === id && data) saveAndSet({ ...data, email });
+            });
+          }, 0);
         }
       }
     );

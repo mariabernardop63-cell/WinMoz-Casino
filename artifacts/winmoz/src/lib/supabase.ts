@@ -161,12 +161,6 @@ async function runEnsureFreshSession({ forceRefresh, marginSeconds = 90 }: Ensur
  */
 export async function getSessionWithRefresh(): Promise<Session | null> {
   const session = await ensureFreshSession({ marginSeconds: 60 });
-  if (!session) {
-    try {
-      const { data: { session: stored } } = await supabase.auth.getSession();
-      if (!stored) forceSessionLogout("session_missing");
-    } catch { /* ignore */ }
-  }
   return session;
 }
 

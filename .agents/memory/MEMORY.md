@@ -8,3 +8,4 @@
 - [Winmoz Debito Pay integration](winmoz-debito-pay.md) — C2B USSD push via Debito Pay; API key in SLACK_LIVE_API_KEY env var; only e-Mola active; webhook at /api/debito/webhook
 - [Winmoz white aesthetic](winmoz-white-aesthetic.md) — white minimal style: bg #fff, text #0a0a0a/#111, border #e5e7eb, black CTA buttons (#000), no border-radius on inputs/buttons; applied to Apostar + all outer game containers (Ludo/Chess/Damas); SegmentedToggle + MobileWalletPhoneField also converted; SMS screens intentionally kept dark
 - [Winmoz AppSettingsContext](winmoz-app-settings.md) — global context at AppSettingsContext.tsx; storage key wm_app_settings_v2; currencies via open.er-api.com; payment methods max 3; betting limits with daily enforcement; wrapped in App.tsx inside BrandProvider
+- [Winmoz authentication session rules](auth-session-rules.md) — keep Supabase auth callbacks synchronous and never log out on one transient API 401

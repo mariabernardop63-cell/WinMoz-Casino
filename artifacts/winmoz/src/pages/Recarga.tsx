@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import {
   ChevronLeft, CheckCircle2, XCircle, RotateCcw, Zap, ClipboardPaste,
 } from "lucide-react";
-import { forceSessionLogout, getSessionWithRefresh, recoverAfter401 } from "@/lib/supabase";
+import { getSessionWithRefresh, recoverAfter401 } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { API_BASE } from "@/lib/apiBase";
 import { supabase } from "@/lib/supabase";
@@ -105,7 +105,9 @@ export default function Recarga() {
       const res = await Promise.race([
         doRecharge(session.access_token).then(async r => {
           // Token expirado a meio: refresca e repete uma vez antes de falhar.
-          if (r.status === 401 && await recoverAfter401()) {
+          if (r.status === 401) {
+            const recovered = await recoverAfter401();
+            if (!recovered) return r;
             const fresh = await getSessionWithRefresh();
             if (fresh) return doRecharge(fresh.access_token);
           }
@@ -115,7 +117,8 @@ export default function Recarga() {
       ]) as Response;
 
        if (!res.ok) {
-         if (res.status === 401) forceSessionLogout("recharge_unauthorized");
+        // recoverAfter401 já encerra apenas quando o refresh token morreu.
+        // Não transformar um 401 transitório num logout.
          try {
            const errData = await res.json() as { error?: string };
            setErrorMsg(errData?.error ?? null);
