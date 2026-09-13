@@ -1643,15 +1643,21 @@ export default function LudoGame() {
         setTurn(st);
         setPhase("roll");
         phaseRef.current = "roll";
-        if(st==="blue")setDiceBlue(null);else setDiceGreen(null);
+          if(st==="blue"){ diceBlueRef.current=null; setDiceBlue(null); }
+          else { diceGreenRef.current=null; setDiceGreen(null); }
         setMsg(st===myColor?myTurnMsg:oppTurnMsg);
       }
-      return false;
+      // A retry can receive 423 after the first request already committed the
+      // hand-off. Treat the expected next turn as success; otherwise this
+      // client must not advance a turn that the server assigned elsewhere.
+      const expected = keepTurn ? myColor : other(myColor);
+      return st === expected;
     }
-    // Se a resposta foi perdida por uma falha de rede, não bloqueamos a
-    // partida indefinidamente. O próximo lançamento volta a ser validado pelo
-    // servidor e, se necessário, o seu turno autoritativo será adoptado.
-    return true;
+    // Sem confirmação nem turno autoritativo, não podemos libertar o turno
+    // localmente. Avançar aqui cria dois jogadores activos ao mesmo tempo.
+    setMsg("A sincronizar a vez com o servidor…");
+    channelRef.current?.send({type:"broadcast",event:"ludo_resync_req",payload:{}}).catch(()=>{});
+    return false;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[isBot,gameId,myColor,playerName,opponentName]);
 
@@ -1729,8 +1735,10 @@ export default function LudoGame() {
         : Promise.resolve(true);
       setTimeout(async()=>{
         if (!(await extraHandoff) || winnerRef.current) return;
+        phaseRef.current = "roll";
         setPhase("roll");
-        if(currentTurn==="blue")setDiceBlue(null);else setDiceGreen(null);
+        if(currentTurn==="blue"){ diceBlueRef.current=null; setDiceBlue(null); }
+        else { diceGreenRef.current=null; setDiceGreen(null); }
         broadcastSync(currentTurn,"roll");
       },400);
     } else {
@@ -1750,8 +1758,10 @@ export default function LudoGame() {
         : Promise.resolve(true);
       setTimeout(async()=>{
         if (!(await nextHandoff) || winnerRef.current) return;
-        setTurn(next); setPhase("roll");
-        if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
+        turnRef.current=next; setTurn(next);
+        phaseRef.current="roll"; setPhase("roll");
+        if(next==="blue"){ diceBlueRef.current=null; setDiceBlue(null); }
+        else { diceGreenRef.current=null; setDiceGreen(null); }
         setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
         broadcastSync(next,"roll");
       },500);
@@ -1840,6 +1850,8 @@ export default function LudoGame() {
     const setD=pl==="blue"?setDiceBlue:setDiceGreen;
     setR(true);
     setTimeout(()=>{
+      if(pl==="blue") diceBlueRef.current=val;
+      else diceGreenRef.current=val;
       setD(val); setR(false);
       // The request/animation lock only covers this roll. Turn ownership is
       // handled by the normal hand-off below.
@@ -1885,8 +1897,10 @@ export default function LudoGame() {
           setTimeout(async()=>{
             if (!(await noMoveHandoff) || winnerRef.current) return;
             const next=other(pl);
-            setTurn(next); setPhase("roll");
-            if(next==="blue")setDiceBlue(null); else setDiceGreen(null);
+            turnRef.current=next; setTurn(next);
+            phaseRef.current="roll"; setPhase("roll");
+            if(next==="blue"){ diceBlueRef.current=null; setDiceBlue(null); }
+            else { diceGreenRef.current=null; setDiceGreen(null); }
             setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
             if (pl===myColor && !isBot) {
               stateVersionRef.current = Math.max(stateVersionRef.current,lastSyncVersionRef.current)+1;
@@ -1922,6 +1936,11 @@ export default function LudoGame() {
       } else {
         if(pl===myColor||isBot){
           // My turn or bot: show selectable pieces + enter select phase
+          // Keep refs in lockstep with React state. The click handler,
+          // timeout autoplay and server broadcasts all read these refs
+          // before React has necessarily committed the state update.
+          movableRef.current = mv;
+          phaseRef.current = "select";
           setMovable(mv); setPhase("select");
           setMsg(`${plName} — ${val}! ${pl===myColor?"Escolhe uma peça.":""}`);
           if (pl===myColor && autoMoveAfterRollRef.current) {
@@ -2623,10 +2642,18 @@ export default function LudoGame() {
   function resetGame(){
     try { sessionStorage.removeItem(turnTimerKey); } catch { /* ignore */ }
     prevTimerTurnRef.current = null;
+    const resetPieces = initialPieces();
+    piecesRef.current = resetPieces;
+    turnRef.current = "blue";
+    phaseRef.current = "roll";
+    movableRef.current = [];
+    diceBlueRef.current = null;
+    diceGreenRef.current = null;
+    winnerRef.current = null;
     betDeductedRef.current=false;
     winCreditedRef.current=false;
     rewardFiredRef.current=false;
-    setPieces(initialPieces()); setTurn("blue"); setPhase("roll");
+    setPieces(resetPieces); setTurn("blue"); setPhase("roll");
     setDiceBlue(null); setDiceGreen(null); setRollingB(false); setRollingG(false);
     setMovable([]); setWinner(null); setLives({blue:5,green:5}); setTimeLeft(30);
     setOpponentTimeLeft(30);
