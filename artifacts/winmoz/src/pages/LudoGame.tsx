@@ -1439,6 +1439,7 @@ export default function LudoGame() {
   const [lives,setLives]           = useState(_savedLudo?.lives ?? {blue:5,green:5});
   const livesRef                   = useRef<{blue:number;green:number}>(_savedLudo?.lives ?? {blue:5,green:5});
   const [timeLeft,setTimeLeft]     = useState(30);
+  const [reconnecting,setReconnecting] = useState(false);
 
   // ── Dice algorithm state ────────────────────────────────────────────────────
   // stuckTurns: how many consecutive turns each player had ALL pieces in base
@@ -1717,13 +1718,11 @@ export default function LudoGame() {
     }
     const enteredHome = mover.pos>=56 && prevPos<56;
     if(enteredHome) playVictoryChime();
-    // A six and reaching the centre grant another roll. Capturing is only a
-    // move result; it must still hand the turn to the opponent. Treating a
-    // capture as an extra turn was the source of repeated rolls by one player
-    // while the other device remained on the old phase.
-    const extraTurn = originalDice===6 || enteredHome;
+    // Rolling a 6, reaching the centre, or capturing an opponent piece
+    // all grant an extra turn.
+    const extraTurn = originalDice===6 || enteredHome || captured;
     if(extraTurn){
-      const reason = originalDice===6?"tirou 6":"chegou ao centro!";
+      const reason = originalDice===6?"tirou 6":captured?"capturou!":"chegou ao centro!";
       const plName=currentTurn===myColor?playerName.split(" ")[0]:opponentName;
       setMsg(`${plName} ${reason} — joga de novo!`);
       setMovable([]);
@@ -1863,12 +1862,15 @@ export default function LudoGame() {
     if(pl===myColor) timerExpiredTurnRef.current = null;
 
     setTimeout(()=>{
-      if(pl==="blue") diceBlueRef.current=val;
-      else diceGreenRef.current=val;
-      // Set the value AND stop rolling in the same synchronous block so
-      // the Dice3D component always renders the final value — never a
-      // stale random face.
-      setD(val); setR(false);
+      // For the opponent (via broadcast), set the dice value now.
+      // For the local player, doRoll already set it before starting
+      // the animation — don't overwrite it.
+      if(pl!==myColor){
+        if(pl==="blue") diceBlueRef.current=val;
+        else diceGreenRef.current=val;
+        setD(val);
+      }
+      setR(false);
 
       if(val===6){
         consecutiveSixesRef.current++;
@@ -1997,6 +1999,9 @@ export default function LudoGame() {
     const setMyRolling = myColor==="blue" ? setRollingB : setRollingG;
     const setMyDice = myColor==="blue" ? setDiceBlue : setDiceGreen;
 
+    // Start rolling IMMEDIATELY on click — no waiting for the API.
+    setMyRolling(true);
+
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
     const allInBase = myPieces.every(p=>p.pos===-1);
     const stuckTurns = stuckTurnsRef.current[myColor];
@@ -2043,19 +2048,20 @@ export default function LudoGame() {
       return;
     }
 
-    // The request may finish after a hand-off/resync. Never publish a late
-    // result as a second roll for a turn that has already ended.
     if (winnerRef.current || turnRef.current !== myColor || phaseRef.current !== "roll") {
       setMyRolling(false);
       rollBusyRef.current = false;
       return;
     }
 
-    // Play only after a valid roll was confirmed. This prevents a rejected
-    // request, timeout, or stale turn from producing a sound with no roll.
+    // Set the dice value — the Dice3D already has `value` so when rolling
+    // stops it shows the correct number immediately.
+    if(myColor==="blue") diceBlueRef.current=val;
+    else diceGreenRef.current=val;
+    setMyDice(val);
+
     playDiceSoundImmediately();
 
-    // Game has definitively started — credit referral reward now (player's own first roll)
     if(BET_AMOUNT > 0 && !rewardFiredRef.current){
       rewardFiredRef.current=true;
       getSessionWithRefresh().then((session)=>{if(session?.access_token)fetch("/api/record-bet-reward",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${session.access_token}`},body:"{}"}).catch(()=>{});}).catch(()=>{});
@@ -2185,6 +2191,19 @@ export default function LudoGame() {
       config:{ broadcast:{ self:false } },
     });
     channelRef.current=channel;
+
+    // Browser-level online/offline detection as a backup to Supabase status
+    const goOffline = () => { if(!winnerRef.current&&phaseRef.current!=="done") setReconnecting(true); };
+    const goOnline  = () => {
+      setReconnecting(false);
+      // Request a fresh state snapshot after reconnecting
+      setTimeout(()=>{
+        channel.send({type:"broadcast",event:"ludo_resync_req",payload:{}}).catch(()=>{});
+      },1200);
+    };
+    window.addEventListener("offline", goOffline);
+    window.addEventListener("online", goOnline);
+    if(!navigator.onLine) goOffline();
 
     channel.on("broadcast",{ event:"dice_rolled" },({ payload })=>{
       // Only process opponent's rolls; ignore our own echoes
@@ -2428,37 +2447,44 @@ export default function LudoGame() {
     });
 
     channel.subscribe(async(status)=>{
-      if(status==="SUBSCRIBED"&&profile?.id){
-        await channel.track({ userId:profile.id, color:myColor, balance:playerBal });
-        if(gameId!=="local"){
-          // Always ask for the opponent's current authoritative state. Covers
-          // both reconnections (saved session) and devices that missed
-          // broadcasts while the tab was throttled.
-          resyncInFlightRef.current = true;
-          setTimeout(()=>{
-            channel.send({type:"broadcast",event:"ludo_resync_req",payload:{}});
-          },800);
-          // Safety net: if no snapshot arrives, stop waiting.
-          setTimeout(()=>{ resyncInFlightRef.current = false; },6000);
+      // Monitor connection status for the reconnecting overlay
+      if(status==="CHANNEL_ERROR"||status==="CLOSED"){
+        if(gameId!=="local"&&!isBot) setReconnecting(true);
+        return;
+      }
+      if(status==="SUBSCRIBED"){
+        setReconnecting(false);
+        if(profile?.id){
+          await channel.track({ userId:profile.id, color:myColor, balance:playerBal });
+          if(gameId!=="local"){
+            resyncInFlightRef.current = true;
+            // Ask for a full state snapshot on every (re)connect so the
+            // game catches up with anything that happened while offline.
+            setTimeout(()=>{
+              channel.send({type:"broadcast",event:"ludo_resync_req",payload:{}});
+            },800);
+            setTimeout(()=>{ resyncInFlightRef.current = false; },6000);
+          }
+          if(BET_AMOUNT > 0 && !betDeductedRef.current){
+            betDeductedRef.current = true;
+            try {
+              const result = await serverBet(BET_AMOUNT, "ludo", "Aposta de jogo (Ludo)", gameId, myColor);
+              if(!result.ok){ betDeductedRef.current = false; }
+              else {
+                try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`, "1"); } catch { /* ignore */ }
+                await refreshProfile();
+              }
+            } catch { betDeductedRef.current = false; }
+          }
         }
-        // Deduct bet from balance when game starts (once per game) — server-side
-        if(BET_AMOUNT > 0 && !betDeductedRef.current){
-          betDeductedRef.current = true;
-          try {
-            const result = await serverBet(BET_AMOUNT, "ludo", "Aposta de jogo (Ludo)", gameId, myColor);
-            if(!result.ok){ betDeductedRef.current = false; }
-            else {
-              try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gameId}`, "1"); } catch { /* ignore */ }
-              await refreshProfile();
-            }
-          } catch { betDeductedRef.current = false; }
-        }
-        // A partida é registada APENAS pelo servidor (/api/games/bet) —
-        // escrita directa no browser está bloqueada por RLS (hardening v2).
       }
     });
 
-    return()=>{ supabase.removeChannel(channel); };
+    return()=>{ 
+      window.removeEventListener("offline", goOffline);
+      window.removeEventListener("online", goOnline);
+      supabase.removeChannel(channel);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[gameId,myColor]);
 
@@ -2553,9 +2579,6 @@ export default function LudoGame() {
 
   autoPlayRef.current  = () => {
     const cur = phaseRef.current;
-    // If a roll is already in progress or a move is animating, don't
-    // deduct a life — the player is already acting. Just skip silently.
-    if (rollBusyRef.current || moveBusyRef.current) return;
 
     const l    = livesRef.current;
     const nb   = l[myColor] - 1;
@@ -2572,13 +2595,16 @@ export default function LudoGame() {
     setMsg(`Tempo esgotado! ${playerName.split(" ")[0]} perde 1 vida (${nb} restante${nb===1?"":"s"}).`);
     if (!isBot) channelRef.current?.send({ type:"broadcast", event:"ludo_lives_sync",
       payload:{ lives: newLives, gameOver: false, player: myColor, timedOut: true } });
+
+    // If a roll/move is already in progress, the player is acting — just
+    // deduct the life but skip the auto-play.
+    if (rollBusyRef.current || moveBusyRef.current) return;
+
     const mv  = movableRef.current;
     const dv  = myColor === "blue" ? diceBlueRef.current : diceGreenRef.current;
     if (cur === "roll") {
       autoMoveAfterRollRef.current = true;
       setTimeout(() => {
-        // Re-check: the flag may have been cleared by a normal hand-off
-        // that completed between the timer firing and this callback.
         if (!autoMoveAfterRollRef.current) return;
         void doRoll();
       }, 200);
@@ -2958,6 +2984,43 @@ export default function LudoGame() {
             onDecline={handleRematchDecline}
             onClose={()=>setRematchPhase("idle")}
           />
+        )}
+      </AnimatePresence>
+
+      {/* ── Reconnecting overlay */}
+      <AnimatePresence>
+        {reconnecting && (
+          <motion.div
+            initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+            style={{
+              position:"fixed", inset:0, zIndex:9999,
+              background:"rgba(0,0,0,0.55)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              backdropFilter:"blur(3px)",
+            }}>
+            <motion.div
+              initial={{scale:0.9}} animate={{scale:1}} exit={{scale:0.9}}
+              style={{
+                background:"#fff", borderRadius:16, padding:"28px 36px",
+                textAlign:"center", boxShadow:"0 12px 40px rgba(0,0,0,0.3)",
+                maxWidth:300,
+              }}>
+              <motion.div
+                animate={{rotate:360}}
+                transition={{duration:1,repeat:Infinity,ease:"linear"}}
+                style={{
+                  width:36,height:36,margin:"0 auto 14px",
+                  border:"3px solid #e5e7eb",borderTopColor:"#3b82f6",
+                  borderRadius:"50%",
+                }}/>
+              <p style={{fontSize:14,fontWeight:700,color:"#1e293b",margin:0}}>
+                A reconectar…
+              </p>
+              <p style={{fontSize:11,color:"#64748b",marginTop:6}}>
+                A verificar ligação ao servidor.
+              </p>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
