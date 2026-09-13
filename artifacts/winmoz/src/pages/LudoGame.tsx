@@ -847,14 +847,12 @@ function DiceFace({ value, sz }:{ value:number; sz:number }) {
     </svg>
   );
 }
-function Dice3D({ value, rolling, onClick, active, sz=48 }:{
-  value:number|null; rolling:boolean; onClick:()=>void; active:boolean; sz?:number;
+function Dice3D({ value, rolling, error, onClick, active, sz=48 }:{
+  value:number|null; rolling:boolean; error?:boolean; onClick:()=>void; active:boolean; sz?:number;
 }) {
   const h=sz/2;
   const [rollKey,setRollKey]=useState(0);
   const [randomFace,setRandomFace]=useState(1);
-  // Remember the last non-null value so the dice never flashes back to 1
-  // when rolling stops before the state update propagates.
   const lastValueRef = useRef<number>(1);
   if(value!==null) lastValueRef.current=value;
   const faceRot:Record<number,{rx:number;ry:number}>={
@@ -863,9 +861,6 @@ function Dice3D({ value, rolling, onClick, active, sz=48 }:{
   useEffect(()=>{
     if(!rolling) return;
     setRollKey(k=>k+1);
-    // Keep cycling random faces until `rolling` becomes false.
-    // The cleanup function clears this interval — the dice snaps to
-    // the correct value on the same render that sets rolling=false.
     const iv=setInterval(()=>{
       setRandomFace(Math.floor(Math.random()*6)+1);
     },60);
@@ -883,10 +878,10 @@ function Dice3D({ value, rolling, onClick, active, sz=48 }:{
   ];
   const rad=sz*0.17;
   return (
-    <div onClick={active&&!rolling?onClick:undefined}
+    <div onClick={active&&!rolling&&!error?onClick:undefined}
       style={{
-        perspective:"400px", width:sz, height:sz,
-        cursor:active&&!rolling?"pointer":"default",
+        perspective:"400px", width:sz, height:sz, position:"relative",
+        cursor:active&&!rolling&&!error?"pointer":"default",
         filter:active
           ?"drop-shadow(0 6px 18px rgba(0,0,0,0.7)) drop-shadow(0 2px 5px rgba(0,0,0,0.4))"
           :"drop-shadow(0 3px 8px rgba(0,0,0,0.4))",
@@ -912,6 +907,24 @@ function Dice3D({ value, rolling, onClick, active, sz=48 }:{
           </div>
         ))}
       </motion.div>
+      {/* Error/retrying overlay — shown when the API call fails */}
+      {error && !rolling && (
+        <div style={{
+          position:"absolute", inset:0, borderRadius:rad,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          background:"rgba(0,0,0,0.35)", zIndex:5,
+        }}>
+          <motion.div
+            animate={{rotate:360}}
+            transition={{duration:0.8,repeat:Infinity,ease:"linear"}}
+            style={{
+              width:sz*0.45,height:sz*0.45,
+              border:"2.5px solid rgba(255,255,255,0.3)",
+              borderTopColor:"#fff",
+              borderRadius:"50%",
+            }}/>
+        </div>
+      )}
     </div>
   );
 }
@@ -960,10 +973,10 @@ function TrophySVG({ size=72 }:{size?:number}) {
 
 
 // ─── Professional Player Panel — white card ─────────────────────────────────────
-function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRoll,
+function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, error, onRoll,
   finished, lives, timeLeft, isMe, canRoll }:{
   player:Player; name:string; balance:string; isActive:boolean; diceValue:number|null;
-  rolling:boolean; onRoll:()=>void; finished:number; lives:number; timeLeft:number; isMe:boolean;
+  rolling:boolean; error?:boolean; onRoll:()=>void; finished:number; lives:number; timeLeft:number; isMe:boolean;
   canRoll?: boolean;
 }) {
   const color:PawnColor = player==="blue" ? "blue" : "green";
@@ -1068,7 +1081,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
           transition:"border-color 0.3s, background 0.3s",
         }}>
           <Dice3D
-            value={diceValue} rolling={rolling}
+            value={diceValue} rolling={rolling} error={error}
             onClick={onRoll}
             active={isActive && isMe && canRoll !== false}
             sz={34}
@@ -1440,6 +1453,8 @@ export default function LudoGame() {
   const [diceGreen,setDiceGreen]   = useState<number|null>(_savedLudo?.diceGreen ?? null);
   const [rollingBlue,setRollingB]  = useState(false);
   const [rollingGreen,setRollingG] = useState(false);
+  const [rollErrorBlue,setRollErrorBlue]   = useState(false);
+  const [rollErrorGreen,setRollErrorGreen] = useState(false);
   const [movable,setMovable]       = useState<PieceId[]>([]);
   const [winner,setWinner]         = useState<Player|null>(null);
   const [lives,setLives]           = useState(_savedLudo?.lives ?? {blue:5,green:5});
@@ -1779,7 +1794,7 @@ export default function LudoGame() {
         else { diceGreenRef.current=null; setDiceGreen(null); }
         setMsg(next===myColor ? myTurnMsg : oppTurnMsg);
         broadcastSync(next,"roll");
-      },500);
+      },200);
     }
   }
 
@@ -1936,7 +1951,7 @@ export default function LudoGame() {
               }});
             }
             if(pl===myColor) rollBusyRef.current = false;
-          },1300);
+          },400);
         } else {
           // The opponent owns the authoritative hand-off. Its state sync will
           // move this client to the next roll phase.
@@ -1988,7 +2003,7 @@ export default function LudoGame() {
           setMsg(`${plName} — ${val}!`);
         }
       }
-    },500);
+    },350);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[myColor,playerName,opponentName,doSelectPiece,isBot]);
 
@@ -2049,8 +2064,12 @@ export default function LudoGame() {
     }
     if(!val){
       setMyRolling(false);
+      // Show retrying spinner on the dice instead of a random number
+      const setMyError = myColor==="blue" ? setRollErrorBlue : setRollErrorGreen;
+      setMyError(true);
+      setTimeout(()=>setMyError(false), 2000);
       rollBusyRef.current = false;
-      setMsg(rollError || "Não foi possível rolar o dado. Tenta novamente.");
+      setMsg(rollError || "Falha na ligação. Tenta novamente.");
       return;
     }
 
@@ -2062,8 +2081,8 @@ export default function LudoGame() {
 
     // Set the dice value — the Dice3D already has `value` so when rolling
     // stops it shows the correct number immediately.
-    if(myColor==="blue") diceBlueRef.current=val;
-    else diceGreenRef.current=val;
+    if(myColor==="blue"){ diceBlueRef.current=val; setRollErrorBlue(false); }
+    else { diceGreenRef.current=val; setRollErrorGreen(false); }
     setMyDice(val);
 
     playDiceSoundImmediately();
@@ -2407,7 +2426,7 @@ export default function LudoGame() {
            diceBlueRef.current=p.diceBlue??null; diceGreenRef.current=p.diceGreen??null;
            if(p.phase==="roll") setMsg(oppTurnMsg);
         }
-      },200);
+      },80);
     });
 
     channel.on("broadcast",{ event:"rematch_request" },({ payload })=>{
@@ -2610,13 +2629,11 @@ export default function LudoGame() {
     const dv  = myColor === "blue" ? diceBlueRef.current : diceGreenRef.current;
     if (cur === "roll") {
       autoMoveAfterRollRef.current = true;
-      setTimeout(() => {
-        if (!autoMoveAfterRollRef.current) return;
-        void doRoll();
-      }, 200);
+      // No delay — fire immediately so the turn passes quickly.
+      void doRoll();
     }
     else if (cur === "select" && mv.length > 0 && dv !== null)
-      setTimeout(() => doSelectPiece(mv[Math.floor(Math.random() * mv.length)], dv, myColor, piecesRef.current), 200);
+      doSelectPiece(mv[Math.floor(Math.random() * mv.length)], dv, myColor, piecesRef.current);
   };
 
   // ── Local countdown for opponent timer (keeps ticking even when their tab is throttled) ──
@@ -2823,6 +2840,7 @@ export default function LudoGame() {
           isActive={turn===player&&!winner}
           diceValue={isGreen ? diceGreen : diceBlue}
           rolling={isGreen ? rollingGreen : rollingBlue}
+          error={isGreen ? rollErrorGreen : rollErrorBlue}
           onRoll={doRoll}
           finished={isGreen ? greenFinished : blueFinished}
           lives={isGreen ? lives.green : lives.blue}

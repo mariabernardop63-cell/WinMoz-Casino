@@ -186,35 +186,51 @@ export default function Levantar() {
         const session = await getSessionWithRefresh();
         const token = session?.access_token;
         if (token) {
-          const res = await fetch(`/withdraw`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`,
-            },
-            body: JSON.stringify({ amount: amountVal, phone: profile?.phone }),
-          });
-          if (res.ok) {
-            const json = await res.json() as { success?: boolean; withdrawalId?: string };
+          // Retry up to 2 times on 429 (rate limit) with backoff
+          let res: Response | null = null;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            if (attempt > 0) await new Promise(r => setTimeout(r, attempt * 3000));
+            res = await fetch(`${API_BASE}/withdraw`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+              },
+              body: JSON.stringify({ amount: amountVal, phone: profile?.phone }),
+            });
+            if (res.status !== 429) break;
+          }
+          if (res!.ok) {
+            const json = await res!.json() as { success?: boolean; withdrawalId?: string };
             if (json.success && json.withdrawalId) {
               withdrawalId = json.withdrawalId;
               apiSuccess = true;
             }
           } else {
-            const errJson = await res.json().catch(() => ({})) as { code?: string; message?: string; error?: string };
-            if (errJson.code === "BONUS_LOCKED") {
-              setProcessingConfirm(false);
-              setBonusLockedMsg(errJson.message || "Faz uma aposta para desbloquear o teu bónus.");
-              setScreen("rejected");
-              return;
+            let errorMsg = "Erro no servidor. Tenta novamente.";
+            try {
+              const errJson = await res!.json() as { code?: string; message?: string; error?: string };
+              if (errJson.code === "BONUS_LOCKED") {
+                setProcessingConfirm(false);
+                setBonusLockedMsg(errJson.message || "Faz uma aposta para desbloquear o teu bónus.");
+                setScreen("rejected");
+                return;
+              }
+              errorMsg = errJson.error || errJson.message || errorMsg;
+            } catch {
+              if (res!.status === 429) errorMsg = "Servidor ocupado. Tenta novamente dentro de alguns minutos.";
             }
+            setProcessingConfirm(false);
+            setBonusLockedMsg(errorMsg);
+            setScreen("rejected");
+            return;
           }
         }
-      } catch { /* fall through to direct Supabase */ }
+      } catch { /* fall through */ }
 
       if (!apiSuccess) {
-        // API endpoint unavailable — show error, do NOT attempt direct DB writes
         setProcessingConfirm(false);
+        setBonusLockedMsg("Falha na ligação. Verifica a tua internet e tenta novamente.");
         setScreen("rejected");
         return;
       }
@@ -649,7 +665,9 @@ export default function Levantar() {
             <XCircle style={{ width: 36, height: 36, color: "#dc2626" }} strokeWidth={2} />
           </motion.div>
           <p style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", letterSpacing: "0.8px", textTransform: "uppercase", marginBottom: 8 }}>
-            Recusado
+            {bonusLockedMsg?.includes("ligação") || bonusLockedMsg?.includes("internet") ? "Erro de Ligação"
+              : bonusLockedMsg?.includes("tentativas") || bonusLockedMsg?.includes("Demasiadas") ? "Limite Atingido"
+              : "Não Concluído"}
           </p>
           <p className="font-syne font-bold text-center" style={{ fontSize: "2.6rem", lineHeight: 1.1, color: "#0a0a0a" }}>
             {fmtMZN(amountVal)}<span style={{ fontSize: "1.2rem", color: "#9ca3af", marginLeft: 6 }}>MZN</span>

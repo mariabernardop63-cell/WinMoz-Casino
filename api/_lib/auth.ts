@@ -28,6 +28,32 @@ export async function authenticateUser(
 ): Promise<{ userId: string; email: string } | null> {
   const token = extractToken(req);
   if (!token) return null;
+
+  // Fast path: decode JWT locally (no Supabase API call → no rate limit)
+  // Supabase uses HS256 JWTs signed with the JWT secret from project settings.
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
+  if (jwtSecret) {
+    try {
+      const crypto = await import("crypto");
+      const parts = token.split(".");
+      if (parts.length === 3) {
+        const header = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf-8"));
+        if (header.alg === "HS256") {
+          const sig = crypto.createHmac("sha256", jwtSecret)
+            .update(`${parts[0]}.${parts[1]}`)
+            .digest("base64url");
+          if (sig === parts[2]) {
+            const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf-8"));
+            if (!payload.exp || payload.exp * 1000 > Date.now()) {
+              return { userId: payload.sub, email: payload.email ?? "" };
+            }
+          }
+        }
+      }
+    } catch { /* fall through to Supabase API */ }
+  }
+
+  // Fallback: call Supabase Auth API
   try {
     const admin = getSupabaseAdmin();
     const { data, error } = await admin.auth.getUser(token);
