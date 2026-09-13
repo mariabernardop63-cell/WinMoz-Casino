@@ -1712,6 +1712,14 @@ export default function LudoGame() {
       const plName=currentTurn===myColor?playerName.split(" ")[0]:opponentName;
       setMsg(`${plName} ${reason} — joga de novo!`);
       setMovable([]);
+      // A jogada extra é um novo turno lógico, mesmo mantendo a mesma cor.
+      // Sem rearmar este estado, o timer que expirou fica preso em 0 e o
+      // efeito do countdown recusa-se a criar um novo intervalo.
+      if (currentTurn === myColor) {
+        resetLocalTurnTimer(currentTurn);
+      } else if (isBot) {
+        setOpponentTimeLeft(30);
+      }
       // Keep consecutiveSixes for this extra turn (don't reset, it accumulates).
       // The next roll is exposed only after the server confirms the extra turn;
       // otherwise the opponent can see a new phase while the API still owns
@@ -1952,7 +1960,10 @@ export default function LudoGame() {
     // One request at a time, matching the working turn/dice flow from
     // 400fe82. The lock is released when the visual roll resolves.
     rollBusyRef.current = true;
-    playDiceSoundImmediately();
+    // Start the visual feedback immediately. Previously the die stayed still
+    // while waiting for the API, which looked like a dead/unresponsive button.
+    const setMyRolling = myColor==="blue" ? setRollingB : setRollingG;
+    setMyRolling(true);
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
     const allInBase = myPieces.every(p=>p.pos===-1);
@@ -1996,7 +2007,7 @@ export default function LudoGame() {
       }
     }
     if(!val){
-      (myColor==="blue"?setRollingB:setRollingG)(false);
+      setMyRolling(false);
       rollBusyRef.current = false;
       setMsg(rollError || "Não foi possível rolar o dado. Tenta novamente.");
       // A timeout is a complete turn action. A transient API/network failure
@@ -2010,6 +2021,10 @@ export default function LudoGame() {
       }
       return;
     }
+
+    // Play only after a valid roll was confirmed. This prevents a rejected
+    // request, timeout, or stale turn from producing a sound with no roll.
+    playDiceSoundImmediately();
 
     // Game has definitively started — credit referral reward now (player's own first roll)
     if(BET_AMOUNT > 0 && !rewardFiredRef.current){
@@ -2483,6 +2498,17 @@ export default function LudoGame() {
   // Turno já "ancorado" pelo timer (evita reiniciar em mudanças de fase e
   // permite retomar com o countdown contínuo)
   const prevTimerTurnRef = useRef<Player|null>(_savedLudo?.turn ?? null);
+
+  function resetLocalTurnTimer(player: Player) {
+    if (player !== myColor || winnerRef.current) return;
+    const start = Date.now();
+    timerExpiredTurnRef.current = null;
+    prevTimerTurnRef.current = player;
+    timerStartRef.current = start;
+    setTimeLeft(30);
+    try { sessionStorage.setItem(turnTimerKey, String(start)); } catch { /* ignore */ }
+  }
+
   autoPlayRef.current  = () => {
     const l    = livesRef.current;
     const nb   = l[myColor] - 1;
