@@ -634,6 +634,8 @@ async function handleMatch(req: VercelRequest, res: VercelResponse) {
     bet_amount: betAmount,
     winner_payout: Math.floor(betAmount * 2 * WIN_RATE),
     status: "active",
+    current_turn: "blue",
+    turn_updated_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
   });
 
@@ -840,7 +842,7 @@ async function handleLudoDice(req: VercelRequest, res: VercelResponse) {
       turnStale = Date.now() - new Date(m.turn_updated_at).getTime() > TURN_STALE_MS;
     }
     if (myColor && expectedTurn !== myColor && !turnStale) {
-      res.status(423).json({ error: "Não é a tua vez de jogar" });
+      res.status(423).json({ error: "Não é a tua vez de jogar", turn: expectedTurn });
       return;
     }
 

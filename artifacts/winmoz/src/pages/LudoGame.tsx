@@ -1690,6 +1690,7 @@ export default function LudoGame() {
 
   function handleMoveComplete(pieceId:PieceId,diceVal:number,currentTurn:Player,prevPos:number,originalDice:number=diceVal){
     moveBusyRef.current = false;
+    if(currentTurn===myColor)
     setPhase("moving");
     lastActivityAtRef.current = Date.now();
     const ps=piecesRef.current;
@@ -1994,6 +1995,7 @@ export default function LudoGame() {
               if (pid) doSelectPiece(pid, val, pl, piecesRef.current);
             }, 220);
           }
+          if(pl===myColor) rollBusyRef.current = false;
         } else {
           // Multiplayer opponent: only show the message.
           // Do NOT touch phase/movable — ludo_state_sync from the opponent
@@ -2048,6 +2050,7 @@ export default function LudoGame() {
       if(result.turnBlocked){
         (myColor==="blue"?setRollingB:setRollingG)(false);
         rollBusyRef.current = false;
+
         const st = result.serverTurn;
         if(st && turnRef.current!==st){
           turnRef.current = st;
@@ -2076,6 +2079,7 @@ export default function LudoGame() {
     if (winnerRef.current || turnRef.current !== myColor || phaseRef.current !== "roll") {
       setMyRolling(false);
       rollBusyRef.current = false;
+
       return;
     }
 
@@ -2361,6 +2365,10 @@ export default function LudoGame() {
       setDiceBlue(p.diceBlue); setDiceGreen(p.diceGreen);
       piecesRef.current=p.pieces; turnRef.current=p.turn; phaseRef.current=p.phase;
       diceBlueRef.current=p.diceBlue; diceGreenRef.current=p.diceGreen;
+       // The snapshot is authoritative. Do not let a delayed opponent
+       // animation keep the local board locked after the new turn arrives.
+       moveBusyRef.current = false;
+
       if(p.stuckTurns){ stuckTurnsRef.current=p.stuckTurns; setStuckTurns(p.stuckTurns); }
       if(p.lives){ livesRef.current=p.lives; setLives(p.lives); }
       if(p.winner){
@@ -2406,6 +2414,8 @@ export default function LudoGame() {
           if(p.stuckTurns) setStuckTurns(p.stuckTurns);
           piecesRef.current=p.pieces; turnRef.current=myColor; phaseRef.current=p.phase;
           diceBlueRef.current=p.diceBlue??null; diceGreenRef.current=p.diceGreen??null;
+           moveBusyRef.current = false;
+
           if(p.phase==="roll") setMsg(myTurnMsg);
         } else if(p.turn===opponentColor){
            // The moving player sends this snapshot after handing the turn to
@@ -2424,6 +2434,8 @@ export default function LudoGame() {
            turnRef.current=opponentColor;
            phaseRef.current=p.phase;
            diceBlueRef.current=p.diceBlue??null; diceGreenRef.current=p.diceGreen??null;
+            moveBusyRef.current = false;
+
            if(p.phase==="roll") setMsg(oppTurnMsg);
         }
       },80);
@@ -2739,6 +2751,7 @@ export default function LudoGame() {
     rewardFiredRef.current=false;
     setPieces(resetPieces); setTurn("blue"); setPhase("roll");
     setDiceBlue(null); setDiceGreen(null); setRollingB(false); setRollingG(false);
+
     setMovable([]); setWinner(null); setLives({blue:5,green:5}); setTimeLeft(30);
     setOpponentTimeLeft(30);
     setStuckTurns({blue:0,green:0}); stuckTurnsRef.current={blue:0,green:0};
@@ -2847,6 +2860,7 @@ export default function LudoGame() {
           timeLeft={myColor===player ? timeLeft : opponentTimeLeft}
           isMe={myColor===player}
           canRoll={phase==="roll" && !winner}
+
         />
       </div>
     );
