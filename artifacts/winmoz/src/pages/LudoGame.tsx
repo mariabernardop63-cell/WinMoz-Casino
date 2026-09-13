@@ -572,7 +572,7 @@ const HOME_DECO: { color:PawnColor; slots:[number,number][] }[] = [
 ];
 const ARROWS=[{r:7,c:0,s:"→"},{r:7,c:14,s:"←"},{r:0,c:7,s:"↓"},{r:14,c:7,s:"↑"}];
 
-function BoardSVG({ pieces }:{ pieces:GamePiece[] }) {
+function BoardSVG({ pieces, mirror }:{ pieces:GamePiece[]; mirror?:boolean }) {
   const inHome:Record<"blue"|"green",Set<number>> = {
     blue:  new Set(pieces.filter(p=>p.player==="blue"  &&p.pos===-1).map(p=>+p.id[1])),
     green: new Set(pieces.filter(p=>p.player==="green" &&p.pos===-1).map(p=>+p.id[1])),
@@ -583,7 +583,10 @@ function BoardSVG({ pieces }:{ pieces:GamePiece[] }) {
 
   return (
     <svg viewBox={`0 0 ${SZ} ${SZ}`} width="100%" height="100%"
-      style={{display:"block",position:"absolute",inset:0}}
+      style={{
+        display:"block",position:"absolute",inset:0,
+        transform: mirror ? "scale(-1,-1)" : undefined,
+      }}
       preserveAspectRatio="xMidYMid meet">
       <defs>
         <linearGradient id="ludoBoardBase" x1="0" y1="0" x2="0" y2="1">
@@ -671,10 +674,8 @@ function Board({ pieces, movable, onSelectPiece, rotateForPlayer }:{
   pieces:GamePiece[]; movable:PieceId[]; onSelectPiece:(id:PieceId)=>void;
   rotateForPlayer?: boolean;
 }) {
-  // Show selection effect only when player has a real choice (2+ movable pieces)
   const mustChoose = movable.length >= 2;
 
-  // Build cell map for stacking offsets (exclude home base and finished)
   const cellMap = new Map<string,GamePiece[]>();
   pieces.forEach(p=>{
     if(p.pos===-1||p.pos>=56) return;
@@ -683,9 +684,12 @@ function Board({ pieces, movable, onSelectPiece, rotateForPlayer }:{
     cellMap.set(k,[...(cellMap.get(k)||[]),p]);
   });
 
-  // Finished pieces rendered in center triangles
   const blueFinished  = pieces.filter(p=>p.pos>=56&&p.player==="blue");
   const greenFinished = pieces.filter(p=>p.pos>=56&&p.player==="green");
+
+  const mR = (r:number) => rotateForPlayer ? 14 - r : r;
+  const mC = (c:number) => rotateForPlayer ? 14 - c : c;
+  const mXY = (x:number) => rotateForPlayer ? SZ - x : x;
 
   function renderFinished(arr:GamePiece[], cxSvg:number, cySvg:number) {
     if(!arr.length) return null;
@@ -693,14 +697,16 @@ function Board({ pieces, movable, onSelectPiece, rotateForPlayer }:{
     const sz = Math.max(10, 20 - (count-1)*3);
     const spacing = sz + 2;
     const totalW = spacing*(count-1);
+    const cx = mXY(cxSvg);
+    const cy = mXY(cySvg);
     return arr.map((p,idx)=>{
       const color:PawnColor = p.player==="blue"?"blue":"green";
       const xOff = -totalW/2 + idx*spacing;
       return (
         <div key={p.id} style={{
           position:"absolute",
-          left:`${cxSvg/SZ*100}%`,
-          top:`${cySvg/SZ*100}%`,
+          left:`${cx/SZ*100}%`,
+          top:`${cy/SZ*100}%`,
           transform:`translate(calc(-50% + ${xOff}px),-50%)`,
           zIndex:15, pointerEvents:"none",
         }}>
@@ -717,23 +723,22 @@ function Board({ pieces, movable, onSelectPiece, rotateForPlayer }:{
       background:"#DCE5EF",
       border:"1px solid #CBD5E1",
       boxShadow:"0 18px 38px rgba(15,23,42,0.18), 0 4px 10px rgba(15,23,42,0.10)",
-      transform: rotateForPlayer ? "rotate(180deg)" : undefined,
     }}>
-      <BoardSVG pieces={pieces}/>
+      <BoardSVG pieces={pieces} mirror={rotateForPlayer}/>
 
       {pieces.map(p=>{
         const selectable = movable.includes(p.id);
-        // Only show the highlight effect when there's a real choice to make
         const showEffect = selectable && mustChoose;
         const color: PawnColor = p.player==="blue" ? "blue" : "green";
 
-        // Finished pieces rendered separately below
         if(p.pos>=56) return null;
 
-        // Home pieces: render at SVG slot coordinates
+        // Home pieces: render at mirrored SVG slot coordinates
         if(p.pos===-1){
           const slotIdx = +p.id[1];
-          const [svgX,svgY] = HOME_SVG_PX[p.player][slotIdx];
+          const [rawX,rawY] = HOME_SVG_PX[p.player][slotIdx];
+          const svgX = mXY(rawX);
+          const svgY = mXY(rawY);
           return (
             <motion.div key={p.id}
               onPointerDown={selectable?()=>onSelectPiece(p.id):undefined}
@@ -763,14 +768,14 @@ function Board({ pieces, movable, onSelectPiece, rotateForPlayer }:{
           );
         }
 
-        // Track / stretch pieces: centered exactly on cell
+        // Track / stretch pieces
         const [r,c]=getPieceCoord(p);
+        const mr_ = mR(r);
+        const mc_ = mC(c);
         const here=cellMap.get(`${r},${c}`) || [];
         const idx=here.findIndex(x=>x.id===p.id);
         const count = here.length;
 
-        // Compact stacking layout — keeps all pieces within the cell boundary
-        // Offsets and sizes are tuned for PAWN_SIZE=16 (cell ≈ 27px)
         let pawnSize = PAWN_SIZE;
         let offX = 0, offY = 0;
         if (count === 2) {
@@ -795,8 +800,8 @@ function Board({ pieces, movable, onSelectPiece, rotateForPlayer }:{
             style={{
               position:"absolute",
               width:PIECE_BOX, height:PIECE_BOX,
-              left:`${(c+0.5)/15*100}%`,
-              top:`${(r+0.5)/15*100}%`,
+              left:`${(mc_+0.5)/15*100}%`,
+              top:`${(mr_+0.5)/15*100}%`,
               translateX:`calc(-50% + ${offX}px)`,
               translateY:`calc(-50% + ${offY}px)`,
               zIndex:selectable?20:10,
