@@ -2351,6 +2351,101 @@ router.post("/games/win", async (req, res) => {
   }
 });
 
+/* ── Games: settle the opponent when the authenticated player forfeits ── */
+router.post("/games/forfeit", async (req, res) => {
+  try {
+    const gate = await buildAdminAndVerify(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+    const { supabaseAdmin, userId } = gate;
+    const { gameId, gameType } = req.body as { gameId?: string; gameType?: string };
+
+    if (!gameId || !UUID_RE.test(gameId)) {
+      res.status(400).json({ error: "ID de jogo inválido" }); return;
+    }
+    if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
+      res.status(400).json({ error: "Tipo de jogo inválido" }); return;
+    }
+
+    const { data: match } = await supabaseAdmin
+      .from("matches")
+      .select("id, status, winner_id, player1_id, player2_id, bet_amount")
+      .eq("id", gameId)
+      .maybeSingle();
+    if (!match) { res.status(404).json({ error: "Partida não encontrada" }); return; }
+
+    const m = match as {
+      id: string; status: string; winner_id: string | null;
+      player1_id: string; player2_id: string | null; bet_amount: number;
+    };
+    if (m.player1_id !== userId && m.player2_id !== userId) {
+      res.status(403).json({ error: "Não és participante desta partida" }); return;
+    }
+    if (!m.player2_id) {
+      res.status(400).json({ error: "Partida sem adversário confirmado" }); return;
+    }
+    const winnerId = m.player1_id === userId ? m.player2_id : m.player1_id;
+
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from("matches")
+      .update({
+        winner_id: winnerId,
+        status: "finished",
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", gameId)
+      .neq("status", "finished")
+      .select("id, bet_amount")
+      .maybeSingle();
+    if (updateError) {
+      req.log.error({ updateError }, "games/forfeit match update failed");
+      res.status(500).json({ error: "Erro ao registar desistência" }); return;
+    }
+    if (!updated) {
+      const { data: current } = await supabaseAdmin
+        .from("matches").select("status, winner_id").eq("id", gameId).maybeSingle();
+      if (current && (current as any).winner_id === winnerId && (current as any).status === "finished") {
+        res.json({ ok: true, winnerId, alreadySettled: true }); return;
+      }
+      res.status(409).json({ error: "Partida já terminada" }); return;
+    }
+
+    const verifiedBet = Math.abs(Number((updated as any).bet_amount) || 0);
+    if (verifiedBet <= 0) {
+      res.status(400).json({ error: "Aposta inválida na partida" }); return;
+    }
+    const payout = Math.min(Math.floor(verifiedBet * 2 * 0.90), 200000);
+    const newBalance = await withUserLock(winnerId, async () => {
+      const { data: balanceRow, error: adjustError } = await supabaseAdmin.rpc("adjust_balance", {
+        p_user_id: winnerId, p_delta: payout, p_min: 0,
+      });
+      if (adjustError || balanceRow === null || balanceRow === undefined) return null;
+      await supabaseAdmin.from("transactions").insert({
+        user_id: winnerId,
+        type: "win",
+        amount: payout,
+        description: `Vitória por desistência (${gameType}) +${payout} MT`,
+        status: "approved",
+        created_at: new Date().toISOString(),
+      });
+      return Number(balanceRow);
+    });
+    if (newBalance === null) {
+      res.status(500).json({ error: "Erro ao creditar saldo do vencedor" }); return;
+    }
+    try {
+      await supabaseAdmin.from("platform_earnings").insert({
+        match_id: gameId, game_type: gameType, bet_amount: verifiedBet, payout,
+        platform_cut: Math.round(verifiedBet * 2 * 0.10),
+        created_at: new Date().toISOString(),
+      });
+    } catch { /* best-effort */ }
+    res.json({ ok: true, winnerId, payout, newBalance });
+  } catch (err) {
+    req.log.error({ err }, "games/forfeit error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── Games: authoritative Ludo turn hand-off (port of Vercel api/games/ludo-turn) ── */
 router.post("/games/ludo-turn", async (req, res) => {
   try {

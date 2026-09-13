@@ -58,6 +58,15 @@ export interface WinResult {
   error?: string;
 }
 
+export interface ForfeitResult {
+  ok: boolean;
+  winnerId?: string;
+  payout?: number;
+  newBalance?: number;
+  alreadySettled?: boolean;
+  error?: string;
+}
+
 export interface DiceResult {
   value: number;
   error?: string;
@@ -99,6 +108,34 @@ export async function serverWin(
     return { ok: false, payout: 0, newBalance: 0, error: (data.error as string) ?? "Erro ao registar vitória" };
   }
   return { ok: true, payout: Number(data.payout ?? 0), newBalance: Number(data.newBalance ?? 0) };
+}
+
+/**
+ * Ends a multiplayer match because the authenticated player forfeited.
+ * The server derives the winner from the match participants and credits that
+ * user atomically, so a missing realtime packet cannot leave the winner unpaid.
+ */
+export async function serverForfeit(
+  gameId: string,
+  gameType: "damas" | "ludo" | "xadrez"
+): Promise<ForfeitResult> {
+  const result = await postWithAuthRetry("/api/games/forfeit", { gameId, gameType });
+  if (!result) return { ok: false, error: "Não autenticado" };
+  const { res, data } = result;
+  if (!res.ok || !data.ok) {
+    return {
+      ok: false,
+      winnerId: typeof data.winnerId === "string" ? data.winnerId : undefined,
+      error: (data.error as string) ?? "Erro ao registar desistência",
+    };
+  }
+  return {
+    ok: true,
+    winnerId: typeof data.winnerId === "string" ? data.winnerId : undefined,
+    payout: Number(data.payout ?? 0),
+    newBalance: Number(data.newBalance ?? 0),
+    alreadySettled: data.alreadySettled === true,
+  };
 }
 
 export async function rollLudoDice(

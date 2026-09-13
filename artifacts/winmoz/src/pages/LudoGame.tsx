@@ -5,7 +5,7 @@ import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
-import { serverBet, serverWin, rollLudoDice, passLudoTurn } from "@/lib/gameApi";
+import { serverBet, serverWin, serverForfeit, rollLudoDice, passLudoTurn } from "@/lib/gameApi";
 import AdBanner from "@/components/AdBanner";
 import bgImg from "@assets/Gemini_Generated_Image_grc2w7grc2w7grc2_1780220609974.png";
 import rollSoundUrl from "@assets/som_para_quando_o_user_girar_no_dado__1781479690378.mp3";
@@ -1544,8 +1544,10 @@ export default function LudoGame() {
       try {
         if (isWinner) {
           const result = await serverWin(gameId, "ludo", BET_AMOUNT);
-          if (!result.ok) { winCreditedRef.current = false; return; }
           await refreshProfile();
+          if (!result.ok && !result.error?.includes("terminada")) {
+            winCreditedRef.current = false;
+          }
         }
       } catch { winCreditedRef.current = false; }
     })();
@@ -1712,7 +1714,11 @@ export default function LudoGame() {
     }
     const enteredHome = mover.pos>=56 && prevPos<56;
     if(enteredHome) playVictoryChime();
-    const extraTurn = originalDice===6 || captured || enteredHome;
+    // A six and reaching the centre grant another roll. Capturing is only a
+    // move result; it must still hand the turn to the opponent. Treating a
+    // capture as an extra turn was the source of repeated rolls by one player
+    // while the other device remained on the old phase.
+    const extraTurn = originalDice===6 || enteredHome;
     if(extraTurn){
       const reason = originalDice===6?"tirou 6":captured?"capturou uma peça":"chegou ao centro!";
       const plName=currentTurn===myColor?playerName.split(" ")[0]:opponentName;
@@ -2038,6 +2044,14 @@ export default function LudoGame() {
           }
         }, 750);
       }
+      return;
+    }
+
+    // The request may finish after a hand-off/resync. Never publish a late
+    // result as a second roll for a turn that has already ended.
+    if (winnerRef.current || turnRef.current !== myColor || phaseRef.current !== "roll") {
+      setMyRolling(false);
+      rollBusyRef.current = false;
       return;
     }
 
@@ -2675,6 +2689,9 @@ export default function LudoGame() {
     if(winner||phase==="done")return;
     if(!window.confirm("Tens a certeza que queres desistir? Irás perder a partida."))return;
     if(!isBot) channelRef.current?.send({type:"broadcast",event:"ludo_forfeit",payload:{player:myColor}});
+    if(!isBot&&gameId!=="local"&&BET_AMOUNT>0){
+      void serverForfeit(gameId,"ludo");
+    }
     setWinner(opponentColor); setPhase("done");
     setMsg("Desististe da partida.");
   }

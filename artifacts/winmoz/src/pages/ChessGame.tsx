@@ -5,7 +5,7 @@ import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { API_BASE } from "@/lib/apiBase";
-import { serverBet, serverWin } from "@/lib/gameApi";
+import { serverBet, serverWin, serverForfeit } from "@/lib/gameApi";
 import AdBanner from "@/components/AdBanner";
 // ─── Sound helpers ─────────────────────────────────────────────────────────────
 function playChessCapture() {
@@ -1307,8 +1307,8 @@ export default function ChessGame(){
       try{
         if(winner===myColor){
           const result = await serverWin(gameId, "xadrez", BET);
-          if(!result.ok){ winCreditedRef.current=false; return; }
           await refreshProfile();
+          if(!result.ok&&!result.error?.includes("terminada")) winCreditedRef.current=false;
         }
       }catch{winCreditedRef.current=false;}
     })();
@@ -1563,6 +1563,7 @@ export default function ChessGame(){
     if(status!=="playing"&&status!=="check")return;
     if(!window.confirm("Tens a certeza que queres desistir? Irás perder a partida."))return;
     channelRef.current?.send({type:"broadcast",event:"chess_forfeit",payload:{player:myColor}});
+    if(gameId!=="local"&&!isBot&&BET>0) void serverForfeit(gameId,"xadrez");
     setWinner(opponentColor);
     setWinReason("Desististe da partida");
     setStatus("checkmate");

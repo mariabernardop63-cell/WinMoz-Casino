@@ -53,3 +53,6 @@ description: Key decisions and patterns from major bug-fix session — payout, r
 - Avoid adding client-side epochs or snapshot sequence gates to the working Ludo dice flow without a full two-client test.
 - **Why:** A local client can still be on the previous phase when a valid opponent roll arrives; strict epoch/turn filters then reject the event and make one player's die appear permanently disabled.
 - **How to apply:** Keep the reference event flow for dice, selection, and state sync; use only a short local request lock to prevent duplicate clicks, and validate any stronger authority at the server boundary.
+- Capturing a pawn does not grant an extra roll in the current Ludo rules; after the move completes, the server hand-off must switch to the opponent.
+- **Why:** Treating a capture as an extra turn allowed repeated rolls by one player while the other client still had the old phase.
+- **How to apply:** Keep the post-move `serverHandoff(false)` path for captures; only a six or reaching the centre may keep the turn.

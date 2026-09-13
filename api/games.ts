@@ -374,6 +374,106 @@ async function handleWin(req: VercelRequest, res: VercelResponse) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// ?_action=forfeit — settle the opponent's win when this user quits
+// ═════════════════════════════════════════════════════════════════════════════
+async function handleForfeit(req: VercelRequest, res: VercelResponse) {
+  const auth = await authenticateUser(req);
+  if (!auth) { res.status(401).json({ error: "Não autenticado" }); return; }
+
+  const { gameId, gameType } = (req.body ?? {}) as { gameId?: string; gameType?: string };
+  if (!gameId || !UUID_RE.test(gameId)) {
+    res.status(400).json({ error: "ID de jogo inválido" }); return;
+  }
+  if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
+    res.status(400).json({ error: "Tipo de jogo inválido" }); return;
+  }
+
+  const admin = getSupabaseAdmin();
+  const { data: match } = await admin
+    .from("matches")
+    .select("id, status, paid_out, player1_id, player2_id, bet_amount")
+    .eq("id", gameId)
+    .maybeSingle();
+  if (!match) { res.status(404).json({ error: "Partida não encontrada" }); return; }
+
+  const m = match as {
+    id: string; status: string; paid_out: boolean;
+    player1_id: string; player2_id: string | null; bet_amount: number;
+  };
+  if (m.player1_id !== auth.userId && m.player2_id !== auth.userId) {
+    res.status(403).json({ error: "Não és participante desta partida" }); return;
+  }
+  if (!m.player2_id) {
+    res.status(400).json({ error: "Partida sem adversário confirmado" }); return;
+  }
+  const winnerId = m.player1_id === auth.userId ? m.player2_id : m.player1_id;
+
+  // The quitter settles the match server-side. This does not depend on the
+  // realtime forfeit packet reaching the other browser.
+  const { data: updated, error: updateError } = await admin
+    .from("matches")
+    .update({
+      winner_id: winnerId,
+      status: "finished",
+      completed_at: new Date().toISOString(),
+      paid_out: true,
+    })
+    .eq("id", gameId)
+    .eq("paid_out", false)
+    .neq("status", "finished")
+    .select("id, bet_amount")
+    .maybeSingle();
+
+  if (updateError) {
+    console.error("[games/forfeit] Erro ao fechar partida:", updateError);
+    res.status(500).json({ error: "Erro ao registar desistência" }); return;
+  }
+  if (!updated) {
+    const { data: current } = await admin
+      .from("matches").select("status, winner_id, paid_out")
+      .eq("id", gameId).maybeSingle();
+    if (current && (current as any).winner_id === winnerId && (current as any).paid_out) {
+      res.json({ ok: true, winnerId, alreadySettled: true });
+      return;
+    }
+    res.status(409).json({ error: "Partida já terminada" }); return;
+  }
+
+  const verifiedBet = Math.abs(Number((updated as any).bet_amount) || 0);
+  if (verifiedBet <= 0) {
+    res.status(400).json({ error: "Aposta inválida na partida" }); return;
+  }
+  const payout = Math.min(Math.floor(verifiedBet * 2 * WIN_RATE), MAX_PAYOUT);
+  const { data: newBalanceRow, error: adjustError } = await admin
+    .rpc("adjust_balance", { p_user_id: winnerId, p_delta: payout, p_min: 0 });
+  if (adjustError || newBalanceRow === null || newBalanceRow === undefined) {
+    console.error("[games/forfeit] Erro ao creditar saldo:", adjustError);
+    res.status(500).json({ error: "Erro ao creditar saldo do vencedor" }); return;
+  }
+  const newBalance = Number(newBalanceRow);
+  await admin.from("transactions").insert({
+    user_id: winnerId,
+    type: "win",
+    amount: payout,
+    description: `Vitória por desistência (${gameType}) +${payout} MT`,
+    status: "approved",
+    created_at: new Date().toISOString(),
+  });
+  try {
+    await admin.from("platform_earnings").insert({
+      match_id: gameId,
+      game_type: gameType,
+      bet_amount: verifiedBet,
+      payout,
+      platform_cut: Math.round(verifiedBet * 2 * (1 - WIN_RATE)),
+      created_at: new Date().toISOString(),
+    });
+  } catch { /* best-effort */ }
+
+  res.json({ ok: true, winnerId, payout, newBalance });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // ?_action=match — registo idempotente de partida de sala (fluxo Explorar)
 // ═════════════════════════════════════════════════════════════════════════════
 async function handleMatch(req: VercelRequest, res: VercelResponse) {
@@ -864,6 +964,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   switch (action) {
     case "bet":               return handleBet(req, res);
     case "win":               return handleWin(req, res);
+    case "forfeit":           return handleForfeit(req, res);
     case "match":             return handleMatch(req, res);
     case "bot-session":       return handleBotSession(req, res);
     case "ludo-dice":         return handleLudoDice(req, res);

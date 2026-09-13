@@ -5,7 +5,7 @@ import { ArrowLeft, RotateCcw, LogOut } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { evaluateBotDifficulty } from "@/lib/botBrain";
-import { serverBet, serverWin } from "@/lib/gameApi";
+import { serverBet, serverWin, serverForfeit } from "@/lib/gameApi";
 import { API_BASE } from "@/lib/apiBase";
 import AdBanner from "@/components/AdBanner";
 // ─── Sound helpers ────────────────────────────────────────────────────────────
@@ -1182,8 +1182,8 @@ export default function DamasGame() {
       try {
         if (isWinner) {
           const result = await serverWin(gameId, "damas", BET);
-          if (!result.ok) { winCreditedRef.current = false; return; }
           await refreshProfile();
+          if (!result.ok && !result.error?.includes("terminada")) winCreditedRef.current = false;
         }
       } catch { winCreditedRef.current = false; }
     })();
@@ -1816,6 +1816,7 @@ export default function DamasGame() {
     if (winner) return;
     if (!window.confirm("Tens a certeza que queres desistir?")) return;
     channelRef.current?.send({ type:"broadcast", event:"damas_forfeit", payload:{ player:myColor } });
+    if (gameId!=="local"&&!isBot&&BET>0) void serverForfeit(gameId,"damas");
     setWinner(oppColor); setWinReason("Desististe da partida");
   }
 
