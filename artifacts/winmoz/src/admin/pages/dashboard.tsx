@@ -315,7 +315,7 @@ export default function Dashboard() {
   const { data: mTime } = useGetMatchesOverTime();
   useGetBetsOverTime();
   const { data: breakdown } = useGetGameBreakdown();
-  const { data: live } = useListMatches({ status: "active" });
+  const { data: live = [] } = useListMatches({ status: "active" });
 
   const chartData = (mTime ?? []).map((p) => ({
     date:   p.date.slice(5),
@@ -328,7 +328,7 @@ export default function Dashboard() {
   const platformRevenue          = stats?.platformRevenue ?? 0;
   const totalApprovedWithdrawals = stats?.totalApprovedWithdrawals ?? 0;
   const onlinePlayers            = stats?.onlinePlayers ?? 0;
-  const activeBets               = stats?.activeBets ?? 0;
+  const activeBets               = live.length;
   const pendingWithdrawals       = stats?.pendingWithdrawals ?? 0;
   const totalPlayers             = (stats as { totalPlayers?: number } | undefined)?.totalPlayers ?? 0;
 

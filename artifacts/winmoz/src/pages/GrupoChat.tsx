@@ -12,6 +12,8 @@ const CHANNEL_NAME = "group_chat_v1";
 /* As mensagens sobrevivem à navegação dentro da plataforma (sessionStorage
    dura até fechar o separador / sair da app) */
 const MESSAGES_KEY = "wm_group_chat_msgs";
+const MAX_NEWCOMER_MESSAGES = 20;
+const MAX_LIVE_MESSAGES = 200;
 
 /* Grupo oficial da comunidade no WhatsApp */
 const WHATSAPP_GROUP = "https://chat.whatsapp.com/IreRFFLnFSKIEFNzjmKLv2";
@@ -77,7 +79,7 @@ function loadStoredMessages(): Msg[] {
     const raw = sessionStorage.getItem(MESSAGES_KEY);
     if (!raw) return seedBotMessages();
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.slice(-200) : seedBotMessages();
+    return Array.isArray(parsed) ? parsed.slice(-MAX_NEWCOMER_MESSAGES) : seedBotMessages();
   } catch { return seedBotMessages(); }
 }
 
@@ -108,7 +110,9 @@ function seedBotMessages(): Msg[] {
 
 function storeMessages(msgs: Msg[]) {
   try {
-    sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(msgs.slice(-200)));
+    // A new visitor only receives the latest 20 messages. The mounted
+    // session keeps its full in-memory history until it leaves the chat.
+    sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(msgs.slice(-MAX_NEWCOMER_MESSAGES)));
   } catch { /* quota — ignora */ }
 }
 
@@ -149,12 +153,14 @@ export default function GrupoChat() {
   });
   const [text, setText] = useState("");
   const [showInfo, setShowInfo] = useState(false);
-  const [onlineCount, setOnlineCount] = useState(39);
+  const [onlineCount, setOnlineCount] = useState(() => 20 + Math.floor(Math.random() * 11));
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const { user, profile } = useAuth();
   const { brandName } = useBrand();
+
+  const randomOnlineCount = () => 20 + Math.floor(Math.random() * 11);
 
   const myName = profile?.full_name ?? user?.email?.split("@")[0] ?? "Jogador";
   const myInitials = getInitials(myName);
@@ -180,7 +186,10 @@ export default function GrupoChat() {
 
       try {
         // Send recent bot messages as context to avoid repetition
-        const context = botStateRef.current.recentBotMessages.slice(-6).join("\n");
+        const context = messages
+          .slice(-6)
+          .map(m => `${m.user}: ${m.text ?? ""}`)
+          .join("\n");
         const res = await fetch(`/api/chat-bots?context=${encodeURIComponent(context)}`);
         if (!res.ok) throw new Error("Bot API error");
 
@@ -196,7 +205,7 @@ export default function GrupoChat() {
         };
 
         setMessages(prev => {
-          const next = [...prev, botMsg];
+          const next = [...prev, botMsg].slice(-MAX_LIVE_MESSAGES);
           storeMessages(next);
           return next;
         });
@@ -242,7 +251,7 @@ export default function GrupoChat() {
     channel.on("broadcast", { event: "msg" }, ({ payload }) => {
       setMessages(prev => {
         if (prev.some(m => m.id === payload.id)) return prev;
-        const next = [...prev, { ...(payload as Msg), isMe: false }];
+        const next = [...prev, { ...(payload as Msg), isMe: false }].slice(-MAX_LIVE_MESSAGES);
         storeMessages(next);
         return next;
       });
@@ -251,7 +260,10 @@ export default function GrupoChat() {
     channel.on("presence", { event: "sync" }, () => {
       const state = channel.presenceState();
       const count = Object.keys(state).length;
-      setOnlineCount(Math.max(39, count + 38));
+      // Presence is real for the current channel; the community also
+      // includes users browsing elsewhere in the app. Keep that estimate
+      // moving in the requested 20–30 range.
+      setOnlineCount(Math.min(30, Math.max(20, count + 19 + Math.floor(Math.random() * 5))));
     });
 
     channel.subscribe(async (status) => {
@@ -260,7 +272,13 @@ export default function GrupoChat() {
       }
     });
 
-    return () => { supabase.removeChannel(channel); channelRef.current = null; };
+    const onlineTicker = setInterval(() => setOnlineCount(randomOnlineCount()), 30_000);
+
+    return () => {
+      clearInterval(onlineTicker);
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
   }, [user?.id, myName]);
 
   const sendMsg = (msgText: string, img?: string) => {
@@ -277,7 +295,7 @@ export default function GrupoChat() {
       userId: user?.id,
     };
     setMessages(prev => {
-      const next = [...prev, msg];
+      const next = [...prev, msg].slice(-MAX_LIVE_MESSAGES);
       storeMessages(next);
       return next;
     });

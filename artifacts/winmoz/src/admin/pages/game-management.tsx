@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { adminSupabase } from "@/admin/lib/supabase-api";
+import { adminSupabase, useListMatches } from "@/admin/lib/supabase-api";
 import { motion, AnimatePresence } from "framer-motion";
 import { Gamepad2, Clock, Users, Zap, RefreshCw, Search, Wifi } from "lucide-react";
 
@@ -48,19 +48,25 @@ export default function GameManagement() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const channelRef = useRef<any>(null);
 
-  async function fetchQueue() {
-    setLoading(true);
+  const { data: activeMatches = [] } = useListMatches({ status: "active" });
+
+  async function fetchQueue(showLoading = false) {
+    if (showLoading) setLoading(true);
     try {
+      const now = new Date();
+      const queueCutoff = new Date(Date.now() - 15_000).toISOString();
       const [{ data: publicQueue }, { data: privateRooms }] = await Promise.all([
         adminSupabase
           .from("matchmaking_queue")
           .select("id, user_id, display_name, game_type, bet_amount, created_at")
+          .gte("created_at", queueCutoff)
           .order("created_at", { ascending: false })
           .limit(50),
         adminSupabase
           .from("game_rooms")
-          .select("id, status, game_type, bet_amount, creator_id, created_at")
+          .select("id, status, game_type, bet_amount, creator_id, created_at, expires_at")
           .eq("status", "waiting")
+          .gt("expires_at", now.toISOString())
           .order("created_at", { ascending: false })
           .limit(50),
       ]);
@@ -122,7 +128,7 @@ export default function GameManagement() {
   }
 
   useEffect(() => {
-    fetchQueue();
+    fetchQueue(true);
 
     channelRef.current = adminSupabase
       .channel("matchmaking-queue-watch")
@@ -131,17 +137,19 @@ export default function GameManagement() {
       .subscribe();
 
     const ticker = setInterval(() => setTick(t => t + 1), 1000);
+    const refresh = setInterval(() => fetchQueue(), 5000);
 
     return () => {
       if (channelRef.current) adminSupabase.removeChannel(channelRef.current);
       clearInterval(ticker);
+      clearInterval(refresh);
     };
   }, []);
 
   const stats = [
     { label: "Na fila agora", value: queue.length, icon: Search, color: "#52525b" },
     { label: "Última actualização", value: lastRefresh.toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit", second: "2-digit" }), icon: Clock, color: "#52525b", small: true },
-    { label: "Jogos activos", value: "—", icon: Zap, color: "#a16207" },
+    { label: "Jogos activos", value: activeMatches.length, icon: Zap, color: "#a16207" },
   ];
 
   return (

@@ -1920,6 +1920,69 @@ router.post("/admin/notifications/send", async (req, res) => {
   }
 });
 
+/* ── Admin: authoritative match list ── */
+router.get("/admin/matches", async (req, res) => {
+  try {
+    const gate = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+
+    const { data: rows, error } = await gate.supabaseAdmin
+      .from("matches")
+      .select("id, game_type, player1_id, player2_id, player1_name, bet_amount, status, winner_id, created_at, completed_at, paid_out")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) { res.status(500).json({ error: error.message }); return; }
+
+    const ids = [...new Set((rows ?? []).flatMap((m: any) => [m.player1_id, m.player2_id]).filter(Boolean))];
+    const { data: profiles } = ids.length
+      ? await gate.supabaseAdmin.from("profiles").select("id, full_name, phone").in("id", ids)
+      : { data: [] };
+    const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [
+      p.id, p.full_name || p.phone || "—",
+    ]));
+
+    const result = (rows ?? []).map((m: any) => {
+      const botName = typeof m.player1_name === "string"
+        ? m.player1_name.match(/\bvs\s+(.+)$/i)?.[1]?.trim()
+        : null;
+      const isBot = !m.player2_id && Boolean(botName);
+      const isFinished = m.status === "finished" || m.status === "cancelled"
+        || Boolean(m.completed_at) || m.paid_out === true;
+      const status = isFinished
+        ? (m.status === "cancelled" ? "cancelled" : "finished")
+        : (m.player2_id || isBot ? "active" : "pending");
+
+      return {
+        id: String(m.id),
+        game: m.game_type ?? "dama",
+        player1Name: profileMap[m.player1_id] ?? m.player1_name ?? "—",
+        player2Name: profileMap[m.player2_id] ?? botName ?? "—",
+        betAmount: Number(m.bet_amount ?? 0),
+        status,
+        winnerName: m.winner_id ? (profileMap[m.winner_id] ?? "—") : null,
+        winnerId: m.winner_id ?? null,
+        createdAt: m.created_at,
+        durationSeconds: m.completed_at && m.created_at
+          ? Math.max(0, Math.round((new Date(m.completed_at).getTime() - new Date(m.created_at).getTime()) / 1000))
+          : null,
+      };
+    });
+
+    const status = typeof req.query.status === "string" ? req.query.status : "";
+    const game = typeof req.query.game === "string" ? req.query.game : "";
+    const filtered = result.filter((m: any) =>
+      (!status || status === "all" || (status === "live" ? m.status === "active" : m.status === status))
+      && (!game || game === "all" || m.game === game)
+    );
+
+    res.setHeader("Cache-Control", "no-store");
+    res.json(filtered);
+  } catch (err) {
+    req.log.error({ err }, "admin/matches error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
 /* ── Wallet: atomic server-side bet deduct (replaces client-side balance writes) ── */
 router.post("/bet/deduct", async (req, res) => {
   try {

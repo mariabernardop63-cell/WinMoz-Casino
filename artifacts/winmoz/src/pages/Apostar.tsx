@@ -803,6 +803,8 @@ function MatchmakingScreen({
   useEffect(() => {
     const channelName = `matchmaking_${gameType}_${betAmount}`;
     let poll: ReturnType<typeof setInterval> | null = null;
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+    let active = true;
 
     const channel = supabase.channel(channelName, {
       config: { broadcast: { self: false, ack: false } },
@@ -853,17 +855,34 @@ function MatchmakingScreen({
 
     channel.subscribe((status) => {
       if (status === "SUBSCRIBED") {
+        if (!active) return;
         joinQueue();
         setTimeout(announcePresence, 100);
         if (!poll && !matchedRef.current) {
           poll = setInterval(announcePresence, 2500);
         }
+        // `created_at` is also the queue heartbeat. This lets the admin
+        // panel distinguish a real waiting player from a stale row left by a
+        // closed tab or a dropped connection.
+        heartbeat = setInterval(async () => {
+          if (!active || matchedRef.current) return;
+          const query = supabase
+            .from("matchmaking_queue")
+            .update({ created_at: new Date().toISOString() });
+          if (queueIdRef.current) {
+            await query.eq("id", queueIdRef.current);
+          } else {
+            await query.eq("user_id", userId).eq("game_type", gameType);
+          }
+        }, 5000);
       }
     });
 
     return () => {
+      active = false;
       leaveQueue();
       if (poll) { clearInterval(poll); poll = null; }
+      if (heartbeat) { clearInterval(heartbeat); heartbeat = null; }
       supabase.removeChannel(channel);
       channelRef.current = null;
     };

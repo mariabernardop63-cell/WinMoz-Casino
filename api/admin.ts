@@ -667,6 +667,75 @@ async function handleRechargeToggle(req: VercelRequest, res: VercelResponse) {
   }
 }
 
+// ─── /api/admin/matches ──────────────────────────────────────────────────────
+// A tabela matches é server-only; o painel lê esta visão normalizada através
+// de uma rota protegida em vez de tentar reconstruir partidas por transações.
+async function handleMatches(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  const auth = await authenticateAdmin(req);
+  if (!auth) { res.status(403).json({ error: "Acesso negado" }); return; }
+
+  try {
+    const admin = getSupabaseAdmin();
+    const { data: rows, error } = await admin
+      .from("matches")
+      .select("id, game_type, player1_id, player2_id, player1_name, bet_amount, status, winner_id, created_at, completed_at, paid_out")
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    if (error) { res.status(500).json({ error: error.message }); return; }
+
+    const ids = [...new Set((rows ?? []).flatMap((m: any) => [m.player1_id, m.player2_id]).filter(Boolean))];
+    const { data: profiles } = ids.length
+      ? await admin.from("profiles").select("id, full_name, phone").in("id", ids)
+      : { data: [] };
+    const profileMap = Object.fromEntries((profiles ?? []).map((p: any) => [
+      p.id, p.full_name || p.phone || "—",
+    ]));
+
+    const result = (rows ?? []).map((m: any) => {
+      const botName = typeof m.player1_name === "string"
+        ? m.player1_name.match(/\bvs\s+(.+)$/i)?.[1]?.trim()
+        : null;
+      const isBot = !m.player2_id && Boolean(botName);
+      const isFinished = m.status === "finished" || m.status === "cancelled"
+        || Boolean(m.completed_at) || m.paid_out === true;
+      const status = isFinished
+        ? (m.status === "cancelled" ? "cancelled" : "finished")
+        : (m.player2_id || isBot ? "active" : "pending");
+
+      return {
+        id: String(m.id),
+        game: m.game_type ?? "dama",
+        player1Name: profileMap[m.player1_id] ?? m.player1_name ?? "—",
+        player2Name: profileMap[m.player2_id] ?? botName ?? "—",
+        betAmount: Number(m.bet_amount ?? 0),
+        status,
+        winnerName: m.winner_id ? (profileMap[m.winner_id] ?? "—") : null,
+        winnerId: m.winner_id ?? null,
+        createdAt: m.created_at,
+        durationSeconds: m.completed_at && m.created_at
+          ? Math.max(0, Math.round((new Date(m.completed_at).getTime() - new Date(m.created_at).getTime()) / 1000))
+          : null,
+      };
+    });
+
+    const status = typeof req.query.status === "string" ? req.query.status : "";
+    const game = typeof req.query.game === "string" ? req.query.game : "";
+    const filtered = result.filter((m: any) =>
+      (!status || status === "all" || (status === "live" ? m.status === "active" : m.status === status))
+      && (!game || game === "all" || m.game === game)
+    );
+
+    res.setHeader("Cache-Control", "no-store");
+    res.status(200).json(filtered);
+  } catch (error) {
+    console.error("[admin/matches]", error);
+    res.status(500).json({ error: "Erro interno" });
+  }
+}
+
 // ─── Main router ─────────────────────────────────────────────────────────────
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
@@ -691,6 +760,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     case "recharge/create":            return handleRechargeCreate(req, res);
     case "recharge/delete":            return handleRechargeDelete(req, res);
     case "recharge/toggle":            return handleRechargeToggle(req, res);
+    case "matches":                     return handleMatches(req, res);
     default:
       res.status(404).json({ error: "Endpoint não encontrado" });
   }

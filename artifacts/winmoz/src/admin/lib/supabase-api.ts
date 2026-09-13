@@ -329,7 +329,7 @@ export interface AdminMatch {
   player1Name: string;
   player2Name: string;
   betAmount: number;
-  status: "live" | "finished" | "pending" | "active";
+  status: "live" | "finished" | "pending" | "active" | "cancelled";
   winnerName: string | null;
   winnerId: string | null;
   createdAt: string;
@@ -364,112 +364,18 @@ export function useListMatches(params?: { status?: string; game?: string }) {
   return useQuery({
     queryKey: ["matches", params],
     queryFn: async () => {
-      // Reconstruct matches from transaction pairs (bets within ~60s of each other)
-      const [{ data: bets }, { data: wins }, { data: profiles }] = await Promise.all([
-        adminSupabase.from("transactions")
-          .select("id, user_id, amount, description, created_at")
-          .eq("type", "bet").eq("status", "approved")
-          .order("created_at", { ascending: true })
-          .limit(600),
-        adminSupabase.from("transactions")
-          .select("id, user_id, amount, description, created_at")
-          .eq("type", "win").eq("status", "approved"),
-        adminSupabase.from("profiles")
-          .select("id, full_name, phone"),
-      ]);
-
-      const profileName = (id: string) => {
-        const p = (profiles ?? []).find((x: Record<string, unknown>) => x.id === id);
-        return (p as Record<string, unknown> | undefined)?.full_name as string
-          || (p as Record<string, unknown> | undefined)?.phone as string
-          || "—";
-      };
-
-      const matched = new Set<string>();
-      const matchList: AdminMatch[] = [];
-      const sortedBets = (bets ?? []) as Record<string, unknown>[];
-
-      for (let i = 0; i < sortedBets.length; i++) {
-        if (matched.has(sortedBets[i].id as string)) continue;
-        const b1 = sortedBets[i];
-        const game = parseTxGameType(b1.description as string);
-        const t1 = new Date(b1.created_at as string).getTime();
-        const amt1 = Math.abs(Number(b1.amount));
-
-        // Look for a second bet from a different user within 60 seconds, same amount & game
-        let b2: Record<string, unknown> | null = null;
-        for (let j = i + 1; j < sortedBets.length; j++) {
-          if (matched.has(sortedBets[j].id as string)) continue;
-          const b = sortedBets[j];
-          const timeDiff = Math.abs(new Date(b.created_at as string).getTime() - t1);
-          if (timeDiff > 60000) break;
-          if (
-            b.user_id !== b1.user_id &&
-            Math.abs(Number(b.amount)) === amt1 &&
-            parseTxGameType(b.description as string) === game
-          ) {
-            b2 = b;
-            break;
-          }
-        }
-
-        if (b2) {
-          matched.add(b1.id as string);
-          matched.add(b2.id as string);
-
-          // Find win transaction for this match (within 10 minutes after bets)
-          const winTx = (wins ?? []).find((w: Record<string, unknown>) => {
-            const wt = new Date(w.created_at as string).getTime();
-            const delta = wt - t1;
-            return (w.user_id === b1.user_id || w.user_id === b2!.user_id)
-              && delta >= -5000 && delta <= 600000;
-          }) as Record<string, unknown> | undefined;
-
-          const status: AdminMatch["status"] = winTx ? "finished" : "active";
-          matchList.push({
-            id: b1.id as string,
-            game,
-            player1Name: profileName(b1.user_id as string),
-            player2Name: profileName(b2.user_id as string),
-            betAmount: amt1,
-            status,
-            winnerName: winTx ? profileName(winTx.user_id as string) : null,
-            winnerId: (winTx?.user_id as string) ?? null,
-            createdAt: b1.created_at as string,
-            durationSeconds: winTx
-              ? Math.round((new Date(winTx.created_at as string).getTime() - t1) / 1000)
-              : null,
-          });
-        } else {
-          // Solo bet (creating or waiting for opponent)
-          matched.add(b1.id as string);
-          matchList.push({
-            id: b1.id as string,
-            game,
-            player1Name: profileName(b1.user_id as string),
-            player2Name: "—",
-            betAmount: amt1,
-            status: "pending",
-            winnerName: null,
-            winnerId: null,
-            createdAt: b1.created_at as string,
-            durationSeconds: null,
-          });
-        }
-      }
-
-      // Most recent first
-      let result = matchList.reverse();
+      const headers = await getAuthHeader();
+      const query = new URLSearchParams();
+      if (params?.status && params.status !== "all") query.set("status", params.status);
+      if (params?.game && params.game !== "all") query.set("game", params.game);
+      const response = await fetch(`/api/admin/matches${query.toString() ? `?${query}` : ""}`, { headers });
+      if (!response.ok) throw new Error(`Erro ao carregar partidas (${response.status})`);
+      let result = await response.json() as AdminMatch[];
 
       if (params?.status && params.status !== "all") {
         const fs = params.status;
         if (fs === "live" || fs === "active") {
-          // Só mostrar partidas "active" com menos de 30 minutos (evita partidas antigas como "em curso")
-          const thirtyMinsAgo = Date.now() - 30 * 60 * 1000;
-          result = result.filter(m =>
-            m.status === "active" &&
-            new Date(m.createdAt).getTime() > thirtyMinsAgo
-          );
+          result = result.filter(m => m.status === "active");
         } else if (fs === "finished") {
           result = result.filter(m => m.status === "finished");
         } else if (fs === "pending") {
