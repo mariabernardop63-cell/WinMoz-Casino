@@ -381,7 +381,7 @@ async function handleForfeit(req: VercelRequest, res: VercelResponse) {
   if (!auth) { res.status(401).json({ error: "Não autenticado" }); return; }
 
   const { gameId, gameType } = (req.body ?? {}) as { gameId?: string; gameType?: string };
-  if (!gameId || !UUID_RE.test(gameId)) {
+  if (!gameId || !GAME_ID_RE.test(gameId)) {
     res.status(400).json({ error: "ID de jogo inválido" }); return;
   }
   if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {

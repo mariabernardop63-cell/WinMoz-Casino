@@ -2359,19 +2359,23 @@ export default function LudoGame() {
           diceBlueRef.current=p.diceBlue??null; diceGreenRef.current=p.diceGreen??null;
           if(p.phase==="roll") setMsg(myTurnMsg);
         } else if(p.turn===opponentColor){
-          // A sync that keeps the turn with the opponent only makes sense if
-          // the opponent currently owns the turn. If WE own it locally, this
-          // is a stale/duplicated packet (e.g. delayed extra-turn sync after
-          // the hand-off) — applying it would grant a phantom extra roll.
-          if(turnRef.current===opponentColor){
-            lastSyncVersionRef.current=Math.max(lastSyncVersionRef.current,version);
-            setPieces(p.pieces);
-            setPhase(p.phase);
-            setDiceBlue(p.diceBlue??null); setDiceGreen(p.diceGreen??null);
-            if(p.stuckTurns) setStuckTurns(p.stuckTurns);
-            piecesRef.current=p.pieces; phaseRef.current=p.phase;
-            diceBlueRef.current=p.diceBlue??null; diceGreenRef.current=p.diceGreen??null;
-          }
+           // The moving player sends this snapshot after handing the turn to
+           // the opponent. The receiver may still think it owns the turn
+           // locally; that is exactly the state this message must correct.
+           // The monotonic version check above is the stale-packet guard.
+           lastSyncVersionRef.current=Math.max(lastSyncVersionRef.current,version);
+           setPieces(p.pieces);
+           setTurn(opponentColor);
+           setPhase(p.phase);
+           setMovable([]);
+           movableRef.current=[];
+           setDiceBlue(p.diceBlue??null); setDiceGreen(p.diceGreen??null);
+           if(p.stuckTurns) setStuckTurns(p.stuckTurns);
+           piecesRef.current=p.pieces;
+           turnRef.current=opponentColor;
+           phaseRef.current=p.phase;
+           diceBlueRef.current=p.diceBlue??null; diceGreenRef.current=p.diceGreen??null;
+           if(p.phase==="roll") setMsg(oppTurnMsg);
         }
       },200);
     });

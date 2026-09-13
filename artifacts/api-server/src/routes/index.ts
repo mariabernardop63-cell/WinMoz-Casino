@@ -6,6 +6,7 @@ import debitoRouter from "./debito";
 import ws from "ws";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const GAME_ID_RE = /^[A-Za-z0-9_-]{6,128}$/;
 
 /* ── SMS Forwarder In-Memory Store ── */
 interface StoredSMS {
@@ -2199,7 +2200,7 @@ router.post("/games/bet", async (req, res) => {
       res.status(400).json({ error: "Tipo de jogo inválido" }); return;
     }
     const isLocalOrBotGame = gameId === "local" || gameId?.startsWith("bot_") || gameId?.startsWith("wm");
-    if (gameId && !isLocalOrBotGame && !UUID_RE.test(gameId)) {
+    if (gameId && !isLocalOrBotGame && !GAME_ID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
 
@@ -2234,7 +2235,7 @@ router.post("/games/bet", async (req, res) => {
     if (deductResult === null) { res.status(400).json({ error: "Saldo insuficiente" }); return; }
     const updated = { balance: deductResult };
 
-    if (gameId && UUID_RE.test(gameId)) {
+    if (gameId && GAME_ID_RE.test(gameId)) {
       await supabaseAdmin
         .from("matches")
         .upsert({
@@ -2268,7 +2269,7 @@ router.post("/games/win", async (req, res) => {
     if (!gameId || typeof gameId !== "string") {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
-    if (!UUID_RE.test(gameId)) {
+    if (!GAME_ID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
     if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
@@ -2354,12 +2355,15 @@ router.post("/games/win", async (req, res) => {
 /* ── Games: settle the opponent when the authenticated player forfeits ── */
 router.post("/games/forfeit", async (req, res) => {
   try {
+    // This is a player action, not an admin action. Requiring the admin gate
+    // made the winner modal appear while the payout request was rejected for
+    // normal authenticated users.
     const gate = await buildAdminAndVerify(req.headers.authorization ?? "");
     if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
     const { supabaseAdmin, userId } = gate;
     const { gameId, gameType } = req.body as { gameId?: string; gameType?: string };
 
-    if (!gameId || !UUID_RE.test(gameId)) {
+    if (!gameId || !GAME_ID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
     if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
@@ -2460,7 +2464,7 @@ router.post("/games/ludo-turn", async (req, res) => {
     if (!gameId || typeof gameId !== "string" || gameId.length > 128) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
-    if (!UUID_RE.test(gameId)) {
+    if (!GAME_ID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
 
@@ -2560,7 +2564,7 @@ router.post("/games/ludo-dice", async (req, res) => {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
 
-    if (gameId !== "local" && !gameId.startsWith("bot_") && !gameId.startsWith("wm") && !UUID_RE.test(gameId)) {
+    if (gameId !== "local" && !gameId.startsWith("bot_") && !gameId.startsWith("wm") && !GAME_ID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
 
