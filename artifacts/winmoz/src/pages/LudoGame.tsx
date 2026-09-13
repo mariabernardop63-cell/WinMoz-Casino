@@ -858,11 +858,12 @@ function Dice3D({ value, rolling, onClick, active, sz=48 }:{
   useEffect(()=>{
     if(!rolling) return;
     setRollKey(k=>k+1);
-    let n=0;
+    // Keep cycling random faces until `rolling` becomes false.
+    // The cleanup function clears this interval — the dice snaps to
+    // the correct value on the same render that sets rolling=false.
     const iv=setInterval(()=>{
       setRandomFace(Math.floor(Math.random()*6)+1);
-      if(++n>14) clearInterval(iv);
-    },45);
+    },60);
     return()=>clearInterval(iv);
   },[rolling]);
   const disp = rolling ? randomFace : (value ?? lastValueRef.current);
