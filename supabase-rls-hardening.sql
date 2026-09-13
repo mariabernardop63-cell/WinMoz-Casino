@@ -119,6 +119,7 @@ SELECT public.__drop_policy_if_exists('matchmaking_queue', 'mq_all');
 SELECT public.__drop_policy_if_exists('matchmaking_queue', 'mq_insert_own');
 SELECT public.__drop_policy_if_exists('matchmaking_queue', 'mq_select_queue');
 SELECT public.__drop_policy_if_exists('matchmaking_queue', 'mq_delete_own');
+SELECT public.__drop_policy_if_exists('matchmaking_queue', 'mq_update_own');
 SELECT public.__drop_policy_if_exists('matchmaking_queue', 'mq_admin_all');
 
 DO $do$
@@ -147,6 +148,17 @@ BEGIN
     EXECUTE $pol$CREATE POLICY "mq_delete_own" ON public.matchmaking_queue FOR DELETE
   TO authenticated
   USING (user_id = auth.uid())$pol$;
+  END IF;
+END
+$do$;
+
+DO $do$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_tables WHERE schemaname='public' AND tablename='matchmaking_queue') THEN
+    EXECUTE $pol$CREATE POLICY "mq_update_own" ON public.matchmaking_queue FOR UPDATE
+  TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid())$pol$;
   END IF;
 END
 $do$;

@@ -53,73 +53,15 @@ export default function GameManagement() {
   async function fetchQueue(showLoading = false) {
     if (showLoading) setLoading(true);
     try {
-      const now = new Date();
-      const queueCutoff = new Date(Date.now() - 15_000).toISOString();
-      const [{ data: publicQueue }, { data: privateRooms }] = await Promise.all([
-        adminSupabase
-          .from("matchmaking_queue")
-          .select("id, user_id, display_name, game_type, bet_amount, created_at")
-          .gte("created_at", queueCutoff)
-          .order("created_at", { ascending: false })
-          .limit(50),
-        adminSupabase
-          .from("game_rooms")
-          .select("id, status, game_type, bet_amount, creator_id, created_at, expires_at")
-          .eq("status", "waiting")
-          .gt("expires_at", now.toISOString())
-          .order("created_at", { ascending: false })
-          .limit(50),
-      ]);
-
-      const entries: QueueEntry[] = [];
-
-      if (publicQueue && publicQueue.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        publicQueue.forEach((r: any) => {
-          entries.push({
-            id: `mq_${r.id}`,
-            playerId: r.user_id ?? "",
-            playerName: r.display_name ?? "Utilizador",
-            game: r.game_type ?? "damas",
-            bet: parseFloat(r.bet_amount ?? 0),
-            since: new Date(r.created_at),
-            status: "waiting",
-            source: "public",
-          });
-        });
-      }
-
-      if (privateRooms && privateRooms.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const creatorIds = [...new Set(privateRooms.map((r: any) => r.creator_id).filter(Boolean))];
-        const { data: profiles } = await adminSupabase
-          .from("profiles")
-          .select("id, full_name, phone")
-          .in("id", creatorIds);
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const profileMap: Record<string, any> = {};
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (profiles ?? []).forEach((p: any) => { profileMap[p.id] = p; });
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        privateRooms.forEach((r: any) => {
-          const profile = profileMap[r.creator_id] ?? {};
-          entries.push({
-            id: `gr_${r.id}`,
-            playerId: r.creator_id ?? "",
-            playerName: profile.full_name ?? profile.phone ?? "Utilizador",
-            game: r.game_type ?? "damas",
-            bet: parseFloat(r.bet_amount ?? 0),
-            since: new Date(r.created_at),
-            status: r.status,
-            source: "private",
-          });
-        });
-      }
-
-      entries.sort((a, b) => b.since.getTime() - a.since.getTime());
-      setQueue(entries);
+      const { data: { session } } = await adminSupabase.auth.getSession();
+      const response = await fetch("/api/admin/queue", {
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {},
+      });
+      if (!response.ok) throw new Error(`Queue request failed (${response.status})`);
+      const rows = await response.json() as Array<Omit<QueueEntry, "since"> & { since: string }>;
+      setQueue(rows.map(row => ({ ...row, since: new Date(row.since) })));
     } catch {
       setQueue([]);
     }
@@ -137,7 +79,7 @@ export default function GameManagement() {
       .subscribe();
 
     const ticker = setInterval(() => setTick(t => t + 1), 1000);
-    const refresh = setInterval(() => fetchQueue(), 5000);
+    const refresh = setInterval(() => fetchQueue(), 3000);
 
     return () => {
       if (channelRef.current) adminSupabase.removeChannel(channelRef.current);
@@ -177,7 +119,7 @@ export default function GameManagement() {
             <span className="text-[11.5px] font-bold" style={{ color: "#15803d" }}>Live</span>
           </div>
           <button
-            onClick={fetchQueue}
+            onClick={() => void fetchQueue(true)}
             className="flex items-center gap-2 h-9 px-3.5 rounded-xl text-[12.5px] font-bold transition-all active:scale-95"
             style={{ background: "var(--gz-bg-card-btn)", border: "1px solid var(--gz-border-subtle)", color: "var(--gz-text-secondary)" }}
           >

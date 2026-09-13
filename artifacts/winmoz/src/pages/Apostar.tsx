@@ -1269,6 +1269,24 @@ export default function Apostar() {
     if (salaChannelRef.current) { supabase.removeChannel(salaChannelRef.current); salaChannelRef.current = null; }
   }, []);
 
+  /* Private rooms use expires_at as a short lease. This keeps a creator who
+     is actually on the waiting screen visible while removing closed tabs from
+     the admin queue without a background cleanup job. */
+  useEffect(() => {
+    if (screen !== "sala-aguardar" || !salaRoomId || !user?.id) return;
+    const renew = async () => {
+      await supabase
+        .from("game_rooms")
+        .update({ expires_at: new Date(Date.now() + 20_000).toISOString() })
+        .eq("id", salaRoomId)
+        .eq("creator_id", user.id)
+        .eq("status", "waiting");
+    };
+    void renew();
+    const heartbeat = setInterval(() => { void renew(); }, 5_000);
+    return () => clearInterval(heartbeat);
+  }, [screen, salaRoomId, user?.id]);
+
   /* ── Recover abandoned sala on page load ── */
   useEffect(() => {
     if (!user?.id || !gameId) return;
@@ -1564,7 +1582,7 @@ export default function Apostar() {
           <div style={{ background: "#1c1c1e", border: `2px solid ${VIOLET}66`, borderRadius: 20, padding: "20px 28px", marginBottom: 12, width: "100%" }}>
             <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 36, color: "#fff", letterSpacing: 8 }}>{salaCode}</p>
           </div>
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", marginBottom: 32 }}>O código expira em 30 minutos · Aposta: {fmtMT(selectedBet ?? 0)}</p>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.35)", marginBottom: 32 }}>A sala fica activa enquanto esta tela estiver aberta · Aposta: {fmtMT(selectedBet ?? 0)}</p>
           <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.8, repeat: Infinity }}
             style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 40 }}>
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#00D4B4" }} />

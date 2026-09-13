@@ -12,6 +12,7 @@ const CHANNEL_NAME = "group_chat_v1";
 /* As mensagens sobrevivem à navegação dentro da plataforma (sessionStorage
    dura até fechar o separador / sair da app) */
 const MESSAGES_KEY = "wm_group_chat_msgs";
+const CHAT_SEEN_KEY = "wm_group_chat_seen_v1";
 const MAX_NEWCOMER_MESSAGES = 20;
 const MAX_LIVE_MESSAGES = 200;
 
@@ -79,7 +80,12 @@ function loadStoredMessages(): Msg[] {
     const raw = sessionStorage.getItem(MESSAGES_KEY);
     if (!raw) return seedBotMessages();
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.slice(-MAX_NEWCOMER_MESSAGES) : seedBotMessages();
+    if (!Array.isArray(parsed)) return seedBotMessages();
+    const limit = sessionStorage.getItem(CHAT_SEEN_KEY) === "1"
+      ? MAX_LIVE_MESSAGES
+      : MAX_NEWCOMER_MESSAGES;
+    sessionStorage.setItem(CHAT_SEEN_KEY, "1");
+    return parsed.slice(-limit);
   } catch { return seedBotMessages(); }
 }
 
@@ -110,10 +116,15 @@ function seedBotMessages(): Msg[] {
 
 function storeMessages(msgs: Msg[]) {
   try {
-    // A new visitor only receives the latest 20 messages. The mounted
-    // session keeps its full in-memory history until it leaves the chat.
-    sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(msgs.slice(-MAX_NEWCOMER_MESSAGES)));
+    // Keep the full session history available for returning visitors in the
+    // same tab. loadStoredMessages applies the 20-message newcomer window.
+    sessionStorage.setItem(CHAT_SEEN_KEY, "1");
+    sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(msgs.slice(-MAX_LIVE_MESSAGES)));
   } catch { /* quota — ignora */ }
+}
+
+function normaliseBotText(text: string): string {
+  return text.toLocaleLowerCase("pt-PT").replace(/\s+/g, " ").trim();
 }
 
 /* WhatsApp icon (official glyph) */
@@ -157,6 +168,7 @@ export default function GrupoChat() {
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const messagesRef = useRef<Msg[]>(messages);
   const { user, profile } = useAuth();
   const { brandName } = useBrand();
 
@@ -168,6 +180,10 @@ export default function GrupoChat() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
   }, [messages]);
 
   // ── Bot chat engine (AI-powered via b.ia mimo v2.5) ─────────────────────
@@ -186,33 +202,46 @@ export default function GrupoChat() {
 
       try {
         // Send recent bot messages as context to avoid repetition
-        const context = messages
-          .slice(-6)
+        const context = messagesRef.current
+          .slice(-12)
           .map(m => `${m.user}: ${m.text ?? ""}`)
           .join("\n");
-        const res = await fetch(`/api/chat-bots?context=${encodeURIComponent(context)}`);
+        const recentBots = botStateRef.current.recentBotMessages.join("\n");
+        const res = await fetch(`/api/chat-bots?context=${encodeURIComponent(`${context}\n${recentBots}`)}`);
         if (!res.ok) throw new Error("Bot API error");
 
         const data = await res.json() as { name: string; initials: string; avatarBg: string; message: string };
+        const candidate = data.message?.trim() ?? "";
+        const candidateKey = normaliseBotText(candidate);
+        if (!candidateKey) return;
 
         const botMsg: Msg = {
           id: `bot_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
           user: data.name,
           initials: data.initials,
           avatarBg: data.avatarBg,
-          text: data.message,
+          text: candidate,
           time: nowTime(),
         };
 
+        let accepted = false;
         setMessages(prev => {
+          const repeated = botStateRef.current.recentBotMessages
+            .some(message => normaliseBotText(message) === candidateKey)
+            || prev.some(message =>
+              message.user === data.name
+              && normaliseBotText(message.text ?? "") === candidateKey,
+            );
+          if (repeated) return prev;
+          accepted = true;
           const next = [...prev, botMsg].slice(-MAX_LIVE_MESSAGES);
           storeMessages(next);
           return next;
         });
 
         // Track recent messages to avoid repetition
-        botStateRef.current.recentBotMessages.push(data.message);
-        if (botStateRef.current.recentBotMessages.length > 10) {
+        if (accepted) botStateRef.current.recentBotMessages.push(candidate);
+        if (botStateRef.current.recentBotMessages.length > 12) {
           botStateRef.current.recentBotMessages.shift();
         }
       } catch {

@@ -70,6 +70,9 @@ async function handleCreate(req: VercelRequest, res: VercelResponse) {
       game_type: gameType,
       bet_amount: betAmount,
       status: "waiting",
+      // Lease renewed by the creator while the waiting screen is open. If the
+      // tab disappears, the admin queue stops showing the room shortly after.
+      expires_at: new Date(Date.now() + 20_000).toISOString(),
       created_at: new Date().toISOString(),
     }).select("id").single();
 
@@ -108,14 +111,18 @@ async function handleJoin(req: VercelRequest, res: VercelResponse) {
   const admin = getSupabaseAdmin();
 
   const { data: room, error: roomError } = await admin
-    .from("game_rooms").select("id, creator_id, game_type, bet_amount, status")
+    .from("game_rooms").select("id, creator_id, game_type, bet_amount, status, expires_at")
     .eq("code", code.toUpperCase()).eq("status", "waiting").maybeSingle();
 
   if (roomError || !room) {
     res.status(404).json({ error: "Sala não encontrada ou já preenchida." }); return;
   }
 
-  const r = room as { id: string; creator_id: string; game_type: string; bet_amount: number; status: string };
+  const r = room as { id: string; creator_id: string; game_type: string; bet_amount: number; status: string; expires_at: string | null };
+
+  if (r.expires_at && new Date(r.expires_at).getTime() <= Date.now()) {
+    res.status(410).json({ error: "Esta sala já não está activa." }); return;
+  }
 
   if (r.creator_id === auth.userId) {
     res.status(400).json({ error: "Não podes entrar na tua própria sala." }); return;

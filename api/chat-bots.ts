@@ -55,6 +55,40 @@ const BOT_GRADIENTS = [
   "linear-gradient(135deg, #d946ef, #a21caf)",
 ];
 
+function normalise(text: string): string {
+  return text.toLocaleLowerCase("pt-PT").replace(/\s+/g, " ").trim();
+}
+
+function chooseFallback(recentContext: string): { name: string; initials: string; avatarBg: string; message: string } {
+  const fallbackMessages = [
+    "Kmk malta, alguém para jogar?",
+    "Boa noite pessoal!",
+    "Alguém quer jogar Damas?",
+    "Acabei de ganhar uma partida!",
+    "Qual é a sena people?",
+    "Bora jogar Ludo, malta!",
+    "Tou disponível para um desafio!",
+    "Quem aceita uma partida de Xadrez?",
+  ];
+  const recent = new Set(
+    recentContext
+      .split(/\r?\n/)
+      .map(line => line.replace(/^[^:]{1,80}:\s*/, ""))
+      .map(normalise)
+      .filter(Boolean),
+  );
+  const available = fallbackMessages.filter(message => !recent.has(normalise(message)));
+  const pool = available.length > 0 ? available : fallbackMessages;
+  const message = pool[Math.floor(Math.random() * pool.length)];
+  const idx = Math.floor(Math.random() * BOT_NAMES_POOL.length);
+  return {
+    name: BOT_NAMES_POOL[idx],
+    initials: BOT_NAMES_POOL[idx].split(" ").map(n => n[0]).join(""),
+    avatarBg: BOT_GRADIENTS[idx],
+    message,
+  };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const allowedOrigin = process.env["ALLOWED_ORIGIN"] || process.env["VITE_APP_URL"] || "*";
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
@@ -81,27 +115,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const baiKey = process.env["BAI_API_KEY"];
+  const recentContext = (req.query.context as string) || "";
   if (!baiKey) {
-    // Fallback: return a static message if no API key
-    const fallbackMessages = [
-      "Kmk malta, alguém para jogar?",
-      "Boa noite pessoal!",
-      "Alguém quer jogar Damas?",
-      "Acabei de ganhar uma partida!",
-      "Qual é a sena people?",
-    ];
-    const idx = Math.floor(Math.random() * BOT_NAMES_POOL.length);
-    return res.json({
-      name: BOT_NAMES_POOL[idx],
-      initials: BOT_NAMES_POOL[idx].split(" ").map(n => n[0]).join(""),
-      avatarBg: BOT_GRADIENTS[idx],
-      message: fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)],
-    });
+    return res.json(chooseFallback(recentContext));
   }
 
   // Get recent messages from query to provide context (avoid repetition)
-  const recentContext = (req.query.context as string) || "";
-
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
@@ -130,17 +149,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
       console.error("[chat-bots] b.ia API error:", response.status, errText.slice(0, 200));
-      // Fallback to static
-      const idx = Math.floor(Math.random() * BOT_NAMES_POOL.length);
-      const fallbackMessages = [
-        "Kmk malta, alguém para jogar?", "Boa noite pessoal!", "Bora jogar!",
-      ];
-      return res.json({
-        name: BOT_NAMES_POOL[idx],
-        initials: BOT_NAMES_POOL[idx].split(" ").map(n => n[0]).join(""),
-        avatarBg: BOT_GRADIENTS[idx],
-        message: fallbackMessages[Math.floor(Math.random() * fallbackMessages.length)],
-      });
+      return res.json(chooseFallback(recentContext));
     }
 
     const data = (await response.json()) as {
@@ -153,26 +162,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     message = message.replace(/^["']|["']$/g, "").replace(/\*\*/g, "").trim();
 
     if (!message || message.length > 200) {
-      message = "Kmk malta, alguém para jogar?";
+      message = chooseFallback(recentContext).message;
     }
 
     // Pick a random bot identity
-    const idx = Math.floor(Math.random() * BOT_NAMES_POOL.length);
-
     res.json({
-      name: BOT_NAMES_POOL[idx],
-      initials: BOT_NAMES_POOL[idx].split(" ").map(n => n[0]).join(""),
-      avatarBg: BOT_GRADIENTS[idx],
+      ...chooseFallback(""),
       message,
     });
   } catch (err) {
     console.error("[chat-bots] Error:", err instanceof Error ? err.message : "unknown");
-    const idx = Math.floor(Math.random() * BOT_NAMES_POOL.length);
-    res.json({
-      name: BOT_NAMES_POOL[idx],
-      initials: BOT_NAMES_POOL[idx].split(" ").map(n => n[0]).join(""),
-      avatarBg: BOT_GRADIENTS[idx],
-      message: "Kmk malta, alguém disponível?",
-    });
+    res.json(chooseFallback(recentContext));
   }
 }

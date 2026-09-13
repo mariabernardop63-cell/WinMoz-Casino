@@ -1946,10 +1946,13 @@ router.get("/admin/matches", async (req, res) => {
         ? m.player1_name.match(/\bvs\s+(.+)$/i)?.[1]?.trim()
         : null;
       const isBot = !m.player2_id && Boolean(botName);
-      const isFinished = m.status === "finished" || m.status === "cancelled"
-        || Boolean(m.completed_at) || m.paid_out === true;
+      const rawStatus = String(m.status ?? "").toLowerCase();
+      const isFinished = ["finished", "cancelled", "completed", "ended", "resolved"].includes(rawStatus)
+        || Boolean(m.completed_at)
+        || Boolean(m.winner_id)
+        || m.paid_out === true;
       const status = isFinished
-        ? (m.status === "cancelled" ? "cancelled" : "finished")
+        ? (rawStatus === "cancelled" ? "cancelled" : "finished")
         : (m.player2_id || isBot ? "active" : "pending");
 
       return {
@@ -1979,6 +1982,107 @@ router.get("/admin/matches", async (req, res) => {
     res.json(filtered);
   } catch (err) {
     req.log.error({ err }, "admin/matches error");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/* ── Admin: authoritative matchmaking queue ── */
+router.get("/admin/queue", async (req, res) => {
+  try {
+    const gate = await buildAdminAndVerifyAdmin(req.headers.authorization ?? "");
+    if (!gate.ok) { res.status(gate.status).json({ error: gate.error }); return; }
+
+    const now = Date.now();
+    const queueCutoff = new Date(now - 15_000).toISOString();
+    const [{ data: queueRows, error: queueError }, { data: rooms }, { data: matches }] = await Promise.all([
+      gate.supabaseAdmin
+        .from("matchmaking_queue")
+        .select("id, user_id, display_name, game_type, bet_amount, created_at")
+        .gt("created_at", queueCutoff)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      gate.supabaseAdmin
+        .from("game_rooms")
+        .select("id, status, game_type, bet_amount, creator_id, created_at, expires_at")
+        .eq("status", "waiting")
+        .limit(100),
+      gate.supabaseAdmin
+        .from("matches")
+        .select("player1_id, player2_id, status, winner_id, completed_at, paid_out")
+        .limit(500),
+    ]);
+    if (queueError) { res.status(500).json({ error: queueError.message }); return; }
+
+    const inActiveMatch = new Set<string>();
+    for (const match of (matches ?? []) as Array<Record<string, unknown>>) {
+      const rawStatus = String(match.status ?? "").toLowerCase();
+      const terminal = ["finished", "cancelled", "completed", "ended", "resolved"].includes(rawStatus)
+        || Boolean(match.completed_at)
+        || Boolean(match.winner_id)
+        || match.paid_out === true;
+      const hasOpponent = Boolean(match.player2_id);
+      if (!terminal && (hasOpponent || ["active", "live", "in_progress"].includes(rawStatus))) {
+        if (match.player1_id) inActiveMatch.add(String(match.player1_id));
+        if (match.player2_id) inActiveMatch.add(String(match.player2_id));
+      }
+    }
+
+    const result: Array<Record<string, unknown>> = [];
+    const seen = new Set<string>();
+    for (const row of (queueRows ?? []) as Array<Record<string, unknown>>) {
+      const playerId = String(row.user_id ?? "");
+      const game = String(row.game_type ?? "damas");
+      const key = `${playerId}:${game}`;
+      if (!playerId || inActiveMatch.has(playerId) || seen.has(key)) continue;
+      seen.add(key);
+      result.push({
+        id: `mq_${String(row.id)}`,
+        playerId,
+        playerName: String(row.display_name || "Utilizador"),
+        game,
+        bet: Number(row.bet_amount ?? 0),
+        since: String(row.created_at),
+        status: "waiting",
+        source: "public",
+      });
+    }
+
+    const privateRooms = (rooms ?? []) as Array<Record<string, unknown>>;
+    const creatorIds = [...new Set(privateRooms.map(room => String(room.creator_id ?? "")).filter(Boolean))];
+    const { data: profiles } = creatorIds.length
+      ? await gate.supabaseAdmin.from("profiles").select("id, full_name, phone").in("id", creatorIds)
+      : { data: [] };
+    const profileMap = Object.fromEntries((profiles ?? []).map((profile: Record<string, unknown>) => [
+      String(profile.id),
+      String(profile.full_name || profile.phone || "Utilizador"),
+    ]));
+
+    for (const room of privateRooms) {
+      const playerId = String(room.creator_id ?? "");
+      const expiresAt = room.expires_at ? new Date(String(room.expires_at)).getTime() : 0;
+      const createdAt = new Date(String(room.created_at ?? 0)).getTime();
+      const leaseIsValid = expiresAt > now || (!expiresAt && createdAt > now - 15_000);
+      if (!playerId || !leaseIsValid || inActiveMatch.has(playerId)) continue;
+      const key = `${playerId}:${String(room.game_type ?? "damas")}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push({
+        id: `gr_${String(room.id)}`,
+        playerId,
+        playerName: profileMap[playerId] ?? "Utilizador",
+        game: String(room.game_type ?? "damas"),
+        bet: Number(room.bet_amount ?? 0),
+        since: String(room.created_at),
+        status: "waiting",
+        source: "private",
+      });
+    }
+
+    result.sort((a, b) => new Date(String(b.since)).getTime() - new Date(String(a.since)).getTime());
+    res.setHeader("Cache-Control", "no-store");
+    res.json(result);
+  } catch (err) {
+    req.log.error({ err }, "admin/queue error");
     res.status(500).json({ error: "Erro interno" });
   }
 });
