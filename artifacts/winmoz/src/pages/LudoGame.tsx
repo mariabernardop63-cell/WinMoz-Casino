@@ -847,22 +847,25 @@ function Dice3D({ value, rolling, onClick, active, sz=48 }:{
 }) {
   const h=sz/2;
   const [rollKey,setRollKey]=useState(0);
-  const [disp,setDisp]=useState(1);
+  const [randomFace,setRandomFace]=useState(1);
+  // Remember the last non-null value so the dice never flashes back to 1
+  // when rolling stops before the state update propagates.
+  const lastValueRef = useRef<number>(1);
+  if(value!==null) lastValueRef.current=value;
   const faceRot:Record<number,{rx:number;ry:number}>={
     1:{rx:0,ry:0},2:{rx:-90,ry:0},3:{rx:0,ry:-90},4:{rx:0,ry:90},5:{rx:90,ry:0},6:{rx:0,ry:180},
   };
   useEffect(()=>{
-    if(!rolling){
-      // A cleared die must not keep showing the previous player's result.
-      if(value===null){ setDisp(1); return; }
-      setDisp(value);
-      return;
-    }
+    if(!rolling) return;
     setRollKey(k=>k+1);
     let n=0;
-    const iv=setInterval(()=>{ setDisp(Math.floor(Math.random()*6)+1); if(++n>14) clearInterval(iv); },45);
+    const iv=setInterval(()=>{
+      setRandomFace(Math.floor(Math.random()*6)+1);
+      if(++n>14) clearInterval(iv);
+    },45);
     return()=>clearInterval(iv);
-  },[rolling,value]);
+  },[rolling]);
+  const disp = rolling ? randomFace : (value ?? lastValueRef.current);
   const tr=faceRot[disp]||{rx:0,ry:0};
   const faces:[number,string,string][]=[
     [1,`translateZ(${h}px)`,"#FAFAF8"],
@@ -1755,6 +1758,7 @@ export default function LudoGame() {
       }
       setMovable([]);
       consecutiveSixesRef.current=0;
+      autoMoveAfterRollRef.current = false;
       // Flip the turn on the server FIRST. The client keeps its own
       // hand-off below, but the server value is authoritative: any further
       // roll request from this device is rejected with 423 until it's
@@ -1839,9 +1843,6 @@ export default function LudoGame() {
 
   // ── Apply a dice roll locally (no broadcast) ────────────────────────────────
   const applyRoll=useCallback((pl:Player,val:number)=>{
-    // Reconciliation: if a roll arrives for a player who does NOT own the
-    // turn, the local state has diverged. Trust the roller's claim, adopt
-    // their turn and let the subsequent state sync settle the rest.
     if(turnRef.current!==pl){
       turnRef.current=pl;
       setTurn(pl);
@@ -1854,30 +1855,34 @@ export default function LudoGame() {
     }
     const setR=pl==="blue"?setRollingB:setRollingG;
     const setD=pl==="blue"?setDiceBlue:setDiceGreen;
-    setR(true);
+    // For the local player, doRoll already started the rolling animation.
+    // For the opponent (via broadcast), start it now.
+    if(pl!==myColor) setR(true);
+    // The roll is happening — clear any expired-timer guard so the timer
+    // can restart for the next phase (select, extra turn, or opponent turn).
+    if(pl===myColor) timerExpiredTurnRef.current = null;
+
     setTimeout(()=>{
       if(pl==="blue") diceBlueRef.current=val;
       else diceGreenRef.current=val;
+      // Set the value AND stop rolling in the same synchronous block so
+      // the Dice3D component always renders the final value — never a
+      // stale random face.
       setD(val); setR(false);
-      // The request/animation lock only covers this roll. Turn ownership is
-      // handled by the normal hand-off below.
-      rollBusyRef.current = false;
 
-      // Track consecutive sixes (Rule 4) — update ref synchronously to avoid timing bugs
       if(val===6){
         consecutiveSixesRef.current++;
       } else {
-        // Non-six rolled: update stuckTurns if all pieces still in base
         const allInBase = piecesRef.current.filter(p=>p.player===pl).every(p=>p.pos===-1);
         if(allInBase){
-          setStuckTurns(prev=>({...prev,[pl]:prev[pl]+1}));
+          stuckTurnsRef.current = {...stuckTurnsRef.current,[pl]:stuckTurnsRef.current[pl]+1};
+          setStuckTurns(stuckTurnsRef.current);
         }
       }
 
       const mv=calcMovable(piecesRef.current,pl,val);
       const plName=pl===myColor?playerName.split(" ")[0]:opponentName;
 
-      // Rule 4: third consecutive roll is forced non-6 — allow player to move normally
       if(val!==6 && consecutiveSixesRef.current>=2){
         consecutiveSixesRef.current=0;
       }
@@ -1901,7 +1906,10 @@ export default function LudoGame() {
             ? serverHandoff(false)
             : Promise.resolve(true);
           setTimeout(async()=>{
-            if (!(await noMoveHandoff) || winnerRef.current) return;
+            if (!(await noMoveHandoff) || winnerRef.current) {
+              if(pl===myColor) rollBusyRef.current = false;
+              return;
+            }
             const next=other(pl);
             turnRef.current=next; setTurn(next);
             phaseRef.current="roll"; setPhase("roll");
@@ -1929,6 +1937,7 @@ export default function LudoGame() {
         setMsg(`${plName} tirou ${val}!`);
         autoMoveAfterRollRef.current = false;
         if(pl===myColor){
+          rollBusyRef.current = false;
           // Auto-move: broadcast piece_selected so opponent can animate
           channelRef.current?.send({type:"broadcast",event:"piece_selected",
             payload:{pieceId:mv[0],diceVal:val,player:pl,seq:Date.now()}});
@@ -1947,6 +1956,7 @@ export default function LudoGame() {
           // before React has necessarily committed the state update.
           movableRef.current = mv;
           phaseRef.current = "select";
+          rollBusyRef.current = false;
           setMovable(mv); setPhase("select");
           setMsg(`${plName} — ${val}! ${pl===myColor?"Escolhe uma peça.":""}`);
           if (pl===myColor && autoMoveAfterRollRef.current) {
@@ -1966,10 +1976,11 @@ export default function LudoGame() {
           // Do NOT touch phase/movable — ludo_state_sync from the opponent
           // is the authoritative state update. Changing phase here would
           // race with that sync and could freeze the next turn.
+          rollBusyRef.current = false;
           setMsg(`${plName} — ${val}!`);
         }
       }
-    },800);
+    },500);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[myColor,playerName,opponentName,doSelectPiece,isBot]);
 
@@ -1979,15 +1990,12 @@ export default function LudoGame() {
       phaseRef.current!=="roll" ||
       turnRef.current!==myColor ||
       winnerRef.current ||
-      rollBusyRef.current
+      rollBusyRef.current ||
+      moveBusyRef.current
     ) return;
-    // One request at a time, matching the working turn/dice flow from
-    // 400fe82. The lock is released when the visual roll resolves.
     rollBusyRef.current = true;
-    // Start the visual feedback immediately. Previously the die stayed still
-    // while waiting for the API, which looked like a dead/unresponsive button.
     const setMyRolling = myColor==="blue" ? setRollingB : setRollingG;
-    setMyRolling(true);
+    const setMyDice = myColor==="blue" ? setDiceBlue : setDiceGreen;
 
     const myPieces  = piecesRef.current.filter(p=>p.player===myColor);
     const allInBase = myPieces.every(p=>p.pos===-1);
@@ -1996,8 +2004,6 @@ export default function LudoGame() {
     let val = 0;
     let rollError = "";
     if(gameId==="local"){
-      // The demo board must remain playable without authentication or an API
-      // server. Real-money games always use the server-side roll below.
       val = generateWeightedDice(
         myPieces,
         piecesRef.current.filter(p=>p.player===opponentColor),
@@ -2034,15 +2040,6 @@ export default function LudoGame() {
       setMyRolling(false);
       rollBusyRef.current = false;
       setMsg(rollError || "Não foi possível rolar o dado. Tenta novamente.");
-      // A timeout is a complete turn action. A transient API/network failure
-      // must not leave the timed-out player permanently without a move.
-      if (autoMoveAfterRollRef.current && phaseRef.current === "roll" && turnRef.current === myColor) {
-        setTimeout(() => {
-          if (phaseRef.current === "roll" && turnRef.current === myColor && !winnerRef.current) {
-            void doRoll();
-          }
-        }, 750);
-      }
       return;
     }
 
@@ -2198,7 +2195,9 @@ export default function LudoGame() {
       if(seq && lastEventSeqRef.current[key] >= seq) return;
       if(seq) lastEventSeqRef.current[key] = seq;
       if(phaseRef.current==="done"||winnerRef.current) return;
-      // Security: validate dice value is in expected range
+      // Reject dice broadcasts while this client is in the middle of
+      // animating a move — it must wait for the authoritative state sync.
+      if(phaseRef.current==="moving"||moveBusyRef.current) return;
       const val = payload.value as number;
       if(typeof val !== "number" || val < 1 || val > 6 || !Number.isInteger(val)) return;
       const remotePlayer = payload.player as Player;
@@ -2553,6 +2552,11 @@ export default function LudoGame() {
   }
 
   autoPlayRef.current  = () => {
+    const cur = phaseRef.current;
+    // If a roll is already in progress or a move is animating, don't
+    // deduct a life — the player is already acting. Just skip silently.
+    if (rollBusyRef.current || moveBusyRef.current) return;
+
     const l    = livesRef.current;
     const nb   = l[myColor] - 1;
     const newLives = { ...l, [myColor]: Math.max(0, nb) };
@@ -2568,12 +2572,16 @@ export default function LudoGame() {
     setMsg(`Tempo esgotado! ${playerName.split(" ")[0]} perde 1 vida (${nb} restante${nb===1?"":"s"}).`);
     if (!isBot) channelRef.current?.send({ type:"broadcast", event:"ludo_lives_sync",
       payload:{ lives: newLives, gameOver: false, player: myColor, timedOut: true } });
-    const cur = phaseRef.current;
     const mv  = movableRef.current;
     const dv  = myColor === "blue" ? diceBlueRef.current : diceGreenRef.current;
     if (cur === "roll") {
       autoMoveAfterRollRef.current = true;
-      setTimeout(() => void doRoll(), 200);
+      setTimeout(() => {
+        // Re-check: the flag may have been cleared by a normal hand-off
+        // that completed between the timer firing and this callback.
+        if (!autoMoveAfterRollRef.current) return;
+        void doRoll();
+      }, 200);
     }
     else if (cur === "select" && mv.length > 0 && dv !== null)
       setTimeout(() => doSelectPiece(mv[Math.floor(Math.random() * mv.length)], dv, myColor, piecesRef.current), 200);
@@ -2595,19 +2603,22 @@ export default function LudoGame() {
 
   useEffect(() => {
     if (winner || (phase !== "roll" && phase !== "select") || turn !== myColor) {
+      // Track the turn even when it's not ours, so isNewTurn detects
+      // when the turn comes back after the opponent played.
+      prevTimerTurnRef.current = turn;
       try { sessionStorage.removeItem(turnTimerKey); } catch { /* ignore */ }
       return;
     }
     // A timeout may transition through several phases while keeping the same
     // turn. Do not create a second expiry callback for that same turn.
+    // However, if the turn was handed to the opponent and came back,
+    // timerExpiredTurnRef must be cleared — it's a new logical turn.
+    const isNewTurn = prevTimerTurnRef.current !== turn;
+    if (isNewTurn) timerExpiredTurnRef.current = null;
     if (timerExpiredTurnRef.current === turn) {
       setTimeLeft(0);
       return;
     }
-    if (timerExpiredTurnRef.current !== turn) timerExpiredTurnRef.current = null;
-    // Novo turno real? → começa agora. Mudança de fase (roll↔select) ou
-    // retoma (back + voltar)? → o timer CONTINUA do início original.
-    const isNewTurn = prevTimerTurnRef.current !== turn;
     prevTimerTurnRef.current = turn;
     let start = 0;
     if (!isNewTurn) {
