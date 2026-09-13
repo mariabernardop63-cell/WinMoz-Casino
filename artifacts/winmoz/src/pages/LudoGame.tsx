@@ -952,10 +952,10 @@ function TrophySVG({ size=72 }:{size?:number}) {
 
 // ─── Professional Player Panel — white card ─────────────────────────────────────
 function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRoll,
-  finished, lives, timeLeft, isMe, canRoll }:{
+  finished, lives, timeLeft, isMe, canRoll, diceLocked }:{
   player:Player; name:string; balance:string; isActive:boolean; diceValue:number|null;
   rolling:boolean; onRoll:()=>void; finished:number; lives:number; timeLeft:number; isMe:boolean;
-  canRoll?: boolean;
+  canRoll?: boolean; diceLocked?: boolean;
 }) {
   const color:PawnColor = player==="blue" ? "blue" : "green";
   const accentColor     = player==="blue" ? "#3B82F6" : "#22C55E";
@@ -1061,7 +1061,7 @@ function PlayerPanel({ player, name, balance, isActive, diceValue, rolling, onRo
           <Dice3D
             value={diceValue} rolling={rolling}
             onClick={onRoll}
-            active={isActive && isMe && canRoll !== false}
+            active={isActive && isMe && canRoll !== false && !diceLocked}
             sz={34}
           />
         </div>
@@ -1431,6 +1431,9 @@ export default function LudoGame() {
   const [diceGreen,setDiceGreen]   = useState<number|null>(_savedLudo?.diceGreen ?? null);
   const [rollingBlue,setRollingB]  = useState(false);
   const [rollingGreen,setRollingG] = useState(false);
+  // State-backed UI lock makes the die non-interactive immediately after the
+  // click; rollBusyRef remains the synchronous guard for rapid pointer events.
+  const [diceLocked,setDiceLocked] = useState(false);
   const [movable,setMovable]       = useState<PieceId[]>([]);
   const [winner,setWinner]         = useState<Player|null>(null);
   const [lives,setLives]           = useState(_savedLudo?.lives ?? {blue:5,green:5});
@@ -1665,6 +1668,7 @@ export default function LudoGame() {
 
   function handleMoveComplete(pieceId:PieceId,diceVal:number,currentTurn:Player,prevPos:number,originalDice:number=diceVal){
     moveBusyRef.current = false;
+    if(currentTurn===myColor) setDiceLocked(false);
     setPhase("moving");
     lastActivityAtRef.current = Date.now();
     const ps=piecesRef.current;
@@ -1861,7 +1865,10 @@ export default function LudoGame() {
       setD(val); setR(false);
       // The request/animation lock only covers this roll. Turn ownership is
       // handled by the normal hand-off below.
-      rollBusyRef.current = false;
+      if(pl===myColor){
+        rollBusyRef.current = false;
+        setDiceLocked(false);
+      }
 
       // Track consecutive sixes (Rule 4) — update ref synchronously to avoid timing bugs
       if(val===6){
@@ -1919,7 +1926,10 @@ export default function LudoGame() {
                 lives:livesRef.current,
               }});
             }
-            if(pl===myColor) rollBusyRef.current = false;
+            if(pl===myColor) {
+              rollBusyRef.current = false;
+              setDiceLocked(false);
+            }
           },1300);
         } else {
           // The opponent owns the authoritative hand-off. Its state sync will
@@ -1961,6 +1971,7 @@ export default function LudoGame() {
               if (pid) doSelectPiece(pid, val, pl, piecesRef.current);
             }, 220);
           }
+          if(pl===myColor) setDiceLocked(false);
         } else {
           // Multiplayer opponent: only show the message.
           // Do NOT touch phase/movable — ludo_state_sync from the opponent
@@ -1984,6 +1995,7 @@ export default function LudoGame() {
     // One request at a time, matching the working turn/dice flow from
     // 400fe82. The lock is released when the visual roll resolves.
     rollBusyRef.current = true;
+    setDiceLocked(true);
     // Start the visual feedback immediately. Previously the die stayed still
     // while waiting for the API, which looked like a dead/unresponsive button.
     const setMyRolling = myColor==="blue" ? setRollingB : setRollingG;
@@ -2016,6 +2028,7 @@ export default function LudoGame() {
       if(result.turnBlocked){
         (myColor==="blue"?setRollingB:setRollingG)(false);
         rollBusyRef.current = false;
+        setDiceLocked(false);
         const st = result.serverTurn;
         if(st && turnRef.current!==st){
           turnRef.current = st;
@@ -2033,6 +2046,7 @@ export default function LudoGame() {
     if(!val){
       setMyRolling(false);
       rollBusyRef.current = false;
+      setDiceLocked(false);
       setMsg(rollError || "Não foi possível rolar o dado. Tenta novamente.");
       // A timeout is a complete turn action. A transient API/network failure
       // must not leave the timed-out player permanently without a move.
@@ -2051,6 +2065,7 @@ export default function LudoGame() {
     if (winnerRef.current || turnRef.current !== myColor || phaseRef.current !== "roll") {
       setMyRolling(false);
       rollBusyRef.current = false;
+      setDiceLocked(false);
       return;
     }
 
@@ -2318,6 +2333,10 @@ export default function LudoGame() {
       setDiceBlue(p.diceBlue); setDiceGreen(p.diceGreen);
       piecesRef.current=p.pieces; turnRef.current=p.turn; phaseRef.current=p.phase;
       diceBlueRef.current=p.diceBlue; diceGreenRef.current=p.diceGreen;
+       // The snapshot is authoritative. Do not let a delayed opponent
+       // animation keep the local board locked after the new turn arrives.
+       moveBusyRef.current = false;
+       setDiceLocked(false);
       if(p.stuckTurns){ stuckTurnsRef.current=p.stuckTurns; setStuckTurns(p.stuckTurns); }
       if(p.lives){ livesRef.current=p.lives; setLives(p.lives); }
       if(p.winner){
@@ -2363,6 +2382,8 @@ export default function LudoGame() {
           if(p.stuckTurns) setStuckTurns(p.stuckTurns);
           piecesRef.current=p.pieces; turnRef.current=myColor; phaseRef.current=p.phase;
           diceBlueRef.current=p.diceBlue??null; diceGreenRef.current=p.diceGreen??null;
+           moveBusyRef.current = false;
+           setDiceLocked(false);
           if(p.phase==="roll") setMsg(myTurnMsg);
         } else if(p.turn===opponentColor){
            // The moving player sends this snapshot after handing the turn to
@@ -2381,6 +2402,8 @@ export default function LudoGame() {
            turnRef.current=opponentColor;
            phaseRef.current=p.phase;
            diceBlueRef.current=p.diceBlue??null; diceGreenRef.current=p.diceGreen??null;
+            moveBusyRef.current = false;
+            setDiceLocked(false);
            if(p.phase==="roll") setMsg(oppTurnMsg);
         }
       },200);
@@ -2679,6 +2702,7 @@ export default function LudoGame() {
     rewardFiredRef.current=false;
     setPieces(resetPieces); setTurn("blue"); setPhase("roll");
     setDiceBlue(null); setDiceGreen(null); setRollingB(false); setRollingG(false);
+    setDiceLocked(false);
     setMovable([]); setWinner(null); setLives({blue:5,green:5}); setTimeLeft(30);
     setOpponentTimeLeft(30);
     setStuckTurns({blue:0,green:0}); stuckTurnsRef.current={blue:0,green:0};
@@ -2786,6 +2810,7 @@ export default function LudoGame() {
           timeLeft={myColor===player ? timeLeft : opponentTimeLeft}
           isMe={myColor===player}
           canRoll={phase==="roll" && !winner}
+           diceLocked={diceLocked}
         />
       </div>
     );
