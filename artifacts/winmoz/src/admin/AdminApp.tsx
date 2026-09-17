@@ -28,6 +28,7 @@ import BotManagement from "@/admin/pages/bots";
 import AffiliatesPage from "@/admin/pages/affiliates";
 import GameManagement from "@/admin/pages/game-management";
 import RechargeManagement from "@/admin/pages/recharge-management";
+import RoletaManagement from "@/admin/pages/roleta";
 
 const BASE = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 const ADMIN_BASE = `${BASE}/admin`;
@@ -58,6 +59,7 @@ function AdminRouter() {
         <Route path="/affiliates"      component={AffiliatesPage}  />
         <Route path="/game-management" component={GameManagement}  />
         <Route path="/recharge-management" component={RechargeManagement} />
+        <Route path="/roleta" component={RoletaManagement} />
         <Route component={Dashboard} />
       </Switch>
     </AdminLayout>

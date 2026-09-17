@@ -23,6 +23,7 @@ import {
   LogOut,
   Moon,
   Sun,
+  RotateCw,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,7 @@ const navSections: Array<{ items: Array<{ href: string; icon: LucideIcon; label:
   {
     items: [
       { href: "/game-management",  icon: Gamepad2,         label: "Gestão de Jogos"     },
+      { href: "/roleta",           icon: RotateCw,         label: "Roleta"              },
       { href: "/bots",             icon: Bot,              label: "Bots"                },
       { href: "/notifications",    icon: Bell,             label: "Notificações"        },
       { href: "/messages",         icon: MessageCircle,    label: "Mensagens"           },

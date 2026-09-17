@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { evaluateBotDifficulty, getBotDifficultySync } from "@/lib/botBrain";
 import { serverBet, serverWin, serverForfeit, rollLudoDice, passLudoTurn } from "@/lib/gameApi";
-import AdBanner from "@/components/AdBanner";
+
 import bgImg from "@assets/Gemini_Generated_Image_grc2w7grc2w7grc2_1780220609974.png";
 import rollSoundUrl from "@assets/som_para_quando_o_user_girar_no_dado__1781479690378.mp3";
 import captureSoundUrl from "@assets/som_para_quando_o_peao_é_matado_1781479683373.mp3";
@@ -2989,11 +2989,6 @@ export default function LudoGame() {
 
         {/* ── Local player panel: always below the board */}
         {renderPlayerPanel(myColor)}
-
-        {/* ── Ad banner */}
-        <div style={{ padding:"0 10px 5px", flexShrink:0 }}>
-          <AdBanner compact />
-        </div>
 
       </div>
 

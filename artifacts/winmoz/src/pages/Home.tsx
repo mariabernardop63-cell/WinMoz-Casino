@@ -4,7 +4,7 @@ import { Link, useLocation } from "wouter";
 import { Play, Star, ChevronRight, ArrowDownLeft, TrendingUp, Bell, User } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import HomeFooter from "@/components/HomeFooter";
-import AdBanner from "@/components/AdBanner";
+
 import WelcomeBonusModal from "@/components/WelcomeBonusModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSyntheticUser, generateWithdrawalAmount, getWithdrawalInterval, shouldBootWithdrawal, getLivePlayerCount, formatPlayerCount } from "@/lib/simulation";
@@ -27,12 +27,12 @@ function SectionHead({
       <div className="flex items-center gap-2.5 min-w-0">
         {Icon && (
           <span className="home-icon-chip flex items-center justify-center flex-shrink-0">
-            <Icon className="w-[15px] h-[15px]" style={{ color: "#1d4ed8" }} strokeWidth={2.2} />
+            <Icon className="w-[14px] h-[14px]" style={{ color: "#374151" }} strokeWidth={2} />
           </span>
         )}
         <div className="min-w-0">
-          <h2 className="font-syne font-bold text-[15px] leading-tight text-slate-900 truncate">{title}</h2>
-          {hint && <p className="text-[10.5px] text-slate-400 mt-0.5 truncate">{hint}</p>}
+          <h2 className="font-syne font-bold text-[14px] leading-tight text-gray-900 tracking-tight truncate">{title}</h2>
+          {hint && <p className="text-[10px] text-gray-400 mt-0.5 truncate">{hint}</p>}
         </div>
       </div>
       {action}
@@ -66,7 +66,6 @@ function makeSaque(extraSeed = 0, timeLabel?: string) {
 
 function SaquesSection() {
   const [visible, setVisible] = useState(() => {
-    // Pre-populate with staggered realistic timestamps
     return [
       makeSaque(0, "agora mesmo"),
       makeSaque(111, "há 3 min"),
@@ -76,7 +75,6 @@ function SaquesSection() {
   });
 
   useEffect(() => {
-    // First update: skip if it's quiet hours
     if (!shouldBootWithdrawal()) return;
 
     const schedule = () => {
@@ -98,7 +96,7 @@ function SaquesSection() {
         icon={TrendingUp}
         hint="Levantamentos processados em tempo real"
         action={
-          <span className="flex items-center gap-1 bg-emerald-50 border border-emerald-200 text-emerald-700 text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+          <span className="flex items-center gap-1 bg-gray-50 border border-gray-200 text-gray-600 text-[9px] font-bold px-2 py-0.5 rounded-full flex-shrink-0">
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse inline-block" />
             AO VIVO
           </span>
@@ -119,16 +117,16 @@ function SaquesSection() {
                 {saque.initials}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-syne font-bold text-slate-900 text-sm truncate">{saque.name}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">{saque.time}</p>
+                <p className="font-syne font-bold text-gray-900 text-sm truncate">{saque.name}</p>
+                <p className="text-[10px] text-gray-400 mt-0.5">{saque.time}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 <div className="text-right">
                   <p className="font-syne font-extrabold text-emerald-600 text-sm">+{saque.amount}</p>
-                  <p className="text-[9px] text-slate-400 uppercase tracking-wide">Saque</p>
+                  <p className="text-[9px] text-gray-400 uppercase tracking-wide">Saque</p>
                 </div>
-                <div className="w-7 h-7 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center flex-shrink-0">
-                  <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-600" />
+                <div className="w-7 h-7 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center flex-shrink-0">
+                  <ArrowDownLeft className="w-3.5 h-3.5 text-gray-600" />
                 </div>
               </div>
             </motion.div>
@@ -198,20 +196,20 @@ export function AtualizacoesCards() {
                 style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", minHeight: 72 }}
               />
             ) : (
-              <div style={{ width: "100%", minHeight: 72, height: "100%", background: post.imageBg ?? "#6366f1", borderRadius: 12 }} />
+              <div style={{ width: "100%", minHeight: 72, height: "100%", background: post.imageBg ?? "#374151", borderRadius: 12 }} />
             )}
           </div>
           <div className="flex-1 py-0.5 flex flex-col justify-between min-w-0">
             <div>
-              <p className="font-syne font-bold text-slate-900 leading-tight mb-1" style={{ fontSize: 12.5 }}>
+              <p className="font-syne font-bold text-gray-900 leading-tight mb-1" style={{ fontSize: 12.5 }}>
                 {post.title}
               </p>
-              <p className="text-slate-500 leading-relaxed" style={{ fontSize: 11.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+              <p className="text-gray-500 leading-relaxed" style={{ fontSize: 11.5, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                 {post.content}
               </p>
             </div>
-            <span className="mt-2 text-slate-400 flex items-center gap-1" style={{ fontSize: 10.5 }}>
-              <span className="w-1 h-1 rounded-full bg-slate-300 inline-block" />
+            <span className="mt-2 text-gray-400 flex items-center gap-1" style={{ fontSize: 10.5 }}>
+              <span className="w-1 h-1 rounded-full bg-gray-300 inline-block" />
               {post.time}
             </span>
           </div>
@@ -764,36 +762,34 @@ function RavoRavoCardArt() {
 
 function BannerSkeleton() {
   return (
-    <section className="px-4 pt-5 pb-3">
+    <section className="home-hero-section px-4 pt-4 pb-3">
       <div
-        className="relative w-full rounded-3xl overflow-hidden"
-        style={{ minHeight: 190, background: "#16142a" }}
+        className="relative w-full overflow-hidden"
+        style={{ minHeight: 180, background: "#1f2937", borderRadius: 20 }}
       >
         <div className="absolute inset-0 skeleton-shimmer-dark" />
         <div
-          className="relative z-10 flex items-center justify-between px-5 py-6 gap-3"
-          style={{ minHeight: 190 }}
+          className="relative z-10 flex items-center justify-between px-5 py-5 gap-4"
+          style={{ minHeight: 180 }}
         >
-          {/* Left text area */}
           <div className="flex-1 flex flex-col gap-3">
-            <div className="h-5 w-36 rounded-full skeleton-shimmer-dark" style={{ borderRadius: 99 }} />
+            <div className="h-4 w-20 rounded skeleton-shimmer-dark" />
             <div className="flex flex-col gap-2">
-              <div className="h-7 w-40 rounded-lg skeleton-shimmer-dark" />
-              <div className="h-7 w-28 rounded-lg skeleton-shimmer-dark" />
+              <div className="h-6 w-36 rounded-lg skeleton-shimmer-dark" />
+              <div className="h-6 w-24 rounded-lg skeleton-shimmer-dark" />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <div className="h-2.5 w-36 rounded skeleton-shimmer-dark" />
-              <div className="h-2.5 w-24 rounded skeleton-shimmer-dark" />
+            <div className="flex flex-col gap-1.5 mt-1">
+              <div className="h-2.5 w-32 rounded skeleton-shimmer-dark" />
+              <div className="h-2.5 w-20 rounded skeleton-shimmer-dark" />
             </div>
-            <div className="h-9 w-28 rounded-xl skeleton-shimmer-dark mt-1" />
+            <div className="h-8 w-28 rounded-lg skeleton-shimmer-dark mt-1" />
           </div>
-          {/* Right board area */}
-          <div className="w-[136px] h-[136px] rounded-xl flex-shrink-0 skeleton-shimmer-dark" />
+          <div className="w-[116px] h-[116px] rounded-xl flex-shrink-0 skeleton-shimmer-dark" />
         </div>
-        {/* Dots */}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-          <div className="w-5 h-1.5 rounded-full skeleton-shimmer-dark" />
-          <div className="w-1.5 h-1.5 rounded-full skeleton-shimmer-dark" />
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-[5px]">
+          <div className="w-[18px] h-[5px] rounded-[3px] skeleton-shimmer-dark" />
+          <div className="w-[5px] h-[5px] rounded-[3px] skeleton-shimmer-dark" />
+          <div className="w-[5px] h-[5px] rounded-[3px] skeleton-shimmer-dark" />
         </div>
       </div>
     </section>
@@ -802,7 +798,7 @@ function BannerSkeleton() {
 
 function GameCardSkeleton() {
   return (
-    <div className="min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-md flex flex-col">
+    <div className="min-w-[148px] flex-shrink-0 bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-md flex flex-col">
       <div className="h-28 w-full skeleton-shimmer" />
       <div className="p-3 flex flex-col gap-2.5">
         <div className="h-3.5 w-20 rounded skeleton-shimmer" />
@@ -821,15 +817,16 @@ const SLIDES = [
   {
     id: "damas",
     duration: 8000,
-    bg: "linear-gradient(135deg, rgba(8,4,0,0.72) 0%, rgba(22,9,0,0.66) 40%, rgba(38,15,0,0.60) 100%)",
+    bg: "linear-gradient(160deg, rgba(17,24,39,0.97) 0%, rgba(31,41,55,0.94) 50%, rgba(55,65,81,0.90) 100%)",
     bgImage: "/wood-texture.jpg" as string | null,
-    accent: "#F59E0B",
-    badge: "Anúncio Patrocinado",
-    badgeBg: "rgba(0,0,0,0.50)",
-    badgeBorder: "rgba(255,255,255,0.22)",
-    badgeDot: "#F59E0B",
-    badgeText: "#FFFFFF",
-    subtitleColor: "rgba(255,255,255,0.82)",
+    accent: "#e5e7eb",
+    accentSoft: "rgba(229,231,235,0.12)",
+    badge: "DESTAQUE",
+    badgeBg: "rgba(255,255,255,0.06)",
+    badgeBorder: "rgba(255,255,255,0.10)",
+    badgeDot: "#e5e7eb",
+    badgeText: "rgba(255,255,255,0.6)",
+    subtitleColor: "rgba(255,255,255,0.55)",
     title: "Domina o\nTabuleiro?",
     subtitle: "Jogue Damas Online e multiplica o teu saldo.",
     cta: "Jogar Agora",
@@ -837,65 +834,69 @@ const SLIDES = [
   {
     id: "ludo",
     duration: 10000,
-    bg: "linear-gradient(135deg, rgba(6,4,16,0.72) 0%, rgba(10,8,28,0.68) 40%, rgba(14,12,40,0.64) 100%)",
+    bg: "linear-gradient(160deg, rgba(17,24,39,0.97) 0%, rgba(31,41,55,0.94) 50%, rgba(55,65,81,0.90) 100%)",
     bgImage: "/ludo-bg.webp" as string | null,
-    accent: "#A78BFA",
-    badge: "Anúncio Patrocinado",
-    badgeBg: "rgba(0,0,0,0.50)",
-    badgeBorder: "rgba(255,255,255,0.22)",
-    badgeDot: "#A78BFA",
-    badgeText: "#FFFFFF",
-    subtitleColor: "rgba(255,255,255,0.82)",
-    title: "Jogue Ludo apostado.",
+    accent: "#d1d5db",
+    accentSoft: "rgba(209,213,219,0.10)",
+    badge: "DESTAQUE",
+    badgeBg: "rgba(255,255,255,0.06)",
+    badgeBorder: "rgba(255,255,255,0.10)",
+    badgeDot: "#d1d5db",
+    badgeText: "rgba(255,255,255,0.6)",
+    subtitleColor: "rgba(255,255,255,0.55)",
+    title: "Jogue Ludo\nApostado.",
     subtitle: "Desafia rivais online e multiplica o teu saldo.",
     cta: "Jogar Agora",
   },
   {
     id: "chat",
     duration: 9000,
-    bg: "linear-gradient(135deg, rgba(0,8,22,0.92) 0%, rgba(0,26,44,0.88) 100%)",
+    bg: "linear-gradient(160deg, rgba(17,24,39,0.97) 0%, rgba(31,41,55,0.94) 100%)",
     bgImage: "/chat-bg.jpg" as string | null,
-    accent: "#00D4B4",
-    badge: "Anúncio Patrocinado",
-    badgeBg: "rgba(0,0,0,0.55)",
-    badgeBorder: "rgba(0,212,180,0.35)",
-    badgeDot: "#00D4B4",
-    badgeText: "#FFFFFF",
-    subtitleColor: "rgba(255,255,255,0.82)",
+    accent: "#e5e7eb",
+    accentSoft: "rgba(229,231,235,0.12)",
+    badge: "COMUNIDADE",
+    badgeBg: "rgba(255,255,255,0.06)",
+    badgeBorder: "rgba(255,255,255,0.10)",
+    badgeDot: "#e5e7eb",
+    badgeText: "rgba(255,255,255,0.6)",
+    subtitleColor: "rgba(255,255,255,0.55)",
     title: "Conversas\nem Grupo!",
     subtitle: "Estratégias, amigos e diversão em tempo real.",
-    cta: "Conversar",
+    cta: "Entrar",
   },
   {
     id: "xadrez",
     duration: 9500,
-    bg: "linear-gradient(135deg, rgba(4,4,12,0.80) 0%, rgba(10,10,28,0.76) 40%, rgba(16,14,38,0.72) 100%)",
+    bg: "linear-gradient(160deg, rgba(17,24,39,0.97) 0%, rgba(31,41,55,0.94) 50%, rgba(55,65,81,0.90) 100%)",
     bgImage: "/chess-board.webp" as string | null,
-    accent: "#94a3b8",
-    badge: "Anúncio Patrocinado",
-    badgeBg: "rgba(0,0,0,0.50)",
-    badgeBorder: "rgba(255,255,255,0.20)",
-    badgeDot: "#94a3b8",
-    badgeText: "#FFFFFF",
-    subtitleColor: "rgba(255,255,255,0.80)",
+    accent: "#d1d5db",
+    accentSoft: "rgba(209,213,219,0.10)",
+    badge: "ESTRATÉGIA",
+    badgeBg: "rgba(255,255,255,0.06)",
+    badgeBorder: "rgba(255,255,255,0.10)",
+    badgeDot: "#d1d5db",
+    badgeText: "rgba(255,255,255,0.6)",
+    subtitleColor: "rgba(255,255,255,0.55)",
     title: "Xadrez\nApostado.",
-    subtitle: "Desafia estrategas e\nmultiplica o teu saldo.",
+    subtitle: "Desafia estrategas e multiplica o teu saldo.",
     cta: "Jogar Agora",
   },
   {
     id: "bilhar",
     duration: 9000,
-    bg: "linear-gradient(135deg, rgba(4,8,16,0.88) 0%, rgba(8,16,28,0.84) 50%, rgba(10,18,32,0.80) 100%)",
+    bg: "linear-gradient(160deg, rgba(17,24,39,0.97) 0%, rgba(31,41,55,0.94) 50%, rgba(55,65,81,0.90) 100%)",
     bgImage: "/bilhar-bg.jpg" as string | null,
-    accent: "#22d3ee",
-    badge: "Anúncio Patrocinado",
-    badgeBg: "rgba(0,0,0,0.52)",
-    badgeBorder: "rgba(34,211,238,0.38)",
-    badgeDot: "#22d3ee",
-    badgeText: "#FFFFFF",
-    subtitleColor: "rgba(255,255,255,0.82)",
+    accent: "#e5e7eb",
+    accentSoft: "rgba(229,231,235,0.12)",
+    badge: "PREMIUM",
+    badgeBg: "rgba(255,255,255,0.06)",
+    badgeBorder: "rgba(255,255,255,0.10)",
+    badgeDot: "#e5e7eb",
+    badgeText: "rgba(255,255,255,0.6)",
+    subtitleColor: "rgba(255,255,255,0.55)",
     title: "Bilhar\nApostado.",
-    subtitle: "Domine a mesa e\nmultiplique as apostas.",
+    subtitle: "Domine a mesa e multiplique as apostas.",
     cta: "Jogar Agora",
   },
 ];
@@ -914,7 +915,6 @@ function ChatBannerArt() {
       transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
       style={{ position: "relative", width: 106, height: 106, flexShrink: 0 }}
     >
-      {/* Incoming bubble with typing dots */}
       <motion.div
         animate={{ y: [0, -2, 0] }}
         transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
@@ -927,18 +927,16 @@ function ChatBannerArt() {
           ))}
         </div>
       </motion.div>
-      {/* Outgoing bubble (cyan) */}
       <motion.div
         animate={{ y: [0, -2, 0] }}
         transition={{ duration: 3.1, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
-        style={{ position: "absolute", top: 36, right: 0, background: "linear-gradient(135deg, #00D4B4, #00a88e)", borderRadius: "12px 3px 12px 12px", padding: "6px 10px", boxShadow: "0 3px 14px rgba(0,212,180,0.45)" }}
+        style={{ position: "absolute", top: 36, right: 0, background: "linear-gradient(135deg, #374151, #1f2937)", borderRadius: "12px 3px 12px 12px", padding: "6px 10px", boxShadow: "0 3px 14px rgba(31,41,55,0.45)" }}
       >
         <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <div style={{ height: 3, width: 42, background: "rgba(0,26,20,0.38)", borderRadius: 4 }} />
-          <div style={{ height: 3, width: 28, background: "rgba(0,26,20,0.28)", borderRadius: 4 }} />
+          <div style={{ height: 3, width: 42, background: "rgba(255,255,255,0.38)", borderRadius: 4 }} />
+          <div style={{ height: 3, width: 28, background: "rgba(255,255,255,0.28)", borderRadius: 4 }} />
         </div>
       </motion.div>
-      {/* Second incoming bubble */}
       <motion.div
         animate={{ y: [0, -2.5, 0] }}
         transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut", delay: 1.1 }}
@@ -949,13 +947,12 @@ function ChatBannerArt() {
           <div style={{ height: 3, width: 22, background: "#e5e7eb", borderRadius: 4 }} />
         </div>
       </motion.div>
-      {/* Online badge */}
       <motion.div
         animate={{ scale: [1, 1.07, 1] }}
         transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-        style={{ position: "absolute", top: -2, right: -2, background: "#22c55e", borderRadius: 20, padding: "2px 6px", display: "flex", alignItems: "center", gap: 3, boxShadow: "0 2px 6px rgba(34,197,94,0.55)" }}
+        style={{ position: "absolute", top: -2, right: -2, background: "#111827", borderRadius: 20, padding: "2px 6px", display: "flex", alignItems: "center", gap: 3, boxShadow: "0 2px 6px rgba(17,24,39,0.55)" }}
       >
-        <span style={{ width: 4, height: 4, borderRadius: 999, background: "#fff", display: "inline-block" }} />
+        <span style={{ width: 4, height: 4, borderRadius: 999, background: "#10b981", display: "inline-block" }} />
         <span style={{ color: "#fff", fontSize: 8, fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>39 online</span>
       </motion.div>
     </motion.div>
@@ -970,8 +967,6 @@ function HeroBanner() {
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    /* Preload only the first slide eagerly (LCP); queue the rest idle so they
-       don't compete with the initial JS/CSS/images for bandwidth */
     const srcs = SLIDES.map(s => s.bgImage).filter(Boolean) as string[];
     let loaded = 0;
     const fallback = setTimeout(() => setReady(true), 900);
@@ -1013,23 +1008,30 @@ function HeroBanner() {
   const slide = SLIDES[slideIdx];
 
   return (
-    <section className="home-hero-section px-4 pt-5 pb-3">
+    <section className="home-hero-section px-4 pt-4 pb-3">
       <div
-        className="home-hero relative w-full rounded-3xl overflow-hidden shadow-2xl"
+        className="home-hero relative w-full rounded-[20px] overflow-hidden"
         style={{
           backgroundImage: slide.bgImage
             ? `${slide.bg}, url(${slide.bgImage})`
             : slide.bg,
           backgroundSize: "cover",
           backgroundPosition: "center",
-          minHeight: 190,
+          minHeight: 180,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.12)",
         }}
       >
-        {/* Ambient glow */}
+        {/* Subtle top highlight */}
+        <div
+          className="absolute inset-x-0 top-0 h-px pointer-events-none"
+          style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent)" }}
+        />
+
+        {/* Ambient glow — very subtle */}
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: `radial-gradient(ellipse at 80% 50%, ${slide.accent}22 0%, transparent 65%)`,
+            background: `radial-gradient(ellipse at 85% 40%, ${slide.accentSoft} 0%, transparent 60%)`,
             transition: "background 0.8s ease",
           }}
         />
@@ -1042,35 +1044,35 @@ function HeroBanner() {
             initial="initial"
             animate="animate"
             exit="exit"
-            className="home-hero-content relative z-10 flex items-center justify-between px-5 py-6 gap-3"
-            style={{ minHeight: 190, maxHeight: 220 }}
+            className="home-hero-content relative z-10 flex items-center justify-between px-5 py-5 gap-4"
+            style={{ minHeight: 180, maxHeight: 210 }}
           >
-            {/* LEFT: text */}
-            <div className="home-hero-copy" style={{ flex: "1 1 0", minWidth: 0, maxWidth: "58%" }}>
-              {/* Badge */}
+            {/* LEFT: text content */}
+            <div className="home-hero-copy flex flex-col justify-center" style={{ flex: "1 1 0", minWidth: 0, maxWidth: "55%" }}>
+              {/* Category badge */}
               <div
-                className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold uppercase border backdrop-blur-sm"
+                className="inline-flex items-center gap-1.5 self-start px-2 py-[3px] rounded-md font-semibold uppercase border backdrop-blur-sm mb-3"
                 style={{
                   borderColor: slide.badgeBorder,
                   background: slide.badgeBg,
                   color: slide.badgeText,
-                  fontSize: 8,
-                  letterSpacing: "0.08em",
+                  fontSize: 8.5,
+                  letterSpacing: "0.1em",
                   whiteSpace: "nowrap",
-                  marginBottom: 10,
                 }}
               >
-                <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block flex-shrink-0" style={{ background: slide.badgeDot }}/>
+                <span className="w-[5px] h-[5px] rounded-full inline-block flex-shrink-0" style={{ background: slide.badgeDot }}/>
                 {slide.badge}
               </div>
 
               {/* Title */}
               <h1
-                className="font-syne font-extrabold leading-tight text-white drop-shadow-md whitespace-pre-line"
+                className="font-syne font-extrabold leading-[1.08] text-white whitespace-pre-line"
                 style={{
-                  fontSize: "clamp(1rem, 4vw, 1.35rem)",
-                  marginBottom: 6,
+                  fontSize: "clamp(1.15rem, 4.5vw, 1.5rem)",
+                  marginBottom: 8,
                   wordBreak: "break-word",
+                  textShadow: "0 1px 2px rgba(0,0,0,0.2)",
                 }}
               >
                 {slide.title}
@@ -1078,64 +1080,69 @@ function HeroBanner() {
 
               {/* Subtitle */}
               <p
-                className="leading-relaxed"
+                className="leading-[1.5]"
                 style={{
                   color: slide.subtitleColor,
-                  fontSize: "clamp(9px, 2.5vw, 11px)",
-                  marginBottom: 12,
-                  maxWidth: 150,
+                  fontSize: "clamp(10px, 2.5vw, 11.5px)",
+                  marginBottom: 14,
+                  maxWidth: 160,
                 }}
               >
                 {slide.subtitle}
               </p>
 
-              {/* CTA */}
-              <motion.button
-                whileTap={{ scale: 0.96 }}
-                onClick={() => {
-                  if (slide.cta === "Conversar") setLocation("/grupo-chat");
-                  else if (slide.cta === "Jogar Agora") {
-                    if (slide.id === "bilhar") setLocation("/bilhar-em-breve?jogo=bilhar");
-                    else if (slide.id === "roleta") setLocation("/roleta");
-                    else setLocation(`/apostar/${slide.id}`);
-                  }
-                }}
-                className="font-syne font-bold rounded-xl shadow-lg transition-all duration-200"
-                style={{
-                  background: slide.accent,
-                  color: slide.id === "chat" ? "#001a16" : "#000",
-                  fontSize: "clamp(11px, 3vw, 13px)",
-                  padding: "7px 16px",
-                  whiteSpace: "nowrap",
-                  display: "inline-block",
-                }}
-              >
-                {slide.cta}
-              </motion.button>
+              {/* CTA Button */}
+              <div>
+                <motion.button
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => {
+                    if (slide.cta === "Entrar") setLocation("/grupo-chat");
+                    else if (slide.cta === "Jogar Agora") {
+                      if (slide.id === "bilhar") setLocation("/bilhar-em-breve?jogo=bilhar");
+                      else if (slide.id === "roleta") setLocation("/roleta");
+                      else setLocation(`/apostar/${slide.id}`);
+                    }
+                  }}
+                  className="font-syne font-bold rounded-lg transition-all duration-200 inline-flex items-center gap-1.5"
+                  style={{
+                    background: slide.id === "chat" ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.95)",
+                    color: "#111827",
+                    fontSize: "clamp(11px, 3vw, 12.5px)",
+                    padding: "8px 18px",
+                    whiteSpace: "nowrap",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                  }}
+                >
+                  {slide.cta}
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                  </svg>
+                </motion.button>
+              </div>
             </div>
 
-            {/* RIGHT: board — fixed size, never grows */}
-            <div className="home-hero-art" style={{ flexShrink: 0, width: 130, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {/* RIGHT: visual element */}
+            <div className="home-hero-art" style={{ flexShrink: 0, width: 120, display: "flex", alignItems: "center", justifyContent: "center" }}>
               {slide.id === "damas" ? (
                 <motion.div
-                  initial={{ opacity: 0, rotate: -4, scale: 0.88 }}
-                  animate={{ opacity: 1, rotate: -4, scale: 1 }}
+                  initial={{ opacity: 0, rotate: -3, scale: 0.9 }}
+                  animate={{ opacity: 1, rotate: -3, scale: 1 }}
                   transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: 0.1 }}
                   style={{
-                    borderRadius: 10,
-                    boxShadow: "0 8px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.4)",
-                    border: "2px solid rgba(255,255,255,0.08)",
+                    borderRadius: 12,
+                    boxShadow: "0 12px 40px rgba(0,0,0,0.45), 0 4px 12px rgba(0,0,0,0.3)",
+                    border: "1.5px solid rgba(255,255,255,0.06)",
                     overflow: "hidden",
                   }}
                 >
-                  <DamasBoard size={126} />
+                  <DamasBoard size={116} />
                 </motion.div>
               ) : slide.id === "ludo" ? (
-                <LudoBannerImage size={126} />
+                <LudoBannerImage size={116} />
               ) : slide.id === "xadrez" ? (
-                <ChessBannerImage size={126} />
+                <ChessBannerImage size={116} />
               ) : slide.id === "bilhar" ? (
-                <BilharBannerImage size={126} />
+                <BilharBannerImage size={116} />
               ) : (
                 <ChatBannerArt />
               )}
@@ -1143,18 +1150,18 @@ function HeroBanner() {
           </motion.div>
         </AnimatePresence>
 
-        {/* Slide dots */}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+        {/* Navigation dots — refined style */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-[5px] z-20">
           {SLIDES.map((s, i) => (
             <button
               key={s.id}
               onClick={() => goTo(i)}
-              className="transition-all duration-400"
+              className="transition-all duration-300"
               style={{
-                width: i === slideIdx ? 20 : 6,
-                height: 6,
-                borderRadius: 4,
-                background: i === slideIdx ? slide.accent : "rgba(255,255,255,0.25)",
+                width: i === slideIdx ? 18 : 5,
+                height: 5,
+                borderRadius: 3,
+                background: i === slideIdx ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.2)",
               }}
             />
           ))}
@@ -1319,11 +1326,11 @@ export default function Home() {
   }, [user?.id]);
 
   return (
-    <div className="min-h-screen bg-[#F4F5F7] text-slate-900 w-full flex justify-center selection:bg-blue-100">
-      <div className="home-shell w-full max-w-[430px] flex flex-col relative pb-24 bg-[#F4F5F7]">
+    <div className="min-h-screen bg-[#fafafa] text-gray-900 w-full flex justify-center selection:bg-gray-100">
+      <div className="home-shell w-full max-w-[430px] flex flex-col relative pb-24 bg-[#fafafa]">
 
         {/* TOP NAV */}
-        <header className="home-header sticky top-0 z-50 flex items-center justify-between px-5 py-3 bg-white/90 backdrop-blur-xl border-b border-slate-200/70">
+        <header className="home-header sticky top-0 z-50 flex items-center justify-between px-5 py-3 bg-white/95 backdrop-blur-xl border-b border-gray-200/80">
           <WinMozLogo />
           <div className="flex items-center gap-5">
             <nav className="home-desktop-links hidden items-center gap-1">
@@ -1333,28 +1340,26 @@ export default function Home() {
                 { href: "/suporte", label: "Suporte" },
               ].map(l => (
                 <Link key={l.href} href={l.href}
-                  className="text-[13px] font-semibold text-slate-500 hover:text-blue-700 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-50">
+                  className="text-[13px] font-semibold text-gray-500 hover:text-gray-900 transition-colors px-3 py-1.5 rounded-lg hover:bg-gray-50">
                   {l.label}
                 </Link>
               ))}
             </nav>
             {isLoggedIn ? (
               <div className="flex items-center gap-2">
-                {/* Notification Bell */}
                 <button onClick={() => setLocation("/notificacoes")}
-                  className="relative flex items-center justify-center w-9 h-9 rounded-full bg-slate-50 border border-slate-200 hover:bg-white hover:border-slate-300 hover:shadow-sm transition-all duration-200">
-                  <Bell className="w-4 h-4 text-slate-600" />
+                  className="relative flex items-center justify-center w-9 h-9 rounded-full bg-gray-50 border border-gray-200 hover:bg-white hover:border-gray-300 hover:shadow-sm transition-all duration-200">
+                  <Bell className="w-4 h-4 text-gray-600" />
                   {hasUnread && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white" />}
                 </button>
-                {/* Profile Icon */}
                 <button
                   onClick={() => setLocation("/perfil")}
-                  className="flex items-center justify-center w-9 h-9 rounded-full border-2 border-blue-500/40 hover:border-blue-600 transition-all duration-200 shadow-sm overflow-hidden"
-                  style={{ background: "#1e1e2e" }}
+                  className="flex items-center justify-center w-9 h-9 rounded-full border-2 border-gray-300 hover:border-gray-400 transition-all duration-200 shadow-sm overflow-hidden"
+                  style={{ background: "#1f2937" }}
                 >
                   {profile?.avatar_url
                     ? <img src={profile.avatar_url} alt="Perfil" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    : <User className="w-4.5 h-4.5 text-slate-300" style={{ width: 18, height: 18 }} />}
+                    : <User className="w-4.5 h-4.5 text-gray-300" style={{ width: 18, height: 18 }} />}
                 </button>
               </div>
             ) : (
@@ -1413,7 +1418,7 @@ export default function Home() {
               >
                 <div
                   className="h-28 w-full relative overflow-hidden"
-                  style={{ background: (game as any).cardBg || "#E2E8F0" }}
+                  style={{ background: (game as any).cardBg || "#f3f4f6" }}
                 >
                   {(game as any).cardArt === "ludo" ? (
                     <LudoCardArt />
@@ -1434,7 +1439,7 @@ export default function Home() {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"/>
                     </>
                   ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-violet-700 via-purple-800 to-indigo-900 flex items-center justify-center">
+                    <div className="w-full h-full bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900 flex items-center justify-center">
                       <svg viewBox="0 0 40 44" width="38" className="drop-shadow-xl" fill="none">
                         <rect x="10" y="34" width="20" height="4" rx="2" fill="white" fillOpacity="0.85"/>
                         <rect x="14" y="28" width="12" height="7" rx="1.5" fill="white" fillOpacity="0.85"/>
@@ -1446,22 +1451,22 @@ export default function Home() {
                       </svg>
                     </div>
                   )}
-                  <div className="absolute top-2 right-2 bg-black/55 backdrop-blur-md rounded-full px-2 py-0.5 flex items-center gap-1 border border-white/10">
+                  <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md rounded-full px-2 py-0.5 flex items-center gap-1 border border-white/10">
                     <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400"/>
                     <span className="text-[10px] font-bold text-white">{game.rating}</span>
                   </div>
                   {(game as any).comingSoon && (
-                    <div className="absolute bottom-2 left-2 bg-black/65 backdrop-blur-md rounded-full px-2 py-0.5 border border-amber-400/30">
-                      <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wide">Em Breve</span>
+                    <div className="absolute bottom-2 left-2 bg-black/65 backdrop-blur-md rounded-full px-2 py-0.5 border border-gray-400/30">
+                      <span className="text-[9px] font-bold text-gray-200 uppercase tracking-wide">Em Breve</span>
                     </div>
                   )}
                 </div>
 
                 <div className="p-3 flex flex-col flex-1">
-                  <h3 className="font-syne font-bold text-slate-900 text-[13px] tracking-wide">{game.name}</h3>
-                  <p className="text-[10px] font-bold text-blue-700 mt-0.5 uppercase tracking-wider">{game.bet}</p>
+                  <h3 className="font-syne font-bold text-gray-900 text-[13px] tracking-wide">{game.name}</h3>
+                  <p className="text-[10px] font-bold text-gray-600 mt-0.5 uppercase tracking-wider">{game.bet}</p>
                   {game.id !== "bilhar" && (
-                    <p className="text-[10px] text-slate-400 mt-0.5 mb-3 flex items-center gap-1">
+                    <p className="text-[10px] text-gray-400 mt-0.5 mb-3 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse" />
                       {formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} jogando
                     </p>
@@ -1504,10 +1509,8 @@ export default function Home() {
                 }}
                 className="home-list-row flex items-center p-3 rounded-2xl transition-all duration-200 group cursor-pointer"
               >
-                {/* Rank */}
                 <span className="home-rank w-5 text-center font-syne font-black text-[15px] flex-shrink-0">{game.rank}</span>
 
-                {/* Thumbnail */}
                 <div
                   className="w-11 h-11 rounded-xl flex-shrink-0 relative overflow-hidden ml-1.5 home-thumb"
                   style={!game.image ? { background: `linear-gradient(135deg, ${game.from}, ${game.to})` } : {}}
@@ -1533,15 +1536,15 @@ export default function Home() {
 
                 <div className="ml-3 flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <h4 className="font-syne font-bold text-slate-900 text-[13.5px] truncate">{game.name}</h4>
+                    <h4 className="font-syne font-bold text-gray-900 text-[13.5px] truncate">{game.name}</h4>
                     {game.rank === 1 && (
-                      <span className="bg-amber-50 text-amber-600 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-amber-200 flex items-center flex-shrink-0">
-                        <Star className="w-2 h-2 mr-0.5 fill-amber-500 text-amber-500"/> #1
+                      <span className="bg-gray-50 text-gray-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-gray-200 flex items-center flex-shrink-0">
+                        <Star className="w-2 h-2 mr-0.5 fill-gray-400 text-gray-400"/> #1
                       </span>
                     )}
                   </div>
                   {game.id !== "bi" && (
-                    <p className="text-[10px] text-slate-400 mt-0.5">
+                    <p className="text-[10px] text-gray-400 mt-0.5">
                       {formatPlayerCount(getLivePlayerCount(game.baseIdx, tick))} apostadores ativos
                     </p>
                   )}
@@ -1556,12 +1559,7 @@ export default function Home() {
         </section>
 
         <div className="home-side-column">
-          {/* SAQUES 24 HORAS */}
-          <div className="home-side-ad px-4 pb-2">
-            <AdBanner />
-          </div>
           <SaquesSection />
-          {/* ATUALIZAÇÕES */}
           <AtualizacoesSection />
         </div>
         </div>
@@ -1583,26 +1581,25 @@ export default function Home() {
               width: 52,
               height: 52,
               borderRadius: 999,
-              background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
+              background: "#111827",
               border: "none",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              boxShadow: "0 6px 24px rgba(37,99,235,0.5), 0 2px 8px rgba(0,0,0,0.25)",
+              boxShadow: "0 6px 24px rgba(17,24,39,0.35), 0 2px 8px rgba(0,0,0,0.2)",
             }}
           >
-            {/* Pulse ring */}
             <motion.span
               animate={{ scale: [1, 1.7, 1], opacity: [0.6, 0, 0.6] }}
               transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
-              style={{ position: "absolute", inset: 0, borderRadius: 999, border: "2px solid #2563eb" }}
+              style={{ position: "absolute", inset: 0, borderRadius: 999, border: "2px solid #374151" }}
             />
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" fill="white" fillOpacity="0.95" />
-              <circle cx="8.5" cy="11" r="1.5" fill="#1d4ed8" />
-              <circle cx="12" cy="11" r="1.5" fill="#1d4ed8" />
-              <circle cx="15.5" cy="11" r="1.5" fill="#1d4ed8" />
+              <circle cx="8.5" cy="11" r="1.5" fill="#374151" />
+              <circle cx="12" cy="11" r="1.5" fill="#374151" />
+              <circle cx="15.5" cy="11" r="1.5" fill="#374151" />
             </svg>
           </motion.button>
 

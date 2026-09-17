@@ -24,7 +24,7 @@ const pageLoaders = {
   RedefinirSenha: () => import("@/pages/RedefinirSenha"),
   OTP: () => import("@/pages/OTP"),
   Perfil: () => import("@/pages/Perfil"),
-  Recarga: () => import("@/pages/Recarga"),
+  Recarga: () => import("@/pages/Recarga"), // kept for build compat — unused
   Levantar: () => import("@/pages/Levantar"),
   Depositar: () => import("@/pages/Depositar"),
   EditarPerfil: () => import("@/pages/EditarPerfil"),
@@ -237,9 +237,6 @@ function Router() {
       </Route>
       <Route path="/editar-perfil">
         <ProtectedRoute><EditarPerfil /></ProtectedRoute>
-      </Route>
-      <Route path="/recarga">
-        <ProtectedRoute><Recarga /></ProtectedRoute>
       </Route>
       <Route path="/levantar">
         <ProtectedRoute><Levantar /></ProtectedRoute>

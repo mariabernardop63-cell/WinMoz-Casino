@@ -7,7 +7,7 @@ import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { evaluateBotDifficulty } from "@/lib/botBrain";
 import { serverBet, serverWin, serverForfeit } from "@/lib/gameApi";
 import { API_BASE } from "@/lib/apiBase";
-import AdBanner from "@/components/AdBanner";
+
 // ─── Sound helpers ────────────────────────────────────────────────────────────
 function playDamasCapture() {
   try {
@@ -2105,11 +2105,6 @@ export default function DamasGame() {
             piecesLeft={myPieces} damesLeft={myDames}
             timeLeft={timers[myColor]} lives={lives[myColor]}
           />
-        </div>
-
-        {/* Ad banner */}
-        <div style={{ padding:"4px 10px 5px", flexShrink:0 }}>
-          <AdBanner compact />
         </div>
 
       </div>

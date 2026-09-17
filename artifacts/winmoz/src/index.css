@@ -818,7 +818,7 @@
 
 /* Fix for main app pages on old Android */
 #root {
-  background-color: #070813;
+  background-color: #fafafa;
   min-height: 100vh;
   min-height: -webkit-fill-available;
 }
@@ -923,10 +923,10 @@
   background: linear-gradient(135deg, rgba(212,160,23,.18), rgba(212,160,23,.06));
   border: 1px solid rgba(212,160,23,.35);
   color: #f2d38a;
-  font-family: 'Syne', sans-serif;
-  font-weight: 800;
-  font-size: 11px;
-  letter-spacing: .4px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.3px;
   white-space: nowrap;
 }
 
@@ -1267,10 +1267,9 @@
 }
 
 /* ── Home desktop composition ──────────────────────────────────────────────
-   The home page gets a deliberate desktop hierarchy instead of stretching the
-   mobile feed across the viewport. */
+   Professional corporate design system. */
 .home-shell {
-  background: #f4f5f7;
+  background: #fafafa;
 }
 
 /* ── Home premium primitives ── */
@@ -1278,44 +1277,51 @@
   width: 30px;
   height: 30px;
   border-radius: 10px;
-  background: linear-gradient(135deg, rgba(29,78,216,.12), rgba(29,78,216,.05));
-  border: 1px solid rgba(29,78,216,.15);
+  background: linear-gradient(135deg, rgba(15,23,42,.08), rgba(15,23,42,.03));
+  border: 1px solid rgba(15,23,42,.08);
 }
 
 .home-cta-primary {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  box-shadow: 0 4px 14px rgba(29,78,216,.32), inset 0 1px 0 rgba(255,255,255,.18);
+  background: #111827;
+  box-shadow: 0 4px 14px rgba(17,24,39,.25), inset 0 1px 0 rgba(255,255,255,.06);
+  transition: background .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+.home-cta-primary:hover {
+  background: #1f2937;
+  box-shadow: 0 6px 20px rgba(17,24,39,.35);
+  transform: translateY(-1px);
 }
 
 .home-link-btn {
-  color: #1d4ed8;
-  background: rgba(29,78,216,.06);
+  color: #374151;
+  background: rgba(15,23,42,.04);
   transition: background .18s ease, transform .18s ease;
 }
 .home-link-btn:hover {
-  background: rgba(29,78,216,.12);
+  background: rgba(15,23,42,.08);
   transform: translateX(1px);
 }
 
 .home-card {
   background: #ffffff;
-  border: 1px solid rgba(15,23,42,.06);
-  box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 4px 14px rgba(15,23,42,.04);
+  border: 1px solid rgba(15,23,42,.07);
+  box-shadow: 0 1px 3px rgba(15,23,42,.04), 0 4px 14px rgba(15,23,42,.03);
   transition: box-shadow .22s ease, transform .22s ease, border-color .22s ease;
 }
 .home-card:hover {
-  box-shadow: 0 2px 6px rgba(15,23,42,.06), 0 10px 28px rgba(15,23,42,.07);
-  border-color: rgba(15,23,42,.1);
+  box-shadow: 0 2px 6px rgba(15,23,42,.06), 0 10px 28px rgba(15,23,42,.06);
+  border-color: rgba(15,23,42,.12);
   transform: translateY(-1px);
 }
 
 .home-game-card {
   border: 1px solid rgba(15,23,42,.06);
-  box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 6px 18px rgba(15,23,42,.05);
+  box-shadow: 0 1px 3px rgba(15,23,42,.04), 0 6px 18px rgba(15,23,42,.04);
+  transition: box-shadow .25s ease, transform .25s ease, border-color .25s ease;
 }
 .home-game-card:hover {
-  border-color: rgba(29,78,216,.3);
-  box-shadow: 0 4px 10px rgba(15,23,42,.07), 0 16px 36px rgba(29,78,216,.12);
+  border-color: rgba(15,23,42,.15);
+  box-shadow: 0 4px 10px rgba(15,23,42,.06), 0 16px 36px rgba(15,23,42,.08);
   transform: translateY(-3px);
 }
 
@@ -1323,27 +1329,28 @@
   background: #ffffff;
   border: 1px solid rgba(15,23,42,.06);
   box-shadow: 0 1px 2px rgba(15,23,42,.03);
+  transition: box-shadow .22s ease, border-color .22s ease, transform .22s ease;
 }
 .home-list-row:hover {
-  border-color: rgba(29,78,216,.28);
-  box-shadow: 0 3px 8px rgba(15,23,42,.06), 0 10px 24px rgba(29,78,216,.1);
+  border-color: rgba(15,23,42,.14);
+  box-shadow: 0 3px 8px rgba(15,23,42,.05), 0 10px 24px rgba(15,23,42,.06);
   transform: translateY(-1px);
 }
 
 .home-rank {
-  color: #cbd5e1;
+  color: #d1d5db;
   font-style: italic;
 }
 .home-list-row:first-child .home-rank,
 .home-popular-list > *:nth-child(1) .home-rank {
-  background: linear-gradient(135deg, #f59e0b, #d97706);
+  background: linear-gradient(135deg, #111827, #374151);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .home-thumb {
-  box-shadow: 0 2px 8px rgba(15,23,42,.18);
+  box-shadow: 0 2px 8px rgba(15,23,42,.15);
 }
 
 .home-secondary-grid {
@@ -1359,7 +1366,7 @@
     max-width: min(1240px, calc(100vw - 48px)) !important;
     margin-block: 20px;
     border-radius: 28px;
-    box-shadow: 0 0 0 1px rgba(15, 23, 42, .05), 0 24px 60px rgba(15, 23, 42, .09);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, .04), 0 24px 60px rgba(15, 23, 42, .06);
     overflow: hidden;
   }
 
@@ -1368,19 +1375,19 @@
   }
 
   .home-hero-section {
-    padding: 26px 32px 18px !important;
+    padding: 24px 32px 16px !important;
   }
 
   .home-hero {
-    min-height: 290px !important;
-    border-radius: 28px !important;
-    box-shadow: 0 20px 50px rgba(15, 23, 42, .22), 0 2px 8px rgba(15, 23, 42, .12) !important;
+    min-height: 260px !important;
+    border-radius: 24px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 20px 50px rgba(15, 23, 42, .10) !important;
   }
 
   .home-hero-content {
-    min-height: 290px !important;
+    min-height: 260px !important;
     max-height: none !important;
-    padding: 36px 48px !important;
+    padding: 36px 44px !important;
   }
 
   .home-hero-copy {
@@ -1388,25 +1395,25 @@
   }
 
   .home-hero h1 {
-    font-size: clamp(1.9rem, 3.2vw, 3rem) !important;
-    line-height: 1.04 !important;
-    margin-bottom: 12px !important;
+    font-size: clamp(1.8rem, 3vw, 2.6rem) !important;
+    line-height: 1.06 !important;
+    margin-bottom: 10px !important;
   }
 
   .home-hero-copy p {
-    max-width: 320px !important;
-    font-size: 14px !important;
-    margin-bottom: 18px !important;
+    max-width: 300px !important;
+    font-size: 13.5px !important;
+    margin-bottom: 16px !important;
   }
 
   .home-hero-copy button {
-    font-size: 14px !important;
-    padding: 10px 20px !important;
+    font-size: 13px !important;
+    padding: 10px 22px !important;
   }
 
   .home-hero-art {
-    width: 240px !important;
-    transform: scale(1.3);
+    width: 220px !important;
+    transform: scale(1.25);
   }
 
   .home-featured-grid {

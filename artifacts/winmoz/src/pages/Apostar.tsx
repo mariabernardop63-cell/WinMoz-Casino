@@ -10,7 +10,7 @@ import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getLivePlayerCount, getSalaOnlineCount } from "@/lib/simulation";
 import { API_BASE } from "@/lib/apiBase";
-import AdBanner from "@/components/AdBanner";
+
 
 /* ── Theme ── */
 const VIOLET = "#7c3aed";
@@ -1109,7 +1109,6 @@ function MatchmakingScreen({
         {/* Info */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.38 }}
           style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "0 8px" }}>
-          <AdBanner />
           <p style={{ fontSize: 12, color: "#9CA3AF", textAlign: "center", lineHeight: 1.65 }}>
             Se nenhum adversário for encontrado em {mins}:{secs}, o teu valor será devolvido automaticamente.
           </p>
@@ -1287,7 +1286,7 @@ export default function Apostar() {
     return () => clearInterval(heartbeat);
   }, [screen, salaRoomId, user?.id]);
 
-  /* ── Recover abandoned sala on page load ── */
+  /* ── Cancel stale sala on page load ── */
   useEffect(() => {
     if (!user?.id || !gameId) return;
     let alive = true;
@@ -1295,38 +1294,27 @@ export default function Apostar() {
       try {
         const { data: rooms } = await supabase
           .from("game_rooms")
-          .select("id, code, bet_amount, status")
-          .eq("creator_id", user.id)
+          .select("id, code, bet_amount, status, creator_id")
           .eq("game_type", gameId)
           .eq("status", "waiting")
+          .or(`creator_id.eq.${user.id}`)
           .order("created_at", { ascending: false })
-          .limit(1);
+          .limit(5);
         if (!alive || !rooms || rooms.length === 0) return;
-        const room = rooms[0];
-        const bet = Number(room.bet_amount);
-        setSalaCode(room.code);
-        setSalaRoomId(room.id);
-        setSelectedBet(bet);
-        const ch = supabase.channel(`sala:${room.code}`);
-        ch.on("broadcast", { event: "joiner_ready" }, ({ payload }) => {
-          supabase.removeChannel(ch); salaChannelRef.current = null;
-          const gId   = payload.gameId as string;
-          const jName = payload.joinerName as string;
-          const myEnc  = encodeURIComponent(profile?.full_name ?? "Jogador");
-          const oppEnc = encodeURIComponent(jName);
-          try { sessionStorage.setItem(`wm_bet_deducted_ludo_${gId}`,  "1"); } catch {}
-          try { sessionStorage.setItem(`wm_bet_deducted_damas_${gId}`, "1"); } catch {}
-          try { sessionStorage.setItem(`wm_bet_deducted_chess_${gId}`, "1"); } catch {}
-          setScreen("matched");
-          let dest = "/";
-          if (gameId === "ludo")   dest = `/ludo-jogo?gameId=${gId}&color=blue&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
-          else if (gameId === "xadrez") dest = `/xadrez-jogo?gameId=${gId}&color=white&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
-          else if (gameId === "damas")  dest = `/damas-jogo?gameId=${gId}&color=w&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
-          setTimeout(() => setLocation(dest), 2200);
-        });
-        ch.subscribe();
-        salaChannelRef.current = ch;
-        setScreen("sala-aguardar");
+        const session = await getSessionWithRefresh();
+        const token = session?.access_token;
+        for (const room of rooms) {
+          if (room.creator_id === user.id && token) {
+            try {
+              await fetch(`${API_BASE}/rooms/cancel`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ roomId: room.id }),
+              });
+              await supabase.from("game_rooms").update({ status: "cancelled" }).eq("id", room.id).eq("status", "waiting");
+            } catch { /* ignore */ }
+          }
+        }
       } catch { /* ignore */ }
     })();
     return () => { alive = false; };
@@ -1650,7 +1638,7 @@ export default function Apostar() {
         amount={selectedBet ?? 0}
         balance={parseFloat(String(profile?.balance ?? "0")) || 0}
         onRetry={() => setScreen("bet")}
-        onRecharge={() => setLocation("/recarga")}
+        onRecharge={() => setLocation("/depositar")}
       />
     );
   }
@@ -1940,7 +1928,7 @@ export default function Apostar() {
             />
             <motion.button
               whileTap={{ scale: 0.98 }}
-              onClick={() => setLocation("/recarga")}
+              onClick={() => setLocation("/depositar")}
               className="w-full h-12 font-semibold text-sm flex items-center justify-center gap-2.5 transition-all"
               style={{
                 background: "linear-gradient(135deg, #16a34a, #15803d)",
@@ -1951,13 +1939,8 @@ export default function Apostar() {
                 boxShadow: "0 4px 14px rgba(22,163,74,.3)",
               }}>
               <Zap style={{ width: 16, height: 16 }} />
-              Recarregar Saldo
+              Depositar Saldo
             </motion.button>
-
-            {/* Ad banner below payment toggle */}
-            <div style={{ marginTop: 12 }}>
-              <AdBanner />
-            </div>
           </motion.div>
 
           {/* Start Button */}

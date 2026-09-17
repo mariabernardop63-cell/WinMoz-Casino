@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { API_BASE } from "@/lib/apiBase";
 import { serverBet, serverWin, serverForfeit } from "@/lib/gameApi";
-import AdBanner from "@/components/AdBanner";
+
 // ─── Sound helpers ─────────────────────────────────────────────────────────────
 function playChessCapture() {
   try {
@@ -1735,11 +1735,6 @@ export default function ChessGame(){
             color={myColor} timer={myTimer}
             captured={captured[myColor]} isCheck={myCheck}
           />
-        </div>
-
-        {/* Ad banner */}
-        <div style={{padding:"0 10px 3px",flexShrink:0}}>
-          <AdBanner compact />
         </div>
 
         {/* Turn indicator */}

@@ -4,7 +4,7 @@ import {
   User, Eye, EyeOff,
   ArrowDownToLine, Plus, RefreshCw, MoreHorizontal,
   ArrowUpRight, ArrowDownLeft,
-  X, UserCog, UserPlus, FileText, Flag, Lock, HelpCircle, Settings, LogOut, ChevronRight, Shield, ScanLine,
+  X, UserCog, UserPlus, FileText, Flag, Lock, HelpCircle, Settings, LogOut, ChevronRight, Shield,
   Gamepad2, CreditCard, Star,
 } from "lucide-react";
 
@@ -203,7 +203,7 @@ export default function Perfil() {
   const handleAction = (label: string) => {
     if (label === "Levantar")  setLocation("/levantar");
     if (label === "Depositar") setLocation("/depositar");
-    if (label === "Recaregar") setLocation("/recarga");
+    if (label === "Convidar")  setLocation("/convidar-amigos");
     if (label === "Mais")      setFerramentasOpen(true);
   };
 
@@ -219,7 +219,7 @@ export default function Perfil() {
   const ACTIONS = [
     { icon: ArrowDownToLine, label: "Levantar"  },
     { icon: Plus,            label: "Depositar" },
-    { icon: RefreshCw,       label: "Recaregar" },
+    { icon: UserPlus,        label: "Convidar"  },
     { icon: MoreHorizontal,  label: "Mais"      },
   ];
 
@@ -230,10 +230,6 @@ export default function Perfil() {
         {/* ── DARK TOP SECTION ── */}
         <div className="px-5 pt-6 pb-0 relative">
           <div className="absolute top-6 right-5 flex items-center gap-2">
-            <button onClick={() => setLocation("/scanner-qr")} className="flex items-center justify-center rounded-full transition-all"
-              style={{ width: 34, height: 34, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-              <ScanLine style={{ width: 16, height: 16, color: "#a1a1aa" }} />
-            </button>
             <button onClick={() => setBalanceVisible(v => !v)}
               className="flex items-center justify-center rounded-full transition-all"
               style={{ width: 34, height: 34, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>

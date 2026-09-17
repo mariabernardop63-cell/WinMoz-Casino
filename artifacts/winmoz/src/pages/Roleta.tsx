@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Star, Zap, AlertCircle, Lock, X } from "lucide-react";
+import { ChevronLeft, Star, Zap, AlertCircle, Lock, X, Check } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSessionWithRefresh } from "@/lib/supabase";
 import { useLocation } from "wouter";
@@ -18,8 +18,7 @@ const SECTORS = [
 ];
 const N = SECTORS.length;
 const SLICE = 360 / N;
-
-const PAID_SPIN_COST = 5;
+const FREE_SPINS_PER_WEEK = 3;
 
 // ─── Audio (Web Audio API — no delay) ─────────────────────────────────────
 let sharedAudioCtx: AudioContext | null = null;
@@ -104,16 +103,13 @@ function WheelSVG() {
           <stop offset="100%" stopColor="#a1a1aa" />
         </radialGradient>
       </defs>
-      {/* Outer ring */}
       <circle cx={CX} cy={CY} r={R + 6} fill="none" stroke="#e4e4e7" strokeWidth={3} opacity={0.6} />
       <circle cx={CX} cy={CY} r={R + 10} fill="none" stroke="#d4d4d8" strokeWidth={1.5} opacity={0.3} />
-      {/* Sectors */}
       {SECTORS.map((s, i) => (
         <g key={i}>
           <path d={sectorPath(i)} fill={s.color} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
         </g>
       ))}
-      {/* Dividers */}
       {SECTORS.map((_, i) => {
         const a = (i * SLICE - 90) * (Math.PI / 180);
         return <line key={i}
@@ -121,7 +117,6 @@ function WheelSVG() {
           x2={CX + R * Math.cos(a)} y2={CY + R * Math.sin(a)}
           stroke="rgba(255,255,255,0.12)" strokeWidth={1.5} />;
       })}
-      {/* Labels */}
       {SECTORS.map((s, i) => {
         const { x, y, angle } = textPos(i);
         const isJackpot = s.type === "jackpot";
@@ -142,13 +137,11 @@ function WheelSVG() {
           </g>
         );
       })}
-      {/* Outer dots */}
       {Array.from({ length: N * 2 }).map((_, i) => {
         const a = (i * (360 / (N * 2))) * (Math.PI / 180);
         return <circle key={i} cx={CX + (R + 3) * Math.cos(a)} cy={CY + (R + 3) * Math.sin(a)}
           r={2} fill="#a1a1aa" opacity={0.6} />;
       })}
-      {/* Hub */}
       <circle cx={CX} cy={CY} r={INNER - 4} fill="url(#hubGrad)" />
       <circle cx={CX} cy={CY} r={INNER - 4} fill="none" stroke="#d4d4d8" strokeWidth={2} />
       <circle cx={CX} cy={CY} r={INNER - 14} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={1} />
@@ -172,8 +165,8 @@ function Pointer() {
 }
 
 // ─── Prize Modal ───────────────────────────────────────────────────────────
-function PrizeModal({ sector, isFreeSpin, onClose }: {
-  sector: typeof SECTORS[0]; isFreeSpin: boolean; onClose: () => void
+function PrizeModal({ sector, spinsLeft, onClose }: {
+  sector: typeof SECTORS[0]; spinsLeft: number; onClose: () => void
 }) {
   const isJackpot = sector.type === "jackpot";
   const isLuck = sector.type === "luck";
@@ -182,81 +175,103 @@ function PrizeModal({ sector, isFreeSpin, onClose }: {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex",
         alignItems: "center", justifyContent: "center",
-        background: "rgba(0,0,0,0.6)", backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)", padding: 24 }}
+        background: "rgba(0,0,0,0.7)", backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)", padding: 24 }}
       onClick={onClose}>
       <motion.div
-        initial={{ scale: 0.88, opacity: 0, y: 20 }}
+        initial={{ scale: 0.85, opacity: 0, y: 24 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
-        exit={{ scale: 0.92, opacity: 0, y: 10 }}
-        transition={{ type: "spring", stiffness: 340, damping: 26 }}
+        exit={{ scale: 0.9, opacity: 0, y: 12 }}
+        transition={{ type: "spring", stiffness: 360, damping: 28 }}
         onClick={e => e.stopPropagation()}
-        style={{ width: "100%", maxWidth: 360, borderRadius: 24,
+        style={{ width: "100%", maxWidth: 340, borderRadius: 28,
           overflow: "hidden", background: "#fff",
-          boxShadow: "0 32px 80px rgba(0,0,0,0.3), 0 12px 32px rgba(0,0,0,0.15)" }}>
-        {/* Top */}
-        <div style={{ padding: "32px 28px 24px", textAlign: "center",
-          background: isWin ? "#09090b" : "#f4f4f5", position: "relative" }}>
+          boxShadow: "0 40px 100px rgba(0,0,0,0.4), 0 16px 40px rgba(0,0,0,0.2)" }}>
+
+        {/* Top section */}
+        <div style={{ padding: "36px 28px 28px", textAlign: "center",
+          background: isWin ? "#09090b" : "#f8f8f8", position: "relative" }}>
           <button onClick={onClose} style={{
-            position: "absolute", top: 14, right: 14, width: 28, height: 28,
+            position: "absolute", top: 16, right: 16, width: 32, height: 32,
             borderRadius: 999, background: isWin ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.05)",
             border: "none", display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer" }}>
-            <X style={{ width: 14, height: 14, color: isWin ? "rgba(255,255,255,0.5)" : "#71717a" }} />
+            <X style={{ width: 16, height: 16, color: isWin ? "rgba(255,255,255,0.5)" : "#a1a1aa" }} />
           </button>
 
-          <motion.div
-            animate={isJackpot ? { scale: [1, 1.1, 1] } : {}}
-            transition={{ duration: 0.6, repeat: Infinity }}
-            style={{ width: 56, height: 56, borderRadius: 18, margin: "0 auto 16px",
-              background: isWin ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.04)",
-              border: `1.5px solid ${isWin ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.06)"}`,
-              display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {isWin ? (
-              <Star style={{ width: 28, height: 28, color: isJackpot ? "#fbbf24" : "#fafafa" }} fill={isJackpot ? "#fbbf24" : "none"} />
-            ) : (
-              <svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9.5" stroke="#a1a1aa" strokeWidth="1.5"/>
-                <path d="M12 7v5.5l3.5 2" stroke="#71717a" strokeWidth="1.8" strokeLinecap="round"/>
-              </svg>
-            )}
-          </motion.div>
-
-          <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: 3,
-            textTransform: "uppercase", color: isWin ? "rgba(255,255,255,0.4)" : "#a1a1aa",
-            marginBottom: 6 }}>
-            {isJackpot ? "JACKPOT" : isLuck ? "SEM PRÉMIO" : "GANHO"}
-          </p>
-          <p style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, lineHeight: 1.1,
-            fontSize: isJackpot ? 36 : isLuck ? 22 : 30,
-            color: isWin ? "#fff" : "#18181b", letterSpacing: -0.5 }}>
-            {isLuck ? "Boa Sorte!" : `${sector.label} MT`}
-          </p>
-          {isFreeSpin && isLuck && (
-            <p style={{ fontSize: 11, color: isWin ? "rgba(255,255,255,0.4)" : "#a1a1aa", marginTop: 8 }}>
-              Giro grátis usado — aposta para ganhar!
-            </p>
+          {isWin && (
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20, delay: 0.15 }}
+              style={{ width: 72, height: 72, borderRadius: 22, margin: "0 auto 18px",
+                background: isJackpot
+                  ? "linear-gradient(135deg, #fbbf24, #f59e0b)"
+                  : "linear-gradient(135deg, #22c55e, #16a34a)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: isJackpot
+                  ? "0 8px 32px rgba(251,191,36,0.4)"
+                  : "0 8px 32px rgba(34,197,94,0.35)" }}>
+              {isJackpot ? (
+                <Star style={{ width: 36, height: 36, color: "#fff" }} fill="#fff" />
+              ) : (
+                <Check style={{ width: 36, height: 36, color: "#fff" }} strokeWidth={3} />
+              )}
+            </motion.div>
           )}
+
+          {!isWin && (
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20, delay: 0.1 }}
+              style={{ width: 72, height: 72, borderRadius: 22, margin: "0 auto 18px",
+                background: "#e4e4e7",
+                display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontSize: 32 }}>🍀</span>
+            </motion.div>
+          )}
+
+          <motion.p
+            initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+            style={{ fontSize: 11, fontWeight: 800, letterSpacing: 3,
+              textTransform: "uppercase", color: isWin ? "rgba(255,255,255,0.35)" : "#a1a1aa",
+              marginBottom: 8 }}>
+            {isJackpot ? "JACKPOT" : isLuck ? "SEM PRÉMIO" : "PRÉMIO GANHO"}
+          </motion.p>
+
+          <motion.p
+            initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.25, type: "spring", stiffness: 300, damping: 20 }}
+            style={{ fontFamily: "'Syne',sans-serif", fontWeight: 900, lineHeight: 1.1,
+              fontSize: isJackpot ? 40 : isLuck ? 24 : 34,
+              color: isWin ? "#fff" : "#18181b", letterSpacing: -0.5 }}>
+            {isLuck ? "Boa Sorte!" : `${sector.label} MT`}
+          </motion.p>
         </div>
 
-        {/* Bottom */}
-        <div style={{ padding: "18px 24px 24px", borderTop: "1px solid #f4f4f5" }}>
-          <p style={{ fontSize: 13, color: "#71717a", lineHeight: 1.6, marginBottom: 18, textAlign: "center" }}>
+        {/* Bottom section */}
+        <div style={{ padding: "20px 28px 28px", textAlign: "center" }}>
+          <p style={{ fontSize: 13.5, color: "#71717a", lineHeight: 1.65, marginBottom: 20 }}>
             {isLuck
-              ? isFreeSpin
-                ? "O teu giro grátis acabou. Paga 5 MT para continuar a jogar!"
-                : "Desta vez não saiu. Tenta de novo!"
+              ? "Desta vez não saiu premio. Tenta de novo!"
               : isJackpot
               ? "Parabéns! Prémio máximo creditado na tua conta."
               : `+${sector.label} MT adicionados ao teu saldo.`}
           </p>
+
+          {spinsLeft > 0 && (
+            <p style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 16, fontWeight: 600 }}>
+              {spinsLeft} giro{spinsLeft > 1 ? "s" : ""} gratuito{spinsLeft > 1 ? "s" : ""} restante{spinsLeft > 1 ? "s" : ""} esta semana
+            </p>
+          )}
+
           <button onClick={onClose} style={{
-            width: "100%", height: 48, borderRadius: 14, border: "none", cursor: "pointer",
-            background: isWin ? "#09090b" : "#f4f4f5",
-            color: isWin ? "#fff" : "#18181b",
-            fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 14,
-            letterSpacing: "0.3px",
-            boxShadow: isWin ? "0 4px 16px rgba(0,0,0,0.2)" : "none",
+            width: "100%", height: 52, borderRadius: 16, border: "none", cursor: "pointer",
+            background: isWin ? "#09090b" : "#18181b",
+            color: "#fff",
+            fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 15,
+            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
             transition: "transform 0.15s",
           }}
           onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = "scale(0.97)"; }}
@@ -289,16 +304,14 @@ export default function Roleta() {
   const [loading, setLoading] = useState(false);
   const [animating, setAnimating] = useState(false);
   const [result, setResult] = useState<typeof SECTORS[0] | null>(null);
-  const [wasFreeSpin, setWasFreeSpin] = useState(false);
   const [showResult, setShowResult] = useState(false);
-  const [freeSpinAvailable, setFreeSpinAvailable] = useState(false);
+  const [spinsLeft, setSpinsLeft] = useState(0);
   const [statusChecked, setStatusChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localBalance, setLocalBalance] = useState<number | null>(null);
 
   const tickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rotationRef = useRef(0);
-  const pendingBalanceRef = useRef<number | null>(null);
   const suppressBalanceSyncRef = useRef(false);
 
   const profileBalance = parseFloat(String(profile?.balance ?? "0"));
@@ -322,10 +335,10 @@ export default function Roleta() {
       });
       if (res.ok) {
         const data = await res.json();
-        setFreeSpinAvailable(Boolean(data.freeSpinAvailable));
+        setSpinsLeft(data.spinsLeft ?? 0);
       }
     } catch {
-      setFreeSpinAvailable(false);
+      setSpinsLeft(0);
     } finally {
       setStatusChecked(true);
     }
@@ -335,7 +348,7 @@ export default function Roleta() {
     if (tickTimerRef.current) { clearTimeout(tickTimerRef.current); tickTimerRef.current = null; }
   }
 
-  const animateToSector = useCallback((targetIdx: number, isWin: boolean, onComplete: () => void) => {
+  const animateToSector = useCallback((targetIdx: number, isWin: boolean, prize: number, onComplete: () => void) => {
     const ctx = getAudioCtx();
 
     const currentAngleMod = ((rotationRef.current % 360) + 360) % 360;
@@ -349,7 +362,12 @@ export default function Roleta() {
     setRotation(totalRotation);
     rotationRef.current = totalRotation;
 
-    // Ticking audio — starts immediately, no delay
+    /* Update balance immediately when spinning starts (if prize > 0) */
+    if (prize > 0) {
+      suppressBalanceSyncRef.current = true;
+      setLocalBalance(prev => (prev ?? 0) + prize);
+    }
+
     if (ctx) {
       const totalTicks = Math.floor(duration / 60);
       let tickCount = 0;
@@ -375,11 +393,11 @@ export default function Roleta() {
 
   useEffect(() => () => stopTicking(), []);
 
-  const startSpin = async (isFree: boolean) => {
+  const startSpin = async () => {
     if (loading || animating) return;
     if (!profile?.id) { setError("Precisas de estar autenticado para jogar."); return; }
+    if (spinsLeft <= 0) { setError("Sem giros gratuitos esta semana."); return; }
 
-    // Resume audio context on user gesture (fixes iOS/Safari delay)
     const ctx = getAudioCtx();
     if (ctx?.state === "suspended") ctx.resume();
 
@@ -395,10 +413,10 @@ export default function Roleta() {
       const res = await fetch("/api/roleta/spin", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ isFree }),
+        body: JSON.stringify({ isFree: true }),
       });
 
-      let data: { sectorIndex?: number; prize?: number; newBalance?: number; error?: string };
+      let data: { sectorIndex?: number; prize?: number; newBalance?: number; spinsLeft?: number; error?: string };
       try { data = await res.json(); } catch {
         setError("Resposta inválida do servidor."); setLoading(false); return;
       }
@@ -406,18 +424,20 @@ export default function Roleta() {
       if (!res.ok) { setError(data.error ?? "Erro ao processar."); setLoading(false); return; }
 
       const sectorIndex = data.sectorIndex ?? 8;
+      const prize = data.prize ?? 0;
       const newBalance = data.newBalance ?? 0;
-      const isWin = (data.prize ?? 0) > 0;
+      const isWin = prize > 0;
+      const remainingSpins = data.spinsLeft ?? Math.max(0, spinsLeft - 1);
 
-      pendingBalanceRef.current = newBalance;
-      suppressBalanceSyncRef.current = true;
-      if (isFree) setFreeSpinAvailable(false);
       setLoading(false);
+      setSpinsLeft(remainingSpins);
       setAnimating(true);
 
-      animateToSector(sectorIndex, isWin, () => {
+      animateToSector(sectorIndex, isWin, prize, () => {
         setAnimating(false);
-        setWasFreeSpin(isFree);
+        /* Sync with server balance */
+        suppressBalanceSyncRef.current = false;
+        setLocalBalance(newBalance);
         setResult(SECTORS[sectorIndex]);
         setShowResult(true);
       });
@@ -471,23 +491,26 @@ export default function Roleta() {
             color: "#18181b", letterSpacing: 4 }}>
             ROLETA
           </p>
-          <div style={{ padding: "6px 14px", background: "#09090b", borderRadius: 20 }}>
+          <div style={{ padding: "7px 14px", background: "#09090b", borderRadius: 20,
+            display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color: "#fff",
               fontFamily: "'Syne',sans-serif" }}>
-              {balance.toLocaleString("pt-MZ")} MT
+              {Number(balance).toLocaleString("pt-MZ", { minimumFractionDigits: 2 })} MT
             </span>
           </div>
         </div>
 
-        {/* Status badge */}
+        {/* Spins left badge */}
         <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
           {statusChecked && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 16px",
-              background: freeSpinAvailable ? "#f4f4f5" : "#fff",
-              border: "1px solid #e4e4e7", borderRadius: 99 }}>
-              <Zap style={{ width: 13, height: 13, color: freeSpinAvailable ? "#18181b" : "#a1a1aa" }} />
-              <span style={{ fontSize: 11, fontWeight: 700, color: "#18181b" }}>
-                {freeSpinAvailable ? "1 giro grátis disponível hoje!" : `Apostar · 5 MT por giro`}
+              background: spinsLeft > 0 ? "#f0fdf4" : "#f4f4f5",
+              border: `1px solid ${spinsLeft > 0 ? "#bbf7d0" : "#e4e4e7"}`, borderRadius: 99 }}>
+              <Zap style={{ width: 13, height: 13, color: spinsLeft > 0 ? "#16a34a" : "#a1a1aa" }} />
+              <span style={{ fontSize: 11, fontWeight: 700, color: spinsLeft > 0 ? "#15803d" : "#71717a" }}>
+                {spinsLeft > 0
+                  ? `${spinsLeft} giro${spinsLeft > 1 ? "s" : ""} gratuit${spinsLeft > 1 ? "os" : "o"} restante${spinsLeft > 1 ? "s" : ""}`
+                  : "Giros esgotados esta semana"}
               </span>
             </div>
           )}
@@ -536,71 +559,27 @@ export default function Roleta() {
           </div>
         </div>
 
-        {/* Legend */}
-        <div style={{ padding: "12px 20px", flexShrink: 0 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
-            {SECTORS.filter((_, i) => i < 6).map((s, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 6,
-                background: "#fff", borderRadius: 8, padding: "6px 10px",
-                border: "1px solid #f4f4f5" }}>
-                <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#18181b", flexShrink: 0 }} />
-                <span style={{ fontSize: 10, color: "#71717a", fontWeight: 600 }}>
-                  {s.label} {s.sub}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Buttons */}
-        <div style={{ padding: "8px 20px 40px", flexShrink: 0, display: "flex", flexDirection: "column", gap: 10 }}>
-
-          {statusChecked && freeSpinAvailable && (
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => startSpin(true)}
-              disabled={isBusy}
-              style={{
-                width: "100%", height: 54, borderRadius: 16, border: "none",
-                background: isBusy ? "#f4f4f5" : "#09090b",
-                color: isBusy ? "#a1a1aa" : "#fff",
-                fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 14,
-                cursor: isBusy ? "not-allowed" : "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                boxShadow: isBusy ? "none" : "0 4px 16px rgba(0,0,0,0.15)",
-                transition: "all 0.2s",
-              }}>
-              {loading ? <><SpinnerIcon /> A processar…</> : animating ? <><SpinnerIcon /> A girar…</> : (
-                <><Zap style={{ width: 16, height: 16 }} /> Giro Grátis (1 por dia)</>
-              )}
-            </motion.button>
-          )}
-
+        {/* Spin Button */}
+        <div style={{ padding: "12px 20px 40px", flexShrink: 0 }}>
           <motion.button
             whileTap={{ scale: 0.97 }}
-            onClick={() => startSpin(false)}
-            disabled={isBusy || balance < PAID_SPIN_COST}
+            onClick={startSpin}
+            disabled={isBusy || spinsLeft <= 0}
             style={{
-              width: "100%", height: 58, borderRadius: 16, border: "none",
-              background: (isBusy || balance < PAID_SPIN_COST) ? "#f4f4f5" : "#18181b",
-              color: (isBusy || balance < PAID_SPIN_COST) ? "#a1a1aa" : "#fff",
-              fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 15,
-              cursor: (isBusy || balance < PAID_SPIN_COST) ? "not-allowed" : "pointer",
+              width: "100%", height: 60, borderRadius: 18, border: "none",
+              background: (isBusy || spinsLeft <= 0) ? "#e4e4e7" : "#09090b",
+              color: (isBusy || spinsLeft <= 0) ? "#a1a1aa" : "#fff",
+              fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 16,
+              cursor: (isBusy || spinsLeft <= 0) ? "not-allowed" : "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              boxShadow: (isBusy || balance < PAID_SPIN_COST) ? "none" : "0 6px 20px rgba(0,0,0,0.12)",
+              boxShadow: (isBusy || spinsLeft <= 0) ? "none" : "0 8px 28px rgba(0,0,0,0.18)",
               transition: "all 0.2s",
             }}>
             {loading ? <><SpinnerIcon /> A processar…</>
               : animating ? <><SpinnerIcon /> A girar…</>
-              : balance < PAID_SPIN_COST ? "Saldo insuficiente (mínimo 5 MT)"
-              : <><Star style={{ width: 18, height: 18 }} /> Girar por {PAID_SPIN_COST} MT</>}
+              : spinsLeft <= 0 ? "Sem giros esta semana"
+              : <><Zap style={{ width: 18, height: 18 }} /> Girar Grátis ({spinsLeft} restante{spinsLeft > 1 ? "s" : ""})</>}
           </motion.button>
-
-          {statusChecked && !freeSpinAvailable && (
-            <p style={{ textAlign: "center", fontSize: 10, color: "#a1a1aa", marginTop: 2, lineHeight: 1.5 }}>
-              Giro grátis diário já utilizado. Volta amanhã!
-            </p>
-          )}
         </div>
       </div>
 
@@ -609,13 +588,8 @@ export default function Roleta() {
         {showResult && result && (
           <PrizeModal
             sector={result}
-            isFreeSpin={wasFreeSpin}
+            spinsLeft={spinsLeft}
             onClose={() => {
-              suppressBalanceSyncRef.current = false;
-              if (pendingBalanceRef.current !== null) {
-                setLocalBalance(pendingBalanceRef.current);
-                pendingBalanceRef.current = null;
-              }
               setShowResult(false);
               void refreshProfile();
             }}
