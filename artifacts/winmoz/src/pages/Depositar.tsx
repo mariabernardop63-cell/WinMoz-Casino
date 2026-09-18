@@ -92,9 +92,9 @@ export default function Depositar() {
     setSubmitError("");
     try {
       const session = await getSessionWithRefresh();
-      if (!session) { setSubmitting(false); return; }
+      if (!session) { setSubmitting(false); setSubmitError("Sessão expirada. Faz login novamente."); return; }
 
-      const res = await fetch("/api/deposit/request", {
+      const res = await fetch("/api/deposit-request", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -103,8 +103,11 @@ export default function Depositar() {
         body: JSON.stringify({ amount: amountVal, confirmationMsg: confirmationMsg.trim() }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Erro ao enviar pedido");
+      const text = await res.text();
+      let data: any;
+      try { data = JSON.parse(text); } catch { setSubmitError("Erro do servidor: " + text.slice(0, 200)); setSubmitting(false); return; }
+
+      if (!res.ok) { setSubmitError(data?.error || "Erro ao enviar pedido"); setSubmitting(false); return; }
       setShowSuccessModal(true);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Erro ao enviar pedido");
