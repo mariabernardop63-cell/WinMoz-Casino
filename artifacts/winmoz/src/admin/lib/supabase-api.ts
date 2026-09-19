@@ -158,6 +158,7 @@ export function useGetDashboardStats() {
         todayBetsData,
         todayWinsData,
         pendingReportsData,
+        pendingDepositsData,
       ] = await Promise.all([
         safeCount(adminSupabase.from("profiles").select("*", { count: "exact", head: true }) as any),
         safeData(adminSupabase.from("profiles").select("last_seen_at")
@@ -179,6 +180,8 @@ export function useGetDashboardStats() {
           .eq("type", "win").eq("status", "approved")
           .gte("created_at", todayISO) as any),
         safeData(adminSupabase.from("reports").select("id").eq("status", "open") as any),
+        safeData(adminSupabase.from("transactions").select("id, amount")
+          .in("type", ["manual_deposit", "manual_bet"]).eq("status", "pending") as any),
       ]);
 
       const pendingWithdrawals = (pendingWithdrawalsData as unknown[]).length;
@@ -205,6 +208,10 @@ export function useGetDashboardStats() {
       // Active bets: pending bet transactions (game in progress)
       const activeBets = (txToday as unknown[]).length;
 
+      const pendingDeposits = (pendingDepositsData as unknown[]).length;
+      const pendingDepositsAmount = (pendingDepositsData as { amount: number }[])
+        .reduce((s, d) => s + Math.abs(Number(d.amount ?? 0)), 0);
+
       return {
         liveMatches:              activeBets,
         onlinePlayers:            (onlineProfiles as unknown[]).length,
@@ -214,6 +221,8 @@ export function useGetDashboardStats() {
         platformRevenue,
         totalApprovedWithdrawals,
         pendingReports:           (pendingReportsData as unknown[]).length,
+        pendingDeposits,
+        pendingDepositsAmount,
         todayEarnings,
         todaySaidas,
         todayTransactions:        (txToday as unknown[]).length,

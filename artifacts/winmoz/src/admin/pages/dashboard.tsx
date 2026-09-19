@@ -6,7 +6,6 @@ import {
   useListMatches,
   useAdminRealtimeSync,
   resetPlatformRevenue,
-  resetSaidas,
 } from "@/admin/lib/supabase-api";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -18,7 +17,7 @@ import {
 import {
   Users, Coins, Landmark,
   CheckCircle2, AlertTriangle, ClipboardList,
-  Gamepad2, ArrowUpRight, ArrowDownLeft, ArrowLeftRight,
+  Gamepad2, ArrowUpRight, ArrowLeftRight,
   Wallet, TrendingUp, Activity, RefreshCw, ChevronRight,
 } from "lucide-react";
 import { RollingNumber } from "@/admin/components/ui";
@@ -301,16 +300,6 @@ export default function Dashboard() {
     }
   }
 
-  async function handleResetSaidas() {
-    if (!window.confirm("Tens a certeza? As Saídas serão repostas a MT 0,00 no banco de dados. Esta acção não apaga os dados históricos.")) return;
-    try {
-      await resetSaidas();
-      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
-    } catch {
-      alert("Erro ao repor as saídas. Tenta novamente.");
-    }
-  }
-
   const { data: stats, isLoading: sLoad } = useGetDashboardStats();
   const { data: mTime } = useGetMatchesOverTime();
   useGetBetsOverTime();
@@ -331,6 +320,8 @@ export default function Dashboard() {
   const activeBets               = live.length;
   const pendingWithdrawals       = stats?.pendingWithdrawals ?? 0;
   const totalPlayers             = (stats as { totalPlayers?: number } | undefined)?.totalPlayers ?? 0;
+  const pendingDeposits          = (stats as any)?.pendingDeposits ?? 0;
+  const pendingDepositsAmount    = (stats as any)?.pendingDepositsAmount ?? 0;
 
   const damaM   = breakdown?.damaMatches ?? 0;
   const ludoM   = breakdown?.ludoMatches ?? 0;
@@ -340,7 +331,7 @@ export default function Dashboard() {
 
   const kpis = [
     { label: "Saldo Disponível",      value: platformRevenue,          icon: Wallet,        accent: "#15803d", hint: "Lucro da plataforma",      decimals: 2, prefix: "MT", onReset: handleResetRevenue },
-    { label: "Saídas",                value: totalApprovedWithdrawals, icon: ArrowDownLeft, accent: "#b91c1c", hint: "Levantamentos aprovados",  decimals: 2, prefix: "MT", onReset: handleResetSaidas },
+    { label: "Depósitos Pendentes",   value: pendingDeposits,          icon: ClipboardList, accent: "#d97706", badge: `${pendingDeposits} aguard.`, badgeVariant: "warn" as const, decimals: 2, prefix: "MT", hint: `Total MT ${pendingDepositsAmount.toFixed(2)}` },
     { label: "Jogadores Online",      value: onlinePlayers,            icon: Users,         accent: "#2563eb", badge: "ativos",   badgeVariant: "live" as const },
     { label: "Apostas Ativas",        value: activeBets,               icon: Coins,         accent: "#a16207", badge: "pendente", badgeVariant: "warn" as const },
     { label: "Saques Pendentes",      value: pendingWithdrawals,       icon: Landmark,      accent: "#7c3aed", badge: "aguard.",  badgeVariant: "warn" as const },
@@ -354,7 +345,6 @@ export default function Dashboard() {
     { label: "Ganho hoje",      value: stats?.todayEarnings ?? 0,        icon: TrendingUp,     color: "#059669", money: true },
     { label: "Transações",      value: stats?.todayTransactions ?? 0,    icon: ArrowLeftRight, color: V1,        money: false },
     { label: "Usuários Online", value: onlinePlayers,                    icon: Users,          color: "#52525b", money: false },
-    { label: "Saídas",          value: stats?.todaySaidas ?? 0,          icon: ArrowDownLeft,  color: "#b91c1c", money: true },
   ];
 
   const games = [
