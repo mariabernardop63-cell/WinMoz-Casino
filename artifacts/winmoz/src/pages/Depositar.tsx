@@ -109,6 +109,7 @@ export default function Depositar() {
 
       if (!res.ok) { setSubmitError(data?.error || "Erro ao enviar pedido"); setSubmitting(false); return; }
       setShowSuccessModal(true);
+      setScreen("processing");
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Erro ao enviar pedido");
     }
