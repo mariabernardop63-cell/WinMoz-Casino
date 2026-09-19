@@ -113,6 +113,7 @@ interface Ball {
   vy: number;
   pocketed: boolean;
   group: "solid" | "stripe" | "eight" | "cue" | null;
+  rot: number;
 }
 
 type PlayerGroup = "solid" | "stripe" | null;
@@ -153,7 +154,7 @@ function makeInitialBalls(): Ball[] {
   const balls: Ball[] = [];
   const cueX = CANVAS_W / 2;
   const cueY = CANVAS_H * 0.72;
-  balls.push({ id: 0, x: cueX, y: cueY, vx: 0, vy: 0, pocketed: false, group: "cue" });
+  balls.push({ id: 0, x: cueX, y: cueY, vx: 0, vy: 0, pocketed: false, group: "cue", rot: 0 });
 
   const headX = CANVAS_W / 2;
   const headY = CANVAS_H * 0.28;
@@ -171,7 +172,7 @@ function makeInitialBalls(): Ball[] {
       const x = headX + (c - (count - 1) / 2) * d;
       const y = headY + r * d * 0.866;
       const id = rows[r][c];
-      balls.push({ id, x, y, vx: 0, vy: 0, pocketed: false, group: getBallGroup(id) });
+      balls.push({ id, x, y, vx: 0, vy: 0, pocketed: false, group: getBallGroup(id), rot: 0 });
     }
   }
   return balls;
@@ -191,11 +192,18 @@ function stepPhysics(balls: Ball[]): { pocketed: number[]; hadHit: boolean; hadC
   let hadHit = false;
   let hadCushion = false;
 
-  // Move balls
+  // Move balls + update rotation
   for (const b of balls) {
     if (b.pocketed) continue;
     b.x += b.vx;
     b.y += b.vy;
+    // Visual spin based on velocity
+    const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+    if (speed > 0.1) {
+      b.rot += speed * 0.08;
+    } else {
+      b.rot = 0;
+    }
     b.vx *= FRICTION;
     b.vy *= FRICTION;
     if (Math.abs(b.vx) < MIN_SPEED) b.vx = 0;
@@ -541,7 +549,7 @@ function renderBall(ctx: CanvasRenderingContext2D, ball: Ball, _scale: number) {
   ctx.fill();
 
   if (isStripe(ball.id)) {
-    // Stripe: white ball with colored horizontal band
+    // Stripe: white ball with colored band (rotates with ball)
     ctx.save();
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -551,9 +559,13 @@ function renderBall(ctx: CanvasRenderingContext2D, ball: Ball, _scale: number) {
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
-    // Colored band (center stripe)
+    // Colored band (rotated)
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ball.rot);
     ctx.fillStyle = color;
-    ctx.fillRect(x - r - 1, y - r * 0.42, r * 2 + 2, r * 0.84);
+    ctx.fillRect(-r - 1, -r * 0.42, r * 2 + 2, r * 0.84);
+    ctx.restore();
     ctx.restore();
   }
 
@@ -597,21 +609,27 @@ function renderBall(ctx: CanvasRenderingContext2D, ball: Ball, _scale: number) {
   ctx.lineWidth = 0.7;
   ctx.stroke();
 
-  // Ball number (white circle background + number)
+  // Ball number (white circle background + number, rotates with ball)
   if (ball.id > 0) {
     const numR = r * 0.42;
+    ctx.save();
+    ctx.translate(x, y);
+    // White circle stays fixed (doesn't rotate — looks better)
     ctx.beginPath();
-    ctx.arc(x, y, numR, 0, Math.PI * 2);
+    ctx.arc(0, 0, numR, 0, Math.PI * 2);
     ctx.fillStyle = "#FFFFFF";
     ctx.fill();
     ctx.strokeStyle = "rgba(0,0,0,0.15)";
     ctx.lineWidth = 0.4;
     ctx.stroke();
+    // Number rotates with ball
+    ctx.rotate(ball.rot);
     ctx.fillStyle = ball.id === 8 ? "#111" : "#222";
     ctx.font = `bold ${Math.round(r * 0.65)}px Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(String(ball.id), x, y + 0.5);
+    ctx.fillText(String(ball.id), 0, 0.5);
+    ctx.restore();
   }
 }
 
@@ -634,7 +652,7 @@ function renderCueStick(
   const pullBack = power * 35;
 
   // The cue tip sits behind the ball (opposite the aim direction)
-  const gap = BALL_RADIUS + 3 + pullBack;
+  const gap = BALL_RADIUS + 2 + pullBack;
   const tipX = cueBall.x - Math.cos(angle) * gap;
   const tipY = cueBall.y - Math.sin(angle) * gap;
 
@@ -794,14 +812,16 @@ function renderAimLine(
   visible: boolean,
 ) {
   if (!visible || cueBall.pocketed) return;
-  const len = 150;
+  const len = 180;
   const endX = cueBall.x + Math.cos(angle) * len;
   const endY = cueBall.y + Math.sin(angle) * len;
 
   ctx.save();
-  ctx.strokeStyle = "rgba(255,255,255,0.25)";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 6]);
+
+  // Main aim line (dashed)
+  ctx.strokeStyle = "rgba(255,255,255,0.45)";
+  ctx.lineWidth = 1.2;
+  ctx.setLineDash([6, 5]);
   ctx.beginPath();
   ctx.moveTo(
     cueBall.x + Math.cos(angle) * (BALL_RADIUS + 2),
@@ -810,6 +830,14 @@ function renderAimLine(
   ctx.lineTo(endX, endY);
   ctx.stroke();
   ctx.setLineDash([]);
+
+  // Ghost ball (where cue ball ends up)
+  ctx.beginPath();
+  ctx.arc(endX, endY, BALL_RADIUS, 0, Math.PI * 2);
+  ctx.strokeStyle = "rgba(255,255,255,0.2)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
   ctx.restore();
 }
 
@@ -1160,18 +1188,18 @@ export default function BilharGame() {
       ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
       renderTable(ctx);
 
-      // Draw cue stick BEFORE balls (behind them)
+      // Draw balls first
+      for (const ball of ballsRef.current) {
+        renderBall(ctx, ball, scale);
+      }
+
+      // Draw cue stick ON TOP of balls (tip is behind ball, stick extends back)
       const cueBall = ballsRef.current.find(b => b.id === 0 && !b.pocketed);
       if (cueBall && showCue && !isSimulating && !winnerRef.current) {
         renderCueStick(ctx, cueBall, cueAngleRef.current, powerRef.current, true);
       }
 
-      // Draw balls on top
-      for (const ball of ballsRef.current) {
-        renderBall(ctx, ball, scale);
-      }
-
-      // Draw aim line ON TOP of balls (trajectory visibility)
+      // Draw aim line ON TOP of everything
       if (cueBall && showCue && !isSimulating && !winnerRef.current) {
         renderAimLine(ctx, cueBall, cueAngleRef.current, true);
       }
