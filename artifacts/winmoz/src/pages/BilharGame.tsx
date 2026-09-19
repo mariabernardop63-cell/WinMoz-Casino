@@ -624,7 +624,7 @@ function renderCueStick(
 ) {
   if (!visible || cueBall.pocketed) return;
 
-  const stickLen = 220;
+  const stickLen = 200;
   const tipWidth = 2.5;
   const ferruleLen = 10;
   const shaftLen = stickLen * 0.48;
@@ -633,13 +633,15 @@ function renderCueStick(
   const buttWidth = 9;
   const pullBack = power * 35;
 
-  // Tip position (pulled back based on power)
-  const tipX = cueBall.x - Math.cos(angle) * (BALL_RADIUS + 5 + pullBack);
-  const tipY = cueBall.y - Math.sin(angle) * (BALL_RADIUS + 5 + pullBack);
+  // The cue tip sits behind the ball (opposite the aim direction)
+  const gap = BALL_RADIUS + 3 + pullBack;
+  const tipX = cueBall.x - Math.cos(angle) * gap;
+  const tipY = cueBall.y - Math.sin(angle) * gap;
 
   ctx.save();
   ctx.translate(tipX, tipY);
-  ctx.rotate(angle);
+  // Rotate 180° so the stick body extends AWAY from the ball
+  ctx.rotate(angle + Math.PI);
 
   // Tapered shaft shape (thin tip → wider at wrap)
   // Tip (leather)
@@ -1158,16 +1160,20 @@ export default function BilharGame() {
       ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
       renderTable(ctx);
 
-      // Draw balls
+      // Draw cue stick BEFORE balls (behind them)
+      const cueBall = ballsRef.current.find(b => b.id === 0 && !b.pocketed);
+      if (cueBall && showCue && !isSimulating && !winnerRef.current) {
+        renderCueStick(ctx, cueBall, cueAngleRef.current, powerRef.current, true);
+      }
+
+      // Draw balls on top
       for (const ball of ballsRef.current) {
         renderBall(ctx, ball, scale);
       }
 
-      // Draw aim line and cue stick
-      const cueBall = ballsRef.current.find(b => b.id === 0 && !b.pocketed);
+      // Draw aim line ON TOP of balls (trajectory visibility)
       if (cueBall && showCue && !isSimulating && !winnerRef.current) {
         renderAimLine(ctx, cueBall, cueAngleRef.current, true);
-        renderCueStick(ctx, cueBall, cueAngleRef.current, powerRef.current, true);
       }
 
       requestAnimationFrame(draw);
