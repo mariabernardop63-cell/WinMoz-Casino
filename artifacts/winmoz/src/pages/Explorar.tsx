@@ -42,7 +42,7 @@ function GameCard({ game, tick }: { game: typeof jogosCardsMeta[0]; tick: number
   const count = getLivePlayerCount(game.baseIdx, tick);
   const handlePlay = () => {
     if (!user) { setLocation("/login"); return; }
-    if (game.id === "bilhar" || (game as any).comingSoon) { setLocation(`/bilhar-em-breve?jogo=${game.id}`); return; }
+    if (game.id === "bilhar") { setLocation("/apostar/bilhar"); return; }
     if (game.id === "roleta") { setLocation("/roleta"); return; }
     setLocation(`/apostar/${betId}`);
   };

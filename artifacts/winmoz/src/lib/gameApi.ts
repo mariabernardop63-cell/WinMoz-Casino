@@ -83,7 +83,7 @@ export interface PassTurnResult {
 
 export async function serverBet(
   amount: number,
-  gameType: "damas" | "ludo" | "xadrez",
+  gameType: "damas" | "ludo" | "xadrez" | "bilhar",
   description?: string,
   gameId?: string,
   color?: string
@@ -99,7 +99,7 @@ export async function serverBet(
 
 export async function serverWin(
   gameId: string,
-  gameType: "damas" | "ludo" | "xadrez",
+  gameType: "damas" | "ludo" | "xadrez" | "bilhar",
   betAmount: number
 ): Promise<WinResult> {
   const result = await postWithAuthRetry("/api/games/win", { gameId, gameType, betAmount });
@@ -118,7 +118,7 @@ export async function serverWin(
  */
 export async function serverForfeit(
   gameId: string,
-  gameType: "damas" | "ludo" | "xadrez"
+  gameType: "damas" | "ludo" | "xadrez" | "bilhar"
 ): Promise<ForfeitResult> {
   const result = await postWithAuthRetry("/api/games/forfeit", { gameId, gameType });
   if (!result) return { ok: false, error: "Não autenticado" };

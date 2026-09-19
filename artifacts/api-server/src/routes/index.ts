@@ -2194,7 +2194,7 @@ router.post("/games/bet", async (req, res) => {
     if (!amount || typeof amount !== "number" || amount < 1 || amount > 100000) {
       res.status(400).json({ error: "Montante de aposta inválido" }); return;
     }
-    if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
+    if (!gameType || !["damas", "ludo", "xadrez", "bilhar"].includes(gameType)) {
       res.status(400).json({ error: "Tipo de jogo inválido" }); return;
     }
     const isLocalOrBotGame = gameId === "local" || gameId?.startsWith("bot_") || gameId?.startsWith("wm");
@@ -2334,8 +2334,10 @@ router.post("/games/bet", async (req, res) => {
    O frontend chama /api/games/bot-session ao encontrar um bot. Sem esta rota
    o pedido devolvia 404 e o ecrã "matched" voltava ao ecrã de apostar. */
 const BOT_NAMES = [
-  "Miguel Pro", "SuraBot", "Kácia", "Xitique", "Dama Mestre",
-  "Rafa Joga", "Tio Zeca", "Prof Komba", "Lady Pawns", "Rei da Rua",
+  "Alberto Mondlane", "Fátima Sitoe", "Carlos Matsinhe", "Ana Tembe",
+  "Joaquim Chissano", "Rosa Cossa", "Manuel Nhantumbo", "Isabel Muianga",
+  "Pedro Zunguze", "Conceição Macamo", "Domingos Baloi", "Sofia Tivane",
+  "António Mabunda", "Lurdes Cumbe", "Hélder Cumbane", "Maria Macuácua",
 ];
 const BOT_ID_PREFIX = "wmb_";
 
@@ -2346,7 +2348,7 @@ router.post("/games/bot-session", async (req, res) => {
     const { supabaseAdmin, userId } = gate;
 
     const { gameType, betAmount } = req.body as { gameType?: string; betAmount?: number };
-    if (!gameType || !["damas", "xadrez"].includes(gameType)) {
+    if (!gameType || !["damas", "xadrez", "bilhar"].includes(gameType)) {
       res.status(400).json({ error: "Tipo de jogo inválido" }); return;
     }
     if (!betAmount || typeof betAmount !== "number" || betAmount < 10 || betAmount > 5000) {
@@ -2425,7 +2427,7 @@ router.post("/games/match", async (req, res) => {
       gameId?: string; gameType?: string; betAmount?: number; opponentId?: string; color?: string;
     };
     if (!gameId || !GAME_ID_RE.test(gameId)) { res.status(400).json({ error: "ID de jogo inválido" }); return; }
-    if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
+    if (!gameType || !["damas", "ludo", "xadrez", "bilhar"].includes(gameType)) {
       res.status(400).json({ error: "Tipo de jogo inválido" }); return;
     }
     if (!betAmount || typeof betAmount !== "number" || betAmount < 10 || betAmount > 5000) {
@@ -2490,7 +2492,7 @@ router.post("/games/win", async (req, res) => {
     if (!GAME_ID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
-    if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
+    if (!gameType || !["damas", "ludo", "xadrez", "bilhar"].includes(gameType)) {
       res.status(400).json({ error: "Tipo de jogo inválido" }); return;
     }
 
@@ -2584,7 +2586,7 @@ router.post("/games/forfeit", async (req, res) => {
     if (!gameId || !GAME_ID_RE.test(gameId)) {
       res.status(400).json({ error: "ID de jogo inválido" }); return;
     }
-    if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
+    if (!gameType || !["damas", "ludo", "xadrez", "bilhar"].includes(gameType)) {
       res.status(400).json({ error: "Tipo de jogo inválido" }); return;
     }
 

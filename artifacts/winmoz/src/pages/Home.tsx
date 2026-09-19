@@ -1098,7 +1098,7 @@ function HeroBanner() {
                   onClick={() => {
                     if (slide.cta === "Entrar") setLocation("/grupo-chat");
                     else if (slide.cta === "Jogar Agora") {
-                      if (slide.id === "bilhar") setLocation("/bilhar-em-breve?jogo=bilhar");
+                      if (slide.id === "bilhar") setLocation("/apostar/bilhar");
                       else if (slide.id === "roleta") setLocation("/roleta");
                       else setLocation(`/apostar/${slide.id}`);
                     }
@@ -1410,7 +1410,7 @@ export default function Home() {
                 variants={fadeUp}
                 onClick={() => {
                   if (!isLoggedIn) { setLocation("/login"); return; }
-                  if (game.id === "bilhar" || (game as any).comingSoon) { setLocation(`/bilhar-em-breve?jogo=${game.id}`); return; }
+                  if (game.id === "bilhar") { setLocation("/apostar/bilhar"); return; }
                   if (game.id === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.id}`);
                 }}
@@ -1503,7 +1503,7 @@ export default function Home() {
                 variants={fadeUp}
                 onClick={() => {
                   if (!isLoggedIn) { setLocation("/login"); return; }
-                  if (game.gameRoute === "bilhar") { setLocation("/bilhar-em-breve?jogo=bilhar"); return; }
+                  if (game.gameRoute === "bilhar") { setLocation("/apostar/bilhar"); return; }
                   if (game.gameRoute === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.gameRoute}`);
                 }}

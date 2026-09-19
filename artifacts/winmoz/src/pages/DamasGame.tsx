@@ -1115,7 +1115,7 @@ export default function DamasGame() {
         const myCnt = countPieces(finalBoard, myColor);
         if (myCnt === 0) {
           setWinner(oppColor); winnerRef.current = oppColor;
-          setWinReason("Todas as peças foram capturadas pelo bot");
+          setWinReason(`Todas as peças foram capturadas por ${opponentName}`);
         } else {
           if (allKings(finalBoard)) {
             const newCount = kingsOnlyCountRef.current + 1;
@@ -1277,7 +1277,7 @@ export default function DamasGame() {
         if (countPieces(nb, myColor) === 0) {
           setWinner(oppColor);
           winnerRef.current = oppColor;
-          setWinReason("Todas as peças foram capturadas pelo bot");
+          setWinReason(`Todas as peças foram capturadas por ${opponentName}`);
         }
       }
       setTurn(myColor);

@@ -2798,7 +2798,7 @@ export default function LudoGame() {
     if(isBot){
       if(!profile?.id) return;
       try{
-        const result = await serverBet(BET_AMOUNT, "ludo", "Aposta de revanche (Ludo) vs bot");
+        const result = await serverBet(BET_AMOUNT, "ludo", `Aposta de revanche (Ludo) vs ${opponentName}`);
         if(!result.ok){ setRematchPhase("no_balance"); return; }
         await refreshProfile();
         resetGame();

@@ -777,7 +777,7 @@ function MatchmakingScreen({
   const botMatchRef = useRef(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const queueIdRef = useRef<string | null>(null);
-  const BOT_ELIGIBLE = (gameType === "damas" || gameType === "xadrez") && [10, 20, 50].includes(betAmount);
+  const BOT_ELIGIBLE = (gameType === "damas" || gameType === "xadrez" || gameType === "bilhar") && [10, 20, 50].includes(betAmount);
   const botThresholdRef = useRef(Math.floor(Math.random() * (30 - 15 + 1)) + 15);
 
   async function joinQueue() {
@@ -1361,6 +1361,7 @@ export default function Apostar() {
         if (gameId === "ludo")   dest = `/ludo-jogo?gameId=${gId}&color=blue&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
         else if (gameId === "xadrez") dest = `/xadrez-jogo?gameId=${gId}&color=white&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
         else if (gameId === "damas")  dest = `/damas-jogo?gameId=${gId}&color=w&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
+        else if (gameId === "bilhar") dest = `/bilhar-jogo?gameId=${gId}&bet=${bet}&opp=${oppEnc}&myname=${myEnc}`;
         setTimeout(() => setLocation(dest), 2200);
       });
       ch.subscribe();
@@ -1664,6 +1665,8 @@ export default function Apostar() {
           } else if (gameId === "damas") {
             const damasColor = color === "blue" ? "w" : "b";
             dest = `/damas-jogo?gameId=${gId}&color=${damasColor}&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}`;
+          } else if (gameId === "bilhar") {
+            dest = `/bilhar-jogo?gameId=${gId}&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}`;
           }
           setTimeout(() => setLocation(dest), 2200);
         }}
@@ -1683,6 +1686,8 @@ export default function Apostar() {
           let dest: string;
           if (gameId === "xadrez") {
             dest = `/xadrez-jogo?gameId=${publicGameId}&color=white&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}`;
+          } else if (gameId === "bilhar") {
+            dest = `/bilhar-jogo?gameId=${publicGameId}&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}`;
           } else {
             dest = `/damas-jogo?gameId=${publicGameId}&color=w&bet=${selectedBet ?? 0}&opp=${oppEnc}&myname=${myEnc}`;
           }

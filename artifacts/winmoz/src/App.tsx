@@ -45,6 +45,7 @@ const pageLoaders = {
   DamasGame: () => import("@/pages/DamasGame"),
   Roleta: () => import("@/pages/Roleta"),
   BilharEmBreve: () => import("@/pages/BilharEmBreve"),
+  BilharGame: () => import("@/pages/BilharGame"),
   TermosServico: () => import("@/pages/TermosServico"),
 };
 
@@ -78,6 +79,7 @@ const ChessGame = lazy(pageLoaders.ChessGame);
 const DamasGame = lazy(pageLoaders.DamasGame);
 const Roleta = lazy(pageLoaders.Roleta);
 const BilharEmBreve = lazy(pageLoaders.BilharEmBreve);
+const BilharGame = lazy(pageLoaders.BilharGame);
 const TermosServico = lazy(pageLoaders.TermosServico);
 
 /* Pré-carrega os chunks: rotas de autenticação imediatamente (a primeira
@@ -284,6 +286,9 @@ function Router() {
         <ProtectedRoute><Roleta /></ProtectedRoute>
       </Route>
       <Route path="/bilhar-em-breve" component={BilharEmBreve} />
+      <Route path="/bilhar-jogo">
+        <ProtectedRoute><BilharGame /></ProtectedRoute>
+      </Route>
       <Route path="/afiliados">
         <ProtectedRoute><ProgramaAfiliados /></ProtectedRoute>
       </Route>

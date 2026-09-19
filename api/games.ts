@@ -51,7 +51,7 @@ async function handleBet(req: VercelRequest, res: VercelResponse) {
     res.status(400).json({ error: "Montante de aposta inválido" });
     return;
   }
-  if (!gameType || !["damas","ludo","xadrez"].includes(gameType)) {
+  if (!gameType || !["damas","ludo","xadrez","bilhar"].includes(gameType)) {
     res.status(400).json({ error: "Tipo de jogo inválido" });
     return;
   }
@@ -252,7 +252,7 @@ async function handleWin(req: VercelRequest, res: VercelResponse) {
     res.status(400).json({ error: "ID de jogo inválido" });
     return;
   }
-  if (!gameType || !["damas","ludo","xadrez"].includes(gameType)) {
+  if (!gameType || !["damas","ludo","xadrez","bilhar"].includes(gameType)) {
     res.status(400).json({ error: "Tipo de jogo inválido" });
     return;
   }
@@ -453,7 +453,7 @@ async function handleForfeit(req: VercelRequest, res: VercelResponse) {
   if (!gameId || !GAME_ID_RE.test(gameId)) {
     res.status(400).json({ error: "ID de jogo inválido" }); return;
   }
-  if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) {
+  if (!gameType || !["damas", "ludo", "xadrez", "bilhar"].includes(gameType)) {
     res.status(400).json({ error: "Tipo de jogo inválido" }); return;
   }
 
@@ -570,7 +570,7 @@ async function handleMatch(req: VercelRequest, res: VercelResponse) {
   };
 
   if (!gameId || !GAME_ID_RE.test(gameId)) { res.status(400).json({ error: "ID de jogo inválido" }); return; }
-  if (!gameType || !["damas", "ludo", "xadrez"].includes(gameType)) { res.status(400).json({ error: "Tipo de jogo inválido" }); return; }
+  if (!gameType || !["damas", "ludo", "xadrez", "bilhar"].includes(gameType)) { res.status(400).json({ error: "Tipo de jogo inválido" }); return; }
   if (!betAmount || typeof betAmount !== "number" || betAmount < 10 || betAmount > 5000) {
     res.status(400).json({ error: "Montante de aposta inválido" }); return;
   }
@@ -658,8 +658,10 @@ async function handleMatch(req: VercelRequest, res: VercelResponse) {
 // ?_action=bot-session — cria sessão contra bot no servidor
 // ═════════════════════════════════════════════════════════════════════════════
 const BOT_NAMES = [
-  "Miguel Pro", "SuraBot", "Kácia", "Xitique", "Dama Mestre",
-  "Rafa Joga", "Tio Zeca", "Prof Komba", "Lady Pawns", "Rei da Rua",
+  "Alberto Mondlane", "Fátima Sitoe", "Carlos Matsinhe", "Ana Tembe",
+  "Joaquim Chissano", "Rosa Cossa", "Manuel Nhantumbo", "Isabel Muianga",
+  "Pedro Zunguze", "Conceição Macamo", "Domingos Baloi", "Sofia Tivane",
+  "António Mabunda", "Lurdes Cumbe", "Hélder Cumbane", "Maria Macuácua",
 ];
 
 async function handleBotSession(req: VercelRequest, res: VercelResponse) {
@@ -668,7 +670,7 @@ async function handleBotSession(req: VercelRequest, res: VercelResponse) {
 
   const { gameType, betAmount } = (req.body ?? {}) as { gameType?: string; betAmount?: number };
 
-  if (!gameType || !["damas", "xadrez"].includes(gameType)) {
+  if (!gameType || !["damas", "xadrez", "bilhar"].includes(gameType)) {
     res.status(400).json({ error: "Tipo de jogo inválido" });
     return;
   }
