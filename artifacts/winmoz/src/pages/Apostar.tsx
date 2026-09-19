@@ -1511,7 +1511,7 @@ export default function Apostar() {
     }
   };
 
-  const recommendedGames = ALL_GAMES.filter(g => g.id !== gameId);
+  const recommendedGames = ALL_GAMES.filter(g => g.id !== gameId && g.id !== "bilhar");
 
   /* ── Sala Menu ── */
   if (screen === "sala-menu") {
