@@ -10,6 +10,7 @@ import { supabase, getSessionWithRefresh } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getLivePlayerCount, getSalaOnlineCount } from "@/lib/simulation";
 import { API_BASE } from "@/lib/apiBase";
+import BilharAccessModal from "@/components/BilharAccessModal";
 
 
 /* ── Theme ── */
@@ -1235,6 +1236,12 @@ export default function Apostar() {
 
   const gameId = params?.gameId ?? "damas";
 
+  /* Bilhar access code */
+  const [bilharUnlocked, setBilharUnlocked] = useState(() => {
+    try { return sessionStorage.getItem("wm_bilhar_unlocked") === "1"; } catch { return false; }
+  });
+  const [showBilharModal, setShowBilharModal] = useState(gameId === "bilhar" && !bilharUnlocked);
+
   useEffect(() => {
     if (gameId === "roleta") setLocation("/roleta");
   }, [gameId]);
@@ -1803,6 +1810,28 @@ export default function Apostar() {
     <div className="min-h-screen w-full flex justify-center" style={{ background: "#fff" }}>
       <div className="w-full max-w-[430px] flex flex-col min-h-screen">
 
+        {/* Bilhar access gate */}
+        {gameId === "bilhar" && !bilharUnlocked && (
+          <div className="flex-1 flex items-center justify-center" style={{ minHeight: "80vh" }}>
+            <div className="text-center px-8">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: "rgba(14,116,144,0.1)", border: "2px solid rgba(14,116,144,0.2)" }}>
+                <span style={{ fontSize: 28 }}>🔒</span>
+              </div>
+              <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 18, color: "#111" }}>Bilhar Exclusivo</p>
+              <p style={{ fontSize: 13, color: "#9ca3af", marginTop: 6 }}>Introduzir código de acesso para jogar</p>
+              <button
+                onClick={() => setShowBilharModal(true)}
+                className="mt-5 px-6 py-2.5 rounded-xl font-bold text-sm text-white"
+                style={{ background: "linear-gradient(135deg, #0ea5e9, #0891b2)", border: "none", cursor: "pointer" }}
+              >
+                Introduzir Código
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Normal content — only when unlocked or not bilhar */}
+        {(gameId !== "bilhar" || bilharUnlocked) && (<>
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-12 pb-4 flex-shrink-0 border-b border-slate-100">
           <button onClick={() => window.history.back()}
@@ -2045,7 +2074,20 @@ export default function Apostar() {
           </motion.div>
 
         </div>
+        </>)}
       </div>
+      <BilharAccessModal
+        open={showBilharModal}
+        onClose={() => {
+          setShowBilharModal(false);
+          if (!bilharUnlocked) window.history.back();
+        }}
+        onUnlock={() => {
+          setBilharUnlocked(true);
+          setShowBilharModal(false);
+          try { sessionStorage.setItem("wm_bilhar_unlocked", "1"); } catch {}
+        }}
+      />
     </div>
   );
 }
