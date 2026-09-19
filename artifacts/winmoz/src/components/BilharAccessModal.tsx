@@ -11,13 +11,18 @@ interface BilharAccessModalProps {
 export default function BilharAccessModal({ open, onClose, onUnlock }: BilharAccessModalProps) {
   const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
   const [error, setError] = useState(false);
+  const [attempts, setAttempts] = useState(0);
+  const [locked, setLocked] = useState(false);
   const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     if (open) {
       setDigits(["", "", "", ""]);
       setError(false);
-      setTimeout(() => inputsRef.current[0]?.focus(), 200);
+      const prev = parseInt(sessionStorage.getItem("wm_bilhar_attempts") ?? "0");
+      setAttempts(prev);
+      setLocked(prev >= 5);
+      if (prev < 5) setTimeout(() => inputsRef.current[0]?.focus(), 200);
     }
   }, [open]);
 
@@ -34,11 +39,19 @@ export default function BilharAccessModal({ open, onClose, onUnlock }: BilharAcc
     if (next.every(d => d !== "")) {
       setTimeout(() => {
         if (next.join("") === "0011") {
+          sessionStorage.removeItem("wm_bilhar_attempts");
           onUnlock();
         } else {
-          setError(true);
-          setDigits(["", "", "", ""]);
-          inputsRef.current[0]?.focus();
+          const newAttempts = attempts + 1;
+          setAttempts(newAttempts);
+          try { sessionStorage.setItem("wm_bilhar_attempts", String(newAttempts)); } catch {}
+          if (newAttempts >= 5) {
+            setLocked(true);
+          } else {
+            setError(true);
+            setDigits(["", "", "", ""]);
+            inputsRef.current[0]?.focus();
+          }
         }
       }, 150);
     }
@@ -62,11 +75,19 @@ export default function BilharAccessModal({ open, onClose, onUnlock }: BilharAcc
     if (pasted.length === 4) {
       setTimeout(() => {
         if (pasted === "0011") {
+          sessionStorage.removeItem("wm_bilhar_attempts");
           onUnlock();
         } else {
-          setError(true);
-          setDigits(["", "", "", ""]);
-          inputsRef.current[0]?.focus();
+          const newAttempts = attempts + 1;
+          setAttempts(newAttempts);
+          try { sessionStorage.setItem("wm_bilhar_attempts", String(newAttempts)); } catch {}
+          if (newAttempts >= 5) {
+            setLocked(true);
+          } else {
+            setError(true);
+            setDigits(["", "", "", ""]);
+            inputsRef.current[0]?.focus();
+          }
         }
       }, 150);
     }
@@ -147,62 +168,76 @@ export default function BilharAccessModal({ open, onClose, onUnlock }: BilharAcc
             {/* Description */}
             <p style={{
               fontSize: 12.5, color: "#888", textAlign: "center",
-              lineHeight: 1.6, marginBottom: 24, padding: "0 4px",
+              lineHeight: 1.6, marginBottom: locked ? 8 : 24, padding: "0 4px",
             }}>
               Este jogo ainda está em fase de desenvolvimento.
               <br />
-              Introduzir o código de acesso para continuar.
+              {locked
+                ? "O acesso está temporariamente indisponível."
+                : "Introduzir o código de acesso para continuar."}
             </p>
 
-            {/* Code inputs */}
-            <div style={{
-              display: "flex", gap: 10, justifyContent: "center",
-              marginBottom: error ? 8 : 24,
-            }}>
-              {digits.map((d, i) => (
-                <input
-                  key={i}
-                  ref={(el) => { inputsRef.current[i] = el; }}
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={1}
-                  value={d}
-                  onChange={(e) => handleChange(i, e.target.value)}
-                  onKeyDown={(e) => handleKeyDown(i, e)}
-                  onPaste={handlePaste}
-                  autoFocus={i === 0}
-                  style={{
-                    width: 52, height: 58, borderRadius: 12,
-                    border: error
-                      ? "2px solid #dc2626"
-                      : d ? "2px solid #000" : "2px solid #e5e7eb",
-                    background: d ? "#f9fafb" : "#fff",
-                    textAlign: "center",
-                    fontFamily: "Syne, sans-serif", fontWeight: 800,
-                    fontSize: 22, color: "#000",
-                    outline: "none", caretColor: "#000",
-                    transition: "border-color 0.15s, background 0.15s",
-                  }}
-                />
-              ))}
-            </div>
+            {/* Code inputs — only when not locked */}
+            {!locked && (
+              <>
+                <div style={{
+                  display: "flex", gap: 10, justifyContent: "center",
+                  marginBottom: error ? 8 : 0,
+                }}>
+                  {digits.map((d, i) => (
+                    <input
+                      key={i}
+                      ref={(el) => { inputsRef.current[i] = el; }}
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={d}
+                      onChange={(e) => handleChange(i, e.target.value)}
+                      onKeyDown={(e) => handleKeyDown(i, e)}
+                      onPaste={handlePaste}
+                      autoFocus={i === 0}
+                      style={{
+                        width: 52, height: 58, borderRadius: 12,
+                        border: error
+                          ? "2px solid #dc2626"
+                          : d ? "2px solid #000" : "2px solid #e5e7eb",
+                        background: d ? "#f9fafb" : "#fff",
+                        textAlign: "center",
+                        fontFamily: "Syne, sans-serif", fontWeight: 800,
+                        fontSize: 22, color: "#000",
+                        outline: "none", caretColor: "#000",
+                        transition: "border-color 0.15s, background 0.15s",
+                      }}
+                    />
+                  ))}
+                </div>
 
-            {/* Error message */}
-            <AnimatePresence>
-              {error && (
-                <motion.p
-                  initial={{ opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  style={{
-                    fontSize: 11.5, color: "#dc2626", textAlign: "center",
-                    marginBottom: 20, fontWeight: 600,
-                  }}
-                >
-                  Código incorrecto. Tenta novamente.
-                </motion.p>
-              )}
-            </AnimatePresence>
+                {/* Error message */}
+                <AnimatePresence>
+                  {error && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      style={{
+                        fontSize: 11.5, color: "#dc2626", textAlign: "center",
+                        marginTop: 8, fontWeight: 600,
+                      }}
+                    >
+                      Código incorrecto. Tenta novamente.
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </>
+            )}
+
+            {/* Locked state — just the line */}
+            {locked && (
+              <div style={{
+                width: 40, height: 2, borderRadius: 1,
+                background: "#ddd", margin: "0 auto",
+              }} />
+            )}
           </motion.div>
         </motion.div>
       )}

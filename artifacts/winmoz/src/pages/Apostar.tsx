@@ -1240,6 +1240,9 @@ export default function Apostar() {
   const [bilharUnlocked, setBilharUnlocked] = useState(() => {
     try { return sessionStorage.getItem("wm_bilhar_unlocked") === "1"; } catch { return false; }
   });
+  const [bilharLocked, setBilharLocked] = useState(() => {
+    try { return parseInt(sessionStorage.getItem("wm_bilhar_attempts") ?? "0") >= 5; } catch { return false; }
+  });
   const [showBilharModal, setShowBilharModal] = useState(gameId === "bilhar" && !bilharUnlocked);
 
   useEffect(() => {
@@ -1829,16 +1832,23 @@ export default function Apostar() {
               <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 18, color: "#000", marginBottom: 6 }}>
                 Acesso Exclusivo
               </p>
-              <p style={{ fontSize: 13, color: "#999", lineHeight: 1.5, marginBottom: 20 }}>
-                Este jogo ainda está em fase de desenvolvimento.<br />Introduzir código de acesso para continuar.
+              <p style={{ fontSize: 13, color: "#999", lineHeight: 1.5, marginBottom: bilharLocked ? 0 : 20 }}>
+                {bilharLocked
+                  ? "O acesso está temporariamente indisponível."
+                  : "Este jogo ainda está em fase de desenvolvimento.\nIntroduzir código de acesso para continuar."}
               </p>
-              <button
-                onClick={() => setShowBilharModal(true)}
-                className="px-7 py-3 rounded-xl font-bold text-sm"
-                style={{ background: "#000", color: "#fff", border: "none", cursor: "pointer", letterSpacing: "0.3px" }}
-              >
-                Introduzir Código
-              </button>
+              {!bilharLocked && (
+                <button
+                  onClick={() => setShowBilharModal(true)}
+                  className="px-7 py-3 rounded-xl font-bold text-sm"
+                  style={{ background: "#000", color: "#fff", border: "none", cursor: "pointer", letterSpacing: "0.3px" }}
+                >
+                  Introduzir Código
+                </button>
+              )}
+              {bilharLocked && (
+                <div style={{ width: 40, height: 2, borderRadius: 1, background: "#ddd", margin: "0 auto" }} />
+              )}
             </div>
           </div>
         )}
@@ -2097,8 +2107,10 @@ export default function Apostar() {
         }}
         onUnlock={() => {
           setBilharUnlocked(true);
+          setBilharLocked(false);
           setShowBilharModal(false);
           try { sessionStorage.setItem("wm_bilhar_unlocked", "1"); } catch {}
+          try { sessionStorage.removeItem("wm_bilhar_attempts"); } catch {}
         }}
       />
     </div>
