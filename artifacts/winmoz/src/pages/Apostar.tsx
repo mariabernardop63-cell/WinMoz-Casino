@@ -1814,15 +1814,28 @@ export default function Apostar() {
         {gameId === "bilhar" && !bilharUnlocked && (
           <div className="flex-1 flex items-center justify-center" style={{ minHeight: "80vh" }}>
             <div className="text-center px-8">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ background: "rgba(14,116,144,0.1)", border: "2px solid rgba(14,116,144,0.2)" }}>
-                <span style={{ fontSize: 28 }}>🔒</span>
+              <div style={{
+                width: 64, height: 64, borderRadius: "50%", background: "#000",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 18px", boxShadow: "0 6px 20px rgba(0,0,0,0.12)",
+              }}>
+                <div style={{
+                  width: 24, height: 24, borderRadius: "50%", background: "#fff",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <span style={{ fontFamily: "Syne, sans-serif", fontWeight: 900, fontSize: 13, color: "#000" }}>8</span>
+                </div>
               </div>
-              <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: 18, color: "#111" }}>Bilhar Exclusivo</p>
-              <p style={{ fontSize: 13, color: "#9ca3af", marginTop: 6 }}>Introduzir código de acesso para jogar</p>
+              <p style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: 18, color: "#000", marginBottom: 6 }}>
+                Acesso Exclusivo
+              </p>
+              <p style={{ fontSize: 13, color: "#999", lineHeight: 1.5, marginBottom: 20 }}>
+                Este jogo ainda está em fase de desenvolvimento.<br />Introduzir código de acesso para continuar.
+              </p>
               <button
                 onClick={() => setShowBilharModal(true)}
-                className="mt-5 px-6 py-2.5 rounded-xl font-bold text-sm text-white"
-                style={{ background: "linear-gradient(135deg, #0ea5e9, #0891b2)", border: "none", cursor: "pointer" }}
+                className="px-7 py-3 rounded-xl font-bold text-sm"
+                style={{ background: "#000", color: "#fff", border: "none", cursor: "pointer", letterSpacing: "0.3px" }}
               >
                 Introduzir Código
               </button>

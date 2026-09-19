@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Lock, X } from "lucide-react";
+import { X } from "lucide-react";
 
 interface BilharAccessModalProps {
   open: boolean;
@@ -9,24 +9,67 @@ interface BilharAccessModalProps {
 }
 
 export default function BilharAccessModal({ open, onClose, onUnlock }: BilharAccessModalProps) {
-  const [code, setCode] = useState("");
+  const [digits, setDigits] = useState<string[]>(["", "", "", ""]);
   const [error, setError] = useState(false);
+  const inputsRef = useRef<(HTMLInputElement | null)[]>([]);
 
-  function handleSubmit() {
-    if (code === "0011") {
-      onUnlock();
-      setCode("");
+  useEffect(() => {
+    if (open) {
+      setDigits(["", "", "", ""]);
       setError(false);
-    } else {
-      setError(true);
-      setCode("");
+      setTimeout(() => inputsRef.current[0]?.focus(), 200);
+    }
+  }, [open]);
+
+  function handleChange(idx: number, val: string) {
+    if (val.length > 1) val = val.slice(-1);
+    if (val && !/^\d$/.test(val)) return;
+    const next = [...digits];
+    next[idx] = val;
+    setDigits(next);
+    setError(false);
+    if (val && idx < 3) {
+      inputsRef.current[idx + 1]?.focus();
+    }
+    if (next.every(d => d !== "")) {
+      setTimeout(() => {
+        if (next.join("") === "0011") {
+          onUnlock();
+        } else {
+          setError(true);
+          setDigits(["", "", "", ""]);
+          inputsRef.current[0]?.focus();
+        }
+      }, 150);
     }
   }
 
-  function handleClose() {
-    setCode("");
-    setError(false);
-    onClose();
+  function handleKeyDown(idx: number, e: React.KeyboardEvent) {
+    if (e.key === "Backspace" && !digits[idx] && idx > 0) {
+      inputsRef.current[idx - 1]?.focus();
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent) {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+    if (!pasted) return;
+    const next = pasted.split("").concat(["", "", "", ""]).slice(0, 4);
+    setDigits(next);
+    const firstEmpty = next.findIndex(d => d === "");
+    const focusIdx = firstEmpty === -1 ? 3 : firstEmpty;
+    inputsRef.current[focusIdx]?.focus();
+    if (pasted.length === 4) {
+      setTimeout(() => {
+        if (pasted === "0011") {
+          onUnlock();
+        } else {
+          setError(true);
+          setDigits(["", "", "", ""]);
+          inputsRef.current[0]?.focus();
+        }
+      }, 150);
+    }
   }
 
   return (
@@ -36,102 +79,130 @@ export default function BilharAccessModal({ open, onClose, onUnlock }: BilharAcc
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}
           className="fixed inset-0 z-[999] flex items-center justify-center"
-          style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)" }}
-          onClick={handleClose}
+          style={{ background: "rgba(0,0,0,0.85)" }}
+          onClick={onClose}
         >
           <motion.div
-            initial={{ scale: 0.85, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.85, opacity: 0 }}
-            transition={{ type: "spring", damping: 22, stiffness: 300 }}
+            initial={{ scale: 0.9, y: 20, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.9, y: 20, opacity: 0 }}
+            transition={{ type: "spring", damping: 26, stiffness: 320 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-[90%] max-w-[340px] rounded-2xl overflow-hidden"
+            className="relative w-[88%] max-w-[320px]"
             style={{
-              background: "linear-gradient(145deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
-              border: "1px solid rgba(56,189,248,0.2)",
-              boxShadow: "0 0 40px rgba(56,189,248,0.1), 0 25px 50px rgba(0,0,0,0.5)",
+              background: "#fff",
+              borderRadius: 20,
+              padding: "36px 28px 28px",
+              boxShadow: "0 30px 80px rgba(0,0,0,0.6)",
             }}
           >
-            {/* Close button */}
+            {/* Close */}
             <button
-              onClick={handleClose}
-              className="absolute top-3 right-3 z-10 p-1.5 rounded-full"
-              style={{ background: "rgba(255,255,255,0.1)" }}
+              onClick={onClose}
+              style={{
+                position: "absolute", top: 12, right: 12,
+                width: 28, height: 28, borderRadius: "50%",
+                background: "#f3f4f6", border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
             >
-              <X className="w-4 h-4 text-white/60" />
+              <X className="w-3.5 h-3.5" style={{ color: "#999" }} />
             </button>
 
-            {/* Content */}
-            <div className="px-6 pt-8 pb-6 flex flex-col items-center text-center">
-              {/* Icon */}
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-                style={{
-                  background: "linear-gradient(135deg, rgba(56,189,248,0.2), rgba(14,116,144,0.2))",
-                  border: "2px solid rgba(56,189,248,0.3)",
-                }}
-              >
-                <Lock className="w-7 h-7 text-cyan-400" />
+            {/* Top accent line */}
+            <div style={{
+              position: "absolute", top: 0, left: 28, right: 28, height: 2,
+              background: "#000", borderRadius: "0 0 2px 2px",
+            }} />
+
+            {/* Billiard ball icon */}
+            <div style={{
+              width: 52, height: 52, borderRadius: "50%", background: "#000",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              margin: "0 auto 20px", position: "relative",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+            }}>
+              <div style={{
+                width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <span style={{
+                  fontFamily: "Syne, sans-serif", fontWeight: 900,
+                  fontSize: 11, color: "#000", lineHeight: 1,
+                }}>8</span>
               </div>
+            </div>
 
-              <h2 className="text-white font-bold text-lg mb-1" style={{ fontFamily: "Syne, sans-serif" }}>
-                Bilhar Exclusivo
-              </h2>
-              <p className="text-white/50 text-sm mb-6">
-                Introduzir código de acesso para jogar
-              </p>
+            {/* Title */}
+            <h2 style={{
+              fontFamily: "Syne, sans-serif", fontWeight: 800,
+              fontSize: 17, color: "#000", textAlign: "center",
+              marginBottom: 6, letterSpacing: "-0.3px",
+            }}>
+              Acesso Exclusivo
+            </h2>
 
-              {/* Code input */}
-              <div className="w-full mb-4">
+            {/* Description */}
+            <p style={{
+              fontSize: 12.5, color: "#888", textAlign: "center",
+              lineHeight: 1.6, marginBottom: 24, padding: "0 4px",
+            }}>
+              Este jogo ainda está em fase de desenvolvimento.
+              <br />
+              Introduzir o código de acesso para continuar.
+            </p>
+
+            {/* Code inputs */}
+            <div style={{
+              display: "flex", gap: 10, justifyContent: "center",
+              marginBottom: error ? 8 : 24,
+            }}>
+              {digits.map((d, i) => (
                 <input
-                  type="password"
+                  key={i}
+                  ref={(el) => { inputsRef.current[i] = el; }}
+                  type="tel"
                   inputMode="numeric"
-                  maxLength={4}
-                  value={code}
-                  onChange={(e) => {
-                    setCode(e.target.value.replace(/\D/g, ""));
-                    setError(false);
-                  }}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleSubmit(); }}
-                  placeholder="••••"
-                  autoFocus
-                  className="w-full text-center text-2xl tracking-[0.5em] font-bold py-3 rounded-xl outline-none"
+                  maxLength={1}
+                  value={d}
+                  onChange={(e) => handleChange(i, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(i, e)}
+                  onPaste={handlePaste}
+                  autoFocus={i === 0}
                   style={{
-                    background: "rgba(255,255,255,0.08)",
+                    width: 52, height: 58, borderRadius: 12,
                     border: error
-                      ? "2px solid rgba(239,68,68,0.6)"
-                      : "2px solid rgba(56,189,248,0.2)",
-                    color: "#fff",
+                      ? "2px solid #dc2626"
+                      : d ? "2px solid #000" : "2px solid #e5e7eb",
+                    background: d ? "#f9fafb" : "#fff",
+                    textAlign: "center",
+                    fontFamily: "Syne, sans-serif", fontWeight: 800,
+                    fontSize: 22, color: "#000",
+                    outline: "none", caretColor: "#000",
+                    transition: "border-color 0.15s, background 0.15s",
                   }}
                 />
-                {error && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-red-400 text-xs mt-2"
-                  >
-                    Código incorrecto. Tenta novamente.
-                  </motion.p>
-                )}
-              </div>
-
-              {/* Submit button */}
-              <button
-                onClick={handleSubmit}
-                disabled={code.length < 4}
-                className="w-full py-3 rounded-xl font-bold text-sm transition-all duration-200"
-                style={{
-                  background: code.length === 4
-                    ? "linear-gradient(135deg, #0ea5e9, #0891b2)"
-                    : "rgba(255,255,255,0.08)",
-                  color: code.length === 4 ? "#fff" : "rgba(255,255,255,0.3)",
-                  cursor: code.length === 4 ? "pointer" : "not-allowed",
-                }}
-              >
-                Entrar
-              </button>
+              ))}
             </div>
+
+            {/* Error message */}
+            <AnimatePresence>
+              {error && (
+                <motion.p
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  style={{
+                    fontSize: 11.5, color: "#dc2626", textAlign: "center",
+                    marginBottom: 20, fontWeight: 600,
+                  }}
+                >
+                  Código incorrecto. Tenta novamente.
+                </motion.p>
+              )}
+            </AnimatePresence>
           </motion.div>
         </motion.div>
       )}
