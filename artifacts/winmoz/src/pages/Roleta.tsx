@@ -165,8 +165,8 @@ function Pointer() {
 }
 
 // ─── Prize Modal ───────────────────────────────────────────────────────────
-function PrizeModal({ sector, spinsLeft, onClose }: {
-  sector: typeof SECTORS[0]; spinsLeft: number; onClose: () => void
+function PrizeModal({ sector, spinsLeft, spinNumber, onClose }: {
+  sector: typeof SECTORS[0]; spinsLeft: number; spinNumber?: number; onClose: () => void
 }) {
   const isJackpot = sector.type === "jackpot";
   const isLuck = sector.type === "luck";
@@ -254,11 +254,17 @@ function PrizeModal({ sector, spinsLeft, onClose }: {
         <div style={{ padding: "20px 28px 28px", textAlign: "center" }}>
           <p style={{ fontSize: 13.5, color: "#71717a", lineHeight: 1.65, marginBottom: 20 }}>
             {isLuck
-              ? "Desta vez não saiu premio. Tenta de novo!"
+              ? "Desta vez não saiu prémio. Tenta de novo!"
               : isJackpot
               ? "Parabéns! Prémio máximo creditado na tua conta."
               : `+${sector.label} MT adicionados ao teu saldo.`}
           </p>
+
+          {spinNumber && (
+            <p style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 10, fontWeight: 600 }}>
+              Giro {spinNumber}/3
+            </p>
+          )}
 
           {spinsLeft > 0 && (
             <p style={{ fontSize: 11, color: "#a1a1aa", marginBottom: 16, fontWeight: 600 }}>
@@ -309,6 +315,7 @@ export default function Roleta() {
   const [statusChecked, setStatusChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localBalance, setLocalBalance] = useState<number | null>(null);
+  const [spinNumberResult, setSpinNumberResult] = useState<number | undefined>(undefined);
 
   const tickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rotationRef = useRef(0);
@@ -404,6 +411,7 @@ export default function Roleta() {
     setError(null);
     setShowResult(false);
     setResult(null);
+    setSpinNumberResult(undefined);
     setLoading(true);
 
     try {
@@ -416,7 +424,7 @@ export default function Roleta() {
         body: JSON.stringify({ isFree: true }),
       });
 
-      let data: { sectorIndex?: number; prize?: number; newBalance?: number; spinsLeft?: number; error?: string };
+      let data: { sectorIndex?: number; prize?: number; newBalance?: number; spinsLeft?: number; spinNumber?: number; error?: string };
       try { data = await res.json(); } catch {
         setError("Resposta inválida do servidor."); setLoading(false); return;
       }
@@ -440,6 +448,7 @@ export default function Roleta() {
         setLocalBalance(newBalance);
         setResult(SECTORS[sectorIndex]);
         setShowResult(true);
+        setSpinNumberResult(data.spinNumber);
       });
 
     } catch {
@@ -589,6 +598,7 @@ export default function Roleta() {
           <PrizeModal
             sector={result}
             spinsLeft={spinsLeft}
+            spinNumber={spinNumberResult}
             onClose={() => {
               setShowResult(false);
               void refreshProfile();
