@@ -6,6 +6,7 @@ import BottomNav from "@/components/BottomNav";
 import HomeFooter from "@/components/HomeFooter";
 
 import WelcomeBonusModal from "@/components/WelcomeBonusModal";
+import BilharAccessModal from "@/components/BilharAccessModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { getSyntheticUser, generateWithdrawalAmount, getWithdrawalInterval, shouldBootWithdrawal, getLivePlayerCount, formatPlayerCount } from "@/lib/simulation";
 import BrandLogo from "@/components/BrandLogo";
@@ -1098,7 +1099,7 @@ function HeroBanner() {
                   onClick={() => {
                     if (slide.cta === "Entrar") setLocation("/grupo-chat");
                     else if (slide.cta === "Jogar Agora") {
-                      if (slide.id === "bilhar") setLocation("/apostar/bilhar");
+                      if (slide.id === "bilhar") { setBilharDestination("/apostar/bilhar"); setShowBilharModal(true); }
                       else if (slide.id === "roleta") setLocation("/roleta");
                       else setLocation(`/apostar/${slide.id}`);
                     }
@@ -1284,6 +1285,8 @@ export default function Home() {
   const [gamesReady, setGamesReady] = useState(false);
   const [tick, setTick] = useState(0);
   const [showWelcomeBonus, setShowWelcomeBonus] = useState(false);
+  const [showBilharModal, setShowBilharModal] = useState(false);
+  const [bilharDestination, setBilharDestination] = useState("/apostar/bilhar");
   const [, setLocation] = useLocation();
   const { user, profile } = useAuth();
   const isLoggedIn = !!user;
@@ -1410,7 +1413,7 @@ export default function Home() {
                 variants={fadeUp}
                 onClick={() => {
                   if (!isLoggedIn) { setLocation("/login"); return; }
-                  if (game.id === "bilhar") { setLocation("/apostar/bilhar"); return; }
+                  if (game.id === "bilhar") { setBilharDestination("/apostar/bilhar"); setShowBilharModal(true); return; }
                   if (game.id === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.id}`);
                 }}
@@ -1503,7 +1506,7 @@ export default function Home() {
                 variants={fadeUp}
                 onClick={() => {
                   if (!isLoggedIn) { setLocation("/login"); return; }
-                  if (game.gameRoute === "bilhar") { setLocation("/apostar/bilhar"); return; }
+                  if (game.gameRoute === "bilhar") { setBilharDestination("/apostar/bilhar"); setShowBilharModal(true); return; }
                   if (game.gameRoute === "roleta") { setLocation("/roleta"); return; }
                   setLocation(`/apostar/${game.gameRoute}`);
                 }}
@@ -1613,6 +1616,11 @@ export default function Home() {
       <WelcomeBonusModal
         show={showWelcomeBonus}
         onClose={() => setShowWelcomeBonus(false)}
+      />
+      <BilharAccessModal
+        open={showBilharModal}
+        onClose={() => setShowBilharModal(false)}
+        onUnlock={() => { setShowBilharModal(false); setLocation(bilharDestination); }}
       />
     </div>
   );

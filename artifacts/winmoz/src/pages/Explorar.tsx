@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import BottomNav from "@/components/BottomNav";
+import BilharAccessModal from "@/components/BilharAccessModal";
 import { AtualizacoesCards } from "./Home";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase, getSessionWithRefresh } from "@/lib/supabase";
@@ -40,13 +41,20 @@ function GameCard({ game, tick }: { game: typeof jogosCardsMeta[0]; tick: number
   const { user } = useAuth();
   const betId = game.id.split("-")[0];
   const count = getLivePlayerCount(game.baseIdx, tick);
+  const [showBilharModal, setShowBilharModal] = useState(false);
   const handlePlay = () => {
     if (!user) { setLocation("/login"); return; }
-    if (game.id === "bilhar") { setLocation("/apostar/bilhar"); return; }
+    if (game.id === "bilhar") { setShowBilharModal(true); return; }
     if (game.id === "roleta") { setLocation("/roleta"); return; }
     setLocation(`/apostar/${betId}`);
   };
   return (
+    <>
+    <BilharAccessModal
+      open={showBilharModal}
+      onClose={() => setShowBilharModal(false)}
+      onUnlock={() => { setShowBilharModal(false); setLocation("/apostar/bilhar"); }}
+    />
     <motion.div
       variants={fadeUp}
       onClick={handlePlay}
@@ -81,10 +89,9 @@ function GameCard({ game, tick }: { game: typeof jogosCardsMeta[0]; tick: number
       </div>
       <ChevronRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-violet-500 transition-colors flex-shrink-0" />
     </motion.div>
+    </>
   );
 }
-
-/** overlay shown when user tries to watch a private match */
 function PrivateMatchOverlay({ onClose }: { onClose: () => void }) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
