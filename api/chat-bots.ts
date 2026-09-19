@@ -1,18 +1,25 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { createClient } from "@supabase/supabase-js";
 
-/* ── Chat Bot AI Message Generator ────────────────────────────────────────
-   Uses b.ia API (mimo v2.5) to generate realistic Mozambican chat messages.
-   This endpoint is NOT authenticated — it generates anonymous bot messages
-   for the group chat and is rate-limited server-side.
-
-   Environment variables:
-     BAI_API_KEY  — b.ia API key (required, already set in Vercel)
+/* ── Chat Bot + Group Chat Persistence ──────────────────────────────────────
+   GET /api/chat-bots               → bot message generation (existing)
+   GET /api/chat-bots?action=group-history → load last 40 group messages
+   POST /api/chat-bots?action=group-save   → save a message to group chat
    ───────────────────────────────────────────────────────────────────────── */
 
 const BAI_API_URL = "https://api.b.ai/v1/chat/completions";
 const BAI_MODEL   = "mimo-v2.5";
 
 const rateMap = new Map<string, number[]>();
+
+function getAdminClient() {
+  const supabaseUrl = process.env["SUPABASE_URL"] || process.env["VITE_SUPABASE_URL"];
+  const supabaseServiceKey = process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  if (!supabaseUrl || !supabaseServiceKey) return null;
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
 
 const BOT_SYSTEM_PROMPT = `És um membro da comunidade de jogadores moçambicanos numa plataforma de jogos online (Damas, Ludo, Xadrez) com apostas reais em Meticais (MT).
 
@@ -89,38 +96,69 @@ function chooseFallback(recentContext: string): { name: string; initials: string
   };
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const allowedOrigin = process.env["ALLOWED_ORIGIN"] || process.env["VITE_APP_URL"] || "*";
-  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("X-Content-Type-Options", "nosniff");
-  res.setHeader("Cache-Control", "no-store");
+// ─── Group Chat: Load History ───────────────────────────────────────────────
+async function handleGroupHistory(req: VercelRequest, res: VercelResponse) {
+  const supabase = getAdminClient();
+  if (!supabase) { res.status(500).json({ error: "Serviço indisponível" }); return; }
 
-  if (req.method === "OPTIONS") { res.status(204).end(); return; }
-  if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+  const { data, error } = await supabase
+    .from("group_chat_messages")
+    .select("id, user_id, user_name, user_initials, avatar_bg, text, image, created_at")
+    .order("created_at", { ascending: false })
+    .limit(40);
 
-  // Rate limit: 30 requests per minute per IP
-  {
-    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || "unknown";
-    const key = `bot:${ip}`;
-    const now = Date.now();
-    const hits = (rateMap.get(key) ?? []).filter(t => now - t < 60_000);
-    if (hits.length >= 30) {
-      res.status(429).json({ error: "Rate limit exceeded" });
-      return;
-    }
-    hits.push(now);
-    rateMap.set(key, hits);
+  if (error) { res.status(500).json({ error: "Erro ao carregar mensagens" }); return; }
+
+  // Reverse to chronological order
+  res.json({ messages: (data ?? []).reverse() });
+}
+
+// ─── Group Chat: Save Message ───────────────────────────────────────────────
+async function handleGroupSave(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  const supabase = getAdminClient();
+  if (!supabase) { res.status(500).json({ error: "Serviço indisponível" }); return; }
+
+  const body = req.body ?? {};
+  const { user_id, user_name, user_initials, avatar_bg, text, image } = body;
+
+  if (!user_name || !user_initials) {
+    res.status(400).json({ error: "Campos obrigatórios em falta" }); return;
   }
 
-  const baiKey = process.env["BAI_API_KEY"];
+  // Text or image required
+  if (!text && !image) {
+    res.status(400).json({ error: "Mensagem vazia" }); return;
+  }
+
+  // Limit text length
+  if (text && text.length > 500) {
+    res.status(400).json({ error: "Mensagem demasiado longa" }); return;
+  }
+
+  const { error } = await supabase.from("group_chat_messages").insert({
+    user_id: user_id || null,
+    user_name,
+    user_initials,
+    avatar_bg: avatar_bg || "linear-gradient(135deg, #374151, #111827)",
+    text: text || null,
+    image: image || null,
+  });
+
+  if (error) { res.status(500).json({ error: "Erro ao guardar mensagem" }); return; }
+  res.json({ ok: true });
+}
+
+// ─── Bot Message Generation (existing) ──────────────────────────────────────
+async function handleBotMessage(req: VercelRequest, res: VercelResponse) {
   const recentContext = (req.query.context as string) || "";
+
+  const baiKey = process.env["BAI_API_KEY"];
   if (!baiKey) {
     return res.json(chooseFallback(recentContext));
   }
 
-  // Get recent messages from query to provide context (avoid repetition)
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 15_000);
@@ -147,8 +185,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     clearTimeout(timer);
 
     if (!response.ok) {
-      const errText = await response.text().catch(() => "");
-      console.error("[chat-bots] b.ia API error:", response.status, errText.slice(0, 200));
       return res.json(chooseFallback(recentContext));
     }
 
@@ -157,21 +193,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     let message = data.choices?.[0]?.message?.content?.trim() || "";
-
-    // Sanitize: remove quotes, markdown, excess whitespace
     message = message.replace(/^["']|["']$/g, "").replace(/\*\*/g, "").trim();
 
     if (!message || message.length > 200) {
       message = chooseFallback(recentContext).message;
     }
 
-    // Pick a random bot identity
     res.json({
       ...chooseFallback(""),
       message,
     });
-  } catch (err) {
-    console.error("[chat-bots] Error:", err instanceof Error ? err.message : "unknown");
+  } catch {
     res.json(chooseFallback(recentContext));
   }
+}
+
+// ─── Main Router ────────────────────────────────────────────────────────────
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const allowedOrigin = process.env["ALLOWED_ORIGIN"] || process.env["VITE_APP_URL"] || "*";
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Cache-Control", "no-store");
+
+  if (req.method === "OPTIONS") { res.status(204).end(); return; }
+
+  const action = (req.query.action as string) || "";
+
+  // Group chat endpoints
+  if (action === "group-history") {
+    if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+    return handleGroupHistory(req, res);
+  }
+  if (action === "group-save") {
+    return handleGroupSave(req, res);
+  }
+
+  // Default: bot message generation
+  if (req.method !== "GET") { res.status(405).json({ error: "Method not allowed" }); return; }
+
+  // Rate limit: 30 requests per minute per IP
+  {
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() || "unknown";
+    const key = `bot:${ip}`;
+    const now = Date.now();
+    const hits = (rateMap.get(key) ?? []).filter(t => now - t < 60_000);
+    if (hits.length >= 30) {
+      res.status(429).json({ error: "Rate limit exceeded" });
+      return;
+    }
+    hits.push(now);
+    rateMap.set(key, hits);
+  }
+
+  return handleBotMessage(req, res);
 }
