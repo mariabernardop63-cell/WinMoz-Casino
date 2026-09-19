@@ -388,66 +388,108 @@ function botFindBestShot(balls: Ball[], group: PlayerGroup): BotShot | null {
 
 // ─── Canvas Rendering ─────────────────────────────────────────────────────────
 function renderTable(ctx: CanvasRenderingContext2D) {
-  // Outer rail (wood)
-  ctx.fillStyle = "#5C3A1E";
+  // Outer rail (rich dark wood)
+  ctx.fillStyle = "#3E2010";
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
 
-  // Inner rail bevel
-  const rr = 8;
-  ctx.fillStyle = "#7B4F2B";
-  roundRect(ctx, RAIL - 6, RAIL - 6, TABLE_W + 12, TABLE_H + 12, rr);
+  // Wood grain texture on rail
+  ctx.strokeStyle = "rgba(80,40,15,0.25)";
+  ctx.lineWidth = 0.6;
+  for (let i = 0; i < 40; i++) {
+    const gx = Math.random() * CANVAS_W;
+    const gy = Math.random() * CANVAS_H;
+    ctx.beginPath();
+    ctx.moveTo(gx, gy);
+    ctx.lineTo(gx + (Math.random() - 0.5) * 30, gy + Math.random() * 15);
+    ctx.stroke();
+  }
+
+  // Inner rail bevel (lighter wood highlight)
+  ctx.fillStyle = "#5C3520";
+  roundRect(ctx, RAIL - 5, RAIL - 5, TABLE_W + 10, TABLE_H + 10, 8);
   ctx.fill();
 
-  // Felt
-  ctx.fillStyle = "#1B6B3A";
-  roundRect(ctx, RAIL - 1, RAIL - 1, TABLE_W + 2, TABLE_H + 2, 4);
+  // Rail cushion edge (beveled groove)
+  ctx.strokeStyle = "#8B6340";
+  ctx.lineWidth = 1.5;
+  roundRect(ctx, RAIL - 1, RAIL - 1, TABLE_W + 2, TABLE_H + 2, 5);
+  ctx.stroke();
+
+  // Felt base color
+  ctx.fillStyle = "#1A6B3A";
+  roundRect(ctx, RAIL + 1, RAIL + 1, TABLE_W - 2, TABLE_H - 2, 4);
   ctx.fill();
 
-  // Felt texture (subtle)
-  ctx.fillStyle = "rgba(0,0,0,0.03)";
-  for (let i = 0; i < 200; i++) {
-    const x = RAIL + Math.random() * TABLE_W;
-    const y = RAIL + Math.random() * TABLE_H;
+  // Felt gradient overlay (subtle depth)
+  const feltGrad = ctx.createLinearGradient(RAIL, RAIL, RAIL, RAIL + TABLE_H);
+  feltGrad.addColorStop(0, "rgba(255,255,255,0.04)");
+  feltGrad.addColorStop(0.5, "rgba(0,0,0,0)");
+  feltGrad.addColorStop(1, "rgba(0,0,0,0.06)");
+  ctx.fillStyle = feltGrad;
+  roundRect(ctx, RAIL + 1, RAIL + 1, TABLE_W - 2, TABLE_H - 2, 4);
+  ctx.fill();
+
+  // Felt texture (fine noise)
+  ctx.fillStyle = "rgba(0,0,0,0.025)";
+  for (let i = 0; i < 300; i++) {
+    const x = RAIL + 2 + Math.random() * (TABLE_W - 4);
+    const y = RAIL + 2 + Math.random() * (TABLE_H - 4);
     ctx.fillRect(x, y, 1, 1);
   }
 
-  // Head string line (invisible in real pool, but helps for break)
-  ctx.strokeStyle = "rgba(255,255,255,0.06)";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([6, 6]);
+  // Head string line
+  ctx.strokeStyle = "rgba(255,255,255,0.05)";
+  ctx.lineWidth = 0.8;
+  ctx.setLineDash([5, 5]);
   ctx.beginPath();
-  ctx.moveTo(RAIL, RAIL + TABLE_H * 0.72 - BALL_RADIUS * 2);
-  ctx.lineTo(RAIL + TABLE_W, RAIL + TABLE_H * 0.72 - BALL_RADIUS * 2);
+  ctx.moveTo(RAIL + 4, RAIL + TABLE_H * 0.72);
+  ctx.lineTo(RAIL + TABLE_W - 4, RAIL + TABLE_H * 0.72);
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Diamonds (sights)
+  // Foot spot
+  ctx.beginPath();
+  ctx.arc(RAIL + TABLE_W / 2, RAIL + TABLE_H * 0.28, 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.1)";
+  ctx.fill();
+
+  // Diamonds (sights) on rails
   ctx.fillStyle = "rgba(255,255,255,0.12)";
   for (let i = 1; i <= 3; i++) {
     const y = RAIL + (TABLE_H / 4) * i;
-    drawDiamond(ctx, RAIL - 8, y, 3);
-    drawDiamond(ctx, RAIL + TABLE_W + 8, y, 3);
+    drawDiamond(ctx, RAIL - 9, y, 3.2);
+    drawDiamond(ctx, RAIL + TABLE_W + 9, y, 3.2);
   }
   for (let i = 1; i <= 7; i++) {
     const x = RAIL + (TABLE_W / 8) * i;
-    drawDiamond(ctx, x, RAIL - 8, 3);
-    drawDiamond(ctx, x, RAIL + TABLE_H + 8, 3);
+    drawDiamond(ctx, x, RAIL - 9, 3.2);
+    drawDiamond(ctx, x, RAIL + TABLE_H + 9, 3.2);
   }
 
-  // Pocket openings (dark circles)
-  ctx.fillStyle = "#0A0A0A";
+  // Pocket openings (dark recessed holes)
   for (const p of POCKETS) {
+    // Outer shadow ring
+    const outerGrad = ctx.createRadialGradient(p.x, p.y, POCKET_RADIUS * 0.3, p.x, p.y, POCKET_RADIUS + 2);
+    outerGrad.addColorStop(0, "#000");
+    outerGrad.addColorStop(0.7, "#080808");
+    outerGrad.addColorStop(1, "#111");
     ctx.beginPath();
-    ctx.arc(p.x, p.y, POCKET_RADIUS - 1, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, POCKET_RADIUS, 0, Math.PI * 2);
+    ctx.fillStyle = outerGrad;
     ctx.fill();
-  }
 
-  // Pocket inner shadow
-  ctx.fillStyle = "#111";
-  for (const p of POCKETS) {
+    // Inner dark hole
     ctx.beginPath();
     ctx.arc(p.x, p.y, POCKET_RADIUS - 4, 0, Math.PI * 2);
+    ctx.fillStyle = "#050505";
     ctx.fill();
+
+    // Pocket rim highlight
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, POCKET_RADIUS, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(100,70,40,0.4)";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
   }
 }
 
@@ -475,73 +517,102 @@ function drawDiamond(ctx: CanvasRenderingContext2D, x: number, y: number, size: 
   ctx.fill();
 }
 
-function renderBall(ctx: CanvasRenderingContext2D, ball: Ball, scale: number) {
+function renderBall(ctx: CanvasRenderingContext2D, ball: Ball, _scale: number) {
   if (ball.pocketed) return;
   const r = BALL_RADIUS;
   const x = ball.x;
   const y = ball.y;
+  const color = BALL_COLORS[ball.id] ?? "#FFFFFF";
 
-  // Shadow
+  // Soft shadow
+  ctx.save();
   ctx.beginPath();
-  ctx.arc(x + 2 * scale, y + 3 * scale, r, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.arc(x + 1.5, y + 2.5, r + 1, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  ctx.filter = "blur(2px)";
+  ctx.fill();
+  ctx.filter = "none";
+  ctx.restore();
+
+  // Ball body base
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = color;
   ctx.fill();
 
-  // Ball body
   if (isStripe(ball.id)) {
-    // Stripe: white ball with colored band
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fill();
-    // Stripe band
+    // Stripe: white ball with colored horizontal band
     ctx.save();
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.clip();
-    ctx.fillStyle = BALL_COLORS[ball.id];
-    ctx.fillRect(x - r, y - r * 0.45, r * 2, r * 0.9);
-    ctx.restore();
-  } else {
-    // Solid or cue/8
+    // White base
+    ctx.fillStyle = "#FFFFFF";
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
-    const grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
-    grad.addColorStop(0, lightenColor(BALL_COLORS[ball.id], 40));
-    grad.addColorStop(1, BALL_COLORS[ball.id]);
-    ctx.fillStyle = grad;
     ctx.fill();
+    // Colored band (center stripe)
+    ctx.fillStyle = color;
+    ctx.fillRect(x - r - 1, y - r * 0.42, r * 2 + 2, r * 0.84);
+    ctx.restore();
   }
+
+  // 3D sphere gradient overlay (glossy highlight)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Main gradient (light from top-left)
+  const grad = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.05, x, y, r);
+  grad.addColorStop(0, "rgba(255,255,255,0.55)");
+  grad.addColorStop(0.35, "rgba(255,255,255,0.15)");
+  grad.addColorStop(0.7, "rgba(0,0,0,0.0)");
+  grad.addColorStop(1, "rgba(0,0,0,0.25)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+
+  // Sharp specular highlight (top-left)
+  const spec = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, 0, x - r * 0.3, y - r * 0.35, r * 0.4);
+  spec.addColorStop(0, "rgba(255,255,255,0.85)");
+  spec.addColorStop(0.5, "rgba(255,255,255,0.2)");
+  spec.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = spec;
+  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+
+  // Bottom edge darkening
+  const edge = ctx.createRadialGradient(x + r * 0.1, y + r * 0.5, r * 0.3, x, y, r);
+  edge.addColorStop(0, "rgba(0,0,0,0)");
+  edge.addColorStop(0.7, "rgba(0,0,0,0)");
+  edge.addColorStop(1, "rgba(0,0,0,0.3)");
+  ctx.fillStyle = edge;
+  ctx.fillRect(x - r, y - r, r * 2, r * 2);
+
+  ctx.restore();
 
   // Outline
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.strokeStyle = "rgba(0,0,0,0.25)";
-  ctx.lineWidth = 0.8;
+  ctx.strokeStyle = "rgba(0,0,0,0.3)";
+  ctx.lineWidth = 0.7;
   ctx.stroke();
 
-  // Highlight (3D effect)
-  ctx.beginPath();
-  ctx.arc(x - r * 0.25, y - r * 0.25, r * 0.35, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(255,255,255,0.45)";
-  ctx.fill();
-
-  // Ball number
+  // Ball number (white circle background + number)
   if (ball.id > 0) {
-    ctx.fillStyle = ball.id === 8 ? "#FFFFFF" : (isStripe(ball.id) ? "#FFFFFF" : "#FFFFFF");
-    ctx.font = `bold ${Math.round(r * 0.85)}px Arial`;
+    const numR = r * 0.42;
+    ctx.beginPath();
+    ctx.arc(x, y, numR, 0, Math.PI * 2);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.15)";
+    ctx.lineWidth = 0.4;
+    ctx.stroke();
+    ctx.fillStyle = ball.id === 8 ? "#111" : "#222";
+    ctx.font = `bold ${Math.round(r * 0.65)}px Arial, sans-serif`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(String(ball.id), x, y + 0.5);
   }
-}
-
-function lightenColor(hex: string, amount: number): string {
-  const num = parseInt(hex.replace("#", ""), 16);
-  const r = Math.min(255, ((num >> 16) & 255) + amount);
-  const g = Math.min(255, ((num >> 8) & 255) + amount);
-  const b = Math.min(255, (num & 255) + amount);
-  return `rgb(${r},${g},${b})`;
 }
 
 function renderCueStick(
@@ -553,43 +624,163 @@ function renderCueStick(
 ) {
   if (!visible || cueBall.pocketed) return;
 
-  const stickLen = 200;
-  const tipWidth = 3;
-  const buttWidth = 8;
-  const pullBack = power * 30;
+  const stickLen = 220;
+  const tipWidth = 2.5;
+  const ferruleLen = 10;
+  const shaftLen = stickLen * 0.48;
+  const wrapLen = stickLen * 0.18;
+  const buttLen = stickLen * 0.34;
+  const buttWidth = 9;
+  const pullBack = power * 35;
 
-  // Cue tip position (pulled back by power)
-  const tipX = cueBall.x - Math.cos(angle) * (BALL_RADIUS + 4 + pullBack);
-  const tipY = cueBall.y - Math.sin(angle) * (BALL_RADIUS + 4 + pullBack);
+  // Tip position (pulled back based on power)
+  const tipX = cueBall.x - Math.cos(angle) * (BALL_RADIUS + 5 + pullBack);
+  const tipY = cueBall.y - Math.sin(angle) * (BALL_RADIUS + 5 + pullBack);
 
-  // Cue butt position
-  const buttX = tipX - Math.cos(angle) * stickLen;
-  const buttY = tipY - Math.sin(angle) * stickLen;
-
-  // Stick body
   ctx.save();
   ctx.translate(tipX, tipY);
   ctx.rotate(angle);
 
-  // Ferrule (white tip)
-  ctx.fillStyle = "#F5F5DC";
-  ctx.fillRect(0, -tipWidth / 2, 8, tipWidth);
+  // Tapered shaft shape (thin tip → wider at wrap)
+  // Tip (leather)
+  const tipGrad = ctx.createLinearGradient(0, -tipWidth / 2, ferruleLen, tipWidth / 2);
+  tipGrad.addColorStop(0, "#5BA3C9");
+  tipGrad.addColorStop(1, "#4A8FB5");
+  ctx.fillStyle = tipGrad;
+  ctx.beginPath();
+  ctx.moveTo(0, -tipWidth / 2);
+  ctx.lineTo(ferruleLen, -tipWidth / 2 - 0.5);
+  ctx.lineTo(ferruleLen, tipWidth / 2 + 0.5);
+  ctx.lineTo(0, tipWidth / 2);
+  ctx.closePath();
+  ctx.fill();
 
-  // Shaft (light wood)
-  ctx.fillStyle = "#D4A857";
-  ctx.fillRect(8, -tipWidth / 2 - 0.5, stickLen * 0.5, tipWidth + 1);
+  // Ferrule (white/cream section)
+  const ferruleGrad = ctx.createLinearGradient(0, -tipWidth / 2, ferruleLen + 2, tipWidth / 2);
+  ferruleGrad.addColorStop(0, "#F8F4E8");
+  ferruleGrad.addColorStop(0.5, "#FFFDF5");
+  ferruleGrad.addColorStop(1, "#EDE8D8");
+  ctx.fillStyle = ferruleGrad;
+  ctx.fillRect(ferruleLen, -(tipWidth + 0.5) / 2, ferruleLen, tipWidth + 0.5);
 
-  // Wrap (dark)
-  ctx.fillStyle = "#2C1810";
-  ctx.fillRect(8 + stickLen * 0.5, -buttWidth / 2, stickLen * 0.2, buttWidth);
+  // Shaft (maple wood)
+  const shaftEnd = ferruleLen * 2 + shaftLen;
+  const shaftGrad = ctx.createLinearGradient(0, -tipWidth / 2, 0, tipWidth / 2 + 1);
+  shaftGrad.addColorStop(0, "#E8C87A");
+  shaftGrad.addColorStop(0.3, "#F5DFA0");
+  shaftGrad.addColorStop(0.5, "#F0D68C");
+  shaftGrad.addColorStop(0.7, "#DABA64");
+  shaftGrad.addColorStop(1, "#C8A854");
+  ctx.fillStyle = shaftGrad;
+  ctx.beginPath();
+  ctx.moveTo(ferruleLen * 2, -(tipWidth + 0.5) / 2);
+  ctx.lineTo(shaftEnd, -(tipWidth + 2) / 2 - 0.5);
+  ctx.lineTo(shaftEnd, (tipWidth + 2) / 2 + 0.5);
+  ctx.lineTo(ferruleLen * 2, (tipWidth + 0.5) / 2);
+  ctx.closePath();
+  ctx.fill();
 
-  // Butt (dark wood)
-  ctx.fillStyle = "#3D1F0D";
-  ctx.fillRect(8 + stickLen * 0.7, -buttWidth / 2, stickLen * 0.3, buttWidth);
+  // Shaft wood grain lines
+  ctx.strokeStyle = "rgba(180,140,60,0.2)";
+  ctx.lineWidth = 0.3;
+  for (let i = 0; i < 5; i++) {
+    const gy = -tipWidth / 2 + (tipWidth / 5) * i + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(ferruleLen * 2, gy);
+    ctx.lineTo(shaftEnd, gy - 0.3);
+    ctx.stroke();
+  }
 
-  // Bumper
-  ctx.fillStyle = "#111";
-  ctx.fillRect(8 + stickLen - 2, -buttWidth / 2, 3, buttWidth);
+  // Joint ring (silver/metal)
+  const jointX = shaftEnd;
+  const jointGrad = ctx.createLinearGradient(0, -buttWidth / 2, 0, buttWidth / 2);
+  jointGrad.addColorStop(0, "#AAA");
+  jointGrad.addColorStop(0.3, "#DDD");
+  jointGrad.addColorStop(0.5, "#FFF");
+  jointGrad.addColorStop(0.7, "#CCC");
+  jointGrad.addColorStop(1, "#888");
+  ctx.fillStyle = jointGrad;
+  ctx.fillRect(jointX, -buttWidth / 2 - 1, 4, buttWidth + 2);
+
+  // Wrap ( Irish linen, dark textured)
+  const wrapEnd = jointX + 4 + wrapLen;
+  const wrapGrad = ctx.createLinearGradient(0, -buttWidth / 2, 0, buttWidth / 2);
+  wrapGrad.addColorStop(0, "#1A1A1A");
+  wrapGrad.addColorStop(0.3, "#2D2D2D");
+  wrapGrad.addColorStop(0.5, "#1F1F1F");
+  wrapGrad.addColorStop(0.7, "#2A2A2A");
+  wrapGrad.addColorStop(1, "#151515");
+  ctx.fillStyle = wrapGrad;
+  ctx.beginPath();
+  ctx.moveTo(jointX + 4, -(tipWidth + 2) / 2 - 0.5);
+  ctx.lineTo(wrapEnd, -buttWidth / 2 - 0.5);
+  ctx.lineTo(wrapEnd, buttWidth / 2 + 0.5);
+  ctx.lineTo(jointX + 4, (tipWidth + 2) / 2 + 0.5);
+  ctx.closePath();
+  ctx.fill();
+
+  // Wrap texture (cross-hatch)
+  ctx.strokeStyle = "rgba(60,60,60,0.3)";
+  ctx.lineWidth = 0.3;
+  for (let i = 0; i < 8; i++) {
+    const wx = jointX + 4 + (wrapLen / 8) * i;
+    ctx.beginPath();
+    ctx.moveTo(wx, -buttWidth / 2);
+    ctx.lineTo(wx + 3, buttWidth / 2);
+    ctx.stroke();
+  }
+
+  // Butt (dark wood, e.g. rosewood)
+  const buttEnd = wrapEnd + buttLen;
+  const buttGrad = ctx.createLinearGradient(0, -buttWidth / 2, 0, buttWidth / 2);
+  buttGrad.addColorStop(0, "#2E1508");
+  buttGrad.addColorStop(0.2, "#4A2010");
+  buttGrad.addColorStop(0.5, "#3B1A0C");
+  buttGrad.addColorStop(0.8, "#4E2212");
+  buttGrad.addColorStop(1, "#251008");
+  ctx.fillStyle = buttGrad;
+  ctx.beginPath();
+  ctx.moveTo(wrapEnd, -buttWidth / 2 - 0.5);
+  ctx.lineTo(buttEnd, -buttWidth / 2 + 1);
+  ctx.lineTo(buttEnd, buttWidth / 2 - 1);
+  ctx.lineTo(wrapEnd, buttWidth / 2 + 0.5);
+  ctx.closePath();
+  ctx.fill();
+
+  // Butt wood grain
+  ctx.strokeStyle = "rgba(80,30,10,0.2)";
+  ctx.lineWidth = 0.3;
+  for (let i = 0; i < 3; i++) {
+    const gy = -buttWidth / 2 + (buttWidth / 3) * i + 2;
+    ctx.beginPath();
+    ctx.moveTo(wrapEnd, gy);
+    ctx.lineTo(buttEnd, gy + 0.5);
+    ctx.stroke();
+  }
+
+  // Bumper (rubber end cap)
+  const bumperGrad = ctx.createLinearGradient(0, -buttWidth / 2, 0, buttWidth / 2);
+  bumperGrad.addColorStop(0, "#222");
+  bumperGrad.addColorStop(0.5, "#333");
+  bumperGrad.addColorStop(1, "#1A1A1A");
+  ctx.fillStyle = bumperGrad;
+  ctx.beginPath();
+  ctx.moveTo(buttEnd, -buttWidth / 2 + 1);
+  ctx.lineTo(buttEnd + 5, -buttWidth / 2 + 2);
+  ctx.lineTo(buttEnd + 5, buttWidth / 2 - 2);
+  ctx.lineTo(buttEnd, buttWidth / 2 - 1);
+  ctx.closePath();
+  ctx.fill();
+
+  // Subtle outline
+  ctx.strokeStyle = "rgba(0,0,0,0.15)";
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -tipWidth / 2);
+  ctx.lineTo(buttEnd + 5, -buttWidth / 2 + 2);
+  ctx.lineTo(buttEnd + 5, buttWidth / 2 - 2);
+  ctx.lineTo(0, tipWidth / 2);
+  ctx.stroke();
 
   ctx.restore();
 }
@@ -1007,7 +1198,7 @@ export default function BilharGame() {
       serverWin(gameId, "bilhar", BET).then(() => refreshProfile()).catch(() => {});
       }
     } else if (isWinner) {
-      serverWin(gameId, "damas", BET).then(() => refreshProfile()).catch(() => {});
+      serverWin(gameId, "bilhar", BET).then(() => refreshProfile()).catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [winner]);
@@ -1133,7 +1324,7 @@ export default function BilharGame() {
             const res = await fetch("/api/games/bot-session", {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ gameType: "damas", betAmount: BET }),
+              body: JSON.stringify({ gameType: "bilhar", betAmount: BET }),
             });
             const json = await res.json() as { ok?: boolean; gameId?: string; botName?: string; botBalance?: number; error?: string };
             if (!res.ok || !json.ok || !json.gameId) {
@@ -1148,7 +1339,7 @@ export default function BilharGame() {
             setRematchPhase("idle");
             const myEnc = encodeURIComponent(playerName);
             const oppEnc = encodeURIComponent(json.botName ?? opponentName);
-            setLocation(`/bilhar?gameId=${json.gameId}&bet=${BET}&opp=${oppEnc}&myname=${myEnc}`);
+            setLocation(`/bilhar-jogo?gameId=${json.gameId}&bet=${BET}&opp=${oppEnc}&myname=${myEnc}`);
           } catch { setRematchPhase("no_balance"); }
         }, 900 + Math.random() * 700);
       }, 700 + Math.random() * 600);
