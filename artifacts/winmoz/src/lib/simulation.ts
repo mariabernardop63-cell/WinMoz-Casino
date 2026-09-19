@@ -129,31 +129,31 @@ export function getSyntheticUser(seed: number): SyntheticUser {
 
 // ─── Withdrawals ──────────────────────────────────────────────────────────────
 
-/** Tiered amount distribution: small amounts common, large amounts rare */
+/** Tiered amount distribution: minimum 50 MT, small amounts common, large amounts rare */
 export function generateWithdrawalAmount(rng: () => number): number {
   const r = rng();
-  if (r < 0.32) {
-    // Very common: 20–60 MT
-    const pool = [20, 25, 30, 30, 35, 40, 40, 45, 50, 50, 55, 60];
+  if (r < 0.30) {
+    // Very common: 50–100 MT
+    const pool = [50, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
     return pick(pool, Math.floor(rng() * pool.length));
   }
   if (r < 0.55) {
-    // Common: 70–180 MT
-    const pool = [70, 80, 90, 100, 100, 120, 130, 150, 150, 170, 180];
+    // Common: 120–250 MT
+    const pool = [120, 130, 150, 150, 170, 180, 200, 200, 220, 250];
     return pick(pool, Math.floor(rng() * pool.length));
   }
   if (r < 0.75) {
-    // Uncommon: 200–350 MT
-    const pool = [200, 200, 220, 250, 280, 300, 350];
+    // Uncommon: 300–500 MT
+    const pool = [300, 300, 350, 400, 400, 450, 500];
     return pick(pool, Math.floor(rng() * pool.length));
   }
   if (r < 0.90) {
-    // Rare: 400–800 MT
-    const pool = [400, 450, 500, 600, 700, 800];
+    // Rare: 600–1000 MT
+    const pool = [600, 700, 800, 900, 1000];
     return pick(pool, Math.floor(rng() * pool.length));
   }
-  // Very rare: 1 000+ MT
-  const pool = [1000, 1200, 1500, 2000, 3000];
+  // Very rare: 1500+ MT
+  const pool = [1500, 2000, 2500, 3000, 5000];
   return pick(pool, Math.floor(rng() * pool.length));
 }
 

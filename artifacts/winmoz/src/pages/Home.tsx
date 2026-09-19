@@ -1231,30 +1231,6 @@ const games = [
     imageFit: "cover" as const,
     imagePos: "center",
   },
-  {
-    id: "carta",
-    name: "CARTA DA MESA",
-    sub: "Jogo de Cartas",
-    bet: "10–5.000 MT",
-    rating: "4.8",
-    baseIdx: 7,
-    image: "/cartas-card.jpg" as string | null,
-    imageFit: "cover" as const,
-    imagePos: "center",
-    comingSoon: true,
-  },
-  {
-    id: "ravo",
-    name: "RAVO RAVO",
-    sub: "Jogo de Cartas",
-    bet: "10–5.000 MT",
-    rating: "4.7",
-    baseIdx: 8,
-    image: "/cartas-card.jpg" as string | null,
-    imageFit: "cover" as const,
-    imagePos: "center",
-    comingSoon: true,
-  },
 ];
 
 const stagger = {
